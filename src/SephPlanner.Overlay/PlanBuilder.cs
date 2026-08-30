@@ -1,3 +1,4 @@
+using SephPlanner.Core.Charms;
 using SephPlanner.Core.Ipc;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Solver;
@@ -71,6 +72,9 @@ public static class PlanBuilder
         // 차이를 인챈트로 받아들이면 배치를 건드릴 때마다 문제 자체가 달라져 제안이 흔들린다.
         var consistent = IsConsistent(orderedTablets, simulation);
 
+        // 무기 연동 아티팩트는 해당 무기를 들고 있어야 효과가 켜진다. 무기를 모르면 판정하지 않는다.
+        var weapon = snapshot.Run?.WeaponId ?? "";
+
         var positions = new Dictionary<int, GridPos>();
         foreach (var item in inventory.Items
                      .OrderBy(i => i.DefinitionId).ThenBy(i => i.InstanceId))
@@ -85,6 +89,7 @@ public static class PlanBuilder
                 InstanceId = item.InstanceId,
                 Enchant = definition is null || !consistent ? 0 : DeriveEnchant(item, simulation),
                 IsFiller = definition is null,
+                IsDormant = definition is not null && WeaponMatch.IsDormant(definition, weapon),
             });
             positions[item.InstanceId] = item.Position;
             problem.CurrentCharms[item.InstanceId] = item.Position;
@@ -94,7 +99,7 @@ public static class PlanBuilder
 
         var current = PlacementSolver.Score(problem, layout, positions);
         var best = PlacementSolver.Solve(problem);
-        var offers = OfferAdvisor.Rank(problem, best.Score, Candidates(snapshot, catalog));
+        var offers = OfferAdvisor.Rank(problem, best.Score, Candidates(snapshot, catalog, weapon));
 
         return new Plan
         {
@@ -108,7 +113,7 @@ public static class PlanBuilder
     /// <summary>후보가 많으면 한 번에 다 풀기에는 무거워, 종류가 같은 것은 하나로 묶고 수를 제한한다.</summary>
     private const int MaxCandidates = 8;
 
-    private static List<OfferCandidate> Candidates(GameSnapshot snapshot, CatalogStore catalog)
+    private static List<OfferCandidate> Candidates(GameSnapshot snapshot, CatalogStore catalog, string weapon)
     {
         var candidates = new List<OfferCandidate>();
         var seen = new HashSet<int>();
@@ -130,6 +135,7 @@ public static class PlanBuilder
                 Price = offer.Price,
                 Charm = charm,
                 Tablet = tablet,
+                CharmIsDormant = charm is not null && WeaponMatch.IsDormant(charm, weapon),
             });
         }
         return candidates;

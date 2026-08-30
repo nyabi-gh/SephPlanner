@@ -126,7 +126,7 @@ namespace SephPlanner.Core.Solver
             var result = TabletSimulator.Run(layout, occupancy, problem.Grid);
 
             var taken = new HashSet<GridPos>(layout.Select(p => p.Position));
-            var scoring = problem.Charms.Where(c => !c.IsFiller).ToList();
+            var scoring = problem.Charms.Where(c => !c.IsFiller && !c.IsDormant).ToList();
             var levelCap = scoring.Count > 0 ? scoring.Max(c => c.Definition.MaxLevel) : 5;
 
             var levels = new List<int>();
@@ -206,23 +206,34 @@ namespace SephPlanner.Core.Solver
             CharmSlot charm, GridPos cell, SimulationResult result, GridSpec grid, GridOccupancy occupancy)
         {
             if (charm.IsFiller) return 0;
-            if (result.IsDisabled(cell)) return 0;
+            if (Reason(charm, cell, result, grid, occupancy) != CharmInactiveReason.None) return 0;
 
             var level = EffectiveLevel(result, cell, charm.Enchant);
-            if (level < 0) return 0;
-
-            var ignoresCriteria = result.IgnoreCriteria.TryGetValue(cell, out var ignore) && ignore > 0;
-            if (!ignoresCriteria)
-            {
-                var kind = CharmCriteria.FromTypeName(charm.Definition.CriteriaType);
-                if (!CharmCriteria.IsSatisfied(kind, cell, grid, occupancy)) return 0;
-            }
-
             var effective = Math.Min(charm.Definition.MaxLevel, level);
 
             // 상한을 넘긴 레벨은 아무 값어치가 없다. 점수가 같은 배치라면 덜 흘리는 쪽을 고르도록
             // 아주 작은 차이만 준다. 실제 점수 차이를 뒤집을 만한 크기가 아니다.
             return charm.Weight * effective - WastePenalty * Math.Max(0, level - effective);
+        }
+
+        /// <summary>
+        /// 효과가 꺼졌다면 그 이유. 게임의 <c>Charm_Basic.RefreshCharm</c>이 보는 조건과 같고,
+        /// 자리를 옮겨서는 풀 수 없는 무기 불일치를 먼저 본다.
+        /// </summary>
+        private static CharmInactiveReason Reason(
+            CharmSlot charm, GridPos cell, SimulationResult result, GridSpec grid, GridOccupancy occupancy)
+        {
+            if (charm.IsDormant) return CharmInactiveReason.Weapon;
+            if (result.IsDisabled(cell)) return CharmInactiveReason.Disabled;
+            if (EffectiveLevel(result, cell, charm.Enchant) < 0) return CharmInactiveReason.NegativeLevel;
+
+            if (result.IgnoreCriteria.TryGetValue(cell, out var ignore) && ignore > 0)
+                return CharmInactiveReason.None;
+
+            var kind = CharmCriteria.FromTypeName(charm.Definition.CriteriaType);
+            return CharmCriteria.IsSatisfied(kind, cell, grid, occupancy)
+                ? CharmInactiveReason.None
+                : CharmInactiveReason.Criteria;
         }
 
         private static int EffectiveLevel(SimulationResult result, GridPos cell, int enchant)
@@ -311,11 +322,19 @@ namespace SephPlanner.Core.Solver
                 arrangement.Levels[position] = level;
                 if (charm.IsFiller) continue;
 
-                arrangement.EffectiveLevels[position] = Math.Max(0, Math.Min(charm.Definition.MaxLevel, level));
+                var reason = Reason(charm, position, result, problem.Grid, occupancy);
+                if (reason != CharmInactiveReason.None)
+                {
+                    // 꺼진 아티팩트는 레벨이 얼마든 효과가 없다. 칸에 레벨을 그대로 보여 주면
+                    // 켜져 있는 것처럼 읽힌다.
+                    arrangement.EffectiveLevels[position] = 0;
+                    arrangement.InactiveCells[position] = reason;
+                    arrangement.InactiveCharms.Add(charm.InstanceId);
+                    continue;
+                }
 
-                var value = Value(charm, position, result, problem.Grid, occupancy);
-                arrangement.Score += value;
-                if (value <= 0) arrangement.InactiveCharms.Add(charm.InstanceId);
+                arrangement.EffectiveLevels[position] = Math.Max(0, Math.Min(charm.Definition.MaxLevel, level));
+                arrangement.Score += Value(charm, position, result, problem.Grid, occupancy);
             }
             return arrangement;
         }

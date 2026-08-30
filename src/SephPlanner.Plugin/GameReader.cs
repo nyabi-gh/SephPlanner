@@ -26,6 +26,7 @@ namespace SephPlanner.Plugin
             if (avatar == null || avatar.Inventory == null || avatar.IsDead) return snapshot;
 
             snapshot.IsMultiplayer = IsMultiplayerSession();
+            snapshot.Run = ReadRun(avatar);
             snapshot.Inventory = ReadInventory(avatar.Inventory);
             OfferReader.Fill(snapshot, avatar, offerRadius);
             return snapshot;
@@ -65,6 +66,21 @@ namespace SephPlanner.Plugin
         {
             if (NetworkClient.active && !NetworkServer.active) return true;
             return NetworkServer.active && NetworkServer.connections.Count > 1;
+        }
+
+        /// <summary>
+        /// 배치와 무관하지만 점수에 영향을 주는 런 상태. 무기 연동 아티팩트는 해당 무기를 들고
+        /// 있어야 효과가 켜지므로(<c>Charm_Basic.RefreshCharm</c>) 장착 무기를 함께 보낸다.
+        /// </summary>
+        private static RunState ReadRun(PlayerAvatar avatar)
+        {
+            var weapons = avatar.GetComponent<WeaponControllerSimple>();
+            return new RunState
+            {
+                WeaponId = weapons != null && weapons.currentWeapon != null
+                    ? weapons.currentWeapon.weaponType.ToString()
+                    : "",
+            };
         }
 
         private static InventoryState ReadInventory(GridInventory inv)

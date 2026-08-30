@@ -21,6 +21,9 @@ namespace SephPlanner.Core.Model
         /// <summary>참이면 특정 무기를 들어야 발동한다.</summary>
         public bool IsWeaponRelated { get; set; }
 
+        /// <summary>연동된 무기 종류(<c>EWeaponType</c> 이름). 무기 연동이 아니면 빈 문자열.</summary>
+        public string RelatedWeapon { get; set; } = "";
+
         public List<string> Categories { get; set; } = new List<string>();
         public Dictionary<string, string> Names { get; set; } = new Dictionary<string, string>();
     }

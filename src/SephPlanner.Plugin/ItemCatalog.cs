@@ -59,6 +59,9 @@ namespace SephPlanner.Plugin
                     CriteriaType = charm != null && charm.criteria != null ? charm.criteria.GetType().Name : "",
                     IsMagic = charm is Charm_Magic,
                     IsWeaponRelated = charm != null && charm.isWeaponRelatedCharm,
+                    RelatedWeapon = charm != null && charm.isWeaponRelatedCharm
+                        ? charm.relatedWeapon.ToString()
+                        : "",
                     Categories = entity.categories ?? new List<string>(),
                     Names = DisplayName(entity),
                 });

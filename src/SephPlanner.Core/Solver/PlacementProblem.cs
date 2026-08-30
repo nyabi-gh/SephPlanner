@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using SephPlanner.Core.Charms;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Tablets;
 
@@ -20,6 +21,12 @@ namespace SephPlanner.Core.Solver
         /// 취급되어 솔버가 이미 찬 자리에 아티팩트를 놓으라고 한다.
         /// </summary>
         public bool IsFiller { get; set; }
+
+        /// <summary>
+        /// 연동된 무기를 들고 있지 않아 효과가 꺼진 아티팩트. 점수에는 기여하지 않지만 이웃의
+        /// 조건 판정에서는 여전히 아티팩트로 세므로 <see cref="IsFiller"/>와 다르다.
+        /// </summary>
+        public bool IsDormant { get; set; }
     }
 
     public sealed class TabletSlot
@@ -94,7 +101,11 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         public Dictionary<GridPos, int> EffectiveLevels { get; } = new Dictionary<GridPos, int>();
 
-        /// <summary>조건을 만족하지 못해 효과가 꺼진 아티팩트.</summary>
+        /// <summary>효과가 꺼진 아티팩트.</summary>
         public List<int> InactiveCharms { get; } = new List<int>();
+
+        /// <summary>효과가 꺼진 아티팩트가 놓인 칸과 그 이유.</summary>
+        public Dictionary<GridPos, CharmInactiveReason> InactiveCells { get; } =
+            new Dictionary<GridPos, CharmInactiveReason>();
     }
 }

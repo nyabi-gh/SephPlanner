@@ -12,6 +12,9 @@ namespace SephPlanner.Core.Solver
         public int Price { get; set; }
         public CharmDefinition? Charm { get; set; }
         public TabletDefinition? Tablet { get; set; }
+
+        /// <summary>무기 연동인데 지금 든 무기와 맞지 않는 아티팩트. 집어도 효과가 없다.</summary>
+        public bool CharmIsDormant { get; set; }
     }
 
     public sealed class OfferAdvice
@@ -47,6 +50,7 @@ namespace SephPlanner.Core.Solver
                     {
                         Definition = candidate.Charm,
                         InstanceId = nextInstanceId--,
+                        IsDormant = candidate.CharmIsDormant,
                     });
                 }
                 else if (candidate.Tablet is not null)

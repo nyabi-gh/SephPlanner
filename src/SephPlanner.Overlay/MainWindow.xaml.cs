@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using SephPlanner.Core.Charms;
 using SephPlanner.Core.Ipc;
 using SephPlanner.Core.Model;
 
@@ -151,7 +152,8 @@ public partial class MainWindow : Window
             else if (plan.Best.Levels.TryGetValue(position, out var level))
             {
                 plan.Best.EffectiveLevels.TryGetValue(position, out var effective);
-                cell.SetLevel(level, effective, moved.Contains(position));
+                plan.Best.InactiveCells.TryGetValue(position, out var reason);
+                cell.SetLevel(level, effective, reason, moved.Contains(position));
             }
             else cell.SetEmpty();
         }
@@ -184,6 +186,7 @@ public sealed class CellView : INotifyPropertyChanged
     private static readonly Brush TabletFill = new SolidColorBrush(Color.FromRgb(0x2B, 0x3A, 0x2A));
     private static readonly Brush MutedText = new SolidColorBrush(Color.FromRgb(0x5A, 0x51, 0x70));
     private static readonly Brush Wasted = new SolidColorBrush(Color.FromRgb(0xC9, 0xA2, 0x27));
+    private static readonly Brush OffText = new SolidColorBrush(Color.FromRgb(0xB4, 0x6A, 0x6A));
     private static readonly Brush MovedEdge = new SolidColorBrush(Color.FromRgb(0xC9, 0xA2, 0x27));
     private static readonly Brush QuietEdge = new SolidColorBrush(Color.FromRgb(0x2A, 0x24, 0x34));
 
@@ -248,8 +251,18 @@ public sealed class CellView : INotifyPropertyChanged
     /// 보여주는 숫자는 그 칸의 레벨이 아니라 거기 놓인 아티팩트가 실제로 받는 레벨이다.
     /// 상한에 걸려 남는 레벨이 있으면 색으로 알린다.
     /// </summary>
-    public void SetLevel(int level, int effective, bool moved)
+    public void SetLevel(int level, int effective, CharmInactiveReason reason, bool moved)
     {
+        if (reason != CharmInactiveReason.None)
+        {
+            Label = "꺼짐";
+            Tooltip = Explain(reason);
+            Foreground = OffText;
+            Background = EmptyFill;
+            SetEdge(moved);
+            return;
+        }
+
         var wasted = level > effective;
         Label = effective > 0 ? $"+{effective}" : level < 0 ? level.ToString() : "0";
         Tooltip = wasted ? $"칸 레벨 {level}, 이 아티팩트는 {effective}까지만 반영됩니다" : "";
@@ -260,6 +273,15 @@ public sealed class CellView : INotifyPropertyChanged
         Background = EmptyFill;
         SetEdge(moved);
     }
+
+    private static string Explain(CharmInactiveReason reason) => reason switch
+    {
+        CharmInactiveReason.Weapon => "연동된 무기를 들고 있지 않아 꺼져 있습니다. 옮겨도 켜지지 않습니다.",
+        CharmInactiveReason.Disabled => "석판이 이 칸을 사용 불가로 만들었습니다.",
+        CharmInactiveReason.NegativeLevel => "레벨이 0 미만이라 꺼져 있습니다.",
+        CharmInactiveReason.Criteria => "이 아티팩트의 배치 조건을 만족하지 못했습니다.",
+        _ => "",
+    };
 
     private void SetEdge(bool moved)
     {
