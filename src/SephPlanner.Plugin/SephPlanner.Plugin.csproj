@@ -40,6 +40,10 @@
       <HintPath>$(SephiriaManagedDir)\UnityEngine.CoreModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="UnityEngine.ImageConversionModule">
+      <HintPath>$(SephiriaManagedDir)\UnityEngine.ImageConversionModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
   <Target Name="WarnIfGameMissing" BeforeTargets="ResolveAssemblyReferences">

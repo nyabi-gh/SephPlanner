@@ -53,6 +53,7 @@ public partial class MainWindow : Window
         _preferences = _settings.ToPreferences();
         RestorePosition();
         ApplyOpacity();
+        UpdateIconModeButton();
         ApplyLayout();
 
         // 게임 없이 화면을 확인하는 통로. 파이프를 열지 않으므로 실제 오버레이와 같이 떠도 안전하다.
@@ -140,7 +141,7 @@ public partial class MainWindow : Window
         BuildPanel.Visibility = Visibility.Collapsed;
         OfferPanel.Visibility = Visibility.Collapsed;
         MovePanel.Visibility = Visibility.Collapsed;
-        LegendText.Visibility = Visibility.Collapsed;
+        LegendRow.Visibility = Visibility.Collapsed;
         _lastPlanned = "";
         _plan = null;
     }
@@ -177,7 +178,7 @@ public partial class MainWindow : Window
         LegendText.Text = plan.Moves.Count > 0
             ? "노란 테두리 = 옮겨야 할 자리 · 아티팩트 우클릭 = 강화 우선"
             : "아티팩트 우클릭 = 강화 우선 지정";
-        LegendText.Visibility = Visibility.Visible;
+        LegendRow.Visibility = Visibility.Visible;
 
         // 제안이 그대로면 목록을 다시 만들지 않는다. 스냅샷마다 깜빡이는 것을 막는다.
         var signature = string.Join("|", plan.Moves.Select(m => $"{m.Label}{m.Detail}"));
@@ -280,6 +281,7 @@ public partial class MainWindow : Window
                 !advice.Affordable ? Theme.TextDim : advice.MatchesPriority ? Theme.Mint : Theme.Text,
                 advice.Affordable ? Theme.TextDim : Theme.Bad,
                 advice.ComboCompletes ? Theme.Good : Theme.Mint,
+                _settings.IconMode ? IconStore.Get(advice.Candidate.DefinitionId) : null,
                 Explain(advice, gold)));
         }
         OfferPanel.Visibility = _offers.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -346,7 +348,8 @@ public partial class MainWindow : Window
             else if (tabletCells.TryGetValue(position, out var tablet))
             {
                 var name = Naming.Of(tablet.Definition.Names, tablet.Definition.Id, "석판");
-                cell.SetTablet(name, tablet.Rotation, moved.Contains(position));
+                cell.SetTablet(name, tablet.Rotation, moved.Contains(position),
+                    _settings.IconMode ? IconStore.Get(tablet.Definition.EntityId) : null);
             }
             else if (plan.Best.Levels.TryGetValue(position, out var level))
             {
@@ -356,7 +359,8 @@ public partial class MainWindow : Window
                 plan.Charms.TryGetValue(position, out var charmId);
                 cell.SetCharm(
                     name ?? "", level, effective, reason, moved.Contains(position),
-                    charmId, _preferences.PinnedCharms.Contains(charmId));
+                    charmId, _preferences.PinnedCharms.Contains(charmId),
+                    _settings.IconMode ? IconStore.Get(charmId) : null);
             }
             else cell.SetEmpty();
         }
@@ -423,6 +427,19 @@ public partial class MainWindow : Window
             _settings.PinnedCharms.Add(cell.CharmId);
         Resolve();
     }
+
+    private void OnToggleIconMode(object sender, RoutedEventArgs e)
+    {
+        _settings.IconMode = !_settings.IconMode;
+        _settings.Save();
+        UpdateIconModeButton();
+
+        // 계산은 그대로 두고 화면만 다시 그린다.
+        if (_lastSnapshot is { } snapshot && _plan is { } plan) Render(snapshot, plan);
+    }
+
+    private void UpdateIconModeButton() =>
+        IconModeButton.Content = _settings.IconMode ? "글자로 보기" : "아이콘으로 보기";
 
     private async void OnAutoPlace(object sender, RoutedEventArgs e)
     {
@@ -571,10 +588,13 @@ public sealed record ComboChipView(string CategoryId, string Text, Brush Foregro
 
 public sealed record OfferView(
     string Name, string Reach, string Combo, string Price, string Gain,
-    Brush Tone, Brush NameTone, Brush PriceTone, Brush ComboTone, string Tooltip)
+    Brush Tone, Brush NameTone, Brush PriceTone, Brush ComboTone,
+    ImageSource? Icon, string Tooltip)
 {
     /// <summary>살 수 있는 후보에 빈 도움말이 뜨지 않게 한다.</summary>
     public bool HasTooltip => Tooltip.Length > 0;
+
+    public Visibility IconVisibility => Icon is null ? Visibility.Collapsed : Visibility.Visible;
 }
 
 public sealed class CellView : INotifyPropertyChanged
@@ -619,6 +639,7 @@ public sealed class CellView : INotifyPropertyChanged
     public void SetClosed()
     {
         CharmId = 0;
+        Icon = null;
         Fill("", "", "", Theme.TextDim, Theme.ClosedFill);
         SetEdge(false);
     }
@@ -626,13 +647,15 @@ public sealed class CellView : INotifyPropertyChanged
     public void SetEmpty()
     {
         CharmId = 0;
+        Icon = null;
         Fill("", "", "", Theme.TextDim, Theme.EmptyFill);
         SetEdge(false);
     }
 
-    public void SetTablet(string name, int rotation, bool moved)
+    public void SetTablet(string name, int rotation, bool moved, ImageSource? icon = null)
     {
         CharmId = 0;
+        Icon = icon;
         Fill(name, $"회전 {rotation}", name, Theme.TextDim, Theme.TabletFill);
         TitleBrush = Theme.TabletText;
         SetEdge(moved, Theme.TabletEdge);
@@ -641,30 +664,52 @@ public sealed class CellView : INotifyPropertyChanged
     /// <summary>우클릭으로 강화 우선을 지정할 때 이 칸의 아티팩트를 식별한다. 0이면 아티팩트가 아니다.</summary>
     public int CharmId { get; private set; }
 
+    private ImageSource? _icon;
+
+    public ImageSource? Icon
+    {
+        get => _icon;
+        private set
+        {
+            _icon = value;
+            Raise(nameof(Icon));
+            Raise(nameof(IconVisibility));
+            Raise(nameof(TitleVisibility));
+        }
+    }
+
+    /// <summary>아이콘이 있으면 이름 글자는 숨긴다. 전체 이름은 도움말에 있다.</summary>
+    public Visibility IconVisibility => _icon is null ? Visibility.Collapsed : Visibility.Visible;
+    public Visibility TitleVisibility => _icon is null ? Visibility.Visible : Visibility.Collapsed;
+
     /// <summary>
     /// 보여주는 숫자는 그 칸의 레벨이 아니라 거기 놓인 아티팩트가 실제로 받는 레벨이다.
     /// 상한에 걸려 남는 레벨이 있으면 색으로 알리고, 효과가 꺼졌으면 그 이유를 도움말에 적는다.
     /// </summary>
     public void SetCharm(
         string name, int level, int effective, CharmInactiveReason reason, bool moved,
-        int charmId = 0, bool pinned = false)
+        int charmId = 0, bool pinned = false, ImageSource? icon = null)
     {
         CharmId = charmId;
+        Icon = icon;
         var title = pinned ? "★ " + name : name;
         var pinNote = pinned ? "\n강화 우선: 가치를 2배로 칩니다. 우클릭으로 해제합니다." : "";
 
+        // 아이콘 모드에서는 이름 줄이 숨으므로 강화 표시가 레벨 줄로 내려온다.
+        var star = pinned && icon is not null ? "★" : "";
+
         if (reason != CharmInactiveReason.None)
         {
-            Fill(title, "꺼짐", Explain(reason) + pinNote, Theme.Bad, Theme.SlotFill);
+            Fill(title, star + "꺼짐", name + "\n" + Explain(reason) + pinNote, Theme.Bad, Theme.SlotFill);
             SetEdge(moved);
             return;
         }
 
         var wasted = level > effective;
         var label = effective > 0 ? $"+{effective}" : level < 0 ? level.ToString() : "0";
-        var tooltip = wasted ? $"칸 레벨 {level}, 이 아티팩트는 {effective}까지만 반영됩니다" : name;
+        var tooltip = wasted ? $"{name}\n칸 레벨 {level}, 이 아티팩트는 {effective}까지만 반영됩니다" : name;
 
-        Fill(title, label, tooltip + pinNote,
+        Fill(title, star + label, tooltip + pinNote,
             level < 0 ? Theme.Bad : wasted ? Theme.Orange : effective > 0 ? Theme.Good : Theme.TextDim,
             Theme.SlotFill);
         SetEdge(moved);

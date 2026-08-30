@@ -22,13 +22,15 @@ namespace SephPlanner.Plugin
             WriteJson(IpcContract.CharmDbFile, charms);
             WriteJson(IpcContract.ComboDbFile, combos);
 
+            var icons = IconDump.Write();
+
             var report = QueryVerifier.Run(tablets);
             File.WriteAllText(
                 Path.Combine(IpcContract.DataDirectory, IpcContract.VerificationReportFile),
                 QueryVerifier.Format(report));
 
-            return $"석판 {tablets.Count}종, 아티팩트 {charms.Count}종, 콤보 {combos.Count}종 저장. " +
-                   $"질의 검증 {report.Comparisons}건 중 불일치 {report.Mismatches}건.";
+            return $"석판 {tablets.Count}종, 아티팩트 {charms.Count}종, 콤보 {combos.Count}종, " +
+                   $"아이콘 {icons}개 저장. 질의 검증 {report.Comparisons}건 중 불일치 {report.Mismatches}건.";
         }
 
         public static bool HasCatalog() =>

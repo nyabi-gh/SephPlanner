@@ -21,6 +21,9 @@ public sealed class UserSettings
     /// <summary>오버레이 전체 투명도. 1이 불투명.</summary>
     public double Opacity { get; set; } = 1.0;
 
+    /// <summary>격자와 후보 목록에 아이콘을 보여줄지. 아이콘이 아직 없으면 글자로 물러선다.</summary>
+    public bool IconMode { get; set; } = true;
+
     private static string FilePath =>
         Path.Combine(IpcContract.DataDirectory, "overlay-settings.json");
 

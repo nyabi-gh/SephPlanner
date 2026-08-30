@@ -154,10 +154,15 @@
                                             ToolTipService.IsEnabled="{Binding HasTooltip}"
                                             MouseRightButtonUp="OnCellRightClick">
                                         <StackPanel VerticalAlignment="Center">
+                                            <Image Source="{Binding Icon}" Width="24" Height="24"
+                                                   Margin="0,0,0,1"
+                                                   RenderOptions.BitmapScalingMode="NearestNeighbor"
+                                                   Visibility="{Binding IconVisibility}" />
                                             <TextBlock Text="{Binding Title}" Foreground="{Binding TitleBrush}"
                                                        FontFamily="{x:Static local:Theme.Small}" FontSize="10"
                                                        FontWeight="Normal" TextAlignment="Center" TextWrapping="Wrap"
-                                                       MaxHeight="26" Margin="3,0,3,0" />
+                                                       MaxHeight="26" Margin="3,0,3,0"
+                                                       Visibility="{Binding TitleVisibility}" />
                                             <TextBlock Text="{Binding Label}" Foreground="{Binding Foreground}"
                                                        FontSize="12" TextAlignment="Center" />
                                         </StackPanel>
@@ -166,10 +171,15 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <TextBlock x:Name="LegendText" Margin="2,8,0,0"
-                                   FontFamily="{x:Static local:Theme.Small}" FontSize="10" FontWeight="Normal"
-                                   Foreground="{x:Static local:Theme.TextDim}"
-                                   Text="노란 테두리 = 옮겨야 할 자리" Visibility="Collapsed" />
+                        <DockPanel x:Name="LegendRow" Margin="2,8,0,0" LastChildFill="False"
+                                   Visibility="Collapsed">
+                            <TextBlock x:Name="LegendText"
+                                       FontFamily="{x:Static local:Theme.Small}" FontSize="10" FontWeight="Normal"
+                                       Foreground="{x:Static local:Theme.TextDim}"
+                                       Text="노란 테두리 = 옮겨야 할 자리" VerticalAlignment="Center" />
+                            <Button x:Name="IconModeButton" DockPanel.Dock="Right" Content="글자로 보기"
+                                    Style="{StaticResource PixelButton}" Click="OnToggleIconMode"
+                                    ToolTip="격자와 후보 목록을 아이콘 또는 글자로 보여줍니다. 아이콘은 F9로 데이터를 만든 뒤부터 나옵니다." /></DockPanel>
 
                         <StackPanel x:Name="MovePanel" Margin="0,12,0,0" Visibility="Collapsed">
                             <DockPanel Margin="0,0,0,5" LastChildFill="False">
@@ -219,8 +229,13 @@
                                                        Foreground="{Binding ComboTone}"
                                                        FontFamily="{x:Static local:Theme.Small}" FontSize="10"
                                                        FontWeight="Normal" Margin="8,2,0,0" />
+                                            <Image DockPanel.Dock="Left" Source="{Binding Icon}"
+                                                   Width="16" Height="16" Margin="0,0,5,0"
+                                                   RenderOptions.BitmapScalingMode="NearestNeighbor"
+                                                   Visibility="{Binding IconVisibility}" />
                                             <TextBlock Text="{Binding Name}" Foreground="{Binding NameTone}"
-                                                       FontSize="12" TextTrimming="CharacterEllipsis" />
+                                                       FontSize="12" TextTrimming="CharacterEllipsis"
+                                                       VerticalAlignment="Center" />
                                         </DockPanel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>

@@ -39,6 +39,10 @@
      필요 없다.
    - **이름과 설명 텍스트**는 `SephPlanner.DataTool`이 사용자 PC의 `StreamingAssets/Localization`에서
      추출한다. 결과물(`data/generated/`)은 `.gitignore` 대상이며 배포물에 포함하지 않는다.
+   - **아이콘도 같은 방식이다.** 플러그인이 사용자 PC에서 PNG 로 덤프해
+     `%LOCALAPPDATA%\SephPlanner\icons\`에 두고 오버레이가 읽는다. 저장소와 배포물에는 절대
+     포함하지 않는다. "미추출" 방침의 실체는 처음부터 "배포물 미포함"이었고, 이 경로는 그 선을
+     넘지 않는다.
    - 게임 DLL은 `<Private>false</Private>`로 참조만 하고 출력 폴더에 복사하지 않는다.
 4. **비영리.** 광고·구독·후원 어느 것도 붙이지 않는다. 붙이는 순간 SSA §2.G의 상업적 이용에
    직접 부딪힌다.
