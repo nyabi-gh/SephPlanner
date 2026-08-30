@@ -32,10 +32,12 @@ namespace SephPlanner.Plugin
             return snapshot;
         }
 
-        public static string DumpInventory()
+        public static string DumpInventory(float offerRadius)
         {
             var avatar = FindLocalPlayer();
-            return avatar?.Inventory == null ? null : InventoryDiagnostics.Write(avatar.Inventory);
+            return avatar?.Inventory == null
+                ? null
+                : InventoryDiagnostics.Write(avatar.Inventory, avatar, offerRadius);
         }
 
         public static string CheckSimulation()

@@ -77,7 +77,7 @@ namespace SephPlanner.Plugin
         {
             try
             {
-                var path = GameReader.DumpInventory();
+                var path = GameReader.DumpInventory(_offerRadius.Value);
                 Logger.LogInfo(path == null ? "읽을 인벤토리가 없습니다." : "인벤토리 덤프: " + path);
             }
             catch (Exception ex)

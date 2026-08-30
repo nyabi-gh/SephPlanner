@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text;
 using SephPlanner.Core.Ipc;
+using UnityEngine;
 
 namespace SephPlanner.Plugin
 {
@@ -12,7 +13,50 @@ namespace SephPlanner.Plugin
     {
         private const string FileName = "inventory-dump.txt";
 
-        public static string Write(GridInventory inv)
+        /// <summary>
+        /// 왜 어떤 선택지가 추천에 안 들어왔는지 보려면 후보가 될 뻔한 것들의 상태를 알아야 한다.
+        /// 거리, 생성 여부, 이미 가져갔는지가 전부 여기서 갈린다.
+        /// </summary>
+        private static void WriteOffers(StringBuilder text, GridInventory own, PlayerAvatar player, float radius)
+        {
+            var origin = player.transform.position;
+
+            text.AppendLine();
+            text.AppendLine($"[offers] radius={radius}");
+
+            foreach (var sephirite in Object.FindObjectsByType<Sephirite>(FindObjectsSortMode.None))
+            {
+                if (sephirite == null) continue;
+
+                var distance = Vector3.Distance(origin, sephirite.transform.position);
+                text.AppendLine(
+                    $"  Sephirite type={sephirite.type} dist={distance:0.0} " +
+                    $"generated={sephirite.isGenerated} acquired={sephirite.isAcquired} " +
+                    $"rewards={sephirite.Rewards.Count} " +
+                    $"inRange={distance <= radius}");
+
+                foreach (var reward in sephirite.Rewards)
+                    text.AppendLine($"      reward entity={reward.entityID} instance={reward.instanceID}");
+            }
+
+            foreach (var inventory in Object.FindObjectsByType<GridInventory>(FindObjectsSortMode.None))
+            {
+                if (inventory == null || inventory == own) continue;
+
+                var distance = Vector3.Distance(origin, inventory.transform.position);
+                var owner = inventory.UnitAvatar == null ? "none" : inventory.UnitAvatar.GetType().Name;
+
+                var count = 0;
+                foreach (var pair in inventory.inventoryMatrix)
+                    if (pair.Value != null) count++;
+
+                text.AppendLine(
+                    $"  GridInventory owner={owner} dist={distance:0.0} cells={count} " +
+                    $"inRange={distance <= radius}");
+            }
+        }
+
+        public static string Write(GridInventory inv, PlayerAvatar player, float offerRadius)
         {
             var text = new StringBuilder();
             text.AppendLine($"Width={inv.Width} Height={inv.Height} Storage={inv.CurrentInventoryStorage} " +
@@ -65,6 +109,8 @@ namespace SephPlanner.Plugin
             text.AppendLine("[levelMatrix]");
             foreach (var pair in inv.levelMatrix)
                 text.AppendLine($"  ({pair.Key.x},{pair.Key.y}) = {pair.Value}");
+
+            WriteOffers(text, inv, player, offerRadius);
 
             Directory.CreateDirectory(IpcContract.DataDirectory);
             var path = Path.Combine(IpcContract.DataDirectory, FileName);
