@@ -170,38 +170,58 @@ namespace SephPlanner.Core.Planning
             position.Y >= 0 && position.Y < grid.Height &&
             grid.ToIndex(position.X, position.Y) < grid.Storage;
 
+        /// <summary>
+        /// 무엇을 어디로 옮길지, 그리고 그것을 실제로 따라 할 수 있는 순서로 세운다.
+        /// 순서를 정하는 일은 <see cref="MoveOrder"/>가 맡는다.
+        /// </summary>
         private static List<Move> Moves(PlacementProblem problem, Arrangement current, Arrangement best)
         {
-            var moves = new List<Move>();
+            var pending = new List<Relocation>();
+            var stationary = new List<GridPos>();
 
-            for (var i = 0; i < problem.Tablets.Count && i < best.Tablets.Count; i++)
+            for (var i = 0; i < problem.Tablets.Count && i < best.Tablets.Count && i < current.Tablets.Count; i++)
             {
                 var from = current.Tablets[i];
                 var to = best.Tablets[i];
-                var turned = from.Rotation != to.Rotation;
-                if (from.Position == to.Position && !turned) continue;
-
                 var definition = problem.Tablets[i].Definition;
-                var name = Naming.Of(definition.Names, definition.Id, "석판");
-                var detail = from.Position == to.Position
-                    ? $"{from.Position} 회전 {from.Rotation} → {to.Rotation}"
-                    : turned
-                        ? $"{from.Position} → {to.Position} 회전 {to.Rotation}"
-                        : $"{from.Position} → {to.Position}";
 
-                moves.Add(new Move(name, from.Position, to.Position, detail));
+                if (from.Position == to.Position && from.Rotation == to.Rotation)
+                {
+                    stationary.Add(from.Position);
+                    continue;
+                }
+
+                pending.Add(new Relocation
+                {
+                    Name = Naming.Of(definition.Names, definition.Id, "석판"),
+                    From = from.Position,
+                    To = to.Position,
+                    FromRotation = from.Rotation,
+                    ToRotation = to.Rotation,
+                });
             }
 
             foreach (var charm in problem.Charms)
             {
                 if (!current.CharmPositions.TryGetValue(charm.InstanceId, out var from)) continue;
                 if (!best.CharmPositions.TryGetValue(charm.InstanceId, out var to)) continue;
-                if (from == to) continue;
 
-                var name = Naming.Of(charm.Definition.Names, charm.Definition.Id, charm.IsFiller ? "아이템" : "아티팩트");
-                moves.Add(new Move(name, from, to, $"{from} → {to}"));
+                if (from == to)
+                {
+                    stationary.Add(from);
+                    continue;
+                }
+
+                pending.Add(new Relocation
+                {
+                    Name = Naming.Of(
+                        charm.Definition.Names, charm.Definition.Id, charm.IsFiller ? "아이템" : "아티팩트"),
+                    From = from,
+                    To = to,
+                });
             }
-            return moves;
+
+            return MoveOrder.Sequence(problem.Grid, pending, stationary);
         }
     }
 }

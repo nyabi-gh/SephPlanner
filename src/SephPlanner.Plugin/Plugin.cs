@@ -23,6 +23,7 @@ namespace SephPlanner.Plugin
         private string _lastJson;
         private bool _catalogChecked;
         private string _lastSimulationIssue;
+        private string _lastSephiriteReport;
         private int _verifiedTablets;
 
         private void Awake()
@@ -92,6 +93,7 @@ namespace SephPlanner.Plugin
             {
                 var snapshot = GameReader.Read(_offerRadius.Value);
                 VerifySimulation();
+                ReportSephirites(snapshot);
 
                 var timestamp = snapshot.TimestampMs;
                 snapshot.TimestampMs = 0;
@@ -108,6 +110,18 @@ namespace SephPlanner.Plugin
                 Logger.LogError("스냅샷 생성 실패: " + ex);
                 _nextPoll = Time.unscaledTime + 5f;
             }
+        }
+
+        /// <summary>
+        /// 근처 세피라이트의 상태를 남긴다. 무엇이 왜 후보에 못 들어갔는지 나중에 읽을 수 있어야 한다.
+        /// </summary>
+        private void ReportSephirites(SephPlanner.Core.Ipc.GameSnapshot snapshot)
+        {
+            var report = OfferReader.LastSephiriteReport;
+            if (report == _lastSephiriteReport) return;
+
+            _lastSephiriteReport = report;
+            Logger.LogInfo($"세피라이트 {(report.Length == 0 ? "없음" : report)} -> 후보 {snapshot.Offers.Count}개");
         }
 
         private void VerifySimulation()

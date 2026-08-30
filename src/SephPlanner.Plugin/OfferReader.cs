@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text;
 using SephPlanner.Core.Ipc;
 using UnityEngine;
 
@@ -37,12 +38,33 @@ namespace SephPlanner.Plugin
         /// 일단 세피라이트가 생기고 나면 <c>rewards</c>가 동기화되어 무엇이 들었는지 알 수 있다.
         /// 석판은 대개 이 경로로 나오므로 여기를 빼면 석판 추천이 아예 되지 않는다.
         /// </summary>
+        /// <summary>
+        /// 마지막으로 훑은 세피라이트들의 상태. 왜 어떤 선택지가 추천에 안 들어왔는지는 거리와
+        /// 생성 여부로 갈리는데, 단축키로 덤프를 받는 방식은 키 입력이 게임에 닿아야만 해서
+        /// 정작 필요할 때 못 쓴다. 그래서 플러그인이 스스로 로그에 남긴다.
+        /// </summary>
+        public static string LastSephiriteReport { get; private set; } = "";
+
         private static void CollectSephirites(List<OfferedItem> offers, Vector3 origin, float radius)
         {
-            foreach (var sephirite in UnityEngine.Object.FindObjectsByType<Sephirite>(FindObjectsSortMode.None))
+            var report = new StringBuilder();
+
+            // 비활성 오브젝트도 함께 찾는다. 세피라이트를 여는 동안 본체가 잠시 꺼져 있으면
+            // 기본 탐색으로는 보이지 않아, 정작 고르는 순간에 후보가 사라진다.
+            var found = UnityEngine.Object.FindObjectsByType<Sephirite>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None);
+
+            foreach (var sephirite in found)
             {
-                if (sephirite == null || sephirite.isAcquired || !sephirite.isGenerated) continue;
-                if (Vector3.Distance(origin, sephirite.transform.position) > radius) continue;
+                if (sephirite == null) continue;
+
+                var distance = Vector3.Distance(origin, sephirite.transform.position);
+                report.Append($"[{sephirite.type} d={distance:0.0} gen={sephirite.isGenerated} ")
+                      .Append($"acq={sephirite.isAcquired} n={sephirite.Rewards.Count} ")
+                      .Append($"active={sephirite.gameObject.activeInHierarchy}] ");
+
+                if (sephirite.isAcquired || !sephirite.isGenerated) continue;
+                if (distance > radius) continue;
 
                 foreach (var reward in sephirite.Rewards)
                 {
@@ -60,6 +82,8 @@ namespace SephPlanner.Plugin
                     });
                 }
             }
+
+            LastSephiriteReport = report.ToString();
         }
 
         private static void Collect(List<OfferedItem> offers, GridInventory inventory, PlayerAvatar buyer)
