@@ -198,8 +198,10 @@ ilspycmd -t GridInventory "<게임경로>/Sephiria_Data/Managed/Assembly-CSharp.
   세션에서는 읽을 수 없다.
 - **배치 보너스**는 곱셈 뒤에 더해져서 `(석판 + 인챈트) × 배수`라는 우리 모델에 자리가 없다.
 
-셋 다 있는 상황에서는 우리가 계산한 레벨이 게임이 보고한 레벨과 어긋난다. 플러그인의
-`SimulationVerifier`가 그 차이를 잡아 BepInEx 로그에 남긴다.
+셋 다 있는 상황에서는 우리가 계산한 레벨이 게임이 보고한 레벨과 어긋난다. **그리고 지금은 그
+어긋남을 아무도 잡지 못한다.** `SimulationVerifier`는 석판의 `IsApplied`와 질의 해석 범위까지만
+대조하고 최종 `levelMatrix`는 보지 않는다. 스냅샷에 게임이 계산한 `LevelMatrix`가 이미 실려 있으므로
+칸별로 대조하는 검증을 붙이면 실제 런에서 얼마나 어긋나는지 드러난다.
 
 ## 배치 최적화
 
