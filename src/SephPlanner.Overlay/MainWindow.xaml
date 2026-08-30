@@ -58,6 +58,22 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+
+            <StackPanel x:Name="OfferPanel" Margin="0,12,0,0" Visibility="Collapsed">
+                <TextBlock Text="지금 집을 수 있는 것" Foreground="#6B6285" FontSize="10" Margin="0,0,0,5" />
+                <ItemsControl x:Name="OfferList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <DockPanel Margin="0,0,0,3">
+                                <TextBlock DockPanel.Dock="Right" Text="{Binding Gain}"
+                                           Foreground="{Binding Tone}" FontSize="11" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding Name}" Foreground="#C3BBD8" FontSize="11"
+                                           TextTrimming="CharacterEllipsis" />
+                            </DockPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
         </StackPanel>
     </Border>
 </Window>

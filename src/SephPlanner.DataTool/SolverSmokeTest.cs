@@ -53,7 +53,28 @@ public static class SolverSmokeTest
         Console.WriteLine($"  배치된 아티팩트 {arrangement.CharmPositions.Count}개, " +
                           $"효과 꺼진 아티팩트 {arrangement.InactiveCharms.Count}개");
         PrintGrid(problem, arrangement);
+        RankOffers(problem, arrangement.Score, tablets, charms);
         return 0;
+    }
+
+    private static void RankOffers(
+        PlacementProblem problem, double baseScore,
+        List<TabletDefinition> tablets, List<CharmDefinition> charms)
+    {
+        var candidates = new List<OfferCandidate>();
+        foreach (var tablet in tablets.Where(t => !t.IsCustom && t.Query.Length > 0).Skip(3).Take(3))
+            candidates.Add(new OfferCandidate { DefinitionId = tablet.EntityId, Kind = "tablet", Name = tablet.Id, Tablet = tablet });
+        foreach (var charm in charms.Skip(12).Take(3))
+            candidates.Add(new OfferCandidate { DefinitionId = charm.EntityId, Kind = "charm", Name = charm.Id, Charm = charm });
+
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        var advice = OfferAdvisor.Rank(problem, baseScore, candidates);
+        started.Stop();
+
+        Console.WriteLine();
+        Console.WriteLine($"선택지 {candidates.Count}개 평가 ({started.ElapsedMilliseconds}ms)");
+        foreach (var entry in advice)
+            Console.WriteLine($"  {entry.Candidate.Kind,-7} {entry.Candidate.Name,-24} {entry.Gain,6:+0.#;-0.#;0}");
     }
 
     private static void PrintGrid(PlacementProblem problem, Arrangement arrangement)

@@ -52,6 +52,9 @@ dotnet run --project src/SephPlanner.DataTool
 2. `SephPlanner.Plugin.dll`과 `SephPlanner.Core.dll`을 `BepInEx/plugins/`에 넣는다.
 3. 게임을 실행하면 석판/아티팩트 데이터가 `%LOCALAPPDATA%\SephPlanner\`에 덤프된다. F9로 다시 덤프할 수 있다.
 
+인식이 이상한 아이템이 있으면 게임 안에서 F10을 누른다. 인벤토리 내용이 그대로
+`%LOCALAPPDATA%\SephPlanner\inventory-dump.txt`에 기록된다.
+
 같은 폴더의 `query-verification.txt`에 질의 파서 검증 결과가 남는다. 불일치가 0이 아니면
 솔버 결과를 믿을 수 없으므로 먼저 확인한다.
 
@@ -62,6 +65,8 @@ dotnet run --project src/SephPlanner.Overlay -c Release
 ```
 
 게임이 실행 중이면 자동으로 연결된다. 창은 끌어서 옮기고 Esc 또는 오른쪽 위 X로 닫는다.
+
+주변의 상자와 상점에 있는 아이템은 "지금 집을 수 있는 것"에 점수 증가분과 함께 줄 세워 표시된다.
 
 현재 배치 점수와 솔버가 찾은 최적 배치 점수를 나란히 보여주고, 격자에는 제안된 배치의
 칸별 레벨을, 아래에는 무엇을 어디로 옮기면 되는지를 표시한다. 옮겨야 하는 칸은 테두리로 강조된다.

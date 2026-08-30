@@ -30,6 +30,7 @@ namespace SephPlanner.Plugin
                     Rarity = (Rarity)(int)entity.rarity,
                     IsRotatable = tablet.isRotatable,
                     IsCustom = tablet.isCustomTablet,
+                    Names = DisplayName(entity),
                     Query = tablet.query ?? "",
                     ConditionQuery = tablet.conditionQuery ?? "",
                 });
@@ -59,9 +60,19 @@ namespace SephPlanner.Plugin
                     IsMagic = charm is Charm_Magic,
                     IsWeaponRelated = charm != null && charm.isWeaponRelatedCharm,
                     Categories = entity.categories ?? new List<string>(),
+                    Names = DisplayName(entity),
                 });
             }
             return result;
+        }
+
+        // 게임에 설정된 언어로 표시 이름을 담아 둔다. 오버레이가 그대로 보여준다.
+        private static Dictionary<string, string> DisplayName(ItemEntity entity)
+        {
+            var names = new Dictionary<string, string>();
+            var text = entity.aName?.ToString();
+            if (!string.IsNullOrEmpty(text)) names["current"] = text;
+            return names;
         }
 
         // 이름 키가 없는 아이템도 있어 그때는 엔티티 번호를 식별자로 쓴다.

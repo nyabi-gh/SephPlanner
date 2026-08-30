@@ -12,6 +12,7 @@ public partial class MainWindow : Window
 {
     private readonly ObservableCollection<CellView> _cells = new();
     private readonly ObservableCollection<string> _moves = new();
+    private readonly ObservableCollection<OfferView> _offers = new();
     private readonly CatalogStore _catalog = new();
     private readonly CancellationTokenSource _shutdown = new();
 
@@ -23,6 +24,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         GridCells.ItemsSource = _cells;
         MoveList.ItemsSource = _moves;
+        OfferList.ItemsSource = _offers;
 
         var client = new SnapshotClient();
         client.ConnectionChanged += connected => Dispatcher.Invoke(() =>
@@ -67,6 +69,8 @@ public partial class MainWindow : Window
         // 안내만 띄우고 격자를 그대로 두면 직전 런의 배치가 남는다.
         _cells.Clear();
         _moves.Clear();
+        _offers.Clear();
+        OfferPanel.Visibility = Visibility.Collapsed;
         _lastPlanned = "";
     }
 
@@ -92,6 +96,7 @@ public partial class MainWindow : Window
         GainText.Foreground = improved ? Brushes.PaleGreen : new SolidColorBrush(Color.FromRgb(0x8A, 0x7F, 0xA6));
 
         RenderGrid(snapshot, plan);
+        RenderOffers(plan);
 
         // 제안이 그대로면 목록을 다시 만들지 않는다. 스냅샷마다 깜빡이는 것을 막는다.
         var signature = string.Join("|", plan.Moves.Select(m => $"{m.Label}{m.From}{m.To}"));
@@ -102,6 +107,20 @@ public partial class MainWindow : Window
         foreach (var move in plan.Moves.Take(6))
             _moves.Add($"{move.Label}  {move.From} → {move.To}");
         if (plan.Moves.Count > 6) _moves.Add($"… 외 {plan.Moves.Count - 6}개");
+    }
+
+    private void RenderOffers(Plan plan)
+    {
+        _offers.Clear();
+        foreach (var advice in plan.Offers.Take(4))
+        {
+            var gain = advice.Gain;
+            _offers.Add(new OfferView(
+                advice.Candidate.Name,
+                gain > 0.001 ? $"+{gain:0.#}" : gain < -0.001 ? $"{gain:0.#}" : "0",
+                gain > 0.001 ? Brushes.PaleGreen : gain < -0.001 ? Brushes.Salmon : Brushes.Gray));
+        }
+        OfferPanel.Visibility = _offers.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void RenderGrid(GameSnapshot snapshot, Plan plan)
@@ -143,6 +162,8 @@ public partial class MainWindow : Window
         base.OnClosed(e);
     }
 }
+
+public sealed record OfferView(string Name, string Gain, Brush Tone);
 
 public sealed class CellView : INotifyPropertyChanged
 {

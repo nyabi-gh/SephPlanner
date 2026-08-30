@@ -14,6 +14,12 @@ namespace SephPlanner.Core.Solver
 
         /// <summary>이 아티팩트를 얼마나 중요하게 볼지. 1이 기준이다.</summary>
         public double Weight { get; set; } = 1;
+
+        /// <summary>
+        /// 소비 아이템처럼 점수에 기여하지 않지만 칸은 차지하는 것. 무시하면 그 칸이 빈 칸으로
+        /// 취급되어 솔버가 이미 찬 자리에 아티팩트를 놓으라고 한다.
+        /// </summary>
+        public bool IsFiller { get; set; }
     }
 
     public sealed class TabletSlot

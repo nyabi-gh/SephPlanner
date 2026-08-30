@@ -99,9 +99,8 @@ namespace SephPlanner.Core.Solver
             var result = TabletSimulator.Run(layout, occupancy, problem.Grid);
 
             var taken = new HashSet<GridPos>(layout.Select(p => p.Position));
-            var levelCap = problem.Charms.Count > 0
-                ? problem.Charms.Max(c => c.Definition.MaxLevel)
-                : 5;
+            var scoring = problem.Charms.Where(c => !c.IsFiller).ToList();
+            var levelCap = scoring.Count > 0 ? scoring.Max(c => c.Definition.MaxLevel) : 5;
 
             var levels = new List<int>();
             foreach (var cell in cells)
@@ -116,7 +115,7 @@ namespace SephPlanner.Core.Solver
 
             levels.Sort();
             levels.Reverse();
-            return levels.Take(problem.Charms.Count).Sum();
+            return levels.Take(scoring.Count).Sum();
         }
 
         private static Arrangement Evaluate(
@@ -179,6 +178,7 @@ namespace SephPlanner.Core.Solver
         private static double Value(
             CharmSlot charm, GridPos cell, SimulationResult result, GridSpec grid, GridOccupancy occupancy)
         {
+            if (charm.IsFiller) return 0;
             if (result.IsDisabled(cell)) return 0;
 
             var level = EffectiveLevel(result, cell, charm.Enchant);
@@ -225,7 +225,7 @@ namespace SephPlanner.Core.Solver
             foreach (var charm in problem.Charms)
             {
                 if (!positions.TryGetValue(charm.InstanceId, out var position)) continue;
-                occupancy.AddItem(position, true, charm.Definition.IsMagic);
+                occupancy.AddItem(position, !charm.IsFiller, !charm.IsFiller && charm.Definition.IsMagic);
             }
             return occupancy;
         }
@@ -249,16 +249,17 @@ namespace SephPlanner.Core.Solver
             {
                 if (!positions.TryGetValue(charm.InstanceId, out var position))
                 {
-                    arrangement.InactiveCharms.Add(charm.InstanceId);
+                    if (!charm.IsFiller) arrangement.InactiveCharms.Add(charm.InstanceId);
                     continue;
                 }
 
                 arrangement.CharmPositions[charm.InstanceId] = position;
+                arrangement.Levels[position] = EffectiveLevel(result, position, charm.Enchant);
+                if (charm.IsFiller) continue;
+
                 var value = Value(charm, position, result, problem.Grid, occupancy);
                 arrangement.Score += value;
                 if (value <= 0) arrangement.InactiveCharms.Add(charm.InstanceId);
-
-                arrangement.Levels[position] = EffectiveLevel(result, position, charm.Enchant);
             }
             return arrangement;
         }

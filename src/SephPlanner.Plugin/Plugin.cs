@@ -17,6 +17,8 @@ namespace SephPlanner.Plugin
         private SnapshotPipeServer _server;
         private ConfigEntry<float> _pollInterval;
         private ConfigEntry<KeyboardShortcut> _dumpKey;
+        private ConfigEntry<float> _offerRadius;
+        private ConfigEntry<KeyboardShortcut> _diagnosticsKey;
         private float _nextPoll;
         private string _lastJson;
         private bool _catalogChecked;
@@ -31,6 +33,12 @@ namespace SephPlanner.Plugin
             _dumpKey = Config.Bind(
                 "General", "DumpCatalogKey", new KeyboardShortcut(KeyCode.F9),
                 "석판/아티팩트 데이터를 다시 덤프하고 질의 파서를 검증하는 단축키.");
+            _diagnosticsKey = Config.Bind(
+                "General", "DumpInventoryKey", new KeyboardShortcut(KeyCode.F10),
+                "인벤토리 내용을 그대로 파일로 남기는 단축키. 인식 문제를 확인할 때 쓴다.");
+            _offerRadius = Config.Bind(
+                "General", "OfferRadius", 12f,
+                "선택지로 볼 상자/상점까지의 거리. 넓히면 멀리 있는 것까지 추천에 들어온다.");
 
             _server = new SnapshotPipeServer(Logger.LogInfo);
             Logger.LogInfo("SephPlanner 브리지 시작 (읽기 전용)");
@@ -39,6 +47,7 @@ namespace SephPlanner.Plugin
         private void Update()
         {
             if (_dumpKey.Value.IsDown()) DumpCatalog();
+            if (_diagnosticsKey.Value.IsDown()) DumpInventory();
 
             // 리소스는 부팅 직후 준비되므로 첫 프레임에 확인한다.
             if (!_catalogChecked)
@@ -64,11 +73,24 @@ namespace SephPlanner.Plugin
             }
         }
 
+        private void DumpInventory()
+        {
+            try
+            {
+                var path = GameReader.DumpInventory();
+                Logger.LogInfo(path == null ? "읽을 인벤토리가 없습니다." : "인벤토리 덤프: " + path);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("인벤토리 덤프 실패: " + ex);
+            }
+        }
+
         private void PublishSnapshot()
         {
             try
             {
-                var snapshot = GameReader.Read();
+                var snapshot = GameReader.Read(_offerRadius.Value);
                 VerifySimulation();
 
                 var timestamp = snapshot.TimestampMs;

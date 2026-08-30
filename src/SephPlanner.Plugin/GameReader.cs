@@ -14,7 +14,7 @@ namespace SephPlanner.Plugin
         /// 항상 스냅샷을 돌려준다. 런이 끝났거나 플레이어가 죽었으면 인벤토리가 비어 있는 스냅샷이다.
         /// 이때 아무것도 보내지 않으면 오버레이에 직전 런의 배치가 그대로 남는다.
         /// </summary>
-        public static GameSnapshot Read()
+        public static GameSnapshot Read(float offerRadius)
         {
             var snapshot = new GameSnapshot
             {
@@ -27,7 +27,14 @@ namespace SephPlanner.Plugin
 
             snapshot.IsMultiplayer = IsMultiplayerSession();
             snapshot.Inventory = ReadInventory(avatar.Inventory);
+            OfferReader.Fill(snapshot, avatar, offerRadius);
             return snapshot;
+        }
+
+        public static string DumpInventory()
+        {
+            var avatar = FindLocalPlayer();
+            return avatar?.Inventory == null ? null : InventoryDiagnostics.Write(avatar.Inventory);
         }
 
         public static string CheckSimulation()
