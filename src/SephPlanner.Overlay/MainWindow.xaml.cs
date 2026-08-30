@@ -236,6 +236,15 @@ public partial class MainWindow : Window
     /// </summary>
     private void AutoExpand(Plan plan)
     {
+        // 추천이 꺼져 있으면 자동 여닫이도 쉰다. 끄는 순간 후보가 사라지는 것은 상자가 닫힌 것이
+        // 아니므로, 버튼을 누른 사용자 눈앞에서 창을 접어 버리면 안 된다. 접고 펴는 것은
+        // 사용자 몫으로 남긴다.
+        if (!_settings.Recommendations)
+        {
+            _hadOffers = false;
+            return;
+        }
+
         var hasOffers = plan.Offers.Count > 0;
         if (hasOffers == _hadOffers) return;
 
