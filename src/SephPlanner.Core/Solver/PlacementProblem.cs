@@ -58,6 +58,9 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         public List<TabletPlacement> FixedTablets { get; set; } = new List<TabletPlacement>();
 
+        /// <summary>고정 각인이 절대 좌표에 박아 둔 칸 효과. 역시 주어진 조건이다.</summary>
+        public List<FixedEffectCell> FixedEffects { get; set; } = new List<FixedEffectCell>();
+
         /// <summary>
         /// 지금 놓여 있는 자리. 점수가 같은 배치가 여럿일 때 이미 놓인 대로 두는 쪽을 고르는 데 쓴다.
         /// 이것이 없으면 아무것도 달라지지 않았는데도 제안이 이리저리 바뀐다.

@@ -140,7 +140,8 @@
                                             BorderBrush="{Binding BorderBrush}"
                                             BorderThickness="{Binding BorderThickness}"
                                             ToolTip="{Binding Tooltip}"
-                                            ToolTipService.IsEnabled="{Binding HasTooltip}">
+                                            ToolTipService.IsEnabled="{Binding HasTooltip}"
+                                            MouseRightButtonUp="OnCellRightClick">
                                         <StackPanel VerticalAlignment="Center">
                                             <TextBlock Text="{Binding Title}" Foreground="{Binding TitleBrush}"
                                                        FontFamily="{x:Static local:Theme.Small}" FontSize="10"
@@ -210,6 +211,25 @@
                                             <TextBlock Text="{Binding Name}" Foreground="{Binding NameTone}"
                                                        FontSize="12" TextTrimming="CharacterEllipsis" />
                                         </DockPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <StackPanel x:Name="BuildPanel" Margin="0,12,0,0" Visibility="Collapsed">
+                            <TextBlock Text="빌드 우선" Style="{StaticResource SectionHeader}" />
+                            <ItemsControl x:Name="ChipList">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Content="{Binding Text}" Click="OnChipClick"
+                                                Style="{StaticResource PixelButton}"
+                                                Foreground="{Binding Foreground}" Margin="0,0,4,4"
+                                                ToolTip="누르면 이 콤보를 빌드로 지정하거나 해제합니다. 지정한 콤보의 아티팩트와 진행을 추천에서 크게 칩니다." />
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>

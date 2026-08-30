@@ -57,6 +57,9 @@ namespace SephPlanner.Core.Planning
         /// <summary>제안된 배치에서 각 칸에 놓이는 아이템의 이름. 격자에 그대로 보여준다.</summary>
         public Dictionary<GridPos, string> Names { get; set; } = new Dictionary<GridPos, string>();
 
+        /// <summary>제안된 배치에서 각 칸에 놓이는 아티팩트의 엔티티 번호. 강화 우선 지정에 쓴다.</summary>
+        public Dictionary<GridPos, int> Charms { get; set; } = new Dictionary<GridPos, int>();
+
         /// <summary>자동 배치 명령에 실어 보낼 최종 배치. 인스턴스마다 있어야 할 자리다.</summary>
         public List<PlanTarget> Targets { get; set; } = new List<PlanTarget>();
 

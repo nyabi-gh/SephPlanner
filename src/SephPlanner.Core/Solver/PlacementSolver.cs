@@ -65,7 +65,7 @@ namespace SephPlanner.Core.Solver
 
             var placements = new List<TabletPlacement>(layout);
             var occupancy = OccupancyFrom(placements, positions, problem);
-            var result = TabletSimulator.Run(WithFixed(problem, placements), occupancy, problem.Grid);
+            var result = TabletSimulator.Run(WithFixed(problem, placements), occupancy, problem.Grid, problem.FixedEffects);
 
             return Describe(problem, placements, positions, occupancy, result);
         }
@@ -145,7 +145,7 @@ namespace SephPlanner.Core.Solver
             PlacementProblem problem, List<GridPos> cells, List<TabletPlacement> layout)
         {
             var occupancy = OptimisticOccupancy(cells, layout, problem);
-            var result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid);
+            var result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid, problem.FixedEffects);
 
             var taken = new HashSet<GridPos>(layout.Select(p => p.Position));
             var scoring = problem.Charms.Where(c => !c.IsFiller && !c.IsDormant).ToList();
@@ -175,11 +175,11 @@ namespace SephPlanner.Core.Solver
             var free = cells.Where(cell => !taken.Contains(cell)).ToList();
 
             Dictionary<int, GridPos> positions = new Dictionary<int, GridPos>();
-            SimulationResult result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid);
+            SimulationResult result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid, problem.FixedEffects);
 
             for (var iteration = 0; iteration < options.FixpointIterations; iteration++)
             {
-                result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid);
+                result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid, problem.FixedEffects);
                 var next = Assign(problem, free, result, occupancy);
                 if (SamePositions(positions, next)) break;
 

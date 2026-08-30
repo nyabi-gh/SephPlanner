@@ -11,8 +11,9 @@ namespace SephPlanner.Core.Planning
     /// <summary>스냅샷과 카탈로그를 합쳐 현재 배치를 채점하고 더 나은 배치를 찾는다.</summary>
     public static class PlanBuilder
     {
-        public static Plan? Build(GameSnapshot snapshot, ICatalog catalog)
+        public static Plan? Build(GameSnapshot snapshot, ICatalog catalog, PlanPreferences? preferences = null)
         {
+            preferences ??= PlanPreferences.None;
             var inventory = snapshot.Inventory;
             if (inventory is null || inventory.Storage <= 0) return null;
 
@@ -40,6 +41,8 @@ namespace SephPlanner.Core.Planning
                 layout.Add(slot.At(tablet.Position, tablet.Rotation));
                 problem.CurrentTablets[slot.InstanceId] = new TabletSpot(tablet.Position, tablet.Rotation);
             }
+
+            problem.FixedEffects.AddRange(inventory.FixedEffects);
 
             foreach (var engraving in inventory.Engravings)
             {
@@ -72,6 +75,9 @@ namespace SephPlanner.Core.Planning
                     Enchant = definition is null ? 0 : item.Enchant,
                     IsFiller = definition is null,
                     IsDormant = definition is not null && WeaponMatch.IsDormant(definition, weapon),
+                    Weight = definition is not null && preferences.PinnedCharms.Contains(item.DefinitionId)
+                        ? PlanPreferences.PinnedWeight
+                        : 1,
                 });
                 positions[item.InstanceId] = item.Position;
                 problem.CurrentCharms[item.InstanceId] = item.Position;
@@ -84,7 +90,7 @@ namespace SephPlanner.Core.Planning
             var candidates = Candidates(snapshot, catalog, weapon, out var skippedOffers);
             var offers = OfferAdvisor.Rank(
                 problem, best.Score, candidates, snapshot.Run?.Gold ?? int.MaxValue,
-                inventory.ComboCounts, catalog.Combo);
+                inventory.ComboCounts, catalog.Combo, preferences.PriorityCategories);
 
             return new Plan
             {
@@ -95,6 +101,7 @@ namespace SephPlanner.Core.Planning
                 Offers = offers,
                 SkippedOffers = skippedOffers,
                 Names = NamesByCell(problem, best),
+                Charms = CharmsByCell(problem, best),
                 Targets = Targets(problem, best),
             };
         }
@@ -132,6 +139,19 @@ namespace SephPlanner.Core.Planning
                     charm.Definition.Names, charm.Definition.Id, charm.IsFiller ? "아이템" : "아티팩트");
             }
             return names;
+        }
+
+        /// <summary>칸을 우클릭해 강화 우선을 지정하려면 그 칸의 아티팩트가 무엇인지 알아야 한다.</summary>
+        private static Dictionary<GridPos, int> CharmsByCell(PlacementProblem problem, Arrangement best)
+        {
+            var cells = new Dictionary<GridPos, int>();
+            foreach (var charm in problem.Charms)
+            {
+                if (charm.IsFiller || charm.Definition.EntityId == 0) continue;
+                if (!best.CharmPositions.TryGetValue(charm.InstanceId, out var position)) continue;
+                cells[position] = charm.Definition.EntityId;
+            }
+            return cells;
         }
 
         /// <summary>후보가 많으면 한 번에 다 풀기에는 무거워, 종류가 같은 것은 하나로 묶고 수를 제한한다.</summary>

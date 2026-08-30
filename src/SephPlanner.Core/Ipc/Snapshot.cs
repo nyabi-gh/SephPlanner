@@ -56,6 +56,12 @@ namespace SephPlanner.Core.Ipc
         /// 우리가 재현하지 않는 규칙이 있어, 세는 대신 게임 값을 그대로 쓴다.
         /// </summary>
         public Dictionary<string, int> ComboCounts { get; set; } = new Dictionary<string, int>();
+
+        /// <summary>
+        /// 고정 각인(신비 콤보 등)이 칸에 박아 둔 효과. 서버에만 있는 값이라 싱글(호스트)에서만
+        /// 채워지고, 클라이언트로 접속한 세션에서는 비어 있다.
+        /// </summary>
+        public List<FixedEffectCell> FixedEffects { get; set; } = new List<FixedEffectCell>();
     }
 
     public sealed class PlacedItem

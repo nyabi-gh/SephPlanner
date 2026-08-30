@@ -37,9 +37,20 @@ namespace SephPlanner.Core.Tablets
     public static class TabletSimulator
     {
         public static SimulationResult Run(
-            IReadOnlyList<TabletPlacement> placements, GridOccupancy occupancy, GridSpec grid)
+            IReadOnlyList<TabletPlacement> placements, GridOccupancy occupancy, GridSpec grid,
+            IReadOnlyList<FixedEffectCell>? fixedEffects = null)
         {
             var result = new SimulationResult { Applied = new bool[placements.Count] };
+
+            // 고정 각인 몫. 게임은 석판보다 먼저 더하지만(ReleasePermission) 덧셈이라 순서는 무관하고,
+            // 배수도 같은 행렬에 쌓인다.
+            foreach (var cell in fixedEffects ?? System.Array.Empty<FixedEffectCell>())
+            {
+                if (cell.Level != 0) Accumulate(result.Level, cell.Position, cell.Level);
+                if (cell.Disable != 0) Accumulate(result.Disable, cell.Position, cell.Disable);
+                if (cell.IgnoreCriteria != 0) Accumulate(result.IgnoreCriteria, cell.Position, cell.IgnoreCriteria);
+                if (cell.Multiply != 0) Accumulate(result.MultiplyLevel, cell.Position, cell.Multiply);
+            }
 
             for (var i = 0; i < placements.Count; i++)
             {

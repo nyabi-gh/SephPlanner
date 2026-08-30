@@ -265,15 +265,36 @@ ilspycmd -t GridInventory "<게임경로>/Sephiria_Data/Managed/Assembly-CSharp.
 그래서 각인은 배치 탐색의 대상이 아니라 주어진 조건이다. `PlacementProblem.FixedTablets`에 담아
 효과 계산에는 언제나 함께 넣되, 배치 후보에서 자리를 빼앗지는 않는다.
 
+### 고정 각인은 호스트에서 읽는다
+
+**고정 각인**(`fixedEngravingsOnServer`)은 서버에만 있는 `List<FixedEngraving>`이다. 각 원소는
+질의가 아니라 **절대 좌표로 이미 풀린 효과 딕셔너리**(fixedLevel/fixedDisable/fixedIgnoreCriteria/
+fixedMultiplyLevel)를 들고 있고, 배수는 석판과 같은 `multiplyLevelMatrix`에 쌓인다.
+
+정체의 대표가 **신비(MYSTIC) 콤보**다. `ComboEffect_Mystic`이 임계값마다 석판 12002를 고정
+각인으로 심는다. 커뮤니티의 다른 자동배치 모드가 "신비 콤보 ×2 미반영" 버그를 겪은 원인이
+바로 이것이다.
+
+싱글은 호스트 모드라 이 목록을 그대로 읽을 수 있다. `GameReader.ReadFixedEffects`가 칸 효과로
+합쳐 스냅샷(`FixedEffects`)에 싣고, `TabletSimulator`가 행렬에 먼저 깔고 시작한다.
+`SimulationVerifier`도 같은 기준으로 대조한다. **클라이언트로 접속한 세션에서만 여전히 못 읽고**,
+그때는 예전처럼 레벨 불일치 경고로 드러난다.
+
 ### 아직 반영하지 않은 것
 
-- **고정 각인**(`fixedEngravingsOnServer`)은 이름 그대로 서버에만 있어 클라이언트로 접속한
-  세션에서는 읽을 수 없다.
-- **세트 효과**(`SearchSetEffectInInventory`)와 **배치 보너스**(`SearchArrangementBonusInInventory`).
-  배치 보너스는 곱셈 뒤에 더해져서 `(석판 + 인챈트) × 배수`라는 우리 모델에 자리가 없다.
+- **배치 보너스**(`SearchArrangementBonusInInventory`). 곱셈 뒤에 더해져서
+  `(석판 + 인챈트) × 배수`라는 우리 모델에 자리가 없다.
+- **이웃 의존 아티팩트.** 효과의 세기가 자기 레벨이 아니라 다른 칸의 내용에 달린 아티팩트들이다.
+  디컴파일 전수 검색으로 `Inventory.FindItem`을 부르는 아티팩트 클래스를 세어 보니 12종쯤 된다:
+  `Charm_NearLevelDamage`(조화의 수정 - 이웃 8칸 유효 레벨 합에 비례), `Charm_UpCharmDamage`,
+  `Charm_AutoMagic`, `Charm_ReduceMPCost`, `Charm_RightSpellCooldownHelper`(북향의 금빛침),
+  `Charm_NearMagicBullet`, `Charm_PlanetModule`, `Charm_WhitePaper`, `Charm_WoodenBox`,
+  `Charm_MagicCoolDownBonusByTag`, `Charm_BoltMagicMultiShot`, `Charm_CompanionChaos`.
+  각자 로직이 달라 일괄 모델이 없고, 레벨 행렬에는 영향이 없어 불일치 경고로도 안 잡힌다
+  (전투 스탯으로만 새므로). 배치 점수가 이들의 자리 가치를 과소평가하는 문제이며, 당장은
+  사용자가 강화 우선 지정(우클릭)으로 보정한다. 제대로 하려면 아티팩트별 가치 함수가 필요하다.
 
-셋 다 있는 상황에서는 우리가 계산한 레벨이 게임이 보고한 레벨과 어긋난다. 그래서 **어긋나는지를
-항상 확인한다.** 게임이 계산해 둔 `levelMatrix`가 정답지다.
+레벨에 관해서는 어긋나는지를 **항상 확인한다.** 게임이 계산해 둔 `levelMatrix`가 정답지다.
 
 - 플러그인의 `SimulationVerifier`가 아티팩트 칸마다 대조해 어긋나면 BepInEx 로그에 남긴다.
   (석판의 `IsApplied`와 질의 해석 범위만 보던 것에서 최종 레벨까지 넓혔다)

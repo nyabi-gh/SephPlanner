@@ -41,6 +41,9 @@ namespace SephPlanner.Core.Solver
 
         /// <summary>줄 세우기에 더해지는 콤보 가치. 점수 증가분과 같은 단위로 환산한 것이다.</summary>
         public double ComboBonus { get; set; }
+
+        /// <summary>사용자가 밀고 있는 빌드 카테고리에 속하는 아티팩트인가.</summary>
+        public bool MatchesPriority { get; set; }
     }
 
     /// <summary>
@@ -60,10 +63,17 @@ namespace SephPlanner.Core.Solver
         /// <summary>아직 임계값에 못 미치지만 한 걸음 다가가는 가치.</summary>
         private const double ComboProgressWorth = 0.25;
 
+        /// <summary>밀고 있는 카테고리의 콤보 가치를 몇 배로 칠지.</summary>
+        private const double PriorityMultiplier = 3.0;
+
+        /// <summary>콤보 진행과 무관하게, 밀고 있는 카테고리라는 것만으로 얹는 가치.</summary>
+        private const double PriorityWorth = 0.5;
+
         public static List<OfferAdvice> Rank(
             PlacementProblem problem, double baseScore, IReadOnlyList<OfferCandidate> candidates, int gold,
             IReadOnlyDictionary<string, int>? comboCounts = null,
-            Func<string, ComboDefinition?>? combos = null)
+            Func<string, ComboDefinition?>? combos = null,
+            IReadOnlyCollection<string>? priorityCategories = null)
         {
             var advice = new List<OfferAdvice>();
             var nextInstanceId = -1;
@@ -102,7 +112,7 @@ namespace SephPlanner.Core.Solver
                     Affordable = candidate.Price <= gold,
                     Effect = EffectOf(candidate, trial, solved),
                 };
-                EvaluateCombo(entry, comboCounts, combos);
+                EvaluateCombo(entry, comboCounts, combos, priorityCategories);
                 advice.Add(entry);
             }
 
@@ -124,16 +134,30 @@ namespace SephPlanner.Core.Solver
         private static void EvaluateCombo(
             OfferAdvice advice,
             IReadOnlyDictionary<string, int>? comboCounts,
-            Func<string, ComboDefinition?>? combos)
+            Func<string, ComboDefinition?>? combos,
+            IReadOnlyCollection<string>? priorityCategories)
         {
             var charm = advice.Candidate.Charm;
-            if (charm is null || comboCounts is null || combos is null) return;
+            if (charm is null) return;
+
+            foreach (var category in charm.Categories)
+            {
+                if (priorityCategories is null || !priorityCategories.Contains(category)) continue;
+
+                advice.MatchesPriority = true;
+                advice.ComboBonus += PriorityWorth;
+                break;
+            }
+            if (comboCounts is null || combos is null) return;
 
             var parts = new List<string>();
             foreach (var category in charm.Categories)
             {
                 var combo = combos(category);
                 if (combo is null || combo.Thresholds.Count == 0) continue;
+
+                var priority = priorityCategories is not null && priorityCategories.Contains(category);
+                var worth = priority ? PriorityMultiplier : 1;
 
                 comboCounts.TryGetValue(category, out var current);
                 var reached = current + 1;
@@ -145,11 +169,11 @@ namespace SephPlanner.Core.Solver
                 if (goal == reached)
                 {
                     advice.ComboCompletes = true;
-                    advice.ComboBonus += ComboThresholdWorth;
+                    advice.ComboBonus += ComboThresholdWorth * worth;
                 }
                 else
                 {
-                    advice.ComboBonus += ComboProgressWorth;
+                    advice.ComboBonus += ComboProgressWorth * worth;
                 }
 
                 var name = combo.Names.TryGetValue("current", out var text) && text.Length > 0
@@ -182,6 +206,7 @@ namespace SephPlanner.Core.Solver
             Charms = new List<CharmSlot>(problem.Charms),
             Tablets = new List<TabletSlot>(problem.Tablets),
             FixedTablets = problem.FixedTablets,
+            FixedEffects = problem.FixedEffects,
         };
     }
 }

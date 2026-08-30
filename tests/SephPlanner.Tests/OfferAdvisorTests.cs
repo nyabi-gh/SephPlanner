@@ -112,6 +112,36 @@ public class OfferAdvisorTests
     }
 
     [Fact]
+    public void APriorityCategoryCharmOutranksAnEqualOne()
+    {
+        // 배치 점수도 콤보 진행도 같은 두 아티팩트. 밀고 있는 빌드와 맞는 쪽이 위로 온다.
+        var candidates = new List<OfferCandidate> { Charm("stray", "STURDY"), Charm("ember", "EMBER") };
+        var counts = new Dictionary<string, int>();
+        var priorities = new HashSet<string> { "EMBER" };
+
+        var advice = OfferAdvisor.Rank(
+            BaseProblem(), baseScore: 0, candidates, gold: 0, counts, FindCombo, priorities);
+
+        Assert.Equal("ember", advice[0].Candidate.Name);
+        Assert.True(advice[0].MatchesPriority);
+        Assert.False(advice[1].MatchesPriority);
+    }
+
+    [Fact]
+    public void APriorityComboCountsForMoreThanAPlainOne()
+    {
+        // 잉걸불을 밀고 있으면 잉걸불 진행이 다른 콤보 진행보다 크게 잡힌다.
+        var candidates = new List<OfferCandidate> { Charm("ember", "EMBER") };
+        var counts = new Dictionary<string, int> { ["EMBER"] = 2 };
+
+        var plain = OfferAdvisor.Rank(BaseProblem(), 0, candidates, 0, counts, FindCombo);
+        var pushed = OfferAdvisor.Rank(
+            BaseProblem(), 0, candidates, 0, counts, FindCombo, new HashSet<string> { "EMBER" });
+
+        Assert.True(pushed[0].ComboBonus > plain[0].ComboBonus);
+    }
+
+    [Fact]
     public void APastAllThresholdsComboAddsNothing()
     {
         // 임계값을 다 넘긴 카테고리는 더 모아도 변하는 게 없다.

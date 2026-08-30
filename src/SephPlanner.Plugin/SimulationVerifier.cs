@@ -39,7 +39,8 @@ namespace SephPlanner.Plugin
             }
             LastCheckedTablets = placements.Count;
 
-            var result = TabletSimulator.Run(placements, occupancy, grid);
+            // 고정 각인 몫까지 넣어야 게임 levelMatrix 와 같은 기준으로 견주게 된다.
+            var result = TabletSimulator.Run(placements, occupancy, grid, GameReader.ReadFixedEffects(inv));
 
             for (var i = 0; i < tablets.Count; i++)
             {

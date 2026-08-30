@@ -22,8 +22,16 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<CellView> _cells = new();
     private readonly ObservableCollection<MoveView> _moves = new();
     private readonly ObservableCollection<OfferView> _offers = new();
+    private readonly ObservableCollection<ComboChipView> _chips = new();
     private readonly CatalogStore _catalog = new();
     private readonly CancellationTokenSource _shutdown = new();
+    private readonly UserSettings _settings = UserSettings.Load();
+
+    /// <summary>계산 스레드가 읽으므로 통째로 갈아끼우고 제자리에서 바꾸지 않는다.</summary>
+    private volatile PlanPreferences _preferences = PlanPreferences.None;
+
+    /// <summary>선호가 바뀌었을 때 같은 상태를 다시 풀기 위한 최신 스냅샷.</summary>
+    private volatile GameSnapshot? _lastSnapshot;
 
     private int _solving;
     private string _lastPlanned = "";
@@ -41,6 +49,8 @@ public partial class MainWindow : Window
         GridCells.ItemsSource = _cells;
         MoveList.ItemsSource = _moves;
         OfferList.ItemsSource = _offers;
+        ChipList.ItemsSource = _chips;
+        _preferences = _settings.ToPreferences();
         ApplyLayout();
 
         // 게임 없이 화면을 확인하는 통로. 파이프를 열지 않으므로 실제 오버레이와 같이 떠도 안전하다.
@@ -69,8 +79,17 @@ public partial class MainWindow : Window
 
     private void OnSnapshot(GameSnapshot snapshot)
     {
+        _lastSnapshot = snapshot;
         Volatile.Write(ref _pending, snapshot);
         Drain();
+    }
+
+    /// <summary>빌드 우선이나 강화 지정이 바뀌면 마지막 상태를 새 기준으로 다시 푼다.</summary>
+    private void Resolve()
+    {
+        _settings.Save();
+        _preferences = _settings.ToPreferences();
+        if (_lastSnapshot is { } snapshot) OnSnapshot(snapshot);
     }
 
     /// <summary>해를 찾는 데 수백 ms 가 걸리므로 UI 스레드에서 돌리지 않는다.</summary>
@@ -90,7 +109,7 @@ public partial class MainWindow : Window
                         continue;
                     }
 
-                    var plan = PlanBuilder.Build(snapshot, _catalog);
+                    var plan = PlanBuilder.Build(snapshot, _catalog, _preferences);
                     Dispatcher.Invoke(() => Render(snapshot, plan));
                 }
             }
@@ -111,10 +130,12 @@ public partial class MainWindow : Window
         ScorePanel.Visibility = Visibility.Collapsed;
         NextMoveText.Visibility = Visibility.Collapsed;
 
-        // 안내만 띄우고 격자를 그대로 두면 직전 런의 배치가 남는다.
+        // 안내만 띄우고 격자를 그대로 두면 직전 탐험의 배치가 남는다.
         _cells.Clear();
         _moves.Clear();
         _offers.Clear();
+        _chips.Clear();
+        BuildPanel.Visibility = Visibility.Collapsed;
         OfferPanel.Visibility = Visibility.Collapsed;
         MovePanel.Visibility = Visibility.Collapsed;
         LegendText.Visibility = Visibility.Collapsed;
@@ -126,8 +147,9 @@ public partial class MainWindow : Window
     {
         if (plan is null)
         {
+            // "탐험"은 게임 자체가 쓰는 말이다 ("탐험 시작 시", "탐험 중" - ko-KR.json).
             ShowNotice(snapshot.Inventory is null
-                ? "런이 진행 중이 아닙니다."
+                ? "탐험 중이 아닙니다. 탐험을 시작하면 배치를 분석합니다."
                 : "인벤토리에 아티팩트가 없습니다.");
             return;
         }
@@ -148,7 +170,12 @@ public partial class MainWindow : Window
         AutoExpand(plan);
         RenderGrid(snapshot, plan);
         RenderOffers(plan, snapshot.Run?.Gold ?? 0);
-        LegendText.Visibility = plan.Moves.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        RenderChips(snapshot);
+
+        LegendText.Text = plan.Moves.Count > 0
+            ? "노란 테두리 = 옮겨야 할 자리 · 아티팩트 우클릭 = 강화 우선"
+            : "아티팩트 우클릭 = 강화 우선 지정";
+        LegendText.Visibility = Visibility.Visible;
 
         // 제안이 그대로면 목록을 다시 만들지 않는다. 스냅샷마다 깜빡이는 것을 막는다.
         var signature = string.Join("|", plan.Moves.Select(m => $"{m.Label}{m.Detail}"));
@@ -248,7 +275,7 @@ public partial class MainWindow : Window
                 price > 0 ? $"{price}골드" : "",
                 gain > 0.001 ? $"+{gain:0.#}" : gain < -0.001 ? $"{gain:0.#}" : "0",
                 gain > 0.001 ? Theme.Good : gain < -0.001 ? Theme.Bad : Theme.TextDim,
-                advice.Affordable ? Theme.Text : Theme.TextDim,
+                !advice.Affordable ? Theme.TextDim : advice.MatchesPriority ? Theme.Mint : Theme.Text,
                 advice.Affordable ? Theme.TextDim : Theme.Bad,
                 advice.ComboCompletes ? Theme.Good : Theme.Mint,
                 Explain(advice, gold)));
@@ -273,6 +300,8 @@ public partial class MainWindow : Window
     {
         var lines = new List<string>();
         if (!advice.Affordable) lines.Add($"소지금 {gold}골드로는 살 수 없습니다.");
+
+        if (advice.MatchesPriority) lines.Add("밀고 있는 빌드의 아티팩트입니다.");
 
         if (advice.ComboText.Length > 0)
         {
@@ -321,10 +350,66 @@ public partial class MainWindow : Window
                 plan.Best.EffectiveLevels.TryGetValue(position, out var effective);
                 plan.Best.InactiveCells.TryGetValue(position, out var reason);
                 plan.Names.TryGetValue(position, out var name);
-                cell.SetCharm(name ?? "", level, effective, reason, moved.Contains(position));
+                plan.Charms.TryGetValue(position, out var charmId);
+                cell.SetCharm(
+                    name ?? "", level, effective, reason, moved.Contains(position),
+                    charmId, _preferences.PinnedCharms.Contains(charmId));
             }
             else cell.SetEmpty();
         }
+    }
+
+    /// <summary>
+    /// 콤보 칩. 눌러서 그 콤보를 빌드로 지정하거나 해제한다. 지금 세어져 있는 콤보와,
+    /// 개수가 0이 되어도 지정을 풀 수 있도록 이미 지정된 카테고리를 함께 보여준다.
+    /// </summary>
+    private void RenderChips(GameSnapshot snapshot)
+    {
+        _chips.Clear();
+        var counts = snapshot.Inventory?.ComboCounts ?? new Dictionary<string, int>();
+        var shown = new HashSet<string>();
+
+        foreach (var pair in counts.OrderByDescending(p => p.Value))
+            AddChip(pair.Key, pair.Value, shown);
+        foreach (var category in _preferences.PriorityCategories)
+            AddChip(category, 0, shown);
+
+        BuildPanel.Visibility = _chips.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void AddChip(string categoryId, int count, HashSet<string> shown)
+    {
+        if (!shown.Add(categoryId)) return;
+
+        var combo = _catalog.Combo(categoryId);
+        if (combo is null) return;
+
+        var selected = _preferences.PriorityCategories.Contains(categoryId);
+        var name = combo.Names.TryGetValue(Naming.CurrentLanguage, out var text) && text.Length > 0
+            ? text
+            : combo.Id;
+        _chips.Add(new ComboChipView(
+            categoryId,
+            $"{(selected ? "●" : "○")} {name} {count}",
+            selected ? Theme.Mint : Theme.TextDim));
+    }
+
+    private void OnChipClick(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not ComboChipView chip) return;
+
+        if (!_settings.PriorityCategories.Remove(chip.CategoryId))
+            _settings.PriorityCategories.Add(chip.CategoryId);
+        Resolve();
+    }
+
+    private void OnCellRightClick(object sender, MouseButtonEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not CellView cell || cell.CharmId == 0) return;
+
+        if (!_settings.PinnedCharms.Remove(cell.CharmId))
+            _settings.PinnedCharms.Add(cell.CharmId);
+        Resolve();
     }
 
     private async void OnAutoPlace(object sender, RoutedEventArgs e)
@@ -403,6 +488,8 @@ public partial class MainWindow : Window
 
 public sealed record MoveView(string Label, string Detail);
 
+public sealed record ComboChipView(string CategoryId, string Text, Brush Foreground);
+
 public sealed record OfferView(
     string Name, string Reach, string Combo, string Price, string Gain,
     Brush Tone, Brush NameTone, Brush PriceTone, Brush ComboTone, string Tooltip)
@@ -452,32 +539,44 @@ public sealed class CellView : INotifyPropertyChanged
 
     public void SetClosed()
     {
+        CharmId = 0;
         Fill("", "", "", Theme.TextDim, Theme.ClosedFill);
         SetEdge(false);
     }
 
     public void SetEmpty()
     {
+        CharmId = 0;
         Fill("", "", "", Theme.TextDim, Theme.EmptyFill);
         SetEdge(false);
     }
 
     public void SetTablet(string name, int rotation, bool moved)
     {
+        CharmId = 0;
         Fill(name, $"회전 {rotation}", name, Theme.TextDim, Theme.TabletFill);
         TitleBrush = Theme.TabletText;
         SetEdge(moved, Theme.TabletEdge);
     }
 
+    /// <summary>우클릭으로 강화 우선을 지정할 때 이 칸의 아티팩트를 식별한다. 0이면 아티팩트가 아니다.</summary>
+    public int CharmId { get; private set; }
+
     /// <summary>
     /// 보여주는 숫자는 그 칸의 레벨이 아니라 거기 놓인 아티팩트가 실제로 받는 레벨이다.
     /// 상한에 걸려 남는 레벨이 있으면 색으로 알리고, 효과가 꺼졌으면 그 이유를 도움말에 적는다.
     /// </summary>
-    public void SetCharm(string name, int level, int effective, CharmInactiveReason reason, bool moved)
+    public void SetCharm(
+        string name, int level, int effective, CharmInactiveReason reason, bool moved,
+        int charmId = 0, bool pinned = false)
     {
+        CharmId = charmId;
+        var title = pinned ? "★ " + name : name;
+        var pinNote = pinned ? "\n강화 우선: 가치를 2배로 칩니다. 우클릭으로 해제합니다." : "";
+
         if (reason != CharmInactiveReason.None)
         {
-            Fill(name, "꺼짐", Explain(reason), Theme.Bad, Theme.SlotFill);
+            Fill(title, "꺼짐", Explain(reason) + pinNote, Theme.Bad, Theme.SlotFill);
             SetEdge(moved);
             return;
         }
@@ -486,7 +585,7 @@ public sealed class CellView : INotifyPropertyChanged
         var label = effective > 0 ? $"+{effective}" : level < 0 ? level.ToString() : "0";
         var tooltip = wasted ? $"칸 레벨 {level}, 이 아티팩트는 {effective}까지만 반영됩니다" : name;
 
-        Fill(name, label, tooltip,
+        Fill(title, label, tooltip + pinNote,
             level < 0 ? Theme.Bad : wasted ? Theme.Orange : effective > 0 ? Theme.Good : Theme.TextDim,
             Theme.SlotFill);
         SetEdge(moved);
