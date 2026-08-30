@@ -18,9 +18,6 @@ public static class Naming
         if (names.TryGetValue(CurrentLanguage, out var text) && text.Length > 0) return text;
         return id.Length > 0 ? id : fallback;
     }
-
-    /// <summary>격자 칸에 들어갈 만큼 줄인 이름. 한국어 석판 이름은 대부분 두 글자다.</summary>
-    public static string Short(string name) => name.Length <= 3 ? name : name.Substring(0, 2) + "…";
 }
 
 public sealed class Plan
@@ -29,6 +26,9 @@ public sealed class Plan
     public required Arrangement Best { get; init; }
     public required List<Move> Moves { get; init; }
     public required List<OfferAdvice> Offers { get; init; }
+
+    /// <summary>제안된 배치에서 각 칸에 놓이는 아이템의 이름. 격자에 그대로 보여준다.</summary>
+    public required Dictionary<GridPos, string> Names { get; init; }
     public double Gain => Best.Score - Current.Score;
 }
 
@@ -107,7 +107,20 @@ public static class PlanBuilder
             Best = best,
             Moves = Moves(problem, current, best),
             Offers = offers,
+            Names = NamesByCell(problem, best),
         };
+    }
+
+    private static Dictionary<GridPos, string> NamesByCell(PlacementProblem problem, Arrangement best)
+    {
+        var names = new Dictionary<GridPos, string>();
+        foreach (var charm in problem.Charms)
+        {
+            if (!best.CharmPositions.TryGetValue(charm.InstanceId, out var position)) continue;
+            names[position] = Naming.Of(
+                charm.Definition.Names, charm.Definition.Id, charm.IsFiller ? "아이템" : "아티팩트");
+        }
+        return names;
     }
 
     /// <summary>후보가 많으면 한 번에 다 풀기에는 무거워, 종류가 같은 것은 하나로 묶고 수를 제한한다.</summary>
