@@ -10,6 +10,9 @@ namespace SephPlanner.Plugin
     /// </summary>
     internal static class SimulationVerifier
     {
+        /// <summary>마지막 대조에서 확인한 석판 수. 검증이 실제로 돌았는지 판단하는 근거다.</summary>
+        public static int LastCheckedTablets { get; private set; }
+
         /// <summary>일치하면 null, 어긋나면 첫 번째 차이를 설명하는 문자열.</summary>
         public static string Check(GridInventory inv)
         {
@@ -31,6 +34,7 @@ namespace SephPlanner.Plugin
                     InstanceConditionQuery = tablet.GetConditionQuery(tablet.instanceID) ?? "",
                 });
             }
+            LastCheckedTablets = placements.Count;
             if (placements.Count == 0) return null;
 
             var result = TabletSimulator.Run(placements, occupancy, grid);

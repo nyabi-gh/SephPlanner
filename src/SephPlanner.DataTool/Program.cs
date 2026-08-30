@@ -9,6 +9,9 @@ using SephPlanner.DataTool;
 // 뽑는 것은 텍스트뿐이다. 스프라이트/아이콘 같은 저작물은 건드리지 않으며,
 // 결과 파일도 사용자 PC에서 생성될 뿐 배포물에 포함하지 않는다(README 참고).
 
+if (args.Contains("--solve"))
+    return SolverSmokeTest.Run(tabletCount: 3, charmCount: 12);
+
 var gameDir = args.FirstOrDefault(a => !a.StartsWith('-')) ?? GameLocator.Find();
 if (gameDir is null)
 {

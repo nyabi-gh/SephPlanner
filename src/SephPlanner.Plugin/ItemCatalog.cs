@@ -45,11 +45,19 @@ namespace SephPlanner.Plugin
                 if (entity.type != EItemType.Charm) continue;
                 if (entity.activeType == EItemActiveType.Disabled) continue;
 
+                var charm = entity.resourcePrefab != null
+                    ? entity.resourcePrefab.GetComponent<Charm_Basic>()
+                    : null;
+
                 result.Add(new CharmDefinition
                 {
                     Id = IdFromKey(entity.aName?.key, "Item_", entity.id),
                     EntityId = entity.id,
                     Rarity = (Rarity)(int)entity.rarity,
+                    MaxLevel = charm != null ? charm.maxLevel : 5,
+                    CriteriaType = charm != null && charm.criteria != null ? charm.criteria.GetType().Name : "",
+                    IsMagic = charm is Charm_Magic,
+                    IsWeaponRelated = charm != null && charm.isWeaponRelatedCharm,
                     Categories = entity.categories ?? new List<string>(),
                 });
             }

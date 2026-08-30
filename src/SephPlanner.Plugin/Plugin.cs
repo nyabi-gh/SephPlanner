@@ -21,6 +21,7 @@ namespace SephPlanner.Plugin
         private string _lastJson;
         private bool _catalogChecked;
         private string _lastSimulationIssue;
+        private int _verifiedTablets;
 
         private void Awake()
         {
@@ -92,10 +93,19 @@ namespace SephPlanner.Plugin
         private void VerifySimulation()
         {
             var issue = GameReader.CheckSimulation();
-            if (issue == _lastSimulationIssue) return;
+            if (issue != _lastSimulationIssue)
+            {
+                _lastSimulationIssue = issue;
+                if (issue != null) Logger.LogWarning("시뮬레이터 불일치: " + issue);
+            }
 
-            _lastSimulationIssue = issue;
-            if (issue != null) Logger.LogWarning("시뮬레이터 불일치: " + issue);
+            // 일치할 때 아무것도 남기지 않으면 검증이 돌았는지조차 알 수 없다.
+            var checkedTablets = SimulationVerifier.LastCheckedTablets;
+            if (issue == null && checkedTablets > _verifiedTablets)
+            {
+                _verifiedTablets = checkedTablets;
+                Logger.LogInfo($"시뮬레이터 검증 통과 (석판 {checkedTablets}개 동시 배치까지)");
+            }
         }
 
         private void OnDestroy() => _server?.Dispose();

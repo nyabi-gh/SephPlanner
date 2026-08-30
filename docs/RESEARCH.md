@@ -154,3 +154,34 @@ ilspycmd -t GridInventory "<게임경로>/Sephiria_Data/Managed/Assembly-CSharp.
 `SephPlanner.Plugin`의 `QueryVerifier`가 게임 안에서 원본 `StoneTablet.ParseQuery`와 전수 대조한다.
 석판 68종 × 질의 2종 × 회전 4 × storage 7단계 × 모든 원점 조합을 돌려 위치·값·플래그를 비교하고,
 결과를 `%LOCALAPPDATA%\SephPlanner\query-verification.txt`에 남긴다.
+
+## 아티팩트 레벨과 활성 조건
+
+`Charm_Basic.RefreshCharm`이 판정 전부를 담고 있다.
+
+- 아티팩트의 레벨은 곧 `levelMatrix`의 자기 칸 값이다 (`DisplayedLevel`). 기본값은 0이고
+  석판 효과와 인챈트가 더해진 뒤 배수 행렬이 곱해진다.
+- 효과에 실제로 반영되는 레벨은 `min(maxLevel, 레벨)`이다. 상한을 넘겨 올리는 것은 낭비다.
+- 다음 중 하나라도 걸리면 효과가 꺼진다.
+  - `disableMatrix > 0`
+  - **레벨이 0 미만** (0은 살아 있다)
+  - 자체 조건 불만족. 단 `ignoreCriteriaMatrix > 0`이면 조건을 건너뛴다
+  - 무기 연동 아티팩트인데 해당 무기를 들고 있지 않음
+
+자체 조건은 `CharmActivateCriteria` 파생 10종이다. `TopInInventory`, `BottomInInventory`,
+`SideEnd`, `Inside`, `Outlined`는 위치만 보고, `BothSideCharm`, `BothSidesAreEmpty`,
+`NeighborsAreFull`, `Near8MagicBook`은 이웃 칸의 내용을 본다. `FullHP`만 배치와 무관한
+전투 중 상태라 배치 탐색에서는 만족한 것으로 둔다.
+
+## 배치 최적화
+
+문제를 두 조각으로 나눈다.
+
+**석판 배치**는 조합 탐색이다. 석판을 하나씩 놓으며 빔 서치로 후보를 좁힌다.
+
+**아티팩트 배치**는 석판이 정해지면 칸마다 레벨이 확정되므로 배정 문제가 된다.
+헝가리안 알고리즘으로 항상 최적해를 얻는다. 아티팩트 수가 빈 칸보다 많으면 행렬을 뒤집어
+풀어서 어느 아티팩트를 빼는 것이 최선인지까지 함께 결정한다.
+
+석판 조건과 아티팩트 조건이 서로의 배치에 의존하므로 몇 번 되풀이해 수렴시키고,
+**최종 점수는 수렴한 배치로 다시 계산한다.** 그래서 보고되는 점수는 추정치가 아니라 실제 값이다.
