@@ -68,9 +68,7 @@ namespace SephPlanner.Plugin
         {
             try
             {
-                var snapshot = GameReader.TryRead();
-                if (snapshot == null) return;
-
+                var snapshot = GameReader.Read();
                 VerifySimulation();
 
                 var timestamp = snapshot.TimestampMs;

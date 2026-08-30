@@ -10,24 +10,31 @@ namespace SephPlanner.Plugin
     /// <summary>살아 있는 게임 상태를 스냅샷으로 옮긴다. 읽기만 한다.</summary>
     internal static class GameReader
     {
-        public static GameSnapshot TryRead()
+        /// <summary>
+        /// 항상 스냅샷을 돌려준다. 런이 끝났거나 플레이어가 죽었으면 인벤토리가 비어 있는 스냅샷이다.
+        /// 이때 아무것도 보내지 않으면 오버레이에 직전 런의 배치가 그대로 남는다.
+        /// </summary>
+        public static GameSnapshot Read()
         {
-            var avatar = FindLocalPlayer();
-            if (avatar == null || avatar.Inventory == null) return null;
-
-            return new GameSnapshot
+            var snapshot = new GameSnapshot
             {
                 TimestampMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                 GameVersion = Application.version,
-                IsMultiplayer = IsMultiplayerSession(),
-                Inventory = ReadInventory(avatar.Inventory),
             };
+
+            var avatar = FindLocalPlayer();
+            if (avatar == null || avatar.Inventory == null || avatar.IsDead) return snapshot;
+
+            snapshot.IsMultiplayer = IsMultiplayerSession();
+            snapshot.Inventory = ReadInventory(avatar.Inventory);
+            return snapshot;
         }
 
         public static string CheckSimulation()
         {
             var avatar = FindLocalPlayer();
-            return avatar?.Inventory == null ? null : SimulationVerifier.Check(avatar.Inventory);
+            if (avatar == null || avatar.Inventory == null || avatar.IsDead) return null;
+            return SimulationVerifier.Check(avatar.Inventory);
         }
 
         private static PlayerAvatar FindLocalPlayer()

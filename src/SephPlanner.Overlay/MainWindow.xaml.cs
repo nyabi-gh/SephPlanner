@@ -63,13 +63,20 @@ public partial class MainWindow : Window
         NoticeText.Text = message;
         NoticeText.Visibility = Visibility.Visible;
         ScorePanel.Visibility = Visibility.Collapsed;
+
+        // 안내만 띄우고 격자를 그대로 두면 직전 런의 배치가 남는다.
+        _cells.Clear();
+        _moves.Clear();
+        _lastPlanned = "";
     }
 
     private void Render(GameSnapshot snapshot, Plan? plan)
     {
         if (plan is null)
         {
-            ShowNotice("인벤토리에 아티팩트가 없습니다.");
+            ShowNotice(snapshot.Inventory is null
+                ? "런이 진행 중이 아닙니다."
+                : "인벤토리에 아티팩트가 없습니다.");
             return;
         }
 
