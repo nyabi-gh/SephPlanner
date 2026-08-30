@@ -31,6 +31,11 @@ namespace SephPlanner.Plugin
                 if (inventory.UnitAvatar is PlayerAvatar) continue;
                 if (Vector3.Distance(origin, inventory.transform.position) > radius) continue;
 
+                // 닫힌 상자의 내용물도 동기화는 되어 있지만, 열기 전에는 사람이 알 수 없는 정보다.
+                // 그대로 보여주면 수동 플레이로는 불가능한 이득이 된다. 연 뒤에만 후보로 삼는다.
+                var chest = inventory.GetComponentInParent<ItemChest>();
+                if (chest != null && !chest.isOpened) continue;
+
                 Collect(snapshot.Offers, inventory, player);
             }
         }
