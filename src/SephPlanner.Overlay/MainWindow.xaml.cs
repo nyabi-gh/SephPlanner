@@ -9,6 +9,8 @@ using SephPlanner.Core.Charms;
 using SephPlanner.Core.Ipc;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
+using SephPlanner.Core.Solver;
+using SephPlanner.Core.Tablets;
 
 namespace SephPlanner.Overlay;
 
@@ -202,14 +204,45 @@ public partial class MainWindow : Window
 
             _offers.Add(new OfferView(
                 advice.Candidate.Name,
+                Reach(advice.Effect),
                 price > 0 ? $"{price}골드" : "",
                 gain > 0.001 ? $"+{gain:0.#}" : gain < -0.001 ? $"{gain:0.#}" : "0",
                 gain > 0.001 ? Brushes.PaleGreen : gain < -0.001 ? Brushes.Salmon : Brushes.Gray,
                 advice.Affordable ? OfferName : OfferNameDim,
                 advice.Affordable ? PriceText : Brushes.Salmon,
-                advice.Affordable ? "" : $"소지금 {gold}골드로는 살 수 없습니다."));
+                Explain(advice, gold)));
         }
         OfferPanel.Visibility = _offers.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// 석판이 실제로 미치는 범위. 증가분이 같아 보일 때 무엇이 다른지 이 줄에서 드러난다.
+    /// </summary>
+    private static string Reach(TabletEffectSummary effect)
+    {
+        if (effect.IsEmpty) return "";
+
+        var text = effect.RaisedCells > 0 ? $"{effect.RaisedCells}칸 +{effect.RaisedTotal}" : "";
+        if (effect.LoweredCells > 0) text += $" −{effect.LoweredTotal}";
+        if (effect.DisabledCells > 0) text += $" 막힘{effect.DisabledCells}";
+        return text.Trim();
+    }
+
+    private static string Explain(OfferAdvice advice, int gold)
+    {
+        var lines = new List<string>();
+        if (!advice.Affordable) lines.Add($"소지금 {gold}골드로는 살 수 없습니다.");
+
+        var effect = advice.Effect;
+        if (!effect.IsEmpty)
+        {
+            if (effect.RaisedCells > 0) lines.Add($"{effect.RaisedCells}칸의 레벨을 모두 합쳐 {effect.RaisedTotal} 올립니다.");
+            if (effect.LoweredCells > 0) lines.Add($"{effect.LoweredCells}칸은 합쳐 {effect.LoweredTotal} 내립니다.");
+            if (effect.DisabledCells > 0) lines.Add($"{effect.DisabledCells}칸은 쓸 수 없게 만듭니다.");
+            if (effect.MultipliedCells > 0) lines.Add($"{effect.MultipliedCells}칸에 배수가 걸립니다.");
+            if (effect.IgnoreCriteriaCells > 0) lines.Add($"{effect.IgnoreCriteriaCells}칸은 배치 조건을 무시합니다.");
+        }
+        return string.Join(Environment.NewLine, lines);
     }
 
     private void RenderGrid(GameSnapshot snapshot, Plan plan)
@@ -310,7 +343,8 @@ public partial class MainWindow : Window
 public sealed record MoveView(string Label, string Detail);
 
 public sealed record OfferView(
-    string Name, string Price, string Gain, Brush Tone, Brush NameTone, Brush PriceTone, string Tooltip)
+    string Name, string Reach, string Price, string Gain,
+    Brush Tone, Brush NameTone, Brush PriceTone, string Tooltip)
 {
     /// <summary>살 수 있는 후보에 빈 도움말이 뜨지 않게 한다.</summary>
     public bool HasTooltip => Tooltip.Length > 0;

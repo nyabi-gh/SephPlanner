@@ -96,6 +96,9 @@
                                     <TextBlock DockPanel.Dock="Right" Text="{Binding Price}"
                                                Foreground="{Binding PriceTone}" FontSize="10"
                                                Margin="8,1,0,0" />
+                                    <TextBlock DockPanel.Dock="Right" Text="{Binding Reach}"
+                                               Foreground="#6B6285" FontSize="10"
+                                               Margin="8,1,0,0" />
                                     <TextBlock Text="{Binding Name}" Foreground="{Binding NameTone}" FontSize="11"
                                                TextTrimming="CharacterEllipsis" />
                                 </DockPanel>
