@@ -49,6 +49,33 @@
             <Setter Property="Padding" Value="8,5" />
         </Style>
 
+        <Style x:Key="PixelButton" TargetType="Button">
+            <Setter Property="Foreground" Value="{x:Static local:Theme.Text}" />
+            <Setter Property="FontFamily" Value="{x:Static local:Theme.Small}" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Padding" Value="8,3" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{x:Static local:Theme.SlotEdge}"
+                                BorderBrush="{x:Static local:Theme.Frame}" BorderThickness="1"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Foreground" Value="{x:Static local:Theme.TextBright}" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Foreground" Value="{x:Static local:Theme.TextDim}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="SectionHeader" TargetType="TextBlock">
             <Setter Property="FontFamily" Value="{x:Static local:Theme.Small}" />
             <Setter Property="FontSize" Value="10" />
@@ -133,7 +160,14 @@
                                    Text="노란 테두리 = 옮겨야 할 자리" Visibility="Collapsed" />
 
                         <StackPanel x:Name="MovePanel" Margin="0,12,0,0" Visibility="Collapsed">
-                            <TextBlock Text="옮길 것" Style="{StaticResource SectionHeader}" />
+                            <DockPanel Margin="0,0,0,5" LastChildFill="False">
+                                <TextBlock Text="옮길 것" Style="{StaticResource SectionHeader}"
+                                           Margin="0" VerticalAlignment="Center" />
+                                <Button x:Name="AutoPlaceButton" DockPanel.Dock="Right" Content="자동 배치"
+                                        Style="{StaticResource PixelButton}" Click="OnAutoPlace"
+                                        Visibility="Collapsed"
+                                        ToolTip="이 배치를 게임에 그대로 적용합니다. 싱글플레이에서만 동작합니다." />
+                            </DockPanel>
                             <ItemsControl x:Name="MoveList">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>

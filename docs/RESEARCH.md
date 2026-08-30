@@ -89,6 +89,70 @@ Mirror.NetworkClient.localPlayer -> GetComponent<PlayerAvatar>()
 초기화 중에는 `localPlayer`가 비어 있을 수 있어 `FindObjectsOfType<PlayerAvatar>()` +
 `isLocalPlayer` 폴백을 둔다.
 
+## 게임 상태 쓰기 경로 (자동 배치)
+
+자동 배치가 쓰는 경로다. 원칙은 **게임이 스스로 쓰는 경로만 탄다**는 것이다.
+
+### 자리 이동: `GridInventory.Swap`
+
+```
+public void Swap(sbyte xLeft, sbyte yLeft, sbyte xRight, sbyte yRight)
+```
+
+수동 드래그가 타는 그 경로다. 서버(=싱글 호스트)면 `LocalSwap`을 바로 부르고, 클라이언트면
+`CmdSwap`(Mirror Command, `requiresAuthority: true`)으로 서버에 보낸다. `LocalSwap`은
+`inventoryMatrix`/`charms`/`stoneTablets` 세 딕셔너리를 함께 갱신하고, 빈 칸과의 맞바꿈도
+그대로 처리하므로 "이동"과 "맞바꿈"을 구분할 필요가 없다. 임시 저장(손에 들기)을 거치는
+`CmdMoveToTempStorage`/`CmdTempStorageToInventory` 경로도 있지만, 중간에 끊기면 아이템이 손에
+남으므로 쓰지 않는다.
+
+목표 배치를 적용할 때는 대상마다 "지금 자리 ↔ 목표 자리"를 Swap 하면 된다. 맞바꿈이라 밀려난
+물건의 자리를 따로 관리하면 대피 걸음 없이 어떤 순열이든 만들어진다. 단 **여러 칸을 차지하는
+아이템은 한 칸짜리 Swap 으로 옮기면 망가지므로**, 하나라도 보이면 적용 전체를 중단한다.
+
+### 회전: `Permission` 스코프 안에서 `Networkrotation`
+
+배치된 석판의 회전을 바꾸는 전용 Cmd 는 없다. 게임 내장 자동 정리(아래)가 하는 방식을 그대로
+따른다: `using (new GridInventory.Permission(inv))` 안에서 `StoneTablet.Networkrotation`(SyncVar)을
+설정한다. `Permission`은 공개 중첩 클래스로, 생성 시 쓰기 권한을 얻고 Dispose 때
+`ReleasePermission`이 레벨 행렬 전체를 다시 계산한다. `LocalSwap`도 내부에서 같은 스코프를
+여므로, **우리 Permission 스코프 안에서 Swap 을 부르면 권한 중복으로 터진다.** 이동과 회전을
+분리한 이유다.
+
+회전은 인스턴스 단위로 잠길 수 있다(`DungeonManager.IsTabletRotatable(instanceID, isRotatable)`).
+솔버는 카탈로그의 `IsRotatable`만 보므로 잠긴 인스턴스에 회전을 제안할 수 있고, 적용기는 그런
+회전을 건너뛰고 로그에 남긴다. 스냅샷에 인스턴스별 회전 가능 여부를 실어 솔버에 알리는 것이
+다음 과제다.
+
+### 게임 내장 자동 정리
+
+`GridInventory.RequestAutoArrangeInventoryForBestCharmLevels(maxIterations = 4, allowTabletRotation = true)`
+가 이미 게임에 있다(클라이언트용 Cmd 포함). 회전 후보와 쌍별 맞바꿈을 그리디로 4회 반복하는
+지역 탐색이라 우리 솔버(빔 서치 + 헝가리안)보다 약하고, 목적 함수도 다르다:
+
+```
+켜진 아티팩트의 유효 레벨 합 × 10000 + 켜진 수 × 1000 + 전체 레벨 합 × 10
++ 상한 초과분 − 꺼진 수 × 750 − 음수 레벨 합 × 250
+```
+
+우리가 이 함수를 부르지 않는 이유는 우리 배치를 적용하기 위해서다. 다만 이 함수의 존재는
+"자동 배치"가 게임 설계에 이미 있는 동작이라는 근거가 된다. 전체 상태를 갈아끼우는 내부 구현
+(`ApplyAutoArrangeState`)은 여러 칸 아이템 처리가 우리 모델과 달라 흉내 내지 않는다.
+
+### 공식 모드 API
+
+`Assembly-CSharp`에 `HorayModAPI` 정적 클래스가 있다. 개발사가 직접 넣은 모드 훅으로,
+"The MOD System is still under development" 안내와 https://teamhoray.com/mod-api 링크,
+데이터베이스 로드·세션 시작·`GridInventoryStartPermission`/`EndPermission` 등의 이벤트를 제공한다.
+아직 초기 단계라 쓰지는 않지만, 게임이 모드를 공식적으로 상정하고 있다는 근거다.
+
+### 멀티플레이는 검증 전 잠금
+
+싱글은 호스트 모드라 위 경로가 전부 서버 로컬에서 끝난다. 멀티 클라이언트에서는 `CmdSwap` 등
+Cmd 경유가 필요한데, 커뮤니티의 다른 자동배치 모드가 클라이언트 회전 미동작·호스트 인벤토리
+오염을 겪은 전례가 있다. 동기화가 안전하다고 확인될 때까지 플러그인은 멀티 세션에서 적용을
+거부한다(`docs/LEGAL.md`).
+
 ## 텍스트 데이터
 
 `Sephiria_Data/StreamingAssets/Localization/*.json`이 **평문 JSON**이고 15개 언어가 모두 들어 있다.

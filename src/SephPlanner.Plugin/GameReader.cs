@@ -47,7 +47,7 @@ namespace SephPlanner.Plugin
             return SimulationVerifier.Check(avatar.Inventory);
         }
 
-        private static PlayerAvatar FindLocalPlayer()
+        internal static PlayerAvatar FindLocalPlayer()
         {
             var identity = NetworkClient.localPlayer;
             if (identity != null)
@@ -64,7 +64,7 @@ namespace SephPlanner.Plugin
             return null;
         }
 
-        private static bool IsMultiplayerSession()
+        internal static bool IsMultiplayerSession()
         {
             if (NetworkClient.active && !NetworkServer.active) return true;
             return NetworkServer.active && NetworkServer.connections.Count > 1;

@@ -29,6 +29,9 @@ public partial class MainWindow : Window
     private string _lastPlanned = "";
     private bool _expanded;
 
+    /// <summary>자동 배치 버튼이 보낼 최종 배치. 스냅샷이 갱신될 때마다 함께 바뀐다.</summary>
+    private Plan? _plan;
+
     /// <summary>상자나 상점이 열리고 닫히는 순간에만 저절로 펼치고 접는다.</summary>
     private bool _hadOffers;
 
@@ -116,6 +119,7 @@ public partial class MainWindow : Window
         MovePanel.Visibility = Visibility.Collapsed;
         LegendText.Visibility = Visibility.Collapsed;
         _lastPlanned = "";
+        _plan = null;
     }
 
     private void Render(GameSnapshot snapshot, Plan? plan)
@@ -159,6 +163,12 @@ public partial class MainWindow : Window
         }
 
         MovePanel.Visibility = _moves.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+        // 멀티 세션에서는 쓰기 경로의 동기화가 검증되지 않아 자동 배치를 내놓지 않는다 (docs/LEGAL.md).
+        _plan = plan;
+        AutoPlaceButton.Visibility = plan.Moves.Count > 0 && !snapshot.IsMultiplayer
+            ? Visibility.Visible
+            : Visibility.Collapsed;
 
         var next = plan.Moves.FirstOrDefault();
         NextMoveText.Text = next is null ? "" : $"{next.Label}  {next.Detail}";
@@ -306,6 +316,19 @@ public partial class MainWindow : Window
             }
             else cell.SetEmpty();
         }
+    }
+
+    private async void OnAutoPlace(object sender, RoutedEventArgs e)
+    {
+        var plan = _plan;
+        if (plan is null || plan.Targets.Count == 0) return;
+
+        // 적용 결과는 새 스냅샷으로 돌아온다. 그때까지 같은 명령이 두 번 나가지 않게 잠근다.
+        AutoPlaceButton.IsEnabled = false;
+        var sent = await Task.Run(() => CommandClient.TrySend(new ApplyPlanCommand { Targets = plan.Targets }));
+        AutoPlaceButton.IsEnabled = true;
+
+        if (!sent) ShowWarning("플러그인과 연결할 수 없어 자동 배치를 보내지 못했습니다.");
     }
 
     private void OnDragArea(object sender, MouseButtonEventArgs e) => DragMove();

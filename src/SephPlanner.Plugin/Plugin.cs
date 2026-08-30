@@ -7,7 +7,8 @@ using UnityEngine;
 namespace SephPlanner.Plugin
 {
     /// <summary>
-    /// 세피리아 상태를 읽어 SephPlanner 오버레이로 내보내는 브리지. 게임 상태를 변경하지 않는다.
+    /// 세피리아 상태를 읽어 SephPlanner 오버레이로 내보내고, 싱글플레이에서는 오버레이가 요청한
+    /// 자동 배치를 게임 자체의 이동 경로로 적용하는 브리지. 멀티 세션에서는 읽기만 한다.
     /// </summary>
     [BepInPlugin(PluginGuid, "SephPlanner Bridge", "0.1.0")]
     public sealed class SephPlannerPlugin : BaseUnityPlugin
@@ -15,6 +16,7 @@ namespace SephPlanner.Plugin
         public const string PluginGuid = "dev.nyabi.sephplanner.bridge";
 
         private SnapshotPipeServer _server;
+        private CommandPipeServer _commands;
         private ConfigEntry<float> _pollInterval;
         private ConfigEntry<KeyboardShortcut> _dumpKey;
         private ConfigEntry<float> _offerRadius;
@@ -42,7 +44,8 @@ namespace SephPlanner.Plugin
                 "선택지로 볼 상자/상점까지의 거리. 넓히면 멀리 있는 것까지 추천에 들어온다.");
 
             _server = new SnapshotPipeServer(Logger.LogInfo);
-            Logger.LogInfo("SephPlanner 브리지 시작 (읽기 전용)");
+            _commands = new CommandPipeServer(Logger.LogInfo);
+            Logger.LogInfo("SephPlanner 브리지 시작");
         }
 
         private void Update()
@@ -57,9 +60,29 @@ namespace SephPlanner.Plugin
                 if (!CatalogDump.HasCatalog()) DumpCatalog();
             }
 
+            DrainCommands();
+
             if (Time.unscaledTime < _nextPoll) return;
             _nextPoll = Time.unscaledTime + Mathf.Max(0.05f, _pollInterval.Value);
             PublishSnapshot();
+        }
+
+        private void DrainCommands()
+        {
+            while (_commands.TryDequeue(out var command))
+            {
+                try
+                {
+                    Logger.LogInfo(PlanApplier.Apply(command));
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("자동 배치 실패: " + ex);
+                }
+
+                // 적용 결과가 화면에 바로 보이도록 다음 폴링을 기다리지 않는다.
+                _nextPoll = 0;
+            }
         }
 
         private void DumpCatalog()
@@ -142,6 +165,10 @@ namespace SephPlanner.Plugin
             }
         }
 
-        private void OnDestroy() => _server?.Dispose();
+        private void OnDestroy()
+        {
+            _server?.Dispose();
+            _commands?.Dispose();
+        }
     }
 }

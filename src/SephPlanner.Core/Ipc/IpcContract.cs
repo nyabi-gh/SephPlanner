@@ -14,6 +14,9 @@ namespace SephPlanner.Core.Ipc
 
         public const string PipeName = "SephPlanner.Snapshot.v1";
 
+        /// <summary>오버레이가 플러그인으로 명령을 보내는 역방향 파이프. 자동 배치가 이 길로 간다.</summary>
+        public const string CommandPipeName = "SephPlanner.Command.v1";
+
         public const string TabletDbFile = "tablets.json";
         public const string CharmDbFile = "charms.json";
         public const string VerificationReportFile = "query-verification.txt";

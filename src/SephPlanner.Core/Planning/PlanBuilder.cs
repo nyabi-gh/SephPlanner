@@ -94,7 +94,31 @@ namespace SephPlanner.Core.Planning
                 Offers = offers,
                 SkippedOffers = skippedOffers,
                 Names = NamesByCell(problem, best),
+                Targets = Targets(problem, best),
             };
+        }
+
+        /// <summary>자동 배치 명령에 실을 최종 배치. 걸음 순서는 살아 있는 상태를 아는 플러그인이 정한다.</summary>
+        private static List<PlanTarget> Targets(PlacementProblem problem, Arrangement best)
+        {
+            var targets = new List<PlanTarget>();
+            for (var i = 0; i < problem.Tablets.Count && i < best.Tablets.Count; i++)
+            {
+                targets.Add(new PlanTarget
+                {
+                    InstanceId = problem.Tablets[i].InstanceId,
+                    To = best.Tablets[i].Position,
+                    IsTablet = true,
+                    Rotation = best.Tablets[i].Rotation,
+                });
+            }
+
+            foreach (var charm in problem.Charms)
+            {
+                if (!best.CharmPositions.TryGetValue(charm.InstanceId, out var position)) continue;
+                targets.Add(new PlanTarget { InstanceId = charm.InstanceId, To = position });
+            }
+            return targets;
         }
 
         private static Dictionary<GridPos, string> NamesByCell(PlacementProblem problem, Arrangement best)

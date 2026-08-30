@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using SephPlanner.Core.Ipc;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Solver;
 
@@ -55,6 +56,9 @@ namespace SephPlanner.Core.Planning
 
         /// <summary>제안된 배치에서 각 칸에 놓이는 아이템의 이름. 격자에 그대로 보여준다.</summary>
         public Dictionary<GridPos, string> Names { get; set; } = new Dictionary<GridPos, string>();
+
+        /// <summary>자동 배치 명령에 실어 보낼 최종 배치. 인스턴스마다 있어야 할 자리다.</summary>
+        public List<PlanTarget> Targets { get; set; } = new List<PlanTarget>();
 
         public double Gain => Best.Score - Current.Score;
     }

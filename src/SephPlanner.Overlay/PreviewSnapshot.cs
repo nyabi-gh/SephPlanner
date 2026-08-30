@@ -19,7 +19,8 @@ public static class PreviewSnapshot
             Storage = 24,
             Items =
             {
-                new PlacedItem { DefinitionId = 1237, InstanceId = 1, Position = new GridPos(0, 0), IsActive = true },
+                // 석판 효과에서 먼 자리에 두어 이동 제안과 자동 배치 버튼까지 미리보기에 나오게 한다.
+                new PlacedItem { DefinitionId = 1237, InstanceId = 1, Position = new GridPos(5, 3), IsActive = true },
                 new PlacedItem { DefinitionId = 3002, InstanceId = 2, Position = new GridPos(2, 0), IsActive = true },
                 new PlacedItem { DefinitionId = 3012, InstanceId = 3, Position = new GridPos(0, 2), IsActive = true },
                 new PlacedItem { DefinitionId = 0, InstanceId = 4, Position = new GridPos(1, 0) },
