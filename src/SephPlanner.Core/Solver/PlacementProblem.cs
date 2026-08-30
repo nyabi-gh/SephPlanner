@@ -44,6 +44,25 @@ namespace SephPlanner.Core.Solver
         public GridSpec Grid { get; set; } = GridSpec.WithStorage(GridSpec.DefaultWidth * GridSpec.DefaultHeight);
         public List<CharmSlot> Charms { get; set; } = new List<CharmSlot>();
         public List<TabletSlot> Tablets { get; set; } = new List<TabletSlot>();
+
+        /// <summary>
+        /// 지금 놓여 있는 자리. 점수가 같은 배치가 여럿일 때 이미 놓인 대로 두는 쪽을 고르는 데 쓴다.
+        /// 이것이 없으면 아무것도 달라지지 않았는데도 제안이 이리저리 바뀐다.
+        /// </summary>
+        public Dictionary<int, TabletSpot> CurrentTablets { get; } = new Dictionary<int, TabletSpot>();
+        public Dictionary<int, GridPos> CurrentCharms { get; } = new Dictionary<int, GridPos>();
+    }
+
+    public readonly struct TabletSpot
+    {
+        public readonly GridPos Position;
+        public readonly int Rotation;
+
+        public TabletSpot(GridPos position, int rotation)
+        {
+            Position = position;
+            Rotation = rotation;
+        }
     }
 
     public sealed class SolverOptions
@@ -67,8 +86,13 @@ namespace SephPlanner.Core.Solver
 
         public double Score { get; set; }
 
-        /// <summary>칸별 최종 레벨. 오버레이가 그대로 표시한다.</summary>
+        /// <summary>칸별 최종 레벨.</summary>
         public Dictionary<GridPos, int> Levels { get; } = new Dictionary<GridPos, int>();
+
+        /// <summary>
+        /// 그 칸의 아티팩트가 실제로 받는 레벨. 아티팩트마다 상한이 달라 칸의 레벨보다 낮을 수 있다.
+        /// </summary>
+        public Dictionary<GridPos, int> EffectiveLevels { get; } = new Dictionary<GridPos, int>();
 
         /// <summary>조건을 만족하지 못해 효과가 꺼진 아티팩트.</summary>
         public List<int> InactiveCharms { get; } = new List<int>();

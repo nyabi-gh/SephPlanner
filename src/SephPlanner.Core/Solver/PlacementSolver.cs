@@ -17,6 +17,11 @@ namespace SephPlanner.Core.Solver
     /// </summary>
     public static class PlacementSolver
     {
+        private const double WastePenalty = 1e-4;
+
+        /// <summary>낭비 판단보다도 작게 두어, 정말 우열이 없을 때만 현 상태를 유지하도록 한다.</summary>
+        private const double StabilityBonus = 1e-6;
+
         public static Arrangement Solve(PlacementProblem problem, SolverOptions? options = null)
         {
             options ??= new SolverOptions();
@@ -25,10 +30,16 @@ namespace SephPlanner.Core.Solver
                                   .Select(problem.Grid.ToPosition)
                                   .ToList();
 
-            var candidates = SearchTabletLayouts(problem, cells, options);
+            var candidates = SearchTabletLayouts(problem, cells, options)
+                .Take(options.ExactCandidates)
+                .ToList();
+
+            // 탐색이 현재 배치를 후보에서 떨어뜨리면, 이미 최적인 배치를 두고도 옮기라고 하게 된다.
+            var asIs = CurrentLayout(problem);
+            if (asIs != null) candidates.Insert(0, asIs);
 
             Arrangement? best = null;
-            foreach (var layout in candidates.Take(options.ExactCandidates))
+            foreach (var layout in candidates)
             {
                 var arrangement = Evaluate(problem, cells, layout, options);
                 if (best == null || arrangement.Score > best.Score) best = arrangement;
@@ -50,6 +61,22 @@ namespace SephPlanner.Core.Solver
             var result = TabletSimulator.Run(placements, occupancy, problem.Grid);
 
             return Describe(problem, placements, positions, occupancy, result);
+        }
+
+        private static List<TabletPlacement>? CurrentLayout(PlacementProblem problem)
+        {
+            if (problem.Tablets.Count == 0 || problem.CurrentTablets.Count < problem.Tablets.Count) return null;
+
+            var layout = new List<TabletPlacement>(problem.Tablets.Count);
+            var taken = new HashSet<GridPos>();
+
+            foreach (var slot in problem.Tablets)
+            {
+                if (!problem.CurrentTablets.TryGetValue(slot.InstanceId, out var spot)) return null;
+                if (!taken.Add(spot.Position)) return null;
+                layout.Add(slot.At(spot.Position, spot.Rotation));
+            }
+            return layout;
         }
 
         private static List<List<TabletPlacement>> SearchTabletLayouts(
@@ -191,7 +218,11 @@ namespace SephPlanner.Core.Solver
                 if (!CharmCriteria.IsSatisfied(kind, cell, grid, occupancy)) return 0;
             }
 
-            return charm.Weight * Math.Min(charm.Definition.MaxLevel, level);
+            var effective = Math.Min(charm.Definition.MaxLevel, level);
+
+            // 상한을 넘긴 레벨은 아무 값어치가 없다. 점수가 같은 배치라면 덜 흘리는 쪽을 고르도록
+            // 아주 작은 차이만 준다. 실제 점수 차이를 뒤집을 만한 크기가 아니다.
+            return charm.Weight * effective - WastePenalty * Math.Max(0, level - effective);
         }
 
         private static int EffectiveLevel(SimulationResult result, GridPos cell, int enchant)
@@ -230,6 +261,26 @@ namespace SephPlanner.Core.Solver
             return occupancy;
         }
 
+        /// <summary>지금과 같은 자리에 놓인 것마다 아주 작은 값을 더한다.</summary>
+        private static double Familiarity(
+            PlacementProblem problem, List<TabletPlacement> layout, Dictionary<int, GridPos> positions)
+        {
+            var kept = 0;
+
+            for (var i = 0; i < layout.Count && i < problem.Tablets.Count; i++)
+            {
+                if (!problem.CurrentTablets.TryGetValue(problem.Tablets[i].InstanceId, out var spot)) continue;
+                if (spot.Position == layout[i].Position && spot.Rotation == layout[i].Rotation) kept++;
+            }
+
+            foreach (var pair in positions)
+            {
+                if (problem.CurrentCharms.TryGetValue(pair.Key, out var position) && position == pair.Value) kept++;
+            }
+
+            return StabilityBonus * kept;
+        }
+
         private static bool SamePositions(Dictionary<int, GridPos> left, Dictionary<int, GridPos> right)
         {
             if (left.Count != right.Count) return false;
@@ -244,6 +295,7 @@ namespace SephPlanner.Core.Solver
         {
             var arrangement = new Arrangement();
             arrangement.Tablets.AddRange(layout);
+            arrangement.Score += Familiarity(problem, layout, positions);
 
             foreach (var charm in problem.Charms)
             {
@@ -254,8 +306,12 @@ namespace SephPlanner.Core.Solver
                 }
 
                 arrangement.CharmPositions[charm.InstanceId] = position;
-                arrangement.Levels[position] = EffectiveLevel(result, position, charm.Enchant);
+
+                var level = EffectiveLevel(result, position, charm.Enchant);
+                arrangement.Levels[position] = level;
                 if (charm.IsFiller) continue;
+
+                arrangement.EffectiveLevels[position] = Math.Max(0, Math.Min(charm.Definition.MaxLevel, level));
 
                 var value = Value(charm, position, result, problem.Grid, occupancy);
                 arrangement.Score += value;

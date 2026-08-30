@@ -148,7 +148,11 @@ public partial class MainWindow : Window
                 var name = Naming.Of(tablet.Definition.Names, tablet.Definition.Id, "석판");
                 cell.SetTablet(Naming.Short(name), $"{name} · 회전 {tablet.Rotation}", moved.Contains(position));
             }
-            else if (plan.Best.Levels.TryGetValue(position, out var level)) cell.SetLevel(level, moved.Contains(position));
+            else if (plan.Best.Levels.TryGetValue(position, out var level))
+            {
+                plan.Best.EffectiveLevels.TryGetValue(position, out var effective);
+                cell.SetLevel(level, effective, moved.Contains(position));
+            }
             else cell.SetEmpty();
         }
     }
@@ -179,6 +183,7 @@ public sealed class CellView : INotifyPropertyChanged
     private static readonly Brush ClosedFill = new SolidColorBrush(Color.FromRgb(0x12, 0x10, 0x17));
     private static readonly Brush TabletFill = new SolidColorBrush(Color.FromRgb(0x2B, 0x3A, 0x2A));
     private static readonly Brush MutedText = new SolidColorBrush(Color.FromRgb(0x5A, 0x51, 0x70));
+    private static readonly Brush Wasted = new SolidColorBrush(Color.FromRgb(0xC9, 0xA2, 0x27));
     private static readonly Brush MovedEdge = new SolidColorBrush(Color.FromRgb(0xC9, 0xA2, 0x27));
     private static readonly Brush QuietEdge = new SolidColorBrush(Color.FromRgb(0x2A, 0x24, 0x34));
 
@@ -239,11 +244,19 @@ public sealed class CellView : INotifyPropertyChanged
         SetEdge(moved);
     }
 
-    public void SetLevel(int level, bool moved)
+    /// <summary>
+    /// 보여주는 숫자는 그 칸의 레벨이 아니라 거기 놓인 아티팩트가 실제로 받는 레벨이다.
+    /// 상한에 걸려 남는 레벨이 있으면 색으로 알린다.
+    /// </summary>
+    public void SetLevel(int level, int effective, bool moved)
     {
-        Label = level > 0 ? $"+{level}" : level.ToString();
-        Tooltip = "";
-        Foreground = level < 0 ? Brushes.Salmon : level > 0 ? Brushes.PaleGreen : MutedText;
+        var wasted = level > effective;
+        Label = effective > 0 ? $"+{effective}" : level < 0 ? level.ToString() : "0";
+        Tooltip = wasted ? $"칸 레벨 {level}, 이 아티팩트는 {effective}까지만 반영됩니다" : "";
+        Foreground = level < 0 ? Brushes.Salmon
+            : wasted ? Wasted
+            : effective > 0 ? Brushes.PaleGreen
+            : MutedText;
         Background = EmptyFill;
         SetEdge(moved);
     }

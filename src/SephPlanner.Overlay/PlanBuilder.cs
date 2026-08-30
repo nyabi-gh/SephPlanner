@@ -42,8 +42,14 @@ public static class PlanBuilder
         var grid = new GridSpec(inventory.Width, inventory.Height, inventory.Storage);
         var problem = new PlacementProblem { Grid = grid };
 
+        // 빔 서치는 후보를 살펴보는 순서에 따라 같은 점수의 다른 배치를 내놓는다. 스냅샷의 순서는
+        // 석판을 옮기면 바뀌므로, 여기서 한 번 고정해 두어야 제안이 흔들리지 않는다.
+        var orderedTablets = inventory.Tablets
+            .OrderBy(t => t.DefinitionId).ThenBy(t => t.InstanceId)
+            .ToList();
+
         var layout = new List<TabletPlacement>();
-        foreach (var tablet in inventory.Tablets)
+        foreach (var tablet in orderedTablets)
         {
             var definition = catalog.Tablet(tablet.DefinitionId) ?? new TabletDefinition();
             var slot = new TabletSlot
@@ -55,13 +61,19 @@ public static class PlanBuilder
             };
             problem.Tablets.Add(slot);
             layout.Add(slot.At(tablet.Position, tablet.Rotation));
+            problem.CurrentTablets[slot.InstanceId] = new TabletSpot(tablet.Position, tablet.Rotation);
         }
 
         var occupancy = BuildOccupancy(inventory, catalog, grid);
-        var tabletLevels = TabletSimulator.Run(layout, occupancy, grid);
+        var simulation = TabletSimulator.Run(layout, occupancy, grid);
+
+        // 석판을 막 옮긴 직후에는 게임이 아직 레벨을 다시 계산하지 않았을 수 있다. 그 상태에서
+        // 차이를 인챈트로 받아들이면 배치를 건드릴 때마다 문제 자체가 달라져 제안이 흔들린다.
+        var consistent = IsConsistent(orderedTablets, simulation);
 
         var positions = new Dictionary<int, GridPos>();
-        foreach (var item in inventory.Items)
+        foreach (var item in inventory.Items
+                     .OrderBy(i => i.DefinitionId).ThenBy(i => i.InstanceId))
         {
             if (!IsOnGrid(item.Position, grid)) continue;
 
@@ -71,10 +83,11 @@ public static class PlanBuilder
             {
                 Definition = definition ?? new CharmDefinition(),
                 InstanceId = item.InstanceId,
-                Enchant = definition is null ? 0 : DeriveEnchant(item, tabletLevels),
+                Enchant = definition is null || !consistent ? 0 : DeriveEnchant(item, simulation),
                 IsFiller = definition is null,
             });
             positions[item.InstanceId] = item.Position;
+            problem.CurrentCharms[item.InstanceId] = item.Position;
         }
 
         if (problem.Charms.All(charm => charm.IsFiller)) return null;
@@ -148,6 +161,17 @@ public static class PlanBuilder
             occupancy.AddItem(item.Position, definition is not null, definition?.IsMagic ?? false);
         }
         return occupancy;
+    }
+
+    /// <summary>우리 시뮬레이션이 게임이 보고한 석판 적용 상태와 맞는지 본다.</summary>
+    private static bool IsConsistent(List<PlacedTablet> tablets, SimulationResult simulation)
+    {
+        if (tablets.Count != simulation.Applied.Length) return false;
+
+        for (var i = 0; i < tablets.Count; i++)
+            if (tablets[i].IsApplied != simulation.Applied[i]) return false;
+
+        return true;
     }
 
     /// <summary>보조 가방처럼 본 격자 밖에 있는 자리는 배치 대상이 아니다.</summary>
