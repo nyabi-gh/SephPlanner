@@ -142,6 +142,21 @@ public class OfferAdvisorTests
     }
 
     [Fact]
+    public void ARarerCharmOutranksACommonOneOfEqualLevel()
+    {
+        var candidates = new List<OfferCandidate>
+        {
+            new() { Kind = "charm", Name = "common", Charm = new CharmDefinition { MaxLevel = 5 } },
+            new() { Kind = "charm", Name = "eternal", Charm = new CharmDefinition { MaxLevel = 5, Rarity = Rarity.Eternal } },
+        };
+
+        var advice = OfferAdvisor.Rank(BaseProblem(), baseScore: 0, candidates, gold: 0);
+
+        Assert.Equal("eternal", advice[0].Candidate.Name);
+        Assert.True(advice[0].Gain > advice[1].Gain);
+    }
+
+    [Fact]
     public void APastAllThresholdsComboAddsNothing()
     {
         // 임계값을 다 넘긴 카테고리는 더 모아도 변하는 게 없다.

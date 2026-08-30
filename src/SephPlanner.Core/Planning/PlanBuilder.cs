@@ -36,6 +36,7 @@ namespace SephPlanner.Core.Planning
                     InstanceId = tablet.InstanceId,
                     InstanceQuery = tablet.Query,
                     InstanceConditionQuery = tablet.ConditionQuery,
+                    Rotatable = tablet.IsRotatable,
                 };
                 problem.Tablets.Add(slot);
                 layout.Add(slot.At(tablet.Position, tablet.Rotation));
@@ -75,9 +76,10 @@ namespace SephPlanner.Core.Planning
                     Enchant = definition is null ? 0 : item.Enchant,
                     IsFiller = definition is null,
                     IsDormant = definition is not null && WeaponMatch.IsDormant(definition, weapon),
-                    Weight = definition is not null && preferences.PinnedCharms.Contains(item.DefinitionId)
-                        ? PlanPreferences.PinnedWeight
-                        : 1,
+                    Weight = definition is null
+                        ? 1
+                        : Worth.OfRarity(definition.Rarity) *
+                          (preferences.PinnedCharms.Contains(item.DefinitionId) ? PlanPreferences.PinnedWeight : 1),
                 });
                 positions[item.InstanceId] = item.Position;
                 problem.CurrentCharms[item.InstanceId] = item.Position;

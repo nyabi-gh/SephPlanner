@@ -108,7 +108,13 @@ namespace SephPlanner.Core.Solver
 
             foreach (var slot in problem.Tablets)
             {
-                var rotations = slot.Definition.IsRotatable ? 4 : 1;
+                // 돌릴 수 없는 석판은 지금 돌아가 있는 각도 그대로만 쓴다. 0으로 고정하면
+                // 이미 돌아간 채로 잠긴 석판(저주 등)에 불가능한 회전을 제안하게 된다.
+                var rotatable = slot.Definition.IsRotatable && slot.Rotatable;
+                var fixedRotation = problem.CurrentTablets.TryGetValue(slot.InstanceId, out var spot)
+                    ? spot.Rotation
+                    : 0;
+
                 var expanded = new List<(List<TabletPlacement> Layout, double Score)>();
 
                 foreach (var layout in beam)
@@ -119,9 +125,12 @@ namespace SephPlanner.Core.Solver
                     {
                         if (taken.Contains(cell)) continue;
 
-                        for (var rotation = 0; rotation < rotations; rotation++)
+                        for (var rotation = 0; rotation < (rotatable ? 4 : 1); rotation++)
                         {
-                            var next = new List<TabletPlacement>(layout) { slot.At(cell, rotation) };
+                            var next = new List<TabletPlacement>(layout)
+                            {
+                                slot.At(cell, rotatable ? rotation : fixedRotation),
+                            };
                             expanded.Add((next, Estimate(problem, cells, next)));
                         }
                     }

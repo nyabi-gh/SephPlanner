@@ -84,6 +84,12 @@ namespace SephPlanner.Core.Ipc
         public int Rotation { get; set; }
         public bool IsApplied { get; set; }
 
+        /// <summary>
+        /// 이 인스턴스를 지금 돌릴 수 있는지. 저주 등으로 인스턴스 단위로 잠길 수 있어
+        /// 정의의 회전 가능 여부와 별개다(<c>DungeonManager.IsTabletRotatable</c>).
+        /// </summary>
+        public bool IsRotatable { get; set; } = true;
+
         /// <summary>커스텀 석판만 채워진다. 질의가 인스턴스마다 다르기 때문이다.</summary>
         public string? Query { get; set; }
         public string? ConditionQuery { get; set; }

@@ -198,6 +198,7 @@ namespace SephPlanner.Plugin
             Position = new GridPos(tablet.xIdx, tablet.yIdx),
             Rotation = tablet.rotation,
             IsApplied = tablet.IsApplied,
+            IsRotatable = DungeonManager.IsTabletRotatable(tablet.instanceID, tablet.isRotatable),
             Query = tablet.isCustomTablet ? tablet.GetQuery(tablet.instanceID) : null,
             ConditionQuery = tablet.isCustomTablet ? tablet.GetConditionQuery(tablet.instanceID) : null,
         };

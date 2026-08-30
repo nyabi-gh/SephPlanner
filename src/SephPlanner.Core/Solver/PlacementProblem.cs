@@ -36,6 +36,12 @@ namespace SephPlanner.Core.Solver
         public string? InstanceQuery { get; set; }
         public string? InstanceConditionQuery { get; set; }
 
+        /// <summary>
+        /// 이 인스턴스를 돌려도 되는지. 정의가 회전 가능해도 저주 등으로 인스턴스가 잠길 수 있다.
+        /// 잠긴 석판에 회전을 제안하면 사람도 자동 배치도 따라 할 수 없다.
+        /// </summary>
+        public bool Rotatable { get; set; } = true;
+
         public TabletPlacement At(GridPos position, int rotation) => new TabletPlacement
         {
             Definition = Definition,

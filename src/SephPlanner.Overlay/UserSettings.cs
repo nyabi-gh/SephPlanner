@@ -14,6 +14,10 @@ public sealed class UserSettings
     public List<string> PriorityCategories { get; set; } = new();
     public List<int> PinnedCharms { get; set; } = new();
 
+    /// <summary>마지막으로 끌어다 둔 창 위치. 없으면 기본 위치를 쓴다.</summary>
+    public double? WindowLeft { get; set; }
+    public double? WindowTop { get; set; }
+
     private static string FilePath =>
         Path.Combine(IpcContract.DataDirectory, "overlay-settings.json");
 

@@ -51,6 +51,7 @@ public partial class MainWindow : Window
         OfferList.ItemsSource = _offers;
         ChipList.ItemsSource = _chips;
         _preferences = _settings.ToPreferences();
+        RestorePosition();
         ApplyLayout();
 
         // 게임 없이 화면을 확인하는 통로. 파이프를 열지 않으므로 실제 오버레이와 같이 떠도 안전하다.
@@ -425,7 +426,31 @@ public partial class MainWindow : Window
         if (!sent) ShowWarning("플러그인과 연결할 수 없어 자동 배치를 보내지 못했습니다.");
     }
 
-    private void OnDragArea(object sender, MouseButtonEventArgs e) => DragMove();
+    /// <summary>모니터 구성이 바뀌어 저장된 위치가 화면 밖이면 기본 위치로 되돌아간다.</summary>
+    private void RestorePosition()
+    {
+        if (_settings.WindowLeft is not { } left || _settings.WindowTop is not { } top) return;
+
+        var onScreen =
+            left > SystemParameters.VirtualScreenLeft - CompactWidth &&
+            left < SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth &&
+            top > SystemParameters.VirtualScreenTop - 40 &&
+            top < SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight;
+        if (!onScreen) return;
+
+        Left = left;
+        Top = top;
+    }
+
+    private void OnDragArea(object sender, MouseButtonEventArgs e)
+    {
+        DragMove();
+
+        // DragMove 는 끌기가 끝날 때까지 돌아오지 않는다. 여기서 저장하면 곧 마지막 위치다.
+        _settings.WindowLeft = Left;
+        _settings.WindowTop = Top;
+        _settings.Save();
+    }
 
     private void OnClose(object sender, RoutedEventArgs e) => Close();
 

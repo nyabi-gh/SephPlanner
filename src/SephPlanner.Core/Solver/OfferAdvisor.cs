@@ -89,6 +89,7 @@ namespace SephPlanner.Core.Solver
                         Definition = candidate.Charm,
                         InstanceId = nextInstanceId--,
                         IsDormant = candidate.CharmIsDormant,
+                        Weight = Worth.OfRarity(candidate.Charm.Rarity),
                     });
                 }
                 else if (candidate.Tablet is not null)
