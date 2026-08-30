@@ -189,14 +189,24 @@ ilspycmd -t GridInventory "<게임경로>/Sephiria_Data/Managed/Assembly-CSharp.
 값이 있다. 예전에는 게임이 보고한 레벨에서 석판 몫을 빼서 역산했는데, 4단계의 배수가 걸린 칸에서는
 나눗셈이 떨어지지 않아 근사값이 됐다.
 
+### 각인
+
+`GridInventory.engravings`(`SyncList<StoneTablet>`)는 **격자 위 고정된 자리에서 석판과 똑같이
+효과를 내지만 칸은 차지하지 않는다.** `AddEngravingOnServer(entityID, instanceID, rotation, x, y)`가
+위치와 회전을 정하고, `ApplyEffect`는 일반 석판과 같은 코드를 탄다(조건 질의 포함).
+
+`inventoryMatrix`에는 들어가지 않으므로 **각인이 있는 칸에도 아이템을 놓을 수 있다.** 추가와
+제거 API만 있고 이동 API가 없어 **플레이어가 옮길 수 없다.**
+
+그래서 각인은 배치 탐색의 대상이 아니라 주어진 조건이다. `PlacementProblem.FixedTablets`에 담아
+효과 계산에는 언제나 함께 넣되, 배치 후보에서 자리를 빼앗지는 않는다.
+
 ### 아직 반영하지 않은 것
 
-- **각인**(`GridInventory.engravings`)은 읽지 않는다. `SyncList<StoneTablet>`이라 클라이언트에서
-  볼 수는 있지만, 석판과 달리 옮길 수 있는 물건이 아니어서 지금의 배치 모델에 그대로 넣을 수 없다.
-  "고정되어 움직이지 않는 석판"이라는 개념이 필요하다.
 - **고정 각인**(`fixedEngravingsOnServer`)은 이름 그대로 서버에만 있어 클라이언트로 접속한
   세션에서는 읽을 수 없다.
-- **배치 보너스**는 곱셈 뒤에 더해져서 `(석판 + 인챈트) × 배수`라는 우리 모델에 자리가 없다.
+- **세트 효과**(`SearchSetEffectInInventory`)와 **배치 보너스**(`SearchArrangementBonusInInventory`).
+  배치 보너스는 곱셈 뒤에 더해져서 `(석판 + 인챈트) × 배수`라는 우리 모델에 자리가 없다.
 
 셋 다 있는 상황에서는 우리가 계산한 레벨이 게임이 보고한 레벨과 어긋난다. 그래서 **어긋나는지를
 항상 확인한다.** 게임이 계산해 둔 `levelMatrix`가 정답지다.

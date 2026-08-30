@@ -58,9 +58,24 @@ namespace SephPlanner.Core.Solver
 
             var placements = new List<TabletPlacement>(layout);
             var occupancy = OccupancyFrom(placements, positions, problem);
-            var result = TabletSimulator.Run(placements, occupancy, problem.Grid);
+            var result = TabletSimulator.Run(WithFixed(problem, placements), occupancy, problem.Grid);
 
             return Describe(problem, placements, positions, occupancy, result);
+        }
+
+        /// <summary>
+        /// 효과를 계산할 때는 옮길 수 있는 석판과 고정된 각인을 함께 넣는다. 각인은 칸을 차지하지
+        /// 않으므로 배치 후보에서 자리를 빼앗지는 않는다.
+        /// </summary>
+        private static IReadOnlyList<TabletPlacement> WithFixed(
+            PlacementProblem problem, List<TabletPlacement> layout)
+        {
+            if (problem.FixedTablets.Count == 0) return layout;
+
+            var all = new List<TabletPlacement>(layout.Count + problem.FixedTablets.Count);
+            all.AddRange(layout);
+            all.AddRange(problem.FixedTablets);
+            return all;
         }
 
         private static List<TabletPlacement>? CurrentLayout(PlacementProblem problem)
@@ -123,7 +138,7 @@ namespace SephPlanner.Core.Solver
             PlacementProblem problem, List<GridPos> cells, List<TabletPlacement> layout)
         {
             var occupancy = OptimisticOccupancy(cells, layout, problem);
-            var result = TabletSimulator.Run(layout, occupancy, problem.Grid);
+            var result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid);
 
             var taken = new HashSet<GridPos>(layout.Select(p => p.Position));
             var scoring = problem.Charms.Where(c => !c.IsFiller && !c.IsDormant).ToList();
@@ -153,11 +168,11 @@ namespace SephPlanner.Core.Solver
             var free = cells.Where(cell => !taken.Contains(cell)).ToList();
 
             Dictionary<int, GridPos> positions = new Dictionary<int, GridPos>();
-            SimulationResult result = TabletSimulator.Run(layout, occupancy, problem.Grid);
+            SimulationResult result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid);
 
             for (var iteration = 0; iteration < options.FixpointIterations; iteration++)
             {
-                result = TabletSimulator.Run(layout, occupancy, problem.Grid);
+                result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid);
                 var next = Assign(problem, free, result, occupancy);
                 if (SamePositions(positions, next)) break;
 

@@ -118,16 +118,13 @@ namespace SephPlanner.Plugin
                 var tablet = pair.Value;
                 if (tablet == null || !seenTablets.Add(tablet.instanceID)) continue;
 
-                state.Tablets.Add(new PlacedTablet
-                {
-                    DefinitionId = tablet.entityID,
-                    InstanceId = tablet.instanceID,
-                    Position = new GridPos(tablet.xIdx, tablet.yIdx),
-                    Rotation = tablet.rotation,
-                    IsApplied = tablet.IsApplied,
-                    Query = tablet.isCustomTablet ? tablet.GetQuery(tablet.instanceID) : null,
-                    ConditionQuery = tablet.isCustomTablet ? tablet.GetConditionQuery(tablet.instanceID) : null,
-                });
+                state.Tablets.Add(Describe(tablet));
+            }
+
+            foreach (var engraving in inv.engravings)
+            {
+                if (engraving == null) continue;
+                state.Engravings.Add(Describe(engraving));
             }
 
             // 게임이 계산해 둔 값. 우리 시뮬레이터를 대조하는 정답지로 쓴다.
@@ -153,6 +150,17 @@ namespace SephPlanner.Plugin
                 ? enchant
                 : 0;
         }
+
+        private static PlacedTablet Describe(StoneTablet tablet) => new PlacedTablet
+        {
+            DefinitionId = tablet.entityID,
+            InstanceId = tablet.instanceID,
+            Position = new GridPos(tablet.xIdx, tablet.yIdx),
+            Rotation = tablet.rotation,
+            IsApplied = tablet.IsApplied,
+            Query = tablet.isCustomTablet ? tablet.GetQuery(tablet.instanceID) : null,
+            ConditionQuery = tablet.isCustomTablet ? tablet.GetConditionQuery(tablet.instanceID) : null,
+        };
 
         private static int LookupMatrix(SyncDictionary<ItemPosition, int> matrix, sbyte x, sbyte y)
         {

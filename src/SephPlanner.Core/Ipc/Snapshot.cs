@@ -41,6 +41,12 @@ namespace SephPlanner.Core.Ipc
         public List<PlacedItem> Items { get; set; } = new List<PlacedItem>();
         public List<PlacedTablet> Tablets { get; set; } = new List<PlacedTablet>();
 
+        /// <summary>
+        /// 각인. 격자 위 고정된 자리에서 석판과 똑같이 효과를 내지만 칸을 차지하지 않고
+        /// 플레이어가 옮길 수도 없다. 그래서 배치 대상이 아니라 주어진 조건이다.
+        /// </summary>
+        public List<PlacedTablet> Engravings { get; set; } = new List<PlacedTablet>();
+
         /// <summary>게임이 계산해 둔 셀별 최종 레벨. 키는 "x,y".</summary>
         public Dictionary<string, int> LevelMatrix { get; set; } = new Dictionary<string, int>();
         public List<string> DisabledCells { get; set; } = new List<string>();

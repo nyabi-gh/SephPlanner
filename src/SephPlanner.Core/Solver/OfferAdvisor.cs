@@ -89,6 +89,7 @@ namespace SephPlanner.Core.Solver
             Grid = problem.Grid,
             Charms = new List<CharmSlot>(problem.Charms),
             Tablets = new List<TabletSlot>(problem.Tablets),
+            FixedTablets = problem.FixedTablets,
         };
     }
 }

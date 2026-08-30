@@ -41,6 +41,19 @@ namespace SephPlanner.Core.Planning
                 problem.CurrentTablets[slot.InstanceId] = new TabletSpot(tablet.Position, tablet.Rotation);
             }
 
+            foreach (var engraving in inventory.Engravings)
+            {
+                var definition = catalog.Tablet(engraving.DefinitionId) ?? new TabletDefinition();
+                problem.FixedTablets.Add(new TabletPlacement
+                {
+                    Definition = definition,
+                    Position = engraving.Position,
+                    Rotation = engraving.Rotation,
+                    InstanceQuery = engraving.Query,
+                    InstanceConditionQuery = engraving.ConditionQuery,
+                });
+            }
+
             // 무기 연동 아티팩트는 해당 무기를 들고 있어야 효과가 켜진다. 무기를 모르면 판정하지 않는다.
             var weapon = snapshot.Run?.WeaponId ?? "";
 

@@ -51,6 +51,17 @@ namespace SephPlanner.Plugin
             }
 
             text.AppendLine();
+            text.AppendLine("[engravings]");
+            foreach (var engraving in inv.engravings)
+            {
+                if (engraving == null) continue;
+                text.AppendLine(
+                    $"  ({engraving.xIdx},{engraving.yIdx}) entity={engraving.entityID} " +
+                    $"instance={engraving.instanceID} rot={engraving.rotation} " +
+                    $"applied={engraving.IsApplied} custom={engraving.isCustomTablet}");
+            }
+
+            text.AppendLine();
             text.AppendLine("[levelMatrix]");
             foreach (var pair in inv.levelMatrix)
                 text.AppendLine($"  ({pair.Key.x},{pair.Key.y}) = {pair.Value}");

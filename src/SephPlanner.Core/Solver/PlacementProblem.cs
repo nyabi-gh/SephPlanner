@@ -53,6 +53,12 @@ namespace SephPlanner.Core.Solver
         public List<TabletSlot> Tablets { get; set; } = new List<TabletSlot>();
 
         /// <summary>
+        /// 각인처럼 자리가 정해져 있어 옮길 수 없는 석판. 효과는 똑같이 내지만 칸을 차지하지 않아
+        /// 그 자리에 아티팩트를 놓을 수 있다. 배치 탐색의 대상이 아니라 주어진 조건이다.
+        /// </summary>
+        public List<TabletPlacement> FixedTablets { get; set; } = new List<TabletPlacement>();
+
+        /// <summary>
         /// 지금 놓여 있는 자리. 점수가 같은 배치가 여럿일 때 이미 놓인 대로 두는 쪽을 고르는 데 쓴다.
         /// 이것이 없으면 아무것도 달라지지 않았는데도 제안이 이리저리 바뀐다.
         /// </summary>
