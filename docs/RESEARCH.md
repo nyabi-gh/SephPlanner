@@ -236,12 +236,30 @@ ilspycmd -t GridInventory "<게임경로>/Sephiria_Data/Managed/Assembly-CSharp.
 
 ## 선택지 감지
 
-집거나 살 수 있는 아이템을 찾는 데 화면별 UI 클래스를 다룰 필요가 없다.
-상자(`ItemChest.inventory`), 바닥에 떨어진 꾸러미(`DroppedInventory.Inventory`), 상점이
-**모두 각자의 `GridInventory`를 들고 있기 때문이다.**
+두 갈래로 나뉜다. 하나로 될 줄 알았는데 아니었다.
 
-그래서 플러그인은 씬에 있는 `GridInventory` 중 플레이어의 것이 아니고 일정 거리 안에 있는 것을
-훑는다. 새로운 종류의 상자나 상점이 추가되어도 같은 구조를 따르는 한 그대로 잡힌다.
+### 인벤토리를 가진 것
+
+상자(`ItemChest.inventory`), 바닥에 떨어진 꾸러미(`DroppedInventory.Inventory`), 상점은
+**각자 `GridInventory`를 들고 있다.** 그래서 화면별 UI 클래스를 다룰 필요 없이, 씬에 있는
+`GridInventory` 중 플레이어의 것이 아니고 일정 거리 안에 있는 것을 훑으면 된다.
+
+### 세피라이트
+
+**석판과 아티팩트는 대개 세피라이트(`Sephirite`)로 나오는데 여기에는 `GridInventory`가 없다.**
+대신 `SyncList<SephiriteRewardMetadata> rewards`에 `{ instanceID, entityID }`를 담고 있고,
+`isGenerated`가 참이 되면 채워진다. `isAcquired`면 이미 가져간 것이다. 전부 동기화되는 값이라
+클라이언트에서 읽을 수 있다.
+
+`Sephirite.Type`에 `TABLET`, `TABLET_BOSS`, `CHARM`이 있는 데서 보이듯 이쪽이 석판의 주 경로다.
+`GridInventory`만 훑던 동안에는 석판 추천이 아예 되지 않았다.
+
+### 석판 제단에서는 미리 알 수 없다
+
+`AltarOfTablet`의 선택지 세 개(`AltarOfTabletInteractable`)에는 어떤 석판인지에 대한 정보가 없다.
+고르는 순간 서버가 `CmdSpawnReward`에서 세피라이트를 스폰하고 `Sephirite.Initialize(RandomID +
+selectionSeedOffset)`으로 내용을 정한다. **고르기 전에 무엇이 나올지는 클라이언트가 알 수 없고,
+이는 게임의 설계라 우회할 수 없다.** 추천은 세피라이트가 생긴 뒤부터 가능하다.
 
 거리 기준은 BepInEx 설정의 `OfferRadius`로 조정한다.
 

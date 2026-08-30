@@ -7,8 +7,9 @@ namespace SephPlanner.Plugin
     /// <summary>
     /// 지금 집거나 살 수 있는 아이템을 모은다.
     ///
-    /// 상자, 바닥에 떨어진 꾸러미, 상점이 모두 각자의 GridInventory 를 들고 있다. 그래서 화면별
-    /// UI 클래스를 따로 다룰 필요 없이, 플레이어 것이 아닌 가까운 인벤토리를 훑으면 된다.
+    /// 두 갈래다. 상자와 바닥에 떨어진 꾸러미, 상점은 각자의 GridInventory 를 들고 있어 한 번에
+    /// 훑을 수 있다. 하지만 석판과 아티팩트가 나오는 세피라이트는 GridInventory 가 없고
+    /// 보상 목록을 따로 들고 있어서, 그쪽은 따로 봐야 한다.
     /// </summary>
     internal static class OfferReader
     {
@@ -24,6 +25,38 @@ namespace SephPlanner.Plugin
                 if (Vector3.Distance(origin, inventory.transform.position) > radius) continue;
 
                 Collect(snapshot.Offers, inventory, player);
+            }
+
+            CollectSephirites(snapshot.Offers, origin, radius);
+        }
+
+        /// <summary>
+        /// 세피라이트 안에 든 후보들. 제단에서 무엇이 나올지는 고르기 전까지 서버만 알지만,
+        /// 일단 세피라이트가 생기고 나면 <c>rewards</c>가 동기화되어 무엇이 들었는지 알 수 있다.
+        /// 석판은 대개 이 경로로 나오므로 여기를 빼면 석판 추천이 아예 되지 않는다.
+        /// </summary>
+        private static void CollectSephirites(List<OfferedItem> offers, Vector3 origin, float radius)
+        {
+            foreach (var sephirite in UnityEngine.Object.FindObjectsByType<Sephirite>(FindObjectsSortMode.None))
+            {
+                if (sephirite == null || sephirite.isAcquired || !sephirite.isGenerated) continue;
+                if (Vector3.Distance(origin, sephirite.transform.position) > radius) continue;
+
+                foreach (var reward in sephirite.Rewards)
+                {
+                    var entity = ItemDatabase.FindItemById(reward.entityID);
+                    if (entity == null) continue;
+
+                    offers.Add(new OfferedItem
+                    {
+                        DefinitionId = reward.entityID,
+                        Kind = KindOf(entity.type),
+
+                        // 세피라이트는 사는 것이 아니라 여는 것이라 값이 없다.
+                        Price = 0,
+                        SlotIndex = offers.Count,
+                    });
+                }
             }
         }
 
