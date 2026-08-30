@@ -96,8 +96,10 @@
                     MouseLeftButtonDown="OnDragArea">
                 <StackPanel>
                     <DockPanel LastChildFill="False">
-                        <TextBlock Text="SephPlanner" Foreground="{x:Static local:Theme.TextBright}"
-                                   FontSize="12" FontWeight="Bold" />
+                        <TextBlock x:Name="TitleText" Text="SephPlanner"
+                                   Foreground="{x:Static local:Theme.TextBright}"
+                                   FontSize="12" FontWeight="Bold"
+                                   ToolTip="Ctrl+Alt+P = 접기/펼치기 · Ctrl+Alt+O = 숨기기/보이기" />
                         <Button DockPanel.Dock="Right" Content="×" Click="OnClose"
                                 Style="{StaticResource GlyphButton}" Margin="6,0,0,0" FontSize="12"
                                 ToolTip="닫기 (Esc)" />

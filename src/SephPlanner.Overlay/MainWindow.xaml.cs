@@ -494,8 +494,9 @@ public partial class MainWindow : Window
         base.OnKeyDown(e);
     }
 
-    // 게임에 포커스가 가 있는 동안에도 접고 펼칠 수 있어야 해서 전역 단축키로 등록한다.
-    private const int HotkeyId = 0xB1;
+    // 게임에 포커스가 가 있는 동안에도 조작할 수 있어야 해서 전역 단축키로 등록한다.
+    private const int ExpandHotkeyId = 0xB1;
+    private const int VisibilityHotkeyId = 0xB2;
     private const uint ModAlt = 0x0001, ModControl = 0x0002, ModNoRepeat = 0x4000;
     private const int WmHotkey = 0x0312;
 
@@ -507,6 +508,9 @@ public partial class MainWindow : Window
 
     private HwndSource? _source;
 
+    /// <summary>숨긴 뒤 되돌릴 길이 단축키뿐이므로, 등록에 실패했으면 숨기기도 막는다.</summary>
+    private bool _canHide;
+
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
@@ -514,20 +518,36 @@ public partial class MainWindow : Window
         _source = (HwndSource)PresentationSource.FromVisual(this)!;
         _source.AddHook(OnWindowMessage);
 
-        var key = (uint)KeyInterop.VirtualKeyFromKey(Key.P);
-        if (!RegisterHotKey(_source.Handle, HotkeyId, ModControl | ModAlt | ModNoRepeat, key))
+        var keyP = (uint)KeyInterop.VirtualKeyFromKey(Key.P);
+        if (!RegisterHotKey(_source.Handle, ExpandHotkeyId, ModControl | ModAlt | ModNoRepeat, keyP))
         {
             // 다른 프로그램이 이미 쓰고 있으면 등록에 실패한다. 버튼으로는 여전히 접고 펼 수 있다.
             ExpandButton.ToolTip = "펼치기 (Ctrl+Alt+P 는 다른 프로그램이 쓰는 중)";
+        }
+
+        var keyO = (uint)KeyInterop.VirtualKeyFromKey(Key.O);
+        _canHide = RegisterHotKey(_source.Handle, VisibilityHotkeyId, ModControl | ModAlt | ModNoRepeat, keyO);
+        if (!_canHide)
+        {
+            TitleText.ToolTip = "Ctrl+Alt+P = 접기/펼치기 (Ctrl+Alt+O 는 다른 프로그램이 쓰는 중)";
         }
     }
 
     private IntPtr OnWindowMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (message != WmHotkey || wParam.ToInt32() != HotkeyId) return IntPtr.Zero;
+        if (message != WmHotkey) return IntPtr.Zero;
 
-        OnToggleDetail(this, new RoutedEventArgs());
-        handled = true;
+        switch (wParam.ToInt32())
+        {
+            case ExpandHotkeyId:
+                OnToggleDetail(this, new RoutedEventArgs());
+                handled = true;
+                break;
+            case VisibilityHotkeyId when _canHide:
+                Visibility = Visibility == Visibility.Visible ? Visibility.Hidden : Visibility.Visible;
+                handled = true;
+                break;
+        }
         return IntPtr.Zero;
     }
 
@@ -535,7 +555,8 @@ public partial class MainWindow : Window
     {
         if (_source != null)
         {
-            UnregisterHotKey(_source.Handle, HotkeyId);
+            UnregisterHotKey(_source.Handle, ExpandHotkeyId);
+            UnregisterHotKey(_source.Handle, VisibilityHotkeyId);
             _source.RemoveHook(OnWindowMessage);
         }
 
