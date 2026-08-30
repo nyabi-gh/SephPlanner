@@ -18,6 +18,9 @@ public sealed class UserSettings
     public double? WindowLeft { get; set; }
     public double? WindowTop { get; set; }
 
+    /// <summary>오버레이 전체 투명도. 1이 불투명.</summary>
+    public double Opacity { get; set; } = 1.0;
+
     private static string FilePath =>
         Path.Combine(IpcContract.DataDirectory, "overlay-settings.json");
 

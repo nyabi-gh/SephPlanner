@@ -52,6 +52,7 @@ public partial class MainWindow : Window
         ChipList.ItemsSource = _chips;
         _preferences = _settings.ToPreferences();
         RestorePosition();
+        ApplyOpacity();
         ApplyLayout();
 
         // 게임 없이 화면을 확인하는 통로. 파이프를 열지 않으므로 실제 오버레이와 같이 떠도 안전하다.
@@ -434,6 +435,28 @@ public partial class MainWindow : Window
         AutoPlaceButton.IsEnabled = true;
 
         if (!sent) ShowWarning("플러그인과 연결할 수 없어 자동 배치를 보내지 못했습니다.");
+    }
+
+    /// <summary>
+    /// 게임 화면을 가리는 게 부담스러울 때를 위한 단계식 투명도. 완전히 사라지는 값은 두지 않는다.
+    /// </summary>
+    private static readonly double[] OpacitySteps = { 1.0, 0.85, 0.7, 0.55 };
+
+    private void OnCycleOpacity(object sender, RoutedEventArgs e)
+    {
+        var index = Array.IndexOf(OpacitySteps, _settings.Opacity);
+        _settings.Opacity = OpacitySteps[(index + 1) % OpacitySteps.Length];
+        _settings.Save();
+        ApplyOpacity();
+    }
+
+    private void ApplyOpacity()
+    {
+        // 저장된 값이 손상됐거나 단계 밖이면 불투명으로 되돌린다.
+        if (Array.IndexOf(OpacitySteps, _settings.Opacity) < 0) _settings.Opacity = 1.0;
+
+        Opacity = _settings.Opacity;
+        OpacityButton.ToolTip = $"투명도 {_settings.Opacity:P0} - 누를 때마다 한 단계씩 투명해집니다";
     }
 
     /// <summary>모니터 구성이 바뀌어 저장된 위치가 화면 밖이면 기본 위치로 되돌아간다.</summary>

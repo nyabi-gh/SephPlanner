@@ -12,6 +12,7 @@
         ShowInTaskbar="False"
         ResizeMode="NoResize"
         FontFamily="{x:Static local:Theme.Body}"
+        FontWeight="Bold"
         TextOptions.TextFormattingMode="Display"
         TextOptions.TextRenderingMode="Aliased">
 
@@ -53,6 +54,8 @@
             <Setter Property="Foreground" Value="{x:Static local:Theme.Text}" />
             <Setter Property="FontFamily" Value="{x:Static local:Theme.Small}" />
             <Setter Property="FontSize" Value="10" />
+            <!-- Galmuri9 에는 볼드가 없다. 굵기를 흉내 내면 픽셀이 뭉개진다. -->
+            <Setter Property="FontWeight" Value="Normal" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Padding" Value="8,3" />
             <Setter Property="Template">
@@ -79,15 +82,16 @@
         <Style x:Key="SectionHeader" TargetType="TextBlock">
             <Setter Property="FontFamily" Value="{x:Static local:Theme.Small}" />
             <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="Normal" />
             <Setter Property="Foreground" Value="{x:Static local:Theme.TextDim}" />
             <Setter Property="Margin" Value="0,0,0,5" />
         </Style>
     </Window.Resources>
 
     <!-- 게임 패널의 골격: 어두운 윤곽 - 장미빛 프레임 - 어두운 윤곽 - 불투명한 속 -->
-    <Border BorderBrush="{x:Static local:Theme.Outline}" BorderThickness="1">
-        <Border BorderBrush="{x:Static local:Theme.Frame}" BorderThickness="3">
-            <Border BorderBrush="{x:Static local:Theme.Outline}" BorderThickness="1"
+    <Border BorderBrush="{x:Static local:Theme.Outline}" BorderThickness="2">
+        <Border BorderBrush="{x:Static local:Theme.Frame}" BorderThickness="4">
+            <Border BorderBrush="{x:Static local:Theme.Outline}" BorderThickness="2"
                     Background="{x:Static local:Theme.Panel}" Padding="12"
                     MouseLeftButtonDown="OnDragArea">
                 <StackPanel>
@@ -99,8 +103,10 @@
                                 ToolTip="닫기 (Esc)" />
                         <Button x:Name="ExpandButton" DockPanel.Dock="Right" Content="▼" Click="OnToggleDetail"
                                 Style="{StaticResource GlyphButton}" Margin="6,0,0,0" FontSize="10" />
+                        <Button x:Name="OpacityButton" DockPanel.Dock="Right" Content="▒" Click="OnCycleOpacity"
+                                Style="{StaticResource GlyphButton}" Margin="6,0,0,0" FontSize="10" />
                         <TextBlock x:Name="StatusText" DockPanel.Dock="Right" Text="게임 대기 중"
-                                   FontFamily="{x:Static local:Theme.Small}" FontSize="10"
+                                   FontFamily="{x:Static local:Theme.Small}" FontSize="10" FontWeight="Normal"
                                    Foreground="{x:Static local:Theme.TextDim}" VerticalAlignment="Center" />
                     </DockPanel>
 
@@ -112,11 +118,14 @@
                     <StackPanel x:Name="ScorePanel" Orientation="Horizontal" Margin="0,10,0,0"
                                 Visibility="Collapsed">
                         <TextBlock x:Name="CurrentScoreText" FontFamily="{x:Static local:Theme.Score}"
-                                   FontSize="30" Foreground="{x:Static local:Theme.TextDim}" />
+                                   FontSize="30" FontWeight="Normal"
+                                   Foreground="{x:Static local:Theme.TextDim}" />
                         <TextBlock Text="/" FontFamily="{x:Static local:Theme.Score}" FontSize="30"
+                                   FontWeight="Normal"
                                    Foreground="{x:Static local:Theme.TextDim}" Margin="7,0" />
                         <TextBlock x:Name="BestScoreText" FontFamily="{x:Static local:Theme.Score}"
-                                   FontSize="30" Foreground="{x:Static local:Theme.TextBright}" />
+                                   FontSize="30" FontWeight="Normal"
+                                   Foreground="{x:Static local:Theme.TextBright}" />
                         <TextBlock x:Name="GainText" FontSize="12" Margin="8,0,0,4"
                                    VerticalAlignment="Bottom" Foreground="{x:Static local:Theme.Good}" />
                     </StackPanel>
@@ -145,7 +154,7 @@
                                         <StackPanel VerticalAlignment="Center">
                                             <TextBlock Text="{Binding Title}" Foreground="{Binding TitleBrush}"
                                                        FontFamily="{x:Static local:Theme.Small}" FontSize="10"
-                                                       TextAlignment="Center" TextWrapping="Wrap"
+                                                       FontWeight="Normal" TextAlignment="Center" TextWrapping="Wrap"
                                                        MaxHeight="26" Margin="3,0,3,0" />
                                             <TextBlock Text="{Binding Label}" Foreground="{Binding Foreground}"
                                                        FontSize="12" TextAlignment="Center" />
@@ -156,7 +165,7 @@
                         </ItemsControl>
 
                         <TextBlock x:Name="LegendText" Margin="2,8,0,0"
-                                   FontFamily="{x:Static local:Theme.Small}" FontSize="10"
+                                   FontFamily="{x:Static local:Theme.Small}" FontSize="10" FontWeight="Normal"
                                    Foreground="{x:Static local:Theme.TextDim}"
                                    Text="노란 테두리 = 옮겨야 할 자리" Visibility="Collapsed" />
 
@@ -199,15 +208,15 @@
                                             <TextBlock DockPanel.Dock="Right" Text="{Binding Price}"
                                                        Foreground="{Binding PriceTone}"
                                                        FontFamily="{x:Static local:Theme.Small}" FontSize="10"
-                                                       Margin="8,2,0,0" />
+                                                       FontWeight="Normal" Margin="8,2,0,0" />
                                             <TextBlock DockPanel.Dock="Right" Text="{Binding Reach}"
                                                        Foreground="{x:Static local:Theme.TextDim}"
                                                        FontFamily="{x:Static local:Theme.Small}" FontSize="10"
-                                                       Margin="8,2,0,0" />
+                                                       FontWeight="Normal" Margin="8,2,0,0" />
                                             <TextBlock DockPanel.Dock="Right" Text="{Binding Combo}"
                                                        Foreground="{Binding ComboTone}"
                                                        FontFamily="{x:Static local:Theme.Small}" FontSize="10"
-                                                       Margin="8,2,0,0" />
+                                                       FontWeight="Normal" Margin="8,2,0,0" />
                                             <TextBlock Text="{Binding Name}" Foreground="{Binding NameTone}"
                                                        FontSize="12" TextTrimming="CharacterEllipsis" />
                                         </DockPanel>
