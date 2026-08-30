@@ -22,5 +22,11 @@ namespace SephPlanner.Core.Planning
         public HashSet<int> PinnedCharms { get; set; } = new HashSet<int>();
 
         public const double PinnedWeight = 2.0;
+
+        /// <summary>
+        /// 거짓이면 후보 평가를 아예 돌리지 않는다. 화면에서 가리기만 하는 것이 아니라 계산도
+        /// 하지 않는 것이 정직하고, 후보마다 배치를 다시 푸는 비용도 아낀다. 배치(정렬)는 그대로다.
+        /// </summary>
+        public bool Recommendations { get; set; } = true;
     }
 }

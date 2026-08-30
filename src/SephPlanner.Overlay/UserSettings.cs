@@ -24,6 +24,12 @@ public sealed class UserSettings
     /// <summary>격자와 후보 목록에 아이콘을 보여줄지. 아이콘이 아직 없으면 글자로 물러선다.</summary>
     public bool IconMode { get; set; } = true;
 
+    /// <summary>
+    /// 무엇을 집을지에 대한 조언(후보 목록·빌드 우선)을 켤지. 배치(정렬)는 손으로도 할 수 있는
+    /// 일의 대행이지만 추천은 판단을 빌려주는 것이라, 도전을 지키고 싶은 사람은 끌 수 있어야 한다.
+    /// </summary>
+    public bool Recommendations { get; set; } = true;
+
     private static string FilePath =>
         Path.Combine(IpcContract.DataDirectory, "overlay-settings.json");
 
@@ -60,5 +66,6 @@ public sealed class UserSettings
     {
         PriorityCategories = new HashSet<string>(PriorityCategories),
         PinnedCharms = new HashSet<int>(PinnedCharms),
+        Recommendations = Recommendations,
     };
 }

@@ -52,6 +52,21 @@ public class PlanBuilderTests
     }
 
     [Fact]
+    public void TurningRecommendationsOffSkipsOffersButKeepsPlacement()
+    {
+        var snapshot = Snapshot();
+        snapshot.Offers.Add(new OfferedItem { DefinitionId = CharmEntity, Kind = "charm" });
+
+        var quiet = PlanBuilder.Build(snapshot, Catalog(), new PlanPreferences { Recommendations = false });
+        var full = PlanBuilder.Build(snapshot, Catalog());
+
+        Assert.NotNull(quiet);
+        Assert.Empty(quiet!.Offers);
+        Assert.NotEmpty(full!.Offers);
+        Assert.Equal(full.Best.Score, quiet.Best.Score);
+    }
+
+    [Fact]
     public void ASnapshotBecomesAScoredPlan()
     {
         var plan = PlanBuilder.Build(Snapshot(), Catalog());

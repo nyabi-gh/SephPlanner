@@ -54,6 +54,7 @@ public partial class MainWindow : Window
         RestorePosition();
         ApplyOpacity();
         UpdateIconModeButton();
+        UpdateRecommendButton();
         ApplyLayout();
 
         // 게임 없이 화면을 확인하는 통로. 파이프를 열지 않으므로 실제 오버레이와 같이 떠도 안전하다.
@@ -373,6 +374,14 @@ public partial class MainWindow : Window
     private void RenderChips(GameSnapshot snapshot)
     {
         _chips.Clear();
+
+        // 빌드 우선은 추천에만 작용하므로 추천을 끄면 함께 접는다. 지정 자체는 남아 있다.
+        if (!_settings.Recommendations)
+        {
+            BuildPanel.Visibility = Visibility.Collapsed;
+            return;
+        }
+
         var counts = snapshot.Inventory?.ComboCounts ?? new Dictionary<string, int>();
         var shown = new HashSet<string>();
 
@@ -427,6 +436,18 @@ public partial class MainWindow : Window
             _settings.PinnedCharms.Add(cell.CharmId);
         Resolve();
     }
+
+    private void OnToggleRecommendations(object sender, RoutedEventArgs e)
+    {
+        _settings.Recommendations = !_settings.Recommendations;
+        UpdateRecommendButton();
+
+        // 후보 평가를 돌릴지 자체가 바뀌므로 다시 푼다. Resolve 가 저장까지 한다.
+        Resolve();
+    }
+
+    private void UpdateRecommendButton() =>
+        RecommendButton.Content = _settings.Recommendations ? "추천 끄기" : "추천 켜기";
 
     private void OnToggleIconMode(object sender, RoutedEventArgs e)
     {
