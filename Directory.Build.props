@@ -1,5 +1,9 @@
 <Project>
   <PropertyGroup>
+    <!-- 배포 버전. 릴리스 zip 이름과 어셈블리 버전이 여기서 나온다. -->
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+  <PropertyGroup>
     <!--
       게임 설치 경로. 우선순위: 환경변수 SEPHIRIA_DIR > 기본 Steam 경로.
       플러그인 프로젝트가 게임 어셈블리를 참조할 때만 필요하다.

@@ -49,8 +49,20 @@ dotnet run --project src/SephPlanner.DataTool
 
 `data/generated/`는 각자 PC에서 생성되며 저장소에 커밋하지 않는다. 이유는 [docs/LEGAL.md](docs/LEGAL.md) 참고.
 
+## 배포
+
+```powershell
+scripts/make-release.ps1
+# -> artifacts/SephPlanner-v{버전}.zip
+```
+
+오버레이는 .NET 런타임 없이 도는 자체 포함 exe로, 플러그인은 DLL 두 개로 묶인다. BepInEx와
+게임 파일은 넣지 않는다. 버전은 `Directory.Build.props`의 `<Version>`에서 나온다.
+사용자용 안내는 [docs/INSTALL.md](docs/INSTALL.md)가 zip에 `설치안내.md`로 들어간다.
+
 ## 문서
 
+- [docs/INSTALL.md](docs/INSTALL.md) — 사용자용 설치 안내 (배포 zip에 포함)
 - [docs/RESEARCH.md](docs/RESEARCH.md) — 게임 내부 구조 조사 결과
 - [docs/LEGAL.md](docs/LEGAL.md) — 약관·저작권 검토와 그에 따른 설계 제약
 

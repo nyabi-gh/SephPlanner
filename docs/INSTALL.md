@@ -1,0 +1,43 @@
+# SephPlanner 설치 안내
+
+세피리아(Sephiria)용 비공식 컴패니언 오버레이입니다. TEAM HORAY와 무관한 팬 제작 도구이며
+무료입니다. 게임 상태를 읽어 석판 배치를 계산하고, 싱글플레이에서는 버튼 한 번으로 그 배치를
+적용해 줍니다. 멀티플레이에서는 읽기 전용으로 동작합니다.
+
+## 준비물
+
+- 세피리아 (Steam)
+- [BepInEx 5.4.23.5](https://github.com/BepInEx/BepInEx/releases) — win_x64, Mono 버전
+
+## 설치
+
+1. BepInEx zip을 게임 폴더(`...\steamapps\common\Sephiria`)에 풀고 게임을 한 번 실행했다가
+   종료합니다. `BepInEx/plugins` 폴더가 생겼으면 준비된 것입니다.
+2. 이 zip의 `BepInEx-plugins` 안에 있는 `SephPlanner.Plugin.dll`과 `SephPlanner.Core.dll`을
+   게임 폴더의 `BepInEx/plugins/`에 복사합니다.
+3. `SephPlanner.Overlay.exe`는 아무 곳에나 두고 실행하면 됩니다. 별도 설치가 필요 없습니다.
+
+## 사용
+
+1. 게임을 켜고 `SephPlanner.Overlay.exe`를 실행합니다. 순서는 상관없으며 자동으로 연결됩니다.
+2. 처음 한 번은 게임 안에서 **F9**를 눌러 데이터를 만들어 줍니다. 게임이 패치되면 다시 한 번
+   눌러 주세요.
+3. 탐험을 시작하면 오버레이에 점수가 뜹니다. 상자·상점·세피라이트를 열면 저절로 펼쳐져
+   후보별 추천을 보여줍니다. `Ctrl+Alt+P`로 직접 접고 펼 수 있습니다.
+
+## 문제가 있을 때
+
+- 인식이 이상한 아이템이 있으면 게임 안에서 **F10**을 누르세요.
+  `%LOCALAPPDATA%\SephPlanner\inventory-dump.txt`에 상태가 기록됩니다.
+- 오류 내용은 `게임폴더\BepInEx\LogOutput.log`에 남습니다. 제보할 때 이 두 파일을 함께
+  올려 주시면 빠릅니다.
+
+## 지우기
+
+`BepInEx/plugins/`에서 SephPlanner DLL 두 개를 지우고, `%LOCALAPPDATA%\SephPlanner\` 폴더를
+지우면 흔적 없이 제거됩니다.
+
+---
+
+포함된 Galmuri 글꼴은 SIL 오픈 폰트 라이선스(OFL-1.1)를 따르며, 라이선스 전문은
+`LICENSE-Galmuri.txt`에 있습니다.
