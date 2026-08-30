@@ -1,0 +1,55 @@
+using System.Collections.Generic;
+using SephPlanner.Core.Model;
+using SephPlanner.Core.Solver;
+
+namespace SephPlanner.Core.Planning
+{
+    /// <summary>무엇을 어디로 옮기라는 한 줄.</summary>
+    public sealed class Move
+    {
+        public Move(string label, GridPos from, GridPos to, string detail)
+        {
+            Label = label;
+            From = from;
+            To = to;
+            Detail = detail;
+        }
+
+        public string Label { get; }
+        public GridPos From { get; }
+        public GridPos To { get; }
+        public string Detail { get; }
+    }
+
+    /// <summary>카탈로그의 표시 이름을 꺼내는 규칙. 이름이 없으면 내부 식별자로 물러선다.</summary>
+    public static class Naming
+    {
+        public const string CurrentLanguage = "current";
+
+        public static string Of(Dictionary<string, string> names, string id, string fallback)
+        {
+            if (names.TryGetValue(CurrentLanguage, out var text) && text.Length > 0) return text;
+            return id.Length > 0 ? id : fallback;
+        }
+    }
+
+    /// <summary>지금 배치와 제안, 그리고 그 차이를 설명하는 데 필요한 것들.</summary>
+    public sealed class Plan
+    {
+        public Arrangement Current { get; set; } = new Arrangement();
+        public Arrangement Best { get; set; } = new Arrangement();
+        public List<Move> Moves { get; set; } = new List<Move>();
+        public List<OfferAdvice> Offers { get; set; } = new List<OfferAdvice>();
+
+        /// <summary>
+        /// 게임이 계산해 둔 레벨과 우리 계산이 어긋난 칸 수. 0이 아니면 우리가 읽지 않는 효과가
+        /// 걸려 있다는 뜻이라, 점수를 그대로 믿으면 안 된다.
+        /// </summary>
+        public int LevelMismatches { get; set; }
+
+        /// <summary>제안된 배치에서 각 칸에 놓이는 아이템의 이름. 격자에 그대로 보여준다.</summary>
+        public Dictionary<GridPos, string> Names { get; set; } = new Dictionary<GridPos, string>();
+
+        public double Gain => Best.Score - Current.Score;
+    }
+}

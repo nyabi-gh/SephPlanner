@@ -8,6 +8,7 @@ using System.Windows.Media;
 using SephPlanner.Core.Charms;
 using SephPlanner.Core.Ipc;
 using SephPlanner.Core.Model;
+using SephPlanner.Core.Planning;
 
 namespace SephPlanner.Overlay;
 

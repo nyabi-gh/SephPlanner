@@ -8,7 +8,7 @@ TEAM HORAY와 무관한 팬 제작 도구이며, 비영리로 배포한다.
 ## 구조
 
 ```
-SephPlanner.Core      도메인 모델 + IPC 계약 (netstandard2.1)
+SephPlanner.Core      도메인 모델 + IPC 계약 + 솔버와 배치 계산 (netstandard2.1)
 SephPlanner.Plugin    BepInEx 플러그인. 게임 상태를 읽어 명명 파이프로 내보낸다 (읽기 전용)
 SephPlanner.Overlay   WPF 오버레이. 파이프에 붙어 화면에 표시한다 (net10.0-windows)
 SephPlanner.DataTool  게임 로컬라이제이션에서 이름/설명 텍스트를 추출하는 CLI

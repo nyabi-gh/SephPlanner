@@ -2,6 +2,7 @@ using System.IO;
 using System.Text.Json;
 using SephPlanner.Core.Ipc;
 using SephPlanner.Core.Model;
+using SephPlanner.Core.Planning;
 
 namespace SephPlanner.Overlay;
 
@@ -9,7 +10,7 @@ namespace SephPlanner.Overlay;
 /// 플러그인이 덤프해 둔 석판/아티팩트 정의를 읽어 둔다. 게임 패치로 데이터가 바뀌면
 /// 플러그인이 파일을 다시 쓰므로, 파일이 갱신되면 다시 읽는다.
 /// </summary>
-public sealed class CatalogStore
+public sealed class CatalogStore : ICatalog
 {
     private static readonly JsonSerializerOptions Options = new() { PropertyNameCaseInsensitive = true };
 
