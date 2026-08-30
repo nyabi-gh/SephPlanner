@@ -16,16 +16,18 @@ namespace SephPlanner.Plugin
 
             var tablets = ItemCatalog.LoadTablets();
             var charms = ItemCatalog.LoadCharms();
+            var combos = ItemCatalog.LoadCombos();
 
             WriteJson(IpcContract.TabletDbFile, tablets);
             WriteJson(IpcContract.CharmDbFile, charms);
+            WriteJson(IpcContract.ComboDbFile, combos);
 
             var report = QueryVerifier.Run(tablets);
             File.WriteAllText(
                 Path.Combine(IpcContract.DataDirectory, IpcContract.VerificationReportFile),
                 QueryVerifier.Format(report));
 
-            return $"석판 {tablets.Count}종, 아티팩트 {charms.Count}종 저장. " +
+            return $"석판 {tablets.Count}종, 아티팩트 {charms.Count}종, 콤보 {combos.Count}종 저장. " +
                    $"질의 검증 {report.Comparisons}건 중 불일치 {report.Mismatches}건.";
         }
 

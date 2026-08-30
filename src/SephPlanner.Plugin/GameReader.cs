@@ -136,6 +136,10 @@ namespace SephPlanner.Plugin
             foreach (var pair in inv.disableMatrix)
                 if (pair.Value > 0) state.DisabledCells.Add(CellKey(pair.Key.x, pair.Key.y));
 
+            // 유니크 페어 보정 같은 규칙까지 게임이 이미 반영해 둔 값이다. 우리가 다시 세지 않는다.
+            foreach (var pair in inv.currentSetEffectCount)
+                state.ComboCounts[pair.Key] = pair.Value;
+
             return state;
         }
 

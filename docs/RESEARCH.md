@@ -375,6 +375,29 @@ selectionSeedOffset)`으로 내용을 정한다. **고르기 전에 무엇이 �
 같은 증상이 다시 나오면 그 시점에 F10으로 받은 덤프가 있어야 한다. 덤프에는 칸별 좌표, 엔티티
 번호, 아이템 종류, `activeType`, 이름 키, 컴포넌트 유무가 그대로 남는다.
 
+## 콤보 (세트 효과)
+
+화면 오른쪽 "콤보 효과" 패널(잉걸불 6/8 등)의 정체다. 자료 구조는 이렇게 이어진다.
+
+- 아티팩트의 `ItemEntity.categories`가 카테고리 문자열 목록을 갖는다 (`EMBER`, `FLAMESWORD` 등).
+  이미 카탈로그 덤프에 `Categories`로 들어 있다.
+- 카테고리 정의는 `Resources.LoadAll<ItemCategoryEntity>("ItemCategory")`. `id`, 로컬라이즈된
+  `categoryName`, 그리고 발동 효과가 있다. 효과는 두 세대가 공존한다: 신형은 `comboEffectPrefab`의
+  `ComboEffectBase.addStatByCombo[]`(원소마다 `comboCount` 임계값), 구형은 `setStatus[]`
+  (`itemCount` 임계값). 게임의 `SearchSetEffectInInventory`가 양쪽을 다 쓰므로 임계값은 둘을
+  합쳐 모은다. `CatalogDump`가 `combos.json`으로 덤프한다.
+- 개수 판정은 `GridInventory.SearchSetEffectInInventory`(서버). **배치 위치·레벨·활성 여부와
+  무관하게 격자에 있는 아티팩트 전체로 카테고리를 센다.** 그래서 콤보는 배치 최적화가 아니라
+  **후보 추천**에만 영향을 준다.
+- 센 결과는 `currentSetEffectCount`(SyncDictionary)로 클라이언트에 동기화된다. 유니크 페어 변환
+  (`allowUniquePairIncreaseCombo`)이나 하드모드 중복 금지(`OVERLAPITEMCOMBO`) 같은 보정이 서버
+  계산에 섞여 있어, **우리가 다시 세지 않고 이 값을 스냅샷(`ComboCounts`)에 그대로 싣는다.**
+
+추천 반영은 `OfferAdvisor`가 한다. 후보 아티팩트의 카테고리마다 "하나 더 모으면" 임계값에
+닿는지 보고, 닿으면 레벨 2에 해당하는 보너스, 다가가기만 하면 소액을 줄 세우기에 더한다.
+배치 점수(증가분)와는 섞지 않고 별도 열("잉걸불 7/8")로 보여준다. 가중치(2.0 / 0.25)는 실측
+근거가 없는 설계값이므로, 추천이 이상하게 기울면 여기부터 의심한다.
+
 ## 무기 연동 아티팩트
 
 `isWeaponRelatedCharm`이 참인 아티팩트는 `relatedWeapon`과 지금 든 무기의 종류가 같아야 효과가

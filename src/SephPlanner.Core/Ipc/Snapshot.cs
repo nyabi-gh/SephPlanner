@@ -50,6 +50,12 @@ namespace SephPlanner.Core.Ipc
         /// <summary>게임이 계산해 둔 셀별 최종 레벨. 키는 "x,y".</summary>
         public Dictionary<string, int> LevelMatrix { get; set; } = new Dictionary<string, int>();
         public List<string> DisabledCells { get; set; } = new List<string>();
+
+        /// <summary>
+        /// 게임이 세어 둔 카테고리별 콤보 개수(<c>currentSetEffectCount</c>). 유니크 페어 보정처럼
+        /// 우리가 재현하지 않는 규칙이 있어, 세는 대신 게임 값을 그대로 쓴다.
+        /// </summary>
+        public Dictionary<string, int> ComboCounts { get; set; } = new Dictionary<string, int>();
     }
 
     public sealed class PlacedItem

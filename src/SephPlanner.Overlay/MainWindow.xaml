@@ -203,6 +203,10 @@
                                                        Foreground="{x:Static local:Theme.TextDim}"
                                                        FontFamily="{x:Static local:Theme.Small}" FontSize="10"
                                                        Margin="8,2,0,0" />
+                                            <TextBlock DockPanel.Dock="Right" Text="{Binding Combo}"
+                                                       Foreground="{Binding ComboTone}"
+                                                       FontFamily="{x:Static local:Theme.Small}" FontSize="10"
+                                                       Margin="8,2,0,0" />
                                             <TextBlock Text="{Binding Name}" Foreground="{Binding NameTone}"
                                                        FontSize="12" TextTrimming="CharacterEllipsis" />
                                         </DockPanel>

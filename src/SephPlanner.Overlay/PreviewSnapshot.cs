@@ -30,6 +30,7 @@ public static class PreviewSnapshot
                 new PlacedTablet { DefinitionId = 2025, InstanceId = 11, Position = new GridPos(1, 1), Rotation = 1, IsApplied = true },
                 new PlacedTablet { DefinitionId = 2044, InstanceId = 12, Position = new GridPos(0, 1), IsApplied = true },
             },
+            ComboCounts = { ["EMBER"] = 5, ["FLAMESWORD"] = 3 },
         },
         Offers =
         {

@@ -244,11 +244,13 @@ public partial class MainWindow : Window
             _offers.Add(new OfferView(
                 advice.Candidate.Name,
                 Reach(advice.Effect),
+                advice.ComboText,
                 price > 0 ? $"{price}골드" : "",
                 gain > 0.001 ? $"+{gain:0.#}" : gain < -0.001 ? $"{gain:0.#}" : "0",
                 gain > 0.001 ? Theme.Good : gain < -0.001 ? Theme.Bad : Theme.TextDim,
                 advice.Affordable ? Theme.Text : Theme.TextDim,
                 advice.Affordable ? Theme.TextDim : Theme.Bad,
+                advice.ComboCompletes ? Theme.Good : Theme.Mint,
                 Explain(advice, gold)));
         }
         OfferPanel.Visibility = _offers.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -271,6 +273,13 @@ public partial class MainWindow : Window
     {
         var lines = new List<string>();
         if (!advice.Affordable) lines.Add($"소지금 {gold}골드로는 살 수 없습니다.");
+
+        if (advice.ComboText.Length > 0)
+        {
+            lines.Add(advice.ComboCompletes
+                ? $"콤보가 발동합니다: {advice.ComboText}"
+                : $"콤보 진행: {advice.ComboText}");
+        }
 
         var effect = advice.Effect;
         if (!effect.IsEmpty)
@@ -395,8 +404,8 @@ public partial class MainWindow : Window
 public sealed record MoveView(string Label, string Detail);
 
 public sealed record OfferView(
-    string Name, string Reach, string Price, string Gain,
-    Brush Tone, Brush NameTone, Brush PriceTone, string Tooltip)
+    string Name, string Reach, string Combo, string Price, string Gain,
+    Brush Tone, Brush NameTone, Brush PriceTone, Brush ComboTone, string Tooltip)
 {
     /// <summary>살 수 있는 후보에 빈 도움말이 뜨지 않게 한다.</summary>
     public bool HasTooltip => Tooltip.Length > 0;

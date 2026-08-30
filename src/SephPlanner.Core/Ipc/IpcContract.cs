@@ -19,6 +19,7 @@ namespace SephPlanner.Core.Ipc
 
         public const string TabletDbFile = "tablets.json";
         public const string CharmDbFile = "charms.json";
+        public const string ComboDbFile = "combos.json";
         public const string VerificationReportFile = "query-verification.txt";
 
         /// <summary>플러그인이 덤프한 데이터와 오버레이가 읽는 데이터의 공용 위치.</summary>

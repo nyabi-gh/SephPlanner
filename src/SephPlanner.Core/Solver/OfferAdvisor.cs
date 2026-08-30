@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using SephPlanner.Core.Model;
@@ -31,6 +32,15 @@ namespace SephPlanner.Core.Solver
         /// 알려주는 근거다. 아티팩트 후보는 비어 있다.
         /// </summary>
         public TabletEffectSummary Effect { get; set; } = new TabletEffectSummary();
+
+        /// <summary>후보를 집었을 때의 콤보 진행. "잉걸불 7/8" 꼴. 콤보와 무관하면 빈 문자열.</summary>
+        public string ComboText { get; set; } = "";
+
+        /// <summary>이 후보로 콤보 임계값에 닿아 새 효과가 발동하는가.</summary>
+        public bool ComboCompletes { get; set; }
+
+        /// <summary>줄 세우기에 더해지는 콤보 가치. 점수 증가분과 같은 단위로 환산한 것이다.</summary>
+        public double ComboBonus { get; set; }
     }
 
     /// <summary>
@@ -44,8 +54,16 @@ namespace SephPlanner.Core.Solver
         /// <summary>후보마다 한 번씩 푸는 만큼, 기본 탐색보다 가볍게 잡는다.</summary>
         private static readonly SolverOptions Faster = new() { BeamWidth = 150, ExactCandidates = 40 };
 
+        /// <summary>같은 카테고리를 하나 더 모아 콤보가 발동할 때의 가치. 점수 단위로 레벨 2에 해당한다.</summary>
+        private const double ComboThresholdWorth = 2.0;
+
+        /// <summary>아직 임계값에 못 미치지만 한 걸음 다가가는 가치.</summary>
+        private const double ComboProgressWorth = 0.25;
+
         public static List<OfferAdvice> Rank(
-            PlacementProblem problem, double baseScore, IReadOnlyList<OfferCandidate> candidates, int gold)
+            PlacementProblem problem, double baseScore, IReadOnlyList<OfferCandidate> candidates, int gold,
+            IReadOnlyDictionary<string, int>? comboCounts = null,
+            Func<string, ComboDefinition?>? combos = null)
         {
             var advice = new List<OfferAdvice>();
             var nextInstanceId = -1;
@@ -77,22 +95,69 @@ namespace SephPlanner.Core.Solver
                 }
 
                 var solved = PlacementSolver.Solve(trial, Faster);
-                advice.Add(new OfferAdvice
+                var entry = new OfferAdvice
                 {
                     Candidate = candidate,
                     Gain = solved.Score - baseScore,
                     Affordable = candidate.Price <= gold,
                     Effect = EffectOf(candidate, trial, solved),
-                });
+                };
+                EvaluateCombo(entry, comboCounts, combos);
+                advice.Add(entry);
             }
 
             // 살 수 없는 것은 아무리 좋아도 지금 고를 수 없다. 지우지는 않고 아래로 내린다.
-            // 증가분까지 같으면 여력이 큰 쪽을 위로 올린다. 아티팩트가 적을 때는 여러 석판이
-            // 똑같이 최대치를 뽑아내 증가분만으로는 우열이 드러나지 않는다.
+            // 콤보 가치는 배치 점수에 안 잡히므로 여기서 더해 줄을 세운다. 증가분까지 같으면
+            // 여력이 큰 쪽을 위로 올린다. 아티팩트가 적을 때는 여러 석판이 똑같이 최대치를
+            // 뽑아내 증가분만으로는 우열이 드러나지 않는다.
             return advice.OrderByDescending(entry => entry.Affordable)
-                         .ThenByDescending(entry => entry.Gain)
+                         .ThenByDescending(entry => entry.Gain + entry.ComboBonus)
                          .ThenByDescending(entry => entry.Effect.Reach)
                          .ToList();
+        }
+
+        /// <summary>
+        /// 후보를 집으면 콤보가 얼마나 나아가는지. 개수는 배치와 무관하게 격자의 아티팩트 전체로
+        /// 세므로(게임 <c>SearchSetEffectInInventory</c>) 배치 솔버 밖에서 따로 평가한다.
+        /// 현재 개수는 게임이 세어 둔 값(스냅샷의 <c>ComboCounts</c>)을 그대로 쓴다.
+        /// </summary>
+        private static void EvaluateCombo(
+            OfferAdvice advice,
+            IReadOnlyDictionary<string, int>? comboCounts,
+            Func<string, ComboDefinition?>? combos)
+        {
+            var charm = advice.Candidate.Charm;
+            if (charm is null || comboCounts is null || combos is null) return;
+
+            var parts = new List<string>();
+            foreach (var category in charm.Categories)
+            {
+                var combo = combos(category);
+                if (combo is null || combo.Thresholds.Count == 0) continue;
+
+                comboCounts.TryGetValue(category, out var current);
+                var reached = current + 1;
+
+                // 다음으로 노릴 임계값. 이미 다 넘겼으면 더 모아도 변하는 것이 없다.
+                var goal = combo.Thresholds.Where(t => t >= reached).DefaultIfEmpty(0).Min();
+                if (goal == 0) continue;
+
+                if (goal == reached)
+                {
+                    advice.ComboCompletes = true;
+                    advice.ComboBonus += ComboThresholdWorth;
+                }
+                else
+                {
+                    advice.ComboBonus += ComboProgressWorth;
+                }
+
+                var name = combo.Names.TryGetValue("current", out var text) && text.Length > 0
+                    ? text
+                    : combo.Id;
+                parts.Add($"{name} {reached}/{goal}");
+            }
+            advice.ComboText = string.Join(" ", parts);
         }
 
         /// <summary>

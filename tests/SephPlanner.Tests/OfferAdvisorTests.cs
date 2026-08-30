@@ -62,4 +62,65 @@ public class OfferAdvisorTests
 
         Assert.True(advice[0].Affordable);
     }
+
+    private static OfferCandidate Charm(string name, params string[] categories) => new()
+    {
+        Kind = "charm",
+        Name = name,
+        Charm = new CharmDefinition { MaxLevel = 5, Categories = new List<string>(categories) },
+    };
+
+    private static readonly Dictionary<string, ComboDefinition> Combos = new()
+    {
+        ["EMBER"] = new ComboDefinition
+        {
+            Id = "EMBER",
+            Thresholds = { 2, 5, 8 },
+            Names = { ["current"] = "잉걸불" },
+        },
+    };
+
+    private static ComboDefinition? FindCombo(string id) => Combos.TryGetValue(id, out var combo) ? combo : null;
+
+    [Fact]
+    public void CompletingAComboOutranksAnEqualCharmWithoutOne()
+    {
+        // 두 아티팩트는 배치 점수가 같다. 잉걸불 4개를 모은 상태에서 5개째(임계값)를 채우는
+        // 쪽이 위로 와야 하고, 화면에 보여줄 진행도 함께 나와야 한다.
+        var candidates = new List<OfferCandidate> { Charm("plain"), Charm("ember", "EMBER") };
+        var counts = new Dictionary<string, int> { ["EMBER"] = 4 };
+
+        var advice = OfferAdvisor.Rank(BaseProblem(), baseScore: 0, candidates, gold: 0, counts, FindCombo);
+
+        Assert.Equal("ember", advice[0].Candidate.Name);
+        Assert.True(advice[0].ComboCompletes);
+        Assert.Equal("잉걸불 5/5", advice[0].ComboText);
+        Assert.Equal("", advice[1].ComboText);
+    }
+
+    [Fact]
+    public void ProgressTowardAComboIsWorthLessThanCompletingIt()
+    {
+        var candidates = new List<OfferCandidate> { Charm("ember", "EMBER") };
+        var counts = new Dictionary<string, int> { ["EMBER"] = 2 };
+
+        var advice = OfferAdvisor.Rank(BaseProblem(), baseScore: 0, candidates, gold: 0, counts, FindCombo);
+
+        Assert.False(advice[0].ComboCompletes);
+        Assert.Equal("잉걸불 3/5", advice[0].ComboText);
+        Assert.True(advice[0].ComboBonus > 0);
+    }
+
+    [Fact]
+    public void APastAllThresholdsComboAddsNothing()
+    {
+        // 임계값을 다 넘긴 카테고리는 더 모아도 변하는 게 없다.
+        var candidates = new List<OfferCandidate> { Charm("ember", "EMBER") };
+        var counts = new Dictionary<string, int> { ["EMBER"] = 8 };
+
+        var advice = OfferAdvisor.Rank(BaseProblem(), baseScore: 0, candidates, gold: 0, counts, FindCombo);
+
+        Assert.Equal("", advice[0].ComboText);
+        Assert.Equal(0, advice[0].ComboBonus);
+    }
 }

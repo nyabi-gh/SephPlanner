@@ -69,6 +69,46 @@ namespace SephPlanner.Plugin
             return result;
         }
 
+        /// <summary>
+        /// 콤보(세트 효과) 정의. 임계값은 콤보 프리팹의 <c>addStatByCombo</c>와 구형 세트 효과의
+        /// <c>setStatus</c> 양쪽에서 모은다. 게임의 <c>SearchSetEffectInInventory</c>가 두 경로를
+        /// 다 쓰기 때문이다.
+        /// </summary>
+        public static List<ComboDefinition> LoadCombos()
+        {
+            var result = new List<ComboDefinition>();
+            foreach (var category in Resources.LoadAll<ItemCategoryEntity>("ItemCategory"))
+            {
+                if (!category.isEnabled) continue;
+
+                var thresholds = new SortedSet<int>();
+                var combo = category.comboEffectPrefab != null
+                    ? category.comboEffectPrefab.GetComponent<ComboEffectBase>()
+                    : null;
+                if (combo != null)
+                {
+                    foreach (var stat in combo.addStatByCombo)
+                        if (stat.comboCount > 0) thresholds.Add(stat.comboCount);
+                }
+                foreach (var target in category.setStatus)
+                    if (target.itemCount > 0) thresholds.Add(target.itemCount);
+
+                if (thresholds.Count == 0) continue;
+
+                var names = new Dictionary<string, string>();
+                var text = category.categoryName?.ToString();
+                if (!string.IsNullOrEmpty(text)) names["current"] = text;
+
+                result.Add(new ComboDefinition
+                {
+                    Id = category.id,
+                    Thresholds = new List<int>(thresholds),
+                    Names = names,
+                });
+            }
+            return result;
+        }
+
         // 게임에 설정된 언어로 표시 이름을 담아 둔다. 오버레이가 그대로 보여준다.
         private static Dictionary<string, string> DisplayName(ItemEntity entity)
         {

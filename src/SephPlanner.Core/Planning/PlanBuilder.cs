@@ -83,7 +83,8 @@ namespace SephPlanner.Core.Planning
             var best = PlacementSolver.Solve(problem);
             var candidates = Candidates(snapshot, catalog, weapon, out var skippedOffers);
             var offers = OfferAdvisor.Rank(
-                problem, best.Score, candidates, snapshot.Run?.Gold ?? int.MaxValue);
+                problem, best.Score, candidates, snapshot.Run?.Gold ?? int.MaxValue,
+                inventory.ComboCounts, catalog.Combo);
 
             return new Plan
             {
