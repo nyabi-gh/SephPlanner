@@ -370,9 +370,15 @@ fixedMultiplyLevel)를 들고 있고, 배수는 석판과 같은 `multiplyLevelM
 `Sephirite.Type`에 `TABLET`, `TABLET_BOSS`, `CHARM`이 있는 데서 보이듯 이쪽이 석판의 주 경로다.
 `GridInventory`만 훑던 동안에는 석판 추천이 아예 되지 않았다.
 
-세피라이트는 상자와 달리 미리 보일 걱정이 없다. `GenerateItems`(내용 생성)는 여는 순간에만
-불린다 — 호출 지점이 `LevelController.Open`, 레벨업 큐의 다음 보상 개봉, 리롤뿐임을 디컴파일로
-전수 확인했다. 즉 `isGenerated`는 "열어서 고르는 중"이라는 신호로 계속 믿어도 된다.
+일반 세피라이트는 미리 보일 걱정이 없다. `GenerateItems`(내용 생성)는 여는 순간에만 불리므로
+`isGenerated`가 "열어서 고르는 중"이라는 신호가 된다.
+
+**레벨업 세피라이트만 예외다.** 레벨업 즉시 `Sephirite_LVUP`이 화면 밖 (-1000,-1000)에 스폰되어
+`LevelController.levelUpQueue`(SyncList)에 쌓이고, 내용은 창이 뜨기 전에 미리 생성될 수 있다
+(`GenerateItemsForReopen` - 코드에 호출자가 없어 프리팹의 UnityEvent 로 묶인 것으로 보인다).
+실제로 창을 열기 전에 목록이 떴다는 사용자 제보로 드러났다. 그래서 큐에 있는 세피라이트는
+**보상 창(`UI_SephiriteRewardPanel.IsOpened`)이 열려 있고 큐 맨 앞일 때만** 후보로 삼는다.
+창이 보여주는 것이 항상 큐 맨 앞이기 때문이다(`LevelController.Open`).
 
 **세피라이트에는 거리를 쓰지 않는다.** 좌표가 플레이어와 같은 기준이 아니어서, 바로 앞에 있는데도
 거리가 1800이 넘게 나온다. 그래서 거리로 거르면 언제나 걸러진다. 애초에 거리는 "지금 닿을 수 있는가"의

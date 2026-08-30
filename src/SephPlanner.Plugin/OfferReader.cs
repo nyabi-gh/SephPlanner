@@ -23,7 +23,7 @@ namespace SephPlanner.Plugin
 
             // 세피라이트를 먼저 담는다. 후보 수에 상한이 있어서, 뒤로 밀리면 상자가 많은 자리에서
             // 석판이 통째로 잘려 나간다. 석판은 대개 세피라이트로만 나오므로 이쪽이 우선이다.
-            CollectSephirites(snapshot.Offers, origin, radius);
+            CollectSephirites(snapshot.Offers, player, origin, radius);
 
             foreach (var inventory in UnityEngine.Object.FindObjectsByType<GridInventory>(FindObjectsSortMode.None))
             {
@@ -52,9 +52,18 @@ namespace SephPlanner.Plugin
         /// </summary>
         public static string LastSephiriteReport { get; private set; } = "";
 
-        private static void CollectSephirites(List<OfferedItem> offers, Vector3 origin, float radius)
+        private static void CollectSephirites(
+            List<OfferedItem> offers, PlayerAvatar player, Vector3 origin, float radius)
         {
             var report = new StringBuilder();
+
+            // 레벨업 보상은 창을 열기도 전에 게임이 미리 생성해 둘 수 있다(즉시 띄우기 위한
+            // 준비). 화면에 보이는 것은 보상 창이 열린 큐 맨 앞뿐이므로 그때만 후보로 삼는다.
+            var levelUpQueue = player.GetComponent<LevelController>()?.levelUpQueue;
+            var rewardPanel = UIManager.Instance != null
+                ? UIManager.Instance.GetElement<UI_SephiriteRewardPanel>()
+                : null;
+            var panelOpen = rewardPanel != null && rewardPanel.IsOpened;
 
             // 비활성 오브젝트도 함께 찾는다. 세피라이트를 여는 동안 본체가 잠시 꺼져 있으면
             // 기본 탐색으로는 보이지 않아, 정작 고르는 순간에 후보가 사라진다.
@@ -65,15 +74,19 @@ namespace SephPlanner.Plugin
             {
                 if (sephirite == null) continue;
 
+                var queued = levelUpQueue != null && levelUpQueue.Contains(sephirite);
                 var distance = Vector3.Distance(origin, sephirite.transform.position);
                 report.Append($"[{sephirite.type} d={distance:0.0} gen={sephirite.isGenerated} ")
                       .Append($"acq={sephirite.isAcquired} n={sephirite.Rewards.Count} ")
-                      .Append($"active={sephirite.gameObject.activeInHierarchy}] ");
+                      .Append($"active={sephirite.gameObject.activeInHierarchy}")
+                      .Append(queued ? $" lvup(panel={panelOpen})] " : "] ");
+
+                if (queued && (!panelOpen || levelUpQueue[0] != sephirite)) continue;
 
                 // 거리로 거르지 않는다. 세피라이트의 좌표는 플레이어와 같은 기준이 아니어서
                 // (실제로 1800 이 넘게 나온다) 거리로 보면 언제나 걸러진다. 게다가 거리는 원래
-                // 근사일 뿐이고, 보상이 만들어졌다는 것 자체가 "플레이어가 열어서 지금 고르는 중"
-                // 이라는 더 정확한 신호다.
+                // 근사일 뿐이고, 일반 세피라이트는 보상 생성이 여는 순간에만 일어나므로
+                // 생성됐다는 것 자체가 "플레이어가 열어서 지금 고르는 중"이라는 신호다.
                 if (sephirite.isAcquired || !sephirite.isGenerated) continue;
 
                 foreach (var reward in sephirite.Rewards)
