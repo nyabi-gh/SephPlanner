@@ -12,6 +12,18 @@ using SephPlanner.DataTool;
 if (args.Contains("--solve"))
     return SolverSmokeTest.Run(tabletCount: 3, charmCount: 12);
 
+// 저장해 둔 스냅샷으로 우리 레벨 계산을 게임 값과 견준다. 게임을 다시 켜지 않고 확인할 수 있다.
+var checkIndex = Array.IndexOf(args, "--check");
+if (checkIndex >= 0)
+{
+    if (checkIndex + 1 >= args.Length)
+    {
+        Console.Error.WriteLine("사용법: --check <스냅샷.json>");
+        return 1;
+    }
+    return SnapshotCheck.Run(args[checkIndex + 1]);
+}
+
 var gameDir = args.FirstOrDefault(a => !a.StartsWith('-')) ?? GameLocator.Find();
 if (gameDir is null)
 {

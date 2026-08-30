@@ -33,6 +33,13 @@ dotnet build
 dotnet test
 ```
 
+저장해 둔 스냅샷으로 우리 레벨 계산이 게임 값과 맞는지 볼 수 있다. 어긋나는 칸이 있으면 아직
+읽지 않는 효과(각인, 세트 효과, 배치 보너스)가 걸려 있다는 뜻이다.
+
+```powershell
+dotnet run --project src/SephPlanner.DataTool -- --check <스냅샷.json>
+```
+
 데이터 추출:
 
 ```powershell
