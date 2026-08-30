@@ -44,6 +44,9 @@ namespace SephPlanner.Core.Solver
 
         /// <summary>사용자가 밀고 있는 빌드 카테고리에 속하는 아티팩트인가.</summary>
         public bool MatchesPriority { get; set; }
+
+        /// <summary>가방이 차 있어 이 후보를 집으면 자리를 내줘야 하는 것의 이름. 없으면 빈 문자열.</summary>
+        public string Displaced { get; set; } = "";
     }
 
     /// <summary>
@@ -81,13 +84,14 @@ namespace SephPlanner.Core.Solver
             foreach (var candidate in candidates)
             {
                 var trial = Clone(problem);
+                var candidateId = nextInstanceId--;
 
                 if (candidate.Charm is not null)
                 {
                     trial.Charms.Add(new CharmSlot
                     {
                         Definition = candidate.Charm,
-                        InstanceId = nextInstanceId--,
+                        InstanceId = candidateId,
                         IsDormant = candidate.CharmIsDormant,
                         Weight = Worth.OfRarity(candidate.Charm.Rarity),
                     });
@@ -97,7 +101,7 @@ namespace SephPlanner.Core.Solver
                     trial.Tablets.Add(new TabletSlot
                     {
                         Definition = candidate.Tablet,
-                        InstanceId = nextInstanceId--,
+                        InstanceId = candidateId,
                     });
                 }
                 else
@@ -112,6 +116,7 @@ namespace SephPlanner.Core.Solver
                     Gain = solved.Score - baseScore,
                     Affordable = candidate.Price <= gold,
                     Effect = EffectOf(candidate, trial, solved),
+                    Displaced = DisplacedBy(trial, solved, candidateId),
                 };
                 EvaluateCombo(entry, comboCounts, combos, priorityCategories);
                 advice.Add(entry);
@@ -199,6 +204,26 @@ namespace SephPlanner.Core.Solver
 
             var placement = solved.Tablets[index];
             return TabletEffectSummary.Of(placement.Query, trial.Grid, placement.Position, placement.Rotation);
+        }
+
+        /// <summary>
+        /// 가방이 차 있으면 후보를 집는 값에 "무엇을 빼는가"가 이미 들어 있다(솔버가 배정에서
+        /// 떨어뜨린다). 그 사실을 이름으로 드러낸다.
+        /// </summary>
+        private static string DisplacedBy(PlacementProblem trial, Arrangement solved, int candidateId)
+        {
+            foreach (var charm in trial.Charms)
+            {
+                if (charm.InstanceId == candidateId) continue;
+                if (solved.CharmPositions.ContainsKey(charm.InstanceId)) continue;
+
+                if (charm.Definition.Names.TryGetValue("current", out var name) && name.Length > 0)
+                    return name;
+                return charm.Definition.Id.Length > 0
+                    ? charm.Definition.Id
+                    : charm.IsFiller ? "아이템" : "아티팩트";
+            }
+            return "";
         }
 
         private static PlacementProblem Clone(PlacementProblem problem) => new()

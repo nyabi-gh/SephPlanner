@@ -142,6 +142,34 @@ public class OfferAdvisorTests
     }
 
     [Fact]
+    public void AFullBagNamesWhatMustGo()
+    {
+        // 빈 칸이 없는 격자. 새 아티팩트를 집으면 기존 것 하나가 자리를 내줘야 한다.
+        var problem = new PlacementProblem { Grid = new GridSpec(6, 7, 2) };
+        problem.Charms.Add(new CharmSlot
+        {
+            InstanceId = 10,
+            Definition = new CharmDefinition { MaxLevel = 5, Names = { ["current"] = "낡은 반지" } },
+        });
+        problem.Charms.Add(new CharmSlot
+        {
+            InstanceId = 11,
+            Definition = new CharmDefinition { MaxLevel = 5, Rarity = Rarity.Eternal, Names = { ["current"] = "핵심" } },
+            Weight = Worth.OfRarity(Rarity.Eternal),
+        });
+
+        var offered = new List<OfferCandidate>
+        {
+            new() { Kind = "charm", Name = "new", Charm = new CharmDefinition { MaxLevel = 5, Rarity = Rarity.Rare } },
+        };
+
+        var advice = OfferAdvisor.Rank(problem, baseScore: 0, offered, gold: 0);
+
+        // 레어도가 낮은 쪽이 밀려나야 하고, 그 이름이 그대로 나와야 한다.
+        Assert.Equal("낡은 반지", advice[0].Displaced);
+    }
+
+    [Fact]
     public void ARarerCharmOutranksACommonOneOfEqualLevel()
     {
         var candidates = new List<OfferCandidate>

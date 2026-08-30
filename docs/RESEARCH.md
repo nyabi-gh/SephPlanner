@@ -247,7 +247,8 @@ ilspycmd -t GridInventory "<게임경로>/Sephiria_Data/Managed/Assembly-CSharp.
 2. **고정 각인**(`fixedEngravingsOnServer`)의 고정 레벨·비활성·조건무시·배수를 더한다.
 3. **석판과 각인**(`stoneTablets`, `engravings`)의 `ApplyEffect`.
 4. **배수 행렬을 곱한다.** 여기까지 더해진 값 전체에 곱한다.
-5. **배치 보너스**(`SearchArrangementBonusInInventory`). 곱셈 뒤에 붙는다.
+
+배치 보너스는 이 파이프라인 뒤에 돌지만 레벨을 바꾸지 않는다(아래 참고).
 
 인챈트는 그대로 읽어 스냅샷에 싣는다. `globalItemStatTable`이 `SyncDictionary`라 클라이언트에도
 값이 있다. 예전에는 게임이 보고한 레벨에서 석판 몫을 빼서 역산했는데, 4단계의 배수가 걸린 칸에서는
@@ -280,10 +281,22 @@ fixedMultiplyLevel)를 들고 있고, 배수는 석판과 같은 `multiplyLevelM
 `SimulationVerifier`도 같은 기준으로 대조한다. **클라이언트로 접속한 세션에서만 여전히 못 읽고**,
 그때는 예전처럼 레벨 불일치 경고로 드러난다.
 
-### 아직 반영하지 않은 것
+### 배치 보너스는 레벨과 무관했다
 
-- **배치 보너스**(`SearchArrangementBonusInInventory`). 곱셈 뒤에 더해져서
-  `(석판 + 인챈트) × 배수`라는 우리 모델에 자리가 없다.
+전에는 배치 보너스(`SearchArrangementBonusInInventory`)가 곱셈 뒤에 레벨에 더해진다고 적었는데,
+디컴파일을 끝까지 따라가 보니 **틀린 추정이었다.** 이 함수는 `ReleasePermission`에서 곱셈 뒤에
+호출되긴 하지만 `levelMatrix`를 건드리지 않는다. 실체는:
+
+- `ArrangementBonusEntity`(Resources "ArrangementBonus")가 "특정 아이템들을 특정 상대 배치로
+  놓으면"이라는 레시피를 정의하고,
+- 일치하면 해당 아티팩트의 `OnApplyArrangementBonus`(가상 메서드)가 불린다. 이를 구현한
+  아티팩트는 **셋뿐이다**: `Charm_FrostiumRing`, `Charm_SummonGreenBat`, `Charm_TooCloseDamage`.
+  전부 전투 효과라 레벨 행렬에는 흔적이 없다.
+
+따라서 레벨 불일치의 원인 목록에서 배치 보너스는 빠진다. 이 셋의 자리 가치는 아래
+이웃 의존 아티팩트와 같은 부류의 과제다.
+
+### 아직 반영하지 않은 것
 - **이웃 의존 아티팩트.** 효과의 세기가 자기 레벨이 아니라 다른 칸의 내용에 달린 아티팩트들이다.
   디컴파일 전수 검색으로 `Inventory.FindItem`을 부르는 아티팩트 클래스를 세어 보니 12종쯤 된다:
   `Charm_NearLevelDamage`(조화의 수정 - 이웃 8칸 유효 레벨 합에 비례), `Charm_UpCharmDamage`,

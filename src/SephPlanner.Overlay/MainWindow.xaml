@@ -229,7 +229,7 @@
                                         <Button Content="{Binding Text}" Click="OnChipClick"
                                                 Style="{StaticResource PixelButton}"
                                                 Foreground="{Binding Foreground}" Margin="0,0,4,4"
-                                                ToolTip="누르면 이 콤보를 빌드로 지정하거나 해제합니다. 지정한 콤보의 아티팩트와 진행을 추천에서 크게 칩니다." />
+                                                ToolTip="{Binding Tooltip}" />
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>

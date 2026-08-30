@@ -104,9 +104,36 @@ namespace SephPlanner.Plugin
                     Id = category.id,
                     Thresholds = new List<int>(thresholds),
                     Names = names,
+                    Effects = EffectLines(combo),
                 });
             }
             return result;
+        }
+
+        /// <summary>
+        /// 임계값별 효과 텍스트. 게임 콤보 패널이 쓰는 <c>RequestComboData</c>를 프리팹 컴포넌트에
+        /// 그대로 부른다. 아바타 없이도 대부분 동작하지만, 런타임 상태가 필요한 콤보는 터질 수
+        /// 있으므로 그때는 임계값만 남긴다.
+        /// </summary>
+        private static List<ComboEffectLine> EffectLines(ComboEffectBase combo)
+        {
+            var lines = new List<ComboEffectLine>();
+            if (combo == null) return lines;
+
+            try
+            {
+                foreach (var element in combo.RequestComboData(null))
+                {
+                    if (string.IsNullOrEmpty(element.effectName)) continue;
+                    lines.Add(new ComboEffectLine { Threshold = element.comboCount, Text = element.effectName });
+                }
+                lines.Sort((a, b) => a.Threshold.CompareTo(b.Threshold));
+            }
+            catch (System.Exception)
+            {
+                lines.Clear();
+            }
+            return lines;
         }
 
         // 게임에 설정된 언어로 표시 이름을 담아 둔다. 오버레이가 그대로 보여준다.

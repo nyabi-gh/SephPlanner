@@ -211,8 +211,8 @@ public partial class MainWindow : Window
         if (plan.LevelMismatches > 0)
         {
             // 무엇이 원인인지는 여기서 알 수 없다. 다만 어긋난다는 사실은 확실하므로 그것만 말한다.
-            return $"칸 {plan.LevelMismatches}개의 레벨이 게임과 다릅니다. 아직 읽지 못하는 효과" +
-                   "(각인, 세트 효과, 배치 보너스)가 걸려 있어 점수가 실제와 다를 수 있습니다.";
+            return $"칸 {plan.LevelMismatches}개의 레벨이 게임과 다릅니다. 아직 읽지 못하는 효과가 " +
+                   "걸려 있어 점수가 실제와 다를 수 있습니다.";
         }
 
         if (plan.SkippedOffers > 0)
@@ -303,6 +303,7 @@ public partial class MainWindow : Window
         if (!advice.Affordable) lines.Add($"소지금 {gold}골드로는 살 수 없습니다.");
 
         if (advice.MatchesPriority) lines.Add("밀고 있는 빌드의 아티팩트입니다.");
+        if (advice.Displaced.Length > 0) lines.Add($"가방이 차 있어, 집으면 빠지는 것: {advice.Displaced}");
 
         if (advice.ComboText.Length > 0)
         {
@@ -389,10 +390,19 @@ public partial class MainWindow : Window
         var name = combo.Names.TryGetValue(Naming.CurrentLanguage, out var text) && text.Length > 0
             ? text
             : combo.Id;
+
+        var lines = new List<string>();
+        foreach (var effect in combo.Effects)
+            lines.Add($"{effect.Threshold}개 - {effect.Text}");
+        lines.Add(selected
+            ? "누르면 빌드 지정을 해제합니다."
+            : "누르면 이 콤보를 빌드로 지정해 추천에서 크게 칩니다.");
+
         _chips.Add(new ComboChipView(
             categoryId,
             $"{(selected ? "●" : "○")} {name} {count}",
-            selected ? Theme.Mint : Theme.TextDim));
+            selected ? Theme.Mint : Theme.TextDim,
+            string.Join(Environment.NewLine, lines)));
     }
 
     private void OnChipClick(object sender, RoutedEventArgs e)
@@ -513,7 +523,7 @@ public partial class MainWindow : Window
 
 public sealed record MoveView(string Label, string Detail);
 
-public sealed record ComboChipView(string CategoryId, string Text, Brush Foreground);
+public sealed record ComboChipView(string CategoryId, string Text, Brush Foreground, string Tooltip);
 
 public sealed record OfferView(
     string Name, string Reach, string Combo, string Price, string Gain,

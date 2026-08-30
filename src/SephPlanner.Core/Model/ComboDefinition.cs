@@ -16,5 +16,14 @@ namespace SephPlanner.Core.Model
         public List<int> Thresholds { get; set; } = new List<int>();
 
         public Dictionary<string, string> Names { get; set; } = new Dictionary<string, string>();
+
+        /// <summary>임계값마다 무슨 효과가 발동하는지. 게임의 콤보 패널이 쓰는 텍스트 그대로다.</summary>
+        public List<ComboEffectLine> Effects { get; set; } = new List<ComboEffectLine>();
+    }
+
+    public sealed class ComboEffectLine
+    {
+        public int Threshold { get; set; }
+        public string Text { get; set; } = "";
     }
 }
