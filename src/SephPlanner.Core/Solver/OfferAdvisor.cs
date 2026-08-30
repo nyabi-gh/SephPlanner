@@ -60,12 +60,6 @@ namespace SephPlanner.Core.Solver
         /// <summary>후보마다 한 번씩 푸는 만큼, 기본 탐색보다 가볍게 잡는다.</summary>
         private static readonly SolverOptions Faster = new() { BeamWidth = 150, ExactCandidates = 40 };
 
-        /// <summary>같은 카테고리를 하나 더 모아 콤보가 발동할 때의 가치. 점수 단위로 레벨 2에 해당한다.</summary>
-        private const double ComboThresholdWorth = 2.0;
-
-        /// <summary>아직 임계값에 못 미치지만 한 걸음 다가가는 가치.</summary>
-        private const double ComboProgressWorth = 0.25;
-
         /// <summary>밀고 있는 카테고리의 콤보 가치를 몇 배로 칠지.</summary>
         private const double PriorityMultiplier = 3.0;
 
@@ -166,26 +160,16 @@ namespace SephPlanner.Core.Solver
                 var worth = priority ? PriorityMultiplier : 1;
 
                 comboCounts.TryGetValue(category, out var current);
-                var reached = current + 1;
+                var step = Worth.OfComboStep(combo, current, out var completes, out var goal);
+                if (step <= 0) continue; // 임계값을 다 넘겼다 - 더 모아도 변하는 것이 없다.
 
-                // 다음으로 노릴 임계값. 이미 다 넘겼으면 더 모아도 변하는 것이 없다.
-                var goal = combo.Thresholds.Where(t => t >= reached).DefaultIfEmpty(0).Min();
-                if (goal == 0) continue;
-
-                if (goal == reached)
-                {
-                    advice.ComboCompletes = true;
-                    advice.ComboBonus += ComboThresholdWorth * worth;
-                }
-                else
-                {
-                    advice.ComboBonus += ComboProgressWorth * worth;
-                }
+                if (completes) advice.ComboCompletes = true;
+                advice.ComboBonus += step * worth;
 
                 var name = combo.Names.TryGetValue("current", out var text) && text.Length > 0
                     ? text
                     : combo.Id;
-                parts.Add($"{name} {reached}/{goal}");
+                parts.Add($"{name} {current + 1}/{goal}");
             }
             advice.ComboText = string.Join(" ", parts);
         }
@@ -233,6 +217,8 @@ namespace SephPlanner.Core.Solver
             Tablets = new List<TabletSlot>(problem.Tablets),
             FixedTablets = problem.FixedTablets,
             FixedEffects = problem.FixedEffects,
+            ComboCounts = problem.ComboCounts,
+            Combos = problem.Combos,
         };
     }
 }

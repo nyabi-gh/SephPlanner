@@ -44,6 +44,8 @@ namespace SephPlanner.Core.Planning
             }
 
             problem.FixedEffects.AddRange(inventory.FixedEffects);
+            problem.ComboCounts = inventory.ComboCounts;
+            problem.Combos = catalog.Combo;
 
             foreach (var engraving in inventory.Engravings)
             {

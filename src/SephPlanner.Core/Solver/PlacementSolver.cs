@@ -184,23 +184,37 @@ namespace SephPlanner.Core.Solver
             var free = cells.Where(cell => !taken.Contains(cell)).ToList();
 
             Dictionary<int, GridPos> positions = new Dictionary<int, GridPos>();
+            Dictionary<GridPos, CharmSlot>? neighbors = null;
             SimulationResult result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid, problem.FixedEffects);
 
             for (var iteration = 0; iteration < options.FixpointIterations; iteration++)
             {
                 result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid, problem.FixedEffects);
-                var next = Assign(problem, free, result, occupancy);
+                var next = Assign(problem, free, result, occupancy, neighbors);
                 if (SamePositions(positions, next)) break;
 
                 positions = next;
                 occupancy = OccupancyFrom(layout, positions, problem);
+                neighbors = CharmsByCell(problem, positions);
             }
 
             return Describe(problem, layout, positions, occupancy, result);
         }
 
+        private static Dictionary<GridPos, CharmSlot> CharmsByCell(
+            PlacementProblem problem, Dictionary<int, GridPos> positions)
+        {
+            var map = new Dictionary<GridPos, CharmSlot>();
+            foreach (var charm in problem.Charms)
+            {
+                if (positions.TryGetValue(charm.InstanceId, out var position)) map[position] = charm;
+            }
+            return map;
+        }
+
         private static Dictionary<int, GridPos> Assign(
-            PlacementProblem problem, List<GridPos> free, SimulationResult result, GridOccupancy occupancy)
+            PlacementProblem problem, List<GridPos> free, SimulationResult result, GridOccupancy occupancy,
+            Dictionary<GridPos, CharmSlot>? neighbors)
         {
             var positions = new Dictionary<int, GridPos>();
             if (problem.Charms.Count == 0 || free.Count == 0) return positions;
@@ -215,7 +229,7 @@ namespace SephPlanner.Core.Solver
                 for (var cellIndex = 0; cellIndex < free.Count; cellIndex++)
                 {
                     // 헝가리안은 비용을 최소화하므로 점수를 뒤집어 넣는다.
-                    var value = -Value(problem, problem.Charms[charmIndex], free[cellIndex], result, occupancy);
+                    var value = -Value(problem, problem.Charms[charmIndex], free[cellIndex], result, occupancy, neighbors);
                     if (charmsAreRows) cost[charmIndex, cellIndex] = value;
                     else cost[cellIndex, charmIndex] = value;
                 }
@@ -235,7 +249,7 @@ namespace SephPlanner.Core.Solver
 
         private static double Value(
             PlacementProblem problem, CharmSlot charm, GridPos cell,
-            SimulationResult result, GridOccupancy occupancy)
+            SimulationResult result, GridOccupancy occupancy, Dictionary<GridPos, CharmSlot>? neighbors)
         {
             if (charm.IsFiller) return 0;
             if (Reason(charm, cell, result, problem.Grid, occupancy) != CharmInactiveReason.None) return 0;
@@ -248,12 +262,43 @@ namespace SephPlanner.Core.Solver
             var value = charm.Weight * (ActiveValue + effective)
                         - WastePenalty * Math.Max(0, level - effective);
 
+            if (charm.Definition.Behavior == "Charm_WhitePaper")
+                value += WhitePaperWorth(problem, charm, cell, neighbors);
+
             // 점수가 같은 배치가 여럿일 때 지금 자리를 지킨다. 채점할 때만 더하면 배정기가 이미
             // 자리를 바꿔 놓은 뒤라, 이득이 없는데도 맞바꾸라는 제안이 나온다.
             if (problem.CurrentCharms.TryGetValue(charm.InstanceId, out var current) && current == cell)
                 value += StabilityBonus;
 
             return value;
+        }
+
+        /// <summary>
+        /// 하얀 종이는 양옆 아티팩트가 공유하는 카테고리를 물려받아 콤보 개수에 +1 을 보탠다
+        /// (게임 <c>Charm_WhitePaper</c>: 좌우 이웃의 카테고리 중 둘 다 가진 것을 자기 것으로).
+        /// 이웃은 직전 반복의 배정에서 오는 근사이고, 개수도 지금 배치 기준이라 정확히는 못 세지만
+        /// 같은 카테고리 쌍 사이에 끼우는 방향으로는 충분히 이끈다.
+        /// </summary>
+        private static double WhitePaperWorth(
+            PlacementProblem problem, CharmSlot charm, GridPos cell, Dictionary<GridPos, CharmSlot>? neighbors)
+        {
+            if (neighbors is null || problem.Combos is null) return 0;
+            if (!neighbors.TryGetValue(cell.Offset(-1, 0), out var left) || left == charm || left.IsFiller) return 0;
+            if (!neighbors.TryGetValue(cell.Offset(1, 0), out var right) || right == charm || right.IsFiller) return 0;
+
+            var worth = 0.0;
+            foreach (var category in left.Definition.Categories)
+            {
+                if (!right.Definition.Categories.Contains(category)) continue;
+
+                var combo = problem.Combos(category);
+                if (combo is null) continue;
+
+                var count = 0;
+                problem.ComboCounts?.TryGetValue(category, out count);
+                worth += Worth.OfComboStep(combo, count, out _, out _);
+            }
+            return worth;
         }
 
         /// <summary>
@@ -337,6 +382,9 @@ namespace SephPlanner.Core.Solver
             arrangement.Tablets.AddRange(layout);
             arrangement.Score += Familiarity(problem, layout);
 
+            // 하얀 종이 같은 이웃 의존 가치를 최종 배치 기준으로 다시 매긴다.
+            var neighbors = CharmsByCell(problem, positions);
+
             foreach (var charm in problem.Charms)
             {
                 if (!positions.TryGetValue(charm.InstanceId, out var position))
@@ -363,7 +411,7 @@ namespace SephPlanner.Core.Solver
                 }
 
                 arrangement.EffectiveLevels[position] = Math.Max(0, Math.Min(charm.Definition.MaxLevel, level));
-                arrangement.Score += Value(problem, charm, position, result, occupancy);
+                arrangement.Score += Value(problem, charm, position, result, occupancy, neighbors);
             }
             return arrangement;
         }

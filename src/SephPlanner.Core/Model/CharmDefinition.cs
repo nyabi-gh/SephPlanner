@@ -24,6 +24,12 @@ namespace SephPlanner.Core.Model
         /// <summary>연동된 무기 종류(<c>EWeaponType</c> 이름). 무기 연동이 아니면 빈 문자열.</summary>
         public string RelatedWeapon { get; set; } = "";
 
+        /// <summary>
+        /// 게임의 컴포넌트 클래스 이름. 하얀 종이처럼 배치에 따라 동작이 달라지는 특수 아티팩트를
+        /// 솔버가 알아보는 데 쓴다.
+        /// </summary>
+        public string Behavior { get; set; } = "";
+
         public List<string> Categories { get; set; } = new List<string>();
         public Dictionary<string, string> Names { get; set; } = new Dictionary<string, string>();
     }

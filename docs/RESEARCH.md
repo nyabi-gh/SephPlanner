@@ -301,11 +301,20 @@ fixedMultiplyLevel)를 들고 있고, 배수는 석판과 같은 `multiplyLevelM
   디컴파일 전수 검색으로 `Inventory.FindItem`을 부르는 아티팩트 클래스를 세어 보니 12종쯤 된다:
   `Charm_NearLevelDamage`(조화의 수정 - 이웃 8칸 유효 레벨 합에 비례), `Charm_UpCharmDamage`,
   `Charm_AutoMagic`, `Charm_ReduceMPCost`, `Charm_RightSpellCooldownHelper`(북향의 금빛침),
-  `Charm_NearMagicBullet`, `Charm_PlanetModule`, `Charm_WhitePaper`, `Charm_WoodenBox`,
+  `Charm_NearMagicBullet`, `Charm_PlanetModule`, `Charm_WoodenBox`,
   `Charm_MagicCoolDownBonusByTag`, `Charm_BoltMagicMultiShot`, `Charm_CompanionChaos`.
   각자 로직이 달라 일괄 모델이 없고, 레벨 행렬에는 영향이 없어 불일치 경고로도 안 잡힌다
   (전투 스탯으로만 새므로). 배치 점수가 이들의 자리 가치를 과소평가하는 문제이며, 당장은
   사용자가 강화 우선 지정(우클릭)으로 보정한다. 제대로 하려면 아티팩트별 가치 함수가 필요하다.
+
+  이 부류의 첫 사례로 **하얀 종이(`Charm_WhitePaper`)는 모델에 넣었다.** 좌우 이웃의 아티팩트가
+  공유하는 카테고리를 자기 것으로 물려받아 콤보 개수에 +1을 보태는 아이템이다(둘 다 가진
+  카테고리만, `match=2`). 카탈로그가 컴포넌트 클래스 이름(`Behavior`)을 실어 주고, 솔버의
+  배정 고정점 루프가 직전 반복의 배치를 이웃 지도로 넘겨 "같은 카테고리 쌍 사이에 낀
+  하얀 종이"에 콤보 한 걸음 가치(`Worth.OfComboStep`)를 더한다. 최종 점수(Describe)에도 같은
+  값이 들어간다. 근사가 두 겹이다: 이웃은 직전 반복 기준이라 쌍을 종이 주위로 재구성하는
+  탐색까지는 못 하고(끼울 자리가 이미 있으면 찾아간다), 콤보 개수는 현재 배치 기준이라 종이
+  자신의 기여가 이미 섞여 있을 수 있다.
 
 레벨에 관해서는 어긋나는지를 **항상 확인한다.** 게임이 계산해 둔 `levelMatrix`가 정답지다.
 

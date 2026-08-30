@@ -62,6 +62,7 @@ namespace SephPlanner.Plugin
                     RelatedWeapon = charm != null && charm.isWeaponRelatedCharm
                         ? charm.relatedWeapon.ToString()
                         : "",
+                    Behavior = charm != null ? charm.GetType().Name : "",
                     Categories = entity.categories ?? new List<string>(),
                     Names = DisplayName(entity),
                 });

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using SephPlanner.Core.Charms;
 using SephPlanner.Core.Model;
@@ -66,6 +67,13 @@ namespace SephPlanner.Core.Solver
 
         /// <summary>고정 각인이 절대 좌표에 박아 둔 칸 효과. 역시 주어진 조건이다.</summary>
         public List<FixedEffectCell> FixedEffects { get; set; } = new List<FixedEffectCell>();
+
+        /// <summary>
+        /// 하얀 종이(양옆이 공유하는 카테고리를 물려받아 콤보에 +1)의 자리 가치를 매기는 데 쓴다.
+        /// 없으면 하얀 종이는 평범한 아티팩트로만 평가된다.
+        /// </summary>
+        public IReadOnlyDictionary<string, int>? ComboCounts { get; set; }
+        public Func<string, ComboDefinition?>? Combos { get; set; }
 
         /// <summary>
         /// 지금 놓여 있는 자리. 점수가 같은 배치가 여럿일 때 이미 놓인 대로 두는 쪽을 고르는 데 쓴다.
