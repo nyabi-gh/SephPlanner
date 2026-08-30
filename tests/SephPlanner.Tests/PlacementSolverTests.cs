@@ -112,6 +112,20 @@ public class PlacementSolverTests
     }
 
     [Fact]
+    public void EnchantIsAddedBeforeTheMultiplierNotAfter()
+    {
+        // 게임은 석판 몫과 인챈트를 더한 뒤에 배수 행렬을 곱한다. 순서를 뒤집으면 값이 달라진다.
+        var problem = new PlacementProblem { Grid = OneRow };
+        problem.Tablets.Add(Tablet(1, "RIGHT 2\nRIGHT MUL/2"));
+        problem.Charms.Add(Charm(10, maxLevel: 10));
+        problem.Charms[0].Enchant = 1;
+
+        var arrangement = PlacementSolver.Solve(problem);
+
+        Assert.Equal(6, arrangement.EffectiveLevels[arrangement.CharmPositions[10]]);
+    }
+
+    [Fact]
     public void ItemsThatOnlyTakeUpSpaceAreStillPlaced()
     {
         // 소비 아이템을 빼놓으면 솔버가 이미 찬 자리를 비었다고 보고 거기로 옮기라고 한다.

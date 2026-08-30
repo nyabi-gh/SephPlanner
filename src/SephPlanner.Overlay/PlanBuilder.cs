@@ -65,13 +65,6 @@ public static class PlanBuilder
             problem.CurrentTablets[slot.InstanceId] = new TabletSpot(tablet.Position, tablet.Rotation);
         }
 
-        var occupancy = BuildOccupancy(inventory, catalog, grid);
-        var simulation = TabletSimulator.Run(layout, occupancy, grid);
-
-        // 석판을 막 옮긴 직후에는 게임이 아직 레벨을 다시 계산하지 않았을 수 있다. 그 상태에서
-        // 차이를 인챈트로 받아들이면 배치를 건드릴 때마다 문제 자체가 달라져 제안이 흔들린다.
-        var consistent = IsConsistent(orderedTablets, simulation);
-
         // 무기 연동 아티팩트는 해당 무기를 들고 있어야 효과가 켜진다. 무기를 모르면 판정하지 않는다.
         var weapon = snapshot.Run?.WeaponId ?? "";
 
@@ -87,7 +80,7 @@ public static class PlanBuilder
             {
                 Definition = definition ?? new CharmDefinition(),
                 InstanceId = item.InstanceId,
-                Enchant = definition is null || !consistent ? 0 : DeriveEnchant(item, simulation),
+                Enchant = definition is null ? 0 : item.Enchant,
                 IsFiller = definition is null,
                 IsDormant = definition is not null && WeaponMatch.IsDormant(definition, weapon),
             });
@@ -155,19 +148,6 @@ public static class PlanBuilder
         return candidates;
     }
 
-    /// <summary>
-    /// 인챈트로 붙은 고정 레벨은 따로 알 수 없어, 게임이 보고한 레벨에서 석판 몫을 빼서 구한다.
-    /// 배수가 걸린 칸에서는 나눗셈이 정확히 떨어지지 않을 수 있어 근사값이 된다.
-    /// </summary>
-    private static int DeriveEnchant(PlacedItem item, SimulationResult tabletLevels)
-    {
-        var reported = item.EffectiveLevel;
-        if (tabletLevels.MultiplyLevel.TryGetValue(item.Position, out var multiplier) && multiplier != 0)
-            reported /= multiplier;
-
-        return reported - tabletLevels.LevelAt(item.Position);
-    }
-
     private static GridOccupancy BuildOccupancy(InventoryState inventory, CatalogStore catalog, GridSpec grid)
     {
         var occupancy = new GridOccupancy();
@@ -181,17 +161,6 @@ public static class PlanBuilder
             occupancy.AddItem(item.Position, definition is not null, definition?.IsMagic ?? false);
         }
         return occupancy;
-    }
-
-    /// <summary>우리 시뮬레이션이 게임이 보고한 석판 적용 상태와 맞는지 본다.</summary>
-    private static bool IsConsistent(List<PlacedTablet> tablets, SimulationResult simulation)
-    {
-        if (tablets.Count != simulation.Applied.Length) return false;
-
-        for (var i = 0; i < tablets.Count; i++)
-            if (tablets[i].IsApplied != simulation.Applied[i]) return false;
-
-        return true;
     }
 
     /// <summary>보조 가방처럼 본 격자 밖에 있는 자리는 배치 대상이 아니다.</summary>

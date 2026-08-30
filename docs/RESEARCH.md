@@ -173,6 +173,34 @@ ilspycmd -t GridInventory "<게임경로>/Sephiria_Data/Managed/Assembly-CSharp.
 `NeighborsAreFull`, `Near8MagicBook`은 이웃 칸의 내용을 본다. `FullHP`만 배치와 무관한
 전투 중 상태라 배치 탐색에서는 만족한 것으로 둔다.
 
+## 레벨이 정해지는 순서
+
+`GridInventory.ReleasePermission`이 `levelMatrix`를 만드는 순서다. 순서가 중요한 이유는 배수가
+중간에 한 번 걸리기 때문이다.
+
+1. 아티팩트 칸마다 **인챈트**를 더한다. 값은 `DungeonManager`의 `globalItemStatTable`에
+   `"{instanceID}/Enchant"` 키로 인스턴스마다 따로 들어 있다.
+2. **고정 각인**(`fixedEngravingsOnServer`)의 고정 레벨·비활성·조건무시·배수를 더한다.
+3. **석판과 각인**(`stoneTablets`, `engravings`)의 `ApplyEffect`.
+4. **배수 행렬을 곱한다.** 여기까지 더해진 값 전체에 곱한다.
+5. **배치 보너스**(`SearchArrangementBonusInInventory`). 곱셈 뒤에 붙는다.
+
+인챈트는 그대로 읽어 스냅샷에 싣는다. `globalItemStatTable`이 `SyncDictionary`라 클라이언트에도
+값이 있다. 예전에는 게임이 보고한 레벨에서 석판 몫을 빼서 역산했는데, 4단계의 배수가 걸린 칸에서는
+나눗셈이 떨어지지 않아 근사값이 됐다.
+
+### 아직 반영하지 않은 것
+
+- **각인**(`GridInventory.engravings`)은 읽지 않는다. `SyncList<StoneTablet>`이라 클라이언트에서
+  볼 수는 있지만, 석판과 달리 옮길 수 있는 물건이 아니어서 지금의 배치 모델에 그대로 넣을 수 없다.
+  "고정되어 움직이지 않는 석판"이라는 개념이 필요하다.
+- **고정 각인**(`fixedEngravingsOnServer`)은 이름 그대로 서버에만 있어 클라이언트로 접속한
+  세션에서는 읽을 수 없다.
+- **배치 보너스**는 곱셈 뒤에 더해져서 `(석판 + 인챈트) × 배수`라는 우리 모델에 자리가 없다.
+
+셋 다 있는 상황에서는 우리가 계산한 레벨이 게임이 보고한 레벨과 어긋난다. 플러그인의
+`SimulationVerifier`가 그 차이를 잡아 BepInEx 로그에 남긴다.
+
 ## 배치 최적화
 
 문제를 두 조각으로 나눈다.

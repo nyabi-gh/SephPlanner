@@ -53,6 +53,9 @@ namespace SephPlanner.Core.Ipc
         public GridPos Position { get; set; }
         public int EffectiveLevel { get; set; }
         public bool IsActive { get; set; }
+
+        /// <summary>인챈트로 붙은 고정 레벨. 자리를 옮겨도 따라다닌다.</summary>
+        public int Enchant { get; set; }
     }
 
     public sealed class PlacedTablet
