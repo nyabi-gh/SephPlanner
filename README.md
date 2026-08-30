@@ -87,6 +87,17 @@ dotnet run --project src/SephPlanner.Overlay -c Release
 
 게임이 실행 중이면 자동으로 연결된다. 창은 끌어서 옮기고 Esc 또는 오른쪽 위 X로 닫는다.
 
+게임 없이 화면만 확인하려면 `--preview`를 붙인다. 가짜 스냅샷으로 전체 UI가 채워져 뜨고,
+파이프를 열지 않으므로 실제 오버레이와 같이 떠 있어도 서로 방해하지 않는다.
+
+```powershell
+dotnet run --project src/SephPlanner.Overlay -- --preview
+```
+
+화면은 게임 자체 UI의 문법을 따른다. 색은 게임 패널(가방·콤보 효과·스킬)에서 채집했고
+글꼴은 [Galmuri](https://github.com/quiple/galmuri) 픽셀 폰트다(OFL-1.1, 라이선스는
+`src/SephPlanner.Overlay/Fonts/LICENSE.txt`에 동봉). 값은 전부 `Theme.cs` 한곳에 있다.
+
 오버레이는 **접힌 상태와 펼친 상태** 두 가지로 쓴다. 읽는 방식이 달라서 나눴다.
 
 - **접힘.** 플레이 중에는 화면을 거의 가리지 않는다. 현재 점수와 최적 배치 점수, 그리고 지금

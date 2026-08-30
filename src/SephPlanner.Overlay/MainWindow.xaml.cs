@@ -16,7 +16,7 @@ namespace SephPlanner.Overlay;
 
 public partial class MainWindow : Window
 {
-    private const double CompactWidth = 200;
+    private const double CompactWidth = 232;
     private const double DetailWidth = 420;
 
     private readonly ObservableCollection<CellView> _cells = new();
@@ -39,6 +39,14 @@ public partial class MainWindow : Window
         MoveList.ItemsSource = _moves;
         OfferList.ItemsSource = _offers;
         ApplyLayout();
+
+        // 게임 없이 화면을 확인하는 통로. 파이프를 열지 않으므로 실제 오버레이와 같이 떠도 안전하다.
+        if (Environment.GetCommandLineArgs().Contains("--preview"))
+        {
+            StatusText.Text = "미리보기";
+            OnSnapshot(PreviewSnapshot.Build());
+            return;
+        }
 
         var client = new SnapshotClient();
         client.ConnectionChanged += connected => Dispatcher.Invoke(() =>
@@ -128,7 +136,10 @@ public partial class MainWindow : Window
 
         var improved = plan.Gain > 0.001;
         GainText.Text = improved ? $"+{plan.Gain:0.#}" : "최적";
-        GainText.Foreground = improved ? Brushes.PaleGreen : new SolidColorBrush(Color.FromRgb(0x8A, 0x7F, 0xA6));
+        GainText.Foreground = improved ? Theme.Good : Theme.TextDim;
+
+        // 최적에 도달했으면 지금 점수를 어둡게 둘 이유가 없다.
+        CurrentScoreText.Foreground = improved ? Theme.TextDim : Theme.TextBright;
 
         AutoExpand(plan);
         RenderGrid(snapshot, plan);
@@ -196,7 +207,7 @@ public partial class MainWindow : Window
     {
         DetailPanel.Visibility = _expanded ? Visibility.Visible : Visibility.Collapsed;
         Width = _expanded ? DetailWidth : CompactWidth;
-        ExpandButton.Content = _expanded ? "⌃" : "⌄";
+        ExpandButton.Content = _expanded ? "▲" : "▼";
         ExpandButton.ToolTip = (_expanded ? "접기" : "펼치기") + " (Ctrl+Alt+P)";
     }
 
@@ -212,10 +223,6 @@ public partial class MainWindow : Window
         UpdateNextMoveVisibility();
     }
 
-    private static readonly Brush OfferName = new SolidColorBrush(Color.FromRgb(0xC3, 0xBB, 0xD8));
-    private static readonly Brush OfferNameDim = new SolidColorBrush(Color.FromRgb(0x6B, 0x62, 0x85));
-    private static readonly Brush PriceText = new SolidColorBrush(Color.FromRgb(0x8A, 0x7F, 0xA6));
-
     private void RenderOffers(Plan plan, int gold)
     {
         _offers.Clear();
@@ -229,9 +236,9 @@ public partial class MainWindow : Window
                 Reach(advice.Effect),
                 price > 0 ? $"{price}골드" : "",
                 gain > 0.001 ? $"+{gain:0.#}" : gain < -0.001 ? $"{gain:0.#}" : "0",
-                gain > 0.001 ? Brushes.PaleGreen : gain < -0.001 ? Brushes.Salmon : Brushes.Gray,
-                advice.Affordable ? OfferName : OfferNameDim,
-                advice.Affordable ? PriceText : Brushes.Salmon,
+                gain > 0.001 ? Theme.Good : gain < -0.001 ? Theme.Bad : Theme.TextDim,
+                advice.Affordable ? Theme.Text : Theme.TextDim,
+                advice.Affordable ? Theme.TextDim : Theme.Bad,
                 Explain(advice, gold)));
         }
         OfferPanel.Visibility = _offers.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -374,24 +381,13 @@ public sealed record OfferView(
 
 public sealed class CellView : INotifyPropertyChanged
 {
-    private static readonly Brush EmptyFill = new SolidColorBrush(Color.FromRgb(0x1C, 0x18, 0x24));
-    private static readonly Brush ClosedFill = new SolidColorBrush(Color.FromRgb(0x12, 0x10, 0x17));
-    private static readonly Brush TabletFill = new SolidColorBrush(Color.FromRgb(0x2B, 0x3A, 0x2A));
-    private static readonly Brush MutedText = new SolidColorBrush(Color.FromRgb(0x5A, 0x51, 0x70));
-    private static readonly Brush NameText = new SolidColorBrush(Color.FromRgb(0xA9, 0xA0, 0xC2));
-    private static readonly Brush TabletName = new SolidColorBrush(Color.FromRgb(0x9C, 0xC0, 0x9A));
-    private static readonly Brush Wasted = new SolidColorBrush(Color.FromRgb(0xC9, 0xA2, 0x27));
-    private static readonly Brush OffText = new SolidColorBrush(Color.FromRgb(0xB4, 0x6A, 0x6A));
-    private static readonly Brush MovedEdge = new SolidColorBrush(Color.FromRgb(0xC9, 0xA2, 0x27));
-    private static readonly Brush QuietEdge = new SolidColorBrush(Color.FromRgb(0x2A, 0x24, 0x34));
-
     private string _title = "";
     private string _label = "";
     private string _tooltip = "";
-    private Brush _titleBrush = NameText;
-    private Brush _foreground = MutedText;
-    private Brush _background = EmptyFill;
-    private Brush _borderBrush = QuietEdge;
+    private Brush _titleBrush = Theme.Text;
+    private Brush _foreground = Theme.TextDim;
+    private Brush _background = Theme.EmptyFill;
+    private Brush _borderBrush = Theme.SlotEdge;
     private Thickness _borderThickness = new(1);
 
     public string Title { get => _title; private set { _title = value; Raise(nameof(Title)); } }
@@ -424,21 +420,21 @@ public sealed class CellView : INotifyPropertyChanged
 
     public void SetClosed()
     {
-        Fill("", "", "", MutedText, ClosedFill);
+        Fill("", "", "", Theme.TextDim, Theme.ClosedFill);
         SetEdge(false);
     }
 
     public void SetEmpty()
     {
-        Fill("", "", "", MutedText, EmptyFill);
+        Fill("", "", "", Theme.TextDim, Theme.EmptyFill);
         SetEdge(false);
     }
 
     public void SetTablet(string name, int rotation, bool moved)
     {
-        Fill(name, $"회전 {rotation}", name, Brushes.DarkSeaGreen, TabletFill);
-        TitleBrush = TabletName;
-        SetEdge(moved);
+        Fill(name, $"회전 {rotation}", name, Theme.TextDim, Theme.TabletFill);
+        TitleBrush = Theme.TabletText;
+        SetEdge(moved, Theme.TabletEdge);
     }
 
     /// <summary>
@@ -449,7 +445,7 @@ public sealed class CellView : INotifyPropertyChanged
     {
         if (reason != CharmInactiveReason.None)
         {
-            Fill(name, "꺼짐", Explain(reason), OffText, EmptyFill);
+            Fill(name, "꺼짐", Explain(reason), Theme.Bad, Theme.SlotFill);
             SetEdge(moved);
             return;
         }
@@ -459,8 +455,8 @@ public sealed class CellView : INotifyPropertyChanged
         var tooltip = wasted ? $"칸 레벨 {level}, 이 아티팩트는 {effective}까지만 반영됩니다" : name;
 
         Fill(name, label, tooltip,
-            level < 0 ? Brushes.Salmon : wasted ? Wasted : effective > 0 ? Brushes.PaleGreen : MutedText,
-            EmptyFill);
+            level < 0 ? Theme.Bad : wasted ? Theme.Orange : effective > 0 ? Theme.Good : Theme.TextDim,
+            Theme.SlotFill);
         SetEdge(moved);
     }
 
@@ -469,7 +465,7 @@ public sealed class CellView : INotifyPropertyChanged
         Title = title;
         Label = label;
         Tooltip = tooltip;
-        TitleBrush = NameText;
+        TitleBrush = Theme.Text;
         Foreground = foreground;
         Background = background;
     }
@@ -483,9 +479,9 @@ public sealed class CellView : INotifyPropertyChanged
         _ => "",
     };
 
-    private void SetEdge(bool moved)
+    private void SetEdge(bool moved, Brush? quiet = null)
     {
-        BorderBrush = moved ? MovedEdge : QuietEdge;
+        BorderBrush = moved ? Theme.GoldEdge : quiet ?? Theme.SlotEdge;
         BorderThickness = new Thickness(moved ? 2 : 1);
     }
 
