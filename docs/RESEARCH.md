@@ -185,3 +185,24 @@ ilspycmd -t GridInventory "<게임경로>/Sephiria_Data/Managed/Assembly-CSharp.
 
 석판 조건과 아티팩트 조건이 서로의 배치에 의존하므로 몇 번 되풀이해 수렴시키고,
 **최종 점수는 수렴한 배치로 다시 계산한다.** 그래서 보고되는 점수는 추정치가 아니라 실제 값이다.
+
+## 선택지 감지
+
+집거나 살 수 있는 아이템을 찾는 데 화면별 UI 클래스를 다룰 필요가 없다.
+상자(`ItemChest.inventory`), 바닥에 떨어진 꾸러미(`DroppedInventory.Inventory`), 상점이
+**모두 각자의 `GridInventory`를 들고 있기 때문이다.**
+
+그래서 플러그인은 씬에 있는 `GridInventory` 중 플레이어의 것이 아니고 일정 거리 안에 있는 것을
+훑는다. 새로운 종류의 상자나 상점이 추가되어도 같은 구조를 따르는 한 그대로 잡힌다.
+
+거리 기준은 BepInEx 설정의 `OfferRadius`로 조정한다.
+
+## 아직 확인하지 못한 것
+
+기적 보상으로 얻은 아이템이 오버레이에서 인식되지 않는다는 보고가 있다. 기적은
+`MiracleController`와 `MiracleDatabase`가 다루는 별도 시스템이라 아이템과 경로가 다를 수 있는데,
+어느 단계에서 어긋나는지는 실제 인벤토리 내용을 봐야 한다.
+
+게임 안에서 F10을 누르면 `%LOCALAPPDATA%\SephPlanner\inventory-dump.txt`에 칸별 좌표, 엔티티
+번호, 아이템 종류, `activeType`, 이름 키, 컴포넌트 유무가 그대로 기록된다. 기적 보상을 받은
+직후의 덤프가 있으면 원인을 좁힐 수 있다.
