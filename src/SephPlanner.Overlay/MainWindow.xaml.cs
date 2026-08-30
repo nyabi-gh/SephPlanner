@@ -71,6 +71,7 @@ public partial class MainWindow : Window
         _moves.Clear();
         _offers.Clear();
         OfferPanel.Visibility = Visibility.Collapsed;
+        LegendText.Visibility = Visibility.Collapsed;
         _lastPlanned = "";
     }
 
@@ -97,6 +98,7 @@ public partial class MainWindow : Window
 
         RenderGrid(snapshot, plan);
         RenderOffers(plan);
+        LegendText.Visibility = plan.Moves.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
         // 제안이 그대로면 목록을 다시 만들지 않는다. 스냅샷마다 깜빡이는 것을 막는다.
         var signature = string.Join("|", plan.Moves.Select(m => $"{m.Label}{m.Detail}"));

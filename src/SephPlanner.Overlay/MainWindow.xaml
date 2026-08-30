@@ -52,7 +52,10 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-            <ItemsControl x:Name="MoveList" Margin="0,10,0,0">
+            <TextBlock x:Name="LegendText" Margin="2,8,0,0" FontSize="10" Foreground="#6B6285"
+                       Text="노란 테두리 = 옮겨야 할 자리" Visibility="Collapsed" />
+
+            <ItemsControl x:Name="MoveList" Margin="0,8,0,0">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <TextBlock Text="{Binding}" Foreground="#9C93B8" FontSize="11" Margin="0,0,0,3" />
