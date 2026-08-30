@@ -5,7 +5,22 @@ using SephPlanner.Core.Tablets;
 
 namespace SephPlanner.Overlay;
 
-public sealed record Move(string Label, GridPos From, GridPos To);
+public sealed record Move(string Label, GridPos From, GridPos To, string Detail);
+
+/// <summary>카탈로그의 표시 이름을 꺼내는 규칙. 이름이 없으면 내부 식별자로 물러선다.</summary>
+public static class Naming
+{
+    public const string CurrentLanguage = "current";
+
+    public static string Of(Dictionary<string, string> names, string id, string fallback)
+    {
+        if (names.TryGetValue(CurrentLanguage, out var text) && text.Length > 0) return text;
+        return id.Length > 0 ? id : fallback;
+    }
+
+    /// <summary>격자 칸에 들어갈 만큼 줄인 이름. 한국어 석판 이름은 대부분 두 글자다.</summary>
+    public static string Short(string name) => name.Length <= 3 ? name : name.Substring(0, 2) + "…";
+}
 
 public sealed class Plan
 {
@@ -98,7 +113,7 @@ public static class PlanBuilder
             {
                 DefinitionId = offer.DefinitionId,
                 Kind = offer.Kind,
-                Name = Display(charm?.Names ?? tablet!.Names, charm?.Id ?? tablet!.Id),
+                Name = Naming.Of(charm?.Names ?? tablet!.Names, charm?.Id ?? tablet!.Id, "?"),
                 Price = offer.Price,
                 Charm = charm,
                 Tablet = tablet,
@@ -106,9 +121,6 @@ public static class PlanBuilder
         }
         return candidates;
     }
-
-    private static string Display(Dictionary<string, string> names, string fallback) =>
-        names.TryGetValue("current", out var text) && text.Length > 0 ? text : fallback;
 
     /// <summary>
     /// 인챈트로 붙은 고정 레벨은 따로 알 수 없어, 게임이 보고한 레벨에서 석판 몫을 빼서 구한다.
@@ -152,10 +164,18 @@ public static class PlanBuilder
         {
             var from = current.Tablets[i];
             var to = best.Tablets[i];
-            if (from.Position == to.Position && from.Rotation == to.Rotation) continue;
+            var turned = from.Rotation != to.Rotation;
+            if (from.Position == to.Position && !turned) continue;
 
-            var name = Name(problem.Tablets[i].Definition.Id, "석판");
-            moves.Add(new Move(name, from.Position, to.Position));
+            var definition = problem.Tablets[i].Definition;
+            var name = Naming.Of(definition.Names, definition.Id, "석판");
+            var detail = from.Position == to.Position
+                ? $"{from.Position} 회전 {from.Rotation} → {to.Rotation}"
+                : turned
+                    ? $"{from.Position} → {to.Position} 회전 {to.Rotation}"
+                    : $"{from.Position} → {to.Position}";
+
+            moves.Add(new Move(name, from.Position, to.Position, detail));
         }
 
         foreach (var charm in problem.Charms)
@@ -164,10 +184,9 @@ public static class PlanBuilder
             if (!best.CharmPositions.TryGetValue(charm.InstanceId, out var to)) continue;
             if (from == to) continue;
 
-            moves.Add(new Move(Name(charm.Definition.Id, charm.IsFiller ? "아이템" : "아티팩트"), from, to));
+            var name = Naming.Of(charm.Definition.Names, charm.Definition.Id, charm.IsFiller ? "아이템" : "아티팩트");
+            moves.Add(new Move(name, from, to, $"{from} → {to}"));
         }
         return moves;
     }
-
-    private static string Name(string id, string fallback) => string.IsNullOrEmpty(id) ? fallback : id;
 }

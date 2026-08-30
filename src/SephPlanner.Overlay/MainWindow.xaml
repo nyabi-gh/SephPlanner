@@ -42,7 +42,8 @@
                     <DataTemplate>
                         <Border Margin="2" Height="34" CornerRadius="4"
                                 Background="{Binding Background}"
-                                BorderBrush="{Binding BorderBrush}" BorderThickness="{Binding BorderThickness}">
+                                BorderBrush="{Binding BorderBrush}" BorderThickness="{Binding BorderThickness}"
+                                ToolTip="{Binding Tooltip}" ToolTipService.IsEnabled="{Binding HasTooltip}">
                             <TextBlock Text="{Binding Label}" Foreground="{Binding Foreground}"
                                        FontSize="12" FontWeight="SemiBold"
                                        HorizontalAlignment="Center" VerticalAlignment="Center" />

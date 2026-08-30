@@ -99,13 +99,13 @@ public partial class MainWindow : Window
         RenderOffers(plan);
 
         // 제안이 그대로면 목록을 다시 만들지 않는다. 스냅샷마다 깜빡이는 것을 막는다.
-        var signature = string.Join("|", plan.Moves.Select(m => $"{m.Label}{m.From}{m.To}"));
+        var signature = string.Join("|", plan.Moves.Select(m => $"{m.Label}{m.Detail}"));
         if (signature == _lastPlanned) return;
         _lastPlanned = signature;
 
         _moves.Clear();
         foreach (var move in plan.Moves.Take(6))
-            _moves.Add($"{move.Label}  {move.From} → {move.To}");
+            _moves.Add($"{move.Label}  {move.Detail}");
         if (plan.Moves.Count > 6) _moves.Add($"… 외 {plan.Moves.Count - 6}개");
     }
 
@@ -130,7 +130,9 @@ public partial class MainWindow : Window
         while (_cells.Count < total) _cells.Add(new CellView());
         while (_cells.Count > total) _cells.RemoveAt(_cells.Count - 1);
 
-        var tabletCells = new HashSet<GridPos>(plan.Best.Tablets.Select(t => t.Position));
+        var tabletCells = plan.Best.Tablets
+            .GroupBy(placement => placement.Position)
+            .ToDictionary(group => group.Key, group => group.First());
         var moved = new HashSet<GridPos>(plan.Moves.Select(m => m.To));
 
         for (var index = 0; index < _cells.Count; index++)
@@ -139,7 +141,11 @@ public partial class MainWindow : Window
             var position = new GridPos(index % inventory.Width, index / inventory.Width);
 
             if (index >= inventory.Storage) cell.SetClosed();
-            else if (tabletCells.Contains(position)) cell.SetTablet(moved.Contains(position));
+            else if (tabletCells.TryGetValue(position, out var tablet))
+            {
+                var name = Naming.Of(tablet.Definition.Names, tablet.Definition.Id, "석판");
+                cell.SetTablet(Naming.Short(name), $"{name} · 회전 {tablet.Rotation}", moved.Contains(position));
+            }
             else if (plan.Best.Levels.TryGetValue(position, out var level)) cell.SetLevel(level, moved.Contains(position));
             else cell.SetEmpty();
         }
@@ -175,12 +181,26 @@ public sealed class CellView : INotifyPropertyChanged
     private static readonly Brush QuietEdge = new SolidColorBrush(Color.FromRgb(0x2A, 0x24, 0x34));
 
     private string _label = "";
+    private string _tooltip = "";
     private Brush _foreground = MutedText;
     private Brush _background = EmptyFill;
     private Brush _borderBrush = QuietEdge;
     private Thickness _borderThickness = new(1);
 
     public string Label { get => _label; private set { _label = value; Raise(nameof(Label)); } }
+    public string Tooltip
+    {
+        get => _tooltip;
+        private set
+        {
+            _tooltip = value;
+            Raise(nameof(Tooltip));
+            Raise(nameof(HasTooltip));
+        }
+    }
+
+    /// <summary>내용이 없는 칸에 빈 도움말이 뜨지 않게 한다.</summary>
+    public bool HasTooltip => _tooltip.Length > 0;
     public Brush Foreground { get => _foreground; private set { _foreground = value; Raise(nameof(Foreground)); } }
     public Brush Background { get => _background; private set { _background = value; Raise(nameof(Background)); } }
     public Brush BorderBrush { get => _borderBrush; private set { _borderBrush = value; Raise(nameof(BorderBrush)); } }
@@ -194,6 +214,7 @@ public sealed class CellView : INotifyPropertyChanged
     public void SetClosed()
     {
         Label = "";
+        Tooltip = "";
         Background = ClosedFill;
         SetEdge(false);
     }
@@ -201,14 +222,16 @@ public sealed class CellView : INotifyPropertyChanged
     public void SetEmpty()
     {
         Label = "";
+        Tooltip = "";
         Foreground = MutedText;
         Background = EmptyFill;
         SetEdge(false);
     }
 
-    public void SetTablet(bool moved)
+    public void SetTablet(string label, string tooltip, bool moved)
     {
-        Label = "석판";
+        Label = label;
+        Tooltip = tooltip;
         Foreground = Brushes.DarkSeaGreen;
         Background = TabletFill;
         SetEdge(moved);
@@ -217,6 +240,7 @@ public sealed class CellView : INotifyPropertyChanged
     public void SetLevel(int level, bool moved)
     {
         Label = level > 0 ? $"+{level}" : level.ToString();
+        Tooltip = "";
         Foreground = level < 0 ? Brushes.Salmon : level > 0 ? Brushes.PaleGreen : MutedText;
         Background = EmptyFill;
         SetEdge(moved);
