@@ -9,8 +9,10 @@ namespace SephPlanner.Plugin
     /// 지금 집거나 살 수 있는 아이템을 모은다.
     ///
     /// 두 갈래다. 상자와 바닥에 떨어진 꾸러미, 상점은 각자의 GridInventory 를 들고 있어 한 번에
-    /// 훑을 수 있다. 하지만 석판과 아티팩트가 나오는 세피라이트는 GridInventory 가 없고
-    /// 보상 목록을 따로 들고 있어서, 그쪽은 따로 봐야 한다.
+    /// 훑을 수 있고, 거리로 지금 닿을 수 있는 것만 고른다.
+    ///
+    /// 석판과 아티팩트가 나오는 세피라이트는 GridInventory 가 없어 보상 목록을 따로 봐야 하고,
+    /// 거리도 쓰지 않는다. 세피라이트의 좌표는 플레이어와 같은 기준이 아니기 때문이다.
     /// </summary>
     internal static class OfferReader
     {
@@ -63,8 +65,11 @@ namespace SephPlanner.Plugin
                       .Append($"acq={sephirite.isAcquired} n={sephirite.Rewards.Count} ")
                       .Append($"active={sephirite.gameObject.activeInHierarchy}] ");
 
+                // 거리로 거르지 않는다. 세피라이트의 좌표는 플레이어와 같은 기준이 아니어서
+                // (실제로 1800 이 넘게 나온다) 거리로 보면 언제나 걸러진다. 게다가 거리는 원래
+                // 근사일 뿐이고, 보상이 만들어졌다는 것 자체가 "플레이어가 열어서 지금 고르는 중"
+                // 이라는 더 정확한 신호다.
                 if (sephirite.isAcquired || !sephirite.isGenerated) continue;
-                if (distance > radius) continue;
 
                 foreach (var reward in sephirite.Rewards)
                 {
