@@ -1,0 +1,56 @@
+# SephPlanner
+
+세피리아(Sephiria)용 비공식 컴패니언 오버레이. 현재 인벤토리를 읽어 석판 배치를 최적화하고,
+지금 상황에서 어떤 아티팩트를 고르는 게 좋은지 알려준다.
+
+TEAM HORAY와 무관한 팬 제작 도구이며, 비영리로 배포한다.
+
+## 구조
+
+```
+SephPlanner.Core      도메인 모델 + IPC 계약 (netstandard2.1)
+SephPlanner.Plugin    BepInEx 플러그인. 게임 상태를 읽어 명명 파이프로 내보낸다 (읽기 전용)
+SephPlanner.Overlay   WPF 오버레이. 파이프에 붙어 화면에 표시한다 (net10.0-windows)
+SephPlanner.DataTool  게임 로컬라이제이션에서 이름/설명 텍스트를 추출하는 CLI
+```
+
+게임 ↔ 오버레이 통신에 localhost HTTP 대신 **명명 파이프**를 쓴다. 방화벽 팝업이 뜨지 않고,
+포트가 충돌하지 않으며, 같은 사용자 세션 밖에서는 열 수 없다.
+
+## 빌드
+
+게임이 설치돼 있어야 한다. 기본 경로가 아니면 환경변수로 알려준다.
+
+```powershell
+$env:SEPHIRIA_DIR = "D:\SteamLibrary\steamapps\common\Sephiria"
+dotnet build
+```
+
+데이터 추출:
+
+```powershell
+dotnet run --project src/SephPlanner.DataTool
+# -> data/generated/text.json  (석판 68종, 아티팩트 257종, 15개 언어)
+```
+
+`data/generated/`는 각자 PC에서 생성되며 저장소에 커밋하지 않는다. 이유는 [docs/LEGAL.md](docs/LEGAL.md) 참고.
+
+## 문서
+
+- [docs/RESEARCH.md](docs/RESEARCH.md) — 게임 내부 구조 조사 결과
+- [docs/LEGAL.md](docs/LEGAL.md) — 약관·저작권 검토와 그에 따른 설계 제약
+
+## 원칙
+
+- **읽기 전용.** 게임에 값을 쓰지 않는다.
+- **게임 저작물을 배포하지 않는다.** 데이터는 각자 PC의 게임 설치본에서 생성한다.
+- **비영리.**
+
+## 플러그인 설치
+
+1. [BepInEx 5.4.23.5](https://github.com/BepInEx/BepInEx/releases) (win_x64, Mono)를 게임 폴더에 설치하고 한 번 실행한다.
+2. `SephPlanner.Plugin.dll`과 `SephPlanner.Core.dll`을 `BepInEx/plugins/`에 넣는다.
+3. 게임을 실행하면 석판/아티팩트 데이터가 `%LOCALAPPDATA%\SephPlanner\`에 덤프된다. F9로 다시 덤프할 수 있다.
+
+같은 폴더의 `query-verification.txt`에 질의 파서 검증 결과가 남는다. 불일치가 0이 아니면
+솔버 결과를 믿을 수 없으므로 먼저 확인한다.

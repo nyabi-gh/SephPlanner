@@ -1,0 +1,6 @@
+bin/
+obj/
+*.user
+.vs/
+data/generated/
+docs/research/decompiled/

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- netstandard2.1: Unity Mono(BepInEx 플러그인)와 WPF(net10) 양쪽에서 참조 가능한 유일한 공통분모 -->
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <AssemblyName>SephPlanner.Core</AssemblyName>
+    <RootNamespace>SephPlanner.Core</RootNamespace>
+  </PropertyGroup>
+</Project>
