@@ -19,6 +19,13 @@ namespace SephPlanner.Core.Solver
     {
         private const double WastePenalty = 1e-4;
 
+        /// <summary>
+        /// 효과가 켜져 있는 아티팩트 하나의 값어치. 레벨은 세기를 더할 뿐이고 레벨 0 도 살아 있다.
+        /// 이것이 없으면 꺼지는 자리(레벨 음수)와 레벨 0 자리가 똑같이 0점이라, 아티팩트를
+        /// 꺼진 채로 두고도 최적이라고 하게 된다.
+        /// </summary>
+        private const double ActiveValue = 1;
+
         /// <summary>낭비 판단보다도 작게 두어, 정말 우열이 없을 때만 현 상태를 유지하도록 한다.</summary>
         private const double StabilityBonus = 1e-6;
 
@@ -157,7 +164,7 @@ namespace SephPlanner.Core.Solver
 
             levels.Sort();
             levels.Reverse();
-            return levels.Take(scoring.Count).Sum();
+            return levels.Take(scoring.Count).Sum(level => ActiveValue + level);
         }
 
         private static Arrangement Evaluate(
@@ -229,7 +236,8 @@ namespace SephPlanner.Core.Solver
 
             // 상한을 넘긴 레벨은 아무 값어치가 없다. 점수가 같은 배치라면 덜 흘리는 쪽을 고르도록
             // 아주 작은 차이만 준다. 실제 점수 차이를 뒤집을 만한 크기가 아니다.
-            var value = charm.Weight * effective - WastePenalty * Math.Max(0, level - effective);
+            var value = charm.Weight * (ActiveValue + effective)
+                        - WastePenalty * Math.Max(0, level - effective);
 
             // 점수가 같은 배치가 여럿일 때 지금 자리를 지킨다. 채점할 때만 더하면 배정기가 이미
             // 자리를 바꿔 놓은 뒤라, 이득이 없는데도 맞바꾸라는 제안이 나온다.

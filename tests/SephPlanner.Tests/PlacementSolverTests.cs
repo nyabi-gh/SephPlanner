@@ -34,7 +34,8 @@ public class PlacementSolverTests
         problem.Charms[0].IsDormant = true;
         var withCharmOff = PlacementSolver.Solve(problem).Score;
 
-        Assert.Equal(2, withCharmOn, 3);
+        // 켜진 아티팩트 하나(1)에 석판이 준 레벨 2를 더해 3이다. 꺼지면 아무것도 남지 않는다.
+        Assert.Equal(3, withCharmOn, 3);
         Assert.Equal(0, withCharmOff, 3);
     }
 
@@ -62,8 +63,28 @@ public class PlacementSolverTests
 
         var arrangement = PlacementSolver.Solve(problem);
 
-        Assert.Equal(2, arrangement.Score, 2);
+        // 상한이 2 라 레벨 5 중 2까지만 값이 된다. 켜진 몫 1 을 더해 3이다.
+        Assert.Equal(3, arrangement.Score, 2);
         Assert.Equal(2, arrangement.EffectiveLevels[arrangement.CharmPositions[10]]);
+    }
+
+    [Fact]
+    public void ACharmIsMovedOutOfACellThatWouldTurnItOff()
+    {
+        // 레벨 0 은 살아 있고 -1 은 꺼진다. 둘 다 점수에 보태는 레벨이 없다고 해서 같은 자리가
+        // 아니다. 켜지는 칸으로 옮기라고 해야 한다.
+        var problem = new PlacementProblem { Grid = OneRow };
+        problem.Tablets.Add(Tablet(1, "RIGHT -1"));
+        problem.Charms.Add(Charm(10));
+
+        problem.CurrentTablets[1] = new TabletSpot(new GridPos(0, 0), 0);
+        problem.CurrentCharms[10] = new GridPos(1, 0);
+
+        var arrangement = PlacementSolver.Solve(problem);
+
+        Assert.NotEqual(new GridPos(1, 0), arrangement.CharmPositions[10]);
+        Assert.Equal(1, arrangement.Score, 3);
+        Assert.Empty(arrangement.InactiveCharms);
     }
 
     [Fact]

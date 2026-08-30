@@ -28,7 +28,7 @@ public class EngravingTests
 
         var arrangement = PlacementSolver.Solve(problem);
 
-        Assert.Equal(2, arrangement.Score, 3);
+        Assert.Equal(3, arrangement.Score, 3);
         Assert.Empty(arrangement.Tablets);
     }
 
@@ -45,7 +45,9 @@ public class EngravingTests
 
         Assert.Equal(2, arrangement.CharmPositions.Count);
         Assert.Contains(arrangement.CharmPositions.Values, position => position == new GridPos(0, 0));
-        Assert.Equal(3, arrangement.Score, 3);
+
+        // 켜진 아티팩트 둘(2)에, 각인이 자기 칸에 준 레벨 3을 더해 5다.
+        Assert.Equal(5, arrangement.Score, 3);
     }
 
     [Fact]
@@ -73,7 +75,7 @@ public class EngravingTests
 
         var plan = PlanBuilder.Build(new GameSnapshot { Inventory = inventory }, catalog);
 
-        Assert.Equal(2, plan!.Best.Score, 3);
+        Assert.Equal(3, plan!.Best.Score, 3);
 
         // 각인은 옮길 수 없으니 이동 목록에 나와서는 안 된다.
         Assert.DoesNotContain(plan.Moves, move => move.Label == "E");

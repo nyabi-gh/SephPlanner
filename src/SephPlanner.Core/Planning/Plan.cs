@@ -42,6 +42,12 @@ namespace SephPlanner.Core.Planning
         public List<OfferAdvice> Offers { get; set; } = new List<OfferAdvice>();
 
         /// <summary>
+        /// 후보가 너무 많아 평가하지 못하고 넘어간 수. 조용히 빠뜨리면 화면에 없는 선택지를
+        /// 없는 셈 치게 된다.
+        /// </summary>
+        public int SkippedOffers { get; set; }
+
+        /// <summary>
         /// 게임이 계산해 둔 레벨과 우리 계산이 어긋난 칸 수. 0이 아니면 우리가 읽지 않는 효과가
         /// 걸려 있다는 뜻이라, 점수를 그대로 믿으면 안 된다.
         /// </summary>

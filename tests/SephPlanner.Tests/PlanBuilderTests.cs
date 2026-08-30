@@ -57,7 +57,7 @@ public class PlanBuilderTests
         var plan = PlanBuilder.Build(Snapshot(), Catalog());
 
         Assert.NotNull(plan);
-        Assert.Equal(2, plan!.Current.Score, 3);
+        Assert.Equal(3, plan!.Current.Score, 3);
         Assert.Equal(0, plan.LevelMismatches);
         Assert.Equal("C", plan.Names[plan.Best.CharmPositions[10]]);
     }
@@ -68,7 +68,7 @@ public class PlanBuilderTests
         // 인챈트 2가 붙어 게임이 4로 보고한 상황. 우리 계산도 4가 되어야 어긋나지 않는다.
         var plan = PlanBuilder.Build(Snapshot(enchant: 2, reportedLevel: 4), Catalog());
 
-        Assert.Equal(4, plan!.Current.Score, 3);
+        Assert.Equal(5, plan!.Current.Score, 3);
         Assert.Equal(0, plan.LevelMismatches);
     }
 
@@ -113,7 +113,7 @@ public class PlanBuilderTests
 
         var plan = PlanBuilder.Build(Snapshot(weapon: "GreatSword"), Catalog(charm));
 
-        Assert.Equal(2, plan!.Best.Score, 3);
+        Assert.Equal(3, plan!.Best.Score, 3);
         Assert.Empty(plan.Best.InactiveCells);
     }
 

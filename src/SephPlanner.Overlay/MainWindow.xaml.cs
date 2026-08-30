@@ -48,29 +48,48 @@ public partial class MainWindow : Window
         _ = client.RunAsync(_shutdown.Token);
     }
 
+    /// <summary>
+    /// 아직 처리하지 못한 가장 최근 스냅샷.
+    ///
+    /// 계산 중에 온 스냅샷을 버리면 안 된다. 플러그인은 상태가 직전과 같으면 다시 보내지 않으므로,
+    /// 한 번 버린 상태는 영영 오지 않는다. 리롤한 선택지가 옛것으로 남아 있던 것이 이 때문이다.
+    /// </summary>
+    private GameSnapshot? _pending;
+
     private void OnSnapshot(GameSnapshot snapshot)
     {
-        // 해를 찾는 데 수백 ms 가 걸리므로 UI 스레드에서 돌리지 않는다.
-        // 앞선 계산이 아직 진행 중이면 이번 스냅샷은 건너뛴다.
+        Volatile.Write(ref _pending, snapshot);
+        Drain();
+    }
+
+    /// <summary>해를 찾는 데 수백 ms 가 걸리므로 UI 스레드에서 돌리지 않는다.</summary>
+    private void Drain()
+    {
         if (Interlocked.Exchange(ref _solving, 1) == 1) return;
 
         Task.Run(() =>
         {
             try
             {
-                if (!_catalog.Refresh())
+                while (Interlocked.Exchange(ref _pending, null) is { } snapshot)
                 {
-                    Dispatcher.Invoke(() => ShowNotice("게임을 한 번 실행해 데이터를 만들어 주세요. (게임 안에서 F9)"));
-                    return;
-                }
+                    if (!_catalog.Refresh())
+                    {
+                        Dispatcher.Invoke(() => ShowNotice("게임을 한 번 실행해 데이터를 만들어 주세요. (게임 안에서 F9)"));
+                        continue;
+                    }
 
-                var plan = PlanBuilder.Build(snapshot, _catalog);
-                Dispatcher.Invoke(() => Render(snapshot, plan));
+                    var plan = PlanBuilder.Build(snapshot, _catalog);
+                    Dispatcher.Invoke(() => Render(snapshot, plan));
+                }
             }
             finally
             {
                 Interlocked.Exchange(ref _solving, 0);
             }
+
+            // 비운 뒤 문을 닫기 직전에 새 스냅샷이 들어왔을 수 있다.
+            if (Volatile.Read(ref _pending) != null) Drain();
         });
     }
 
@@ -146,6 +165,9 @@ public partial class MainWindow : Window
             return $"칸 {plan.LevelMismatches}개의 레벨이 게임과 다릅니다. 아직 읽지 못하는 효과" +
                    "(각인, 세트 효과, 배치 보너스)가 걸려 있어 점수가 실제와 다를 수 있습니다.";
         }
+
+        if (plan.SkippedOffers > 0)
+            return $"선택지가 많아 {plan.SkippedOffers}개는 평가하지 못했습니다.";
 
         return snapshot.IsMultiplayer ? "멀티플레이 세션 - 제안만 표시합니다." : "";
     }

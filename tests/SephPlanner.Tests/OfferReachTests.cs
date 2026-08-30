@@ -34,8 +34,9 @@ public class OfferReachTests
     [Fact]
     public void ThreeVeryDifferentTabletsCanAllGainTheSame()
     {
+        var problem = Problem();
         var advice = OfferAdvisor.Rank(
-            Problem(), baseScore: 0, new[] { Threeheaded(), Wave(), Shade() }, gold: 0);
+            problem, PlacementSolver.Solve(problem).Score, new[] { Threeheaded(), Wave(), Shade() }, gold: 0);
 
         // 증가분만 보면 우열이 없다. 아티팩트가 셋뿐이라 셋 다 +3 이 한계다.
         Assert.All(advice, entry => Assert.Equal(3, entry.Gain, 2));
@@ -44,8 +45,9 @@ public class OfferReachTests
     [Fact]
     public void ReachTellsThemApartAndOrdersThem()
     {
+        var problem = Problem();
         var advice = OfferAdvisor.Rank(
-            Problem(), baseScore: 0, new[] { Threeheaded(), Wave(), Shade() }, gold: 0);
+            problem, PlacementSolver.Solve(problem).Score, new[] { Threeheaded(), Wave(), Shade() }, gold: 0);
 
         // 차양은 여섯 칸을 올린다. 아티팩트가 늘면 계속 커지는 쪽이다.
         Assert.Equal("차양", advice[0].Candidate.Name);

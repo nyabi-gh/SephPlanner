@@ -81,8 +81,9 @@ namespace SephPlanner.Core.Planning
 
             var current = PlacementSolver.Score(problem, layout, positions);
             var best = PlacementSolver.Solve(problem);
+            var candidates = Candidates(snapshot, catalog, weapon, out var skippedOffers);
             var offers = OfferAdvisor.Rank(
-                problem, best.Score, Candidates(snapshot, catalog, weapon), snapshot.Run?.Gold ?? int.MaxValue);
+                problem, best.Score, candidates, snapshot.Run?.Gold ?? int.MaxValue);
 
             return new Plan
             {
@@ -91,6 +92,7 @@ namespace SephPlanner.Core.Planning
                 Best = best,
                 Moves = Moves(problem, current, best),
                 Offers = offers,
+                SkippedOffers = skippedOffers,
                 Names = NamesByCell(problem, best),
             };
         }
@@ -110,15 +112,21 @@ namespace SephPlanner.Core.Planning
         /// <summary>후보가 많으면 한 번에 다 풀기에는 무거워, 종류가 같은 것은 하나로 묶고 수를 제한한다.</summary>
         private const int MaxCandidates = 8;
 
-        private static List<OfferCandidate> Candidates(GameSnapshot snapshot, ICatalog catalog, string weapon)
+        private static List<OfferCandidate> Candidates(
+            GameSnapshot snapshot, ICatalog catalog, string weapon, out int skipped)
         {
             var candidates = new List<OfferCandidate>();
             var seen = new HashSet<int>();
+            skipped = 0;
 
             foreach (var offer in snapshot.Offers)
             {
                 if (!seen.Add(offer.DefinitionId)) continue;
-                if (candidates.Count >= MaxCandidates) break;
+                if (candidates.Count >= MaxCandidates)
+                {
+                    skipped++;
+                    continue;
+                }
 
                 var charm = offer.Kind == "charm" ? catalog.Charm(offer.DefinitionId) : null;
                 var tablet = offer.Kind == "tablet" ? catalog.Tablet(offer.DefinitionId) : null;

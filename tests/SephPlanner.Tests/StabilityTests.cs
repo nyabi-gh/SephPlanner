@@ -53,6 +53,6 @@ public class StabilityTests
         var arrangement = PlacementSolver.Solve(problem);
 
         Assert.Equal(new GridPos(1, 0), arrangement.CharmPositions[10]);
-        Assert.Equal(3, arrangement.Score, 2);
+        Assert.Equal(4, arrangement.Score, 2);
     }
 }

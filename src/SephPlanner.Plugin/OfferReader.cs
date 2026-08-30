@@ -18,6 +18,10 @@ namespace SephPlanner.Plugin
             var playerInventory = player.Inventory;
             var origin = player.transform.position;
 
+            // 세피라이트를 먼저 담는다. 후보 수에 상한이 있어서, 뒤로 밀리면 상자가 많은 자리에서
+            // 석판이 통째로 잘려 나간다. 석판은 대개 세피라이트로만 나오므로 이쪽이 우선이다.
+            CollectSephirites(snapshot.Offers, origin, radius);
+
             foreach (var inventory in UnityEngine.Object.FindObjectsByType<GridInventory>(FindObjectsSortMode.None))
             {
                 if (inventory == null || inventory == playerInventory) continue;
@@ -26,8 +30,6 @@ namespace SephPlanner.Plugin
 
                 Collect(snapshot.Offers, inventory, player);
             }
-
-            CollectSephirites(snapshot.Offers, origin, radius);
         }
 
         /// <summary>
