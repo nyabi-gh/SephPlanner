@@ -36,6 +36,22 @@ namespace SephPlanner.Core.Solver
             return best ?? Evaluate(problem, cells, new List<TabletPlacement>(), options);
         }
 
+        /// <summary>이미 정해진 배치를 같은 기준으로 채점한다. 현재 배치와 제안을 비교할 때 쓴다.</summary>
+        public static Arrangement Score(
+            PlacementProblem problem,
+            IReadOnlyList<TabletPlacement> layout,
+            IReadOnlyDictionary<int, GridPos> charmPositions)
+        {
+            var positions = new Dictionary<int, GridPos>(charmPositions.Count);
+            foreach (var pair in charmPositions) positions[pair.Key] = pair.Value;
+
+            var placements = new List<TabletPlacement>(layout);
+            var occupancy = OccupancyFrom(placements, positions, problem);
+            var result = TabletSimulator.Run(placements, occupancy, problem.Grid);
+
+            return Describe(problem, placements, positions, occupancy, result);
+        }
+
         private static List<List<TabletPlacement>> SearchTabletLayouts(
             PlacementProblem problem, List<GridPos> cells, SolverOptions options)
         {

@@ -1,106 +1,205 @@
 using System.Collections.ObjectModel;
-using System.Threading;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using SephPlanner.Core.Ipc;
+using SephPlanner.Core.Model;
 
 namespace SephPlanner.Overlay;
 
 public partial class MainWindow : Window
 {
     private readonly ObservableCollection<CellView> _cells = new();
-    private readonly CancellationTokenSource _cts = new();
+    private readonly ObservableCollection<string> _moves = new();
+    private readonly CatalogStore _catalog = new();
+    private readonly CancellationTokenSource _shutdown = new();
+
+    private int _solving;
+    private string _lastPlanned = "";
 
     public MainWindow()
     {
         InitializeComponent();
         GridCells.ItemsSource = _cells;
-        ResetCells(GridWidth, GridHeight);
+        MoveList.ItemsSource = _moves;
 
         var client = new SnapshotClient();
         client.ConnectionChanged += connected => Dispatcher.Invoke(() =>
+            StatusText.Text = connected ? "연결됨" : "게임 대기 중");
+        client.SnapshotReceived += OnSnapshot;
+
+        _ = client.RunAsync(_shutdown.Token);
+    }
+
+    private void OnSnapshot(GameSnapshot snapshot)
+    {
+        // 해를 찾는 데 수백 ms 가 걸리므로 UI 스레드에서 돌리지 않는다.
+        // 앞선 계산이 아직 진행 중이면 이번 스냅샷은 건너뛴다.
+        if (Interlocked.Exchange(ref _solving, 1) == 1) return;
+
+        Task.Run(() =>
         {
-            StatusText.Text = connected ? "연결됨" : "게임 대기 중";
+            try
+            {
+                if (!_catalog.Refresh())
+                {
+                    Dispatcher.Invoke(() => ShowNotice("게임을 한 번 실행해 데이터를 만들어 주세요. (게임 안에서 F9)"));
+                    return;
+                }
+
+                var plan = PlanBuilder.Build(snapshot, _catalog);
+                Dispatcher.Invoke(() => Render(snapshot, plan));
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _solving, 0);
+            }
         });
-        client.SnapshotReceived += snapshot => Dispatcher.Invoke(() => Render(snapshot));
-
-        _ = client.RunAsync(_cts.Token);
     }
 
-    // 게임의 GridInventory 최대 크기와 같다.
-    private const int GridWidth = 6;
-    private const int GridHeight = 7;
-
-    private void ResetCells(int width, int height)
+    private void ShowNotice(string message)
     {
-        _cells.Clear();
-        for (var i = 0; i < width * height; i++) _cells.Add(new CellView());
+        NoticeText.Text = message;
+        NoticeText.Visibility = Visibility.Visible;
+        ScorePanel.Visibility = Visibility.Collapsed;
     }
 
-    private void Render(GameSnapshot snapshot)
+    private void Render(GameSnapshot snapshot, Plan? plan)
     {
-        var inv = snapshot.Inventory;
-        if (inv is null) return;
-
-        HintText.Text = snapshot.IsMultiplayer
-            ? "멀티플레이 세션입니다. 조언만 표시합니다."
-            : $"아이템 {inv.Items.Count}개 · 석판 {inv.Tablets.Count}개";
-
-        for (var i = 0; i < _cells.Count; i++) _cells[i].Reset();
-
-        foreach (var (key, level) in inv.LevelMatrix)
+        if (plan is null)
         {
-            var parts = key.Split(',');
-            if (parts.Length != 2) continue;
-            if (!int.TryParse(parts[0], out var x) || !int.TryParse(parts[1], out var y)) continue;
+            ShowNotice("인벤토리에 아티팩트가 없습니다.");
+            return;
+        }
 
-            var index = y * GridWidth + x;
-            if (index < 0 || index >= _cells.Count) continue;
+        NoticeText.Visibility = snapshot.IsMultiplayer ? Visibility.Visible : Visibility.Collapsed;
+        if (snapshot.IsMultiplayer) NoticeText.Text = "멀티플레이 세션 - 제안만 표시합니다.";
 
-            _cells[index].Label = level > 0 ? $"+{level}" : level.ToString();
-            // 레벨이 음수면 아티팩트가 죽는 자리다. 눈에 띄어야 한다.
-            _cells[index].Foreground = level < 0 ? Brushes.Salmon
-                : level > 0 ? Brushes.PaleGreen
-                : new SolidColorBrush(Color.FromRgb(0x8A, 0x7F, 0xA6));
+        ScorePanel.Visibility = Visibility.Visible;
+        CurrentScoreText.Text = $"{plan.Current.Score:0.#}";
+        BestScoreText.Text = $"{plan.Best.Score:0.#}";
+
+        var improved = plan.Gain > 0.001;
+        GainText.Text = improved ? $"+{plan.Gain:0.#}" : "최적";
+        GainText.Foreground = improved ? Brushes.PaleGreen : new SolidColorBrush(Color.FromRgb(0x8A, 0x7F, 0xA6));
+
+        RenderGrid(snapshot, plan);
+
+        // 제안이 그대로면 목록을 다시 만들지 않는다. 스냅샷마다 깜빡이는 것을 막는다.
+        var signature = string.Join("|", plan.Moves.Select(m => $"{m.Label}{m.From}{m.To}"));
+        if (signature == _lastPlanned) return;
+        _lastPlanned = signature;
+
+        _moves.Clear();
+        foreach (var move in plan.Moves.Take(6))
+            _moves.Add($"{move.Label}  {move.From} → {move.To}");
+        if (plan.Moves.Count > 6) _moves.Add($"… 외 {plan.Moves.Count - 6}개");
+    }
+
+    private void RenderGrid(GameSnapshot snapshot, Plan plan)
+    {
+        var inventory = snapshot.Inventory!;
+        var total = inventory.Width * inventory.Height;
+        while (_cells.Count < total) _cells.Add(new CellView());
+        while (_cells.Count > total) _cells.RemoveAt(_cells.Count - 1);
+
+        var tabletCells = new HashSet<GridPos>(plan.Best.Tablets.Select(t => t.Position));
+        var moved = new HashSet<GridPos>(plan.Moves.Select(m => m.To));
+
+        for (var index = 0; index < _cells.Count; index++)
+        {
+            var cell = _cells[index];
+            var position = new GridPos(index % inventory.Width, index / inventory.Width);
+
+            if (index >= inventory.Storage) cell.SetClosed();
+            else if (tabletCells.Contains(position)) cell.SetTablet(moved.Contains(position));
+            else if (plan.Best.Levels.TryGetValue(position, out var level)) cell.SetLevel(level, moved.Contains(position));
+            else cell.SetEmpty();
         }
     }
 
     private void OnDragArea(object sender, MouseButtonEventArgs e) => DragMove();
 
-    protected override void OnClosed(System.EventArgs e)
+    private void OnClose(object sender, RoutedEventArgs e) => Close();
+
+    // 테두리 없는 창이라 제목 표시줄이 없다. 키보드로도 닫을 수 있어야 한다.
+    protected override void OnKeyDown(KeyEventArgs e)
     {
-        _cts.Cancel();
+        if (e.Key == Key.Escape) Close();
+        base.OnKeyDown(e);
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _shutdown.Cancel();
         base.OnClosed(e);
     }
 }
 
-public sealed class CellView : System.ComponentModel.INotifyPropertyChanged
+public sealed class CellView : INotifyPropertyChanged
 {
+    private static readonly Brush EmptyFill = new SolidColorBrush(Color.FromRgb(0x1C, 0x18, 0x24));
+    private static readonly Brush ClosedFill = new SolidColorBrush(Color.FromRgb(0x12, 0x10, 0x17));
+    private static readonly Brush TabletFill = new SolidColorBrush(Color.FromRgb(0x2B, 0x3A, 0x2A));
+    private static readonly Brush MutedText = new SolidColorBrush(Color.FromRgb(0x5A, 0x51, 0x70));
+    private static readonly Brush MovedEdge = new SolidColorBrush(Color.FromRgb(0xC9, 0xA2, 0x27));
+    private static readonly Brush QuietEdge = new SolidColorBrush(Color.FromRgb(0x2A, 0x24, 0x34));
+
     private string _label = "";
-    private Brush _foreground = Brushes.Gray;
+    private Brush _foreground = MutedText;
+    private Brush _background = EmptyFill;
+    private Brush _borderBrush = QuietEdge;
+    private Thickness _borderThickness = new(1);
 
-    public string Label
+    public string Label { get => _label; private set { _label = value; Raise(nameof(Label)); } }
+    public Brush Foreground { get => _foreground; private set { _foreground = value; Raise(nameof(Foreground)); } }
+    public Brush Background { get => _background; private set { _background = value; Raise(nameof(Background)); } }
+    public Brush BorderBrush { get => _borderBrush; private set { _borderBrush = value; Raise(nameof(BorderBrush)); } }
+
+    public Thickness BorderThickness
     {
-        get => _label;
-        set { _label = value; Raise(nameof(Label)); }
+        get => _borderThickness;
+        private set { _borderThickness = value; Raise(nameof(BorderThickness)); }
     }
 
-    public Brush Foreground
-    {
-        get => _foreground;
-        set { _foreground = value; Raise(nameof(Foreground)); }
-    }
-
-    public Brush Background { get; } = new SolidColorBrush(Color.FromRgb(0x1C, 0x18, 0x24));
-
-    public void Reset()
+    public void SetClosed()
     {
         Label = "";
-        Foreground = Brushes.Gray;
+        Background = ClosedFill;
+        SetEdge(false);
     }
 
-    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
-    private void Raise(string name) =>
-        PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(name));
+    public void SetEmpty()
+    {
+        Label = "";
+        Foreground = MutedText;
+        Background = EmptyFill;
+        SetEdge(false);
+    }
+
+    public void SetTablet(bool moved)
+    {
+        Label = "석판";
+        Foreground = Brushes.DarkSeaGreen;
+        Background = TabletFill;
+        SetEdge(moved);
+    }
+
+    public void SetLevel(int level, bool moved)
+    {
+        Label = level > 0 ? $"+{level}" : level.ToString();
+        Foreground = level < 0 ? Brushes.Salmon : level > 0 ? Brushes.PaleGreen : MutedText;
+        Background = EmptyFill;
+        SetEdge(moved);
+    }
+
+    private void SetEdge(bool moved)
+    {
+        BorderBrush = moved ? MovedEdge : QuietEdge;
+        BorderThickness = new Thickness(moved ? 2 : 1);
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    private void Raise(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
