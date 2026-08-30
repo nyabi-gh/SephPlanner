@@ -124,7 +124,7 @@ namespace SephPlanner.Plugin
             if (issue == null && checkedTablets > _verifiedTablets)
             {
                 _verifiedTablets = checkedTablets;
-                Logger.LogInfo($"시뮬레이터 검증 통과 (석판 {checkedTablets}개 동시 배치까지)");
+                Logger.LogInfo($"시뮬레이터 검증 통과 - 석판 {checkedTablets}개와 칸별 레벨까지 일치");
             }
         }
 

@@ -6,7 +6,10 @@ namespace SephPlanner.Plugin
 {
     /// <summary>
     /// Core 의 석판 시뮬레이터를 게임의 실제 적용 결과와 대조한다.
-    /// 게임이 이미 계산해 둔 <c>IsApplied</c>와 <c>EffectRange</c>가 정답지다.
+    /// 게임이 이미 계산해 둔 <c>IsApplied</c>와 <c>EffectRange</c>, 그리고 <c>levelMatrix</c>가 정답지다.
+    ///
+    /// 석판 질의만 맞아도 최종 레벨은 어긋날 수 있다. 각인과 세트 효과, 배치 보너스가 레벨에
+    /// 더해지는데 우리는 그것들을 아직 모델에 넣지 않았기 때문이다. 그래서 마지막 레벨까지 대조한다.
     /// </summary>
     internal static class SimulationVerifier
     {
@@ -35,7 +38,6 @@ namespace SephPlanner.Plugin
                 });
             }
             LastCheckedTablets = placements.Count;
-            if (placements.Count == 0) return null;
 
             var result = TabletSimulator.Run(placements, occupancy, grid);
 
@@ -49,7 +51,38 @@ namespace SephPlanner.Plugin
                 var difference = CompareEffects(placements[i], grid, tablets[i]);
                 if (difference != null) return $"석판 {tablets[i].entityID} {difference}";
             }
+
+            return CompareLevels(inv, result);
+        }
+
+        /// <summary>
+        /// 아티팩트가 놓인 칸마다 우리가 계산한 레벨과 게임이 계산해 둔 값을 견준다.
+        /// 어긋난다면 우리가 읽지 않는 효과(각인, 세트 효과, 배치 보너스)가 걸려 있다는 뜻이다.
+        /// </summary>
+        private static string CompareLevels(GridInventory inv, SimulationResult result)
+        {
+            foreach (var pair in inv.charms)
+            {
+                var charm = pair.Value;
+                if (charm == null) continue;
+
+                var position = new GridPos(charm.xIdx, charm.yIdx);
+                var item = charm.Item;
+                var enchant = item == null ? 0 : GameReader.EnchantOf(item.InstanceID);
+
+                var ours = result.EffectiveLevel(position, enchant);
+                var theirs = LookupLevel(inv, charm.xIdx, charm.yIdx);
+                if (ours != theirs)
+                    return $"칸 ({charm.xIdx},{charm.yIdx}) 레벨 {ours} != 게임 {theirs} (인챈트 {enchant})";
+            }
             return null;
+        }
+
+        private static int LookupLevel(GridInventory inv, sbyte x, sbyte y)
+        {
+            foreach (var pair in inv.levelMatrix)
+                if (pair.Key.x == x && pair.Key.y == y) return pair.Value;
+            return 0;
         }
 
         private static GridOccupancy BuildOccupancy(GridInventory inv)

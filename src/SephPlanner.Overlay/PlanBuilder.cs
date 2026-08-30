@@ -27,6 +27,12 @@ public sealed class Plan
     public required List<Move> Moves { get; init; }
     public required List<OfferAdvice> Offers { get; init; }
 
+    /// <summary>
+    /// 게임이 계산해 둔 레벨과 우리 계산이 어긋난 칸 수. 0이 아니면 우리가 읽지 않는 효과가
+    /// 걸려 있다는 뜻이라, 점수를 그대로 믿으면 안 된다.
+    /// </summary>
+    public required int LevelMismatches { get; init; }
+
     /// <summary>제안된 배치에서 각 칸에 놓이는 아이템의 이름. 격자에 그대로 보여준다.</summary>
     public required Dictionary<GridPos, string> Names { get; init; }
     public double Gain => Best.Score - Current.Score;
@@ -97,6 +103,7 @@ public static class PlanBuilder
 
         return new Plan
         {
+            LevelMismatches = CountLevelMismatches(inventory, current),
             Current = current,
             Best = best,
             Moves = Moves(problem, current, best),
@@ -148,19 +155,22 @@ public static class PlanBuilder
         return candidates;
     }
 
-    private static GridOccupancy BuildOccupancy(InventoryState inventory, CatalogStore catalog, GridSpec grid)
+    /// <summary>
+    /// 지금 배치를 우리가 계산한 레벨과 게임이 계산해 둔 레벨을 칸마다 견준다.
+    ///
+    /// 각인과 세트 효과, 배치 보너스는 아직 모델에 없어서 그런 것이 걸려 있으면 점수가 어긋난다.
+    /// 무엇이 걸려 있을지 미리 추측해 경고하는 대신, 실제로 어긋날 때만 세어 알린다.
+    /// </summary>
+    private static int CountLevelMismatches(InventoryState inventory, Arrangement current)
     {
-        var occupancy = new GridOccupancy();
-        foreach (var tablet in inventory.Tablets) occupancy.AddItem(tablet.Position, false);
-
-        foreach (var item in inventory.Items)
+        var mismatches = 0;
+        foreach (var pair in current.Levels)
         {
-            if (!IsOnGrid(item.Position, grid)) continue;
-
-            var definition = catalog.Charm(item.DefinitionId);
-            occupancy.AddItem(item.Position, definition is not null, definition?.IsMagic ?? false);
+            var key = pair.Key.X + "," + pair.Key.Y;
+            if (!inventory.LevelMatrix.TryGetValue(key, out var reported)) continue;
+            if (reported != pair.Value) mismatches++;
         }
-        return occupancy;
+        return mismatches;
     }
 
     /// <summary>보조 가방처럼 본 격자 밖에 있는 자리는 배치 대상이 아니다.</summary>

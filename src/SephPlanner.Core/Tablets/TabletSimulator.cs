@@ -15,6 +15,17 @@ namespace SephPlanner.Core.Tablets
 
         public int LevelAt(GridPos position) => Level.TryGetValue(position, out var value) ? value : 0;
         public bool IsDisabled(GridPos position) => Disable.TryGetValue(position, out var value) && value > 0;
+
+        /// <summary>
+        /// 그 칸에 놓인 아티팩트가 받는 레벨. 게임과 같은 순서로 석판 몫과 인챈트를 먼저 더하고
+        /// 배수를 마지막에 곱한다(<c>GridInventory.ReleasePermission</c>). 순서를 바꾸면 값이 달라진다.
+        /// </summary>
+        public int EffectiveLevel(GridPos position, int enchant)
+        {
+            var level = LevelAt(position) + enchant;
+            if (MultiplyLevel.TryGetValue(position, out var multiplier) && multiplier != 0) level *= multiplier;
+            return level;
+        }
     }
 
     /// <summary>

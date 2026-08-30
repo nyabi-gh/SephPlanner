@@ -98,8 +98,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        NoticeText.Visibility = snapshot.IsMultiplayer ? Visibility.Visible : Visibility.Collapsed;
-        if (snapshot.IsMultiplayer) NoticeText.Text = "멀티플레이 세션 - 제안만 표시합니다.";
+        ShowWarning(Warning(snapshot, plan));
 
         ScorePanel.Visibility = Visibility.Visible;
         CurrentScoreText.Text = $"{plan.Current.Score:0.#}";
@@ -131,6 +130,27 @@ public partial class MainWindow : Window
         var next = plan.Moves.FirstOrDefault();
         NextMoveText.Text = next is null ? "" : $"{next.Label}  {next.Detail}";
         UpdateNextMoveVisibility();
+    }
+
+    /// <summary>
+    /// 지금 화면에서 알려야 할 것. 점수를 믿을 수 없는 상황을 멀티 안내보다 먼저 보여준다.
+    /// </summary>
+    private static string Warning(GameSnapshot snapshot, Plan plan)
+    {
+        if (plan.LevelMismatches > 0)
+        {
+            // 무엇이 원인인지는 여기서 알 수 없다. 다만 어긋난다는 사실은 확실하므로 그것만 말한다.
+            return $"칸 {plan.LevelMismatches}개의 레벨이 게임과 다릅니다. 아직 읽지 못하는 효과" +
+                   "(각인, 세트 효과, 배치 보너스)가 걸려 있어 점수가 실제와 다를 수 있습니다.";
+        }
+
+        return snapshot.IsMultiplayer ? "멀티플레이 세션 - 제안만 표시합니다." : "";
+    }
+
+    private void ShowWarning(string message)
+    {
+        NoticeText.Text = message;
+        NoticeText.Visibility = message.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     /// <summary>

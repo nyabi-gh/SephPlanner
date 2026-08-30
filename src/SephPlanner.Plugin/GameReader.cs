@@ -144,7 +144,7 @@ namespace SephPlanner.Plugin
         /// 인챈트는 게임이 인스턴스마다 따로 들고 있다. 보고된 레벨에서 역산하면 배수가 걸린 칸에서
         /// 어긋나므로 그대로 읽는다. SyncDictionary 라 클라이언트에서도 값이 있다.
         /// </summary>
-        private static int EnchantOf(int instanceId)
+        internal static int EnchantOf(int instanceId)
         {
             var dungeon = DungeonManager.Instance;
             if (dungeon == null) return 0;

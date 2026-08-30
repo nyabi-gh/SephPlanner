@@ -135,7 +135,7 @@ namespace SephPlanner.Core.Solver
                 if (taken.Contains(cell)) continue;
                 if (result.IsDisabled(cell)) continue;
 
-                var level = EffectiveLevel(result, cell, 0);
+                var level = result.EffectiveLevel(cell, 0);
                 if (level < 0) continue;
                 levels.Add(Math.Min(level, levelCap));
             }
@@ -208,7 +208,7 @@ namespace SephPlanner.Core.Solver
             if (charm.IsFiller) return 0;
             if (Reason(charm, cell, result, grid, occupancy) != CharmInactiveReason.None) return 0;
 
-            var level = EffectiveLevel(result, cell, charm.Enchant);
+            var level = result.EffectiveLevel(cell, charm.Enchant);
             var effective = Math.Min(charm.Definition.MaxLevel, level);
 
             // 상한을 넘긴 레벨은 아무 값어치가 없다. 점수가 같은 배치라면 덜 흘리는 쪽을 고르도록
@@ -225,7 +225,7 @@ namespace SephPlanner.Core.Solver
         {
             if (charm.IsDormant) return CharmInactiveReason.Weapon;
             if (result.IsDisabled(cell)) return CharmInactiveReason.Disabled;
-            if (EffectiveLevel(result, cell, charm.Enchant) < 0) return CharmInactiveReason.NegativeLevel;
+            if (result.EffectiveLevel(cell, charm.Enchant) < 0) return CharmInactiveReason.NegativeLevel;
 
             if (result.IgnoreCriteria.TryGetValue(cell, out var ignore) && ignore > 0)
                 return CharmInactiveReason.None;
@@ -234,14 +234,6 @@ namespace SephPlanner.Core.Solver
             return CharmCriteria.IsSatisfied(kind, cell, grid, occupancy)
                 ? CharmInactiveReason.None
                 : CharmInactiveReason.Criteria;
-        }
-
-        private static int EffectiveLevel(SimulationResult result, GridPos cell, int enchant)
-        {
-            var level = result.LevelAt(cell) + enchant;
-            if (result.MultiplyLevel.TryGetValue(cell, out var multiplier) && multiplier != 0)
-                level *= multiplier;
-            return level;
         }
 
         private static GridOccupancy OptimisticOccupancy(
@@ -318,7 +310,7 @@ namespace SephPlanner.Core.Solver
 
                 arrangement.CharmPositions[charm.InstanceId] = position;
 
-                var level = EffectiveLevel(result, position, charm.Enchant);
+                var level = result.EffectiveLevel(position, charm.Enchant);
                 arrangement.Levels[position] = level;
                 if (charm.IsFiller) continue;
 
