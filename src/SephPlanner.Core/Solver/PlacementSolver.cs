@@ -199,7 +199,7 @@ namespace SephPlanner.Core.Solver
                 for (var cellIndex = 0; cellIndex < free.Count; cellIndex++)
                 {
                     // 헝가리안은 비용을 최소화하므로 점수를 뒤집어 넣는다.
-                    var value = -Value(problem.Charms[charmIndex], free[cellIndex], result, problem.Grid, occupancy);
+                    var value = -Value(problem, problem.Charms[charmIndex], free[cellIndex], result, occupancy);
                     if (charmsAreRows) cost[charmIndex, cellIndex] = value;
                     else cost[cellIndex, charmIndex] = value;
                 }
@@ -218,17 +218,25 @@ namespace SephPlanner.Core.Solver
         }
 
         private static double Value(
-            CharmSlot charm, GridPos cell, SimulationResult result, GridSpec grid, GridOccupancy occupancy)
+            PlacementProblem problem, CharmSlot charm, GridPos cell,
+            SimulationResult result, GridOccupancy occupancy)
         {
             if (charm.IsFiller) return 0;
-            if (Reason(charm, cell, result, grid, occupancy) != CharmInactiveReason.None) return 0;
+            if (Reason(charm, cell, result, problem.Grid, occupancy) != CharmInactiveReason.None) return 0;
 
             var level = result.EffectiveLevel(cell, charm.Enchant);
             var effective = Math.Min(charm.Definition.MaxLevel, level);
 
             // 상한을 넘긴 레벨은 아무 값어치가 없다. 점수가 같은 배치라면 덜 흘리는 쪽을 고르도록
             // 아주 작은 차이만 준다. 실제 점수 차이를 뒤집을 만한 크기가 아니다.
-            return charm.Weight * effective - WastePenalty * Math.Max(0, level - effective);
+            var value = charm.Weight * effective - WastePenalty * Math.Max(0, level - effective);
+
+            // 점수가 같은 배치가 여럿일 때 지금 자리를 지킨다. 채점할 때만 더하면 배정기가 이미
+            // 자리를 바꿔 놓은 뒤라, 이득이 없는데도 맞바꾸라는 제안이 나온다.
+            if (problem.CurrentCharms.TryGetValue(charm.InstanceId, out var current) && current == cell)
+                value += StabilityBonus;
+
+            return value;
         }
 
         /// <summary>
@@ -279,9 +287,11 @@ namespace SephPlanner.Core.Solver
             return occupancy;
         }
 
-        /// <summary>지금과 같은 자리에 놓인 것마다 아주 작은 값을 더한다.</summary>
-        private static double Familiarity(
-            PlacementProblem problem, List<TabletPlacement> layout, Dictionary<int, GridPos> positions)
+        /// <summary>
+        /// 지금과 같은 자리에 있는 석판마다 아주 작은 값을 더한다. 아티팩트 몫은 배정 단계에서
+        /// 반영해야 뜻이 있어 <see cref="Value"/>가 따로 챙긴다.
+        /// </summary>
+        private static double Familiarity(PlacementProblem problem, List<TabletPlacement> layout)
         {
             var kept = 0;
 
@@ -289,11 +299,6 @@ namespace SephPlanner.Core.Solver
             {
                 if (!problem.CurrentTablets.TryGetValue(problem.Tablets[i].InstanceId, out var spot)) continue;
                 if (spot.Position == layout[i].Position && spot.Rotation == layout[i].Rotation) kept++;
-            }
-
-            foreach (var pair in positions)
-            {
-                if (problem.CurrentCharms.TryGetValue(pair.Key, out var position) && position == pair.Value) kept++;
             }
 
             return StabilityBonus * kept;
@@ -313,7 +318,7 @@ namespace SephPlanner.Core.Solver
         {
             var arrangement = new Arrangement();
             arrangement.Tablets.AddRange(layout);
-            arrangement.Score += Familiarity(problem, layout, positions);
+            arrangement.Score += Familiarity(problem, layout);
 
             foreach (var charm in problem.Charms)
             {
@@ -341,7 +346,7 @@ namespace SephPlanner.Core.Solver
                 }
 
                 arrangement.EffectiveLevels[position] = Math.Max(0, Math.Min(charm.Definition.MaxLevel, level));
-                arrangement.Score += Value(charm, position, result, problem.Grid, occupancy);
+                arrangement.Score += Value(problem, charm, position, result, occupancy);
             }
             return arrangement;
         }
