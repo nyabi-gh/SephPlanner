@@ -197,15 +197,38 @@ ilspycmd -t GridInventory "<게임경로>/Sephiria_Data/Managed/Assembly-CSharp.
 
 거리 기준은 BepInEx 설정의 `OfferRadius`로 조정한다.
 
-## 아직 확인하지 못한 것
+## 특수 경로로 얻은 아이템
 
-기적 보상으로 얻은 아이템이 오버레이에서 인식되지 않는다는 보고가 있다. 기적은
-`MiracleController`와 `MiracleDatabase`가 다루는 별도 시스템이라 아이템과 경로가 다를 수 있는데,
-어느 단계에서 어긋나는지는 실제 인벤토리 내용을 봐야 한다.
+기적 보상으로 얻은 아이템이 오버레이에서 인식되지 않는다는 보고가 있었다. 실제 덤프로 확인한
+결과 **재현되지 않았다.**
 
-게임 안에서 F10을 누르면 `%LOCALAPPDATA%\SephPlanner\inventory-dump.txt`에 칸별 좌표, 엔티티
-번호, 아이템 종류, `activeType`, 이름 키, 컴포넌트 유무가 그대로 기록된다. 기적 보상을 받은
-직후의 덤프가 있으면 원인을 좁힐 수 있다.
+덤프에는 이름 키가 `Item_`이 아니라 `Skill_`로 시작하고(`Skill_0006`, `Skill_0020`) `activeType`이
+`Locked`인, 일반 아이템 풀과 다른 경로로 들어온 아티팩트가 있었다. 이들은 전 구간에서 제대로
+다뤄진다.
+
+- `inventoryMatrix`에 `Charm_Basic`을 단 인스턴스로 그대로 들어 있다. `GameReader`는 석판만
+  걸러내므로 스냅샷에 담긴다.
+- 카탈로그에도 있다. `ItemCatalog`는 `Resources`를 직접 훑고 `activeType`이 `Disabled`인 것만
+  제외한다. 엔티티 3002/3012가 `maxLevel`과 `categories`까지 갖춰 들어 있었다.
+- 그래서 오버레이에서도 자리만 차지하는 아이템이 아니라 아티팩트로 채점된다.
+
+`activeType`을 아이템의 인게임 제약으로 오해하기 쉬운데, 실제로는 **도감과 커스텀 로드아웃에
+보일지**를 정하는 값이다. `Locked`은 아직 해금하지 않아 목록에 안 보인다는 뜻이며
+(`playerSpawner.unlockedCharms`로 판정) 런 중의 이동이나 효과 계산에는 관여하지 않는다.
+읽을 때 걸러야 하는 값은 `Disabled`와 `Hidden`뿐이다.
+
+같은 증상이 다시 나오면 그 시점에 F10으로 받은 덤프가 있어야 한다. 덤프에는 칸별 좌표, 엔티티
+번호, 아이템 종류, `activeType`, 이름 키, 컴포넌트 유무가 그대로 남는다.
+
+## 아직 반영하지 않은 것
+
+무기 연동 아티팩트를 **들고 있는 무기와 무관하게 활성으로 친다.** 게임은
+`isWeaponRelatedCharm`인 아티팩트에 대해 `relatedWeapon`과 `WeaponController.currentWeapon.weaponType`이
+같은지 보고, 다르면 효과를 끈다. 지금은 스냅샷에 장착 무기가 없어서 이 판정을 할 수 없다.
+
+그 결과 현재 배치 점수가 부풀고, 무기가 맞지 않아 아무 효과도 없는 아티팩트를 집으라고 추천할 수
+있다. 카탈로그에 `relatedWeapon`을 싣고 스냅샷의 `RunState`에 장착 무기를 채우면 풀린다.
+`CharmDefinition.IsWeaponRelated`와 `RunState.WeaponId`는 자리만 잡아 두었고 아직 아무도 쓰지 않는다.
 
 ## 제안이 흔들리지 않게 하는 것
 
