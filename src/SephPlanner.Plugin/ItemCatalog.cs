@@ -25,10 +25,11 @@ namespace SephPlanner.Plugin
 
                 result.Add(new TabletDefinition
                 {
-                    Id = IdFromKey(entity.aName?.key, "Item_StoneTablet_"),
+                    Id = IdFromKey(entity.aName?.key, "Item_StoneTablet_", entity.id),
                     EntityId = entity.id,
                     Rarity = (Rarity)(int)entity.rarity,
                     IsRotatable = tablet.isRotatable,
+                    IsCustom = tablet.isCustomTablet,
                     Query = tablet.query ?? "",
                     ConditionQuery = tablet.conditionQuery ?? "",
                 });
@@ -46,7 +47,7 @@ namespace SephPlanner.Plugin
 
                 result.Add(new CharmDefinition
                 {
-                    Id = IdFromKey(entity.aName?.key, "Item_"),
+                    Id = IdFromKey(entity.aName?.key, "Item_", entity.id),
                     EntityId = entity.id,
                     Rarity = (Rarity)(int)entity.rarity,
                     Categories = entity.categories ?? new List<string>(),
@@ -55,12 +56,14 @@ namespace SephPlanner.Plugin
             return result;
         }
 
-        private static string IdFromKey(string key, string prefix)
+        // 이름 키가 없는 아이템도 있어 그때는 엔티티 번호를 식별자로 쓴다.
+        private static string IdFromKey(string key, string prefix, int entityId)
         {
-            if (string.IsNullOrEmpty(key)) return "";
+            if (string.IsNullOrEmpty(key)) return entityId.ToString();
             var start = key.StartsWith(prefix) ? prefix.Length : 0;
             var end = key.LastIndexOf('_');
-            return end > start ? key.Substring(start, end - start) : key.Substring(start);
+            var id = end > start ? key.Substring(start, end - start) : key.Substring(start);
+            return id.Length > 0 ? id : entityId.ToString();
         }
     }
 }

@@ -41,6 +41,11 @@ namespace SephPlanner.Plugin
                         _log("오버레이 연결 끊김");
                     }
                 }
+                catch (ThreadAbortException)
+                {
+                    // 게임이 닫히면서 스레드가 정리되는 정상 경로다.
+                    _running = false;
+                }
                 catch (IOException)
                 {
                 }

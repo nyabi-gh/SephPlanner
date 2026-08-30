@@ -24,6 +24,12 @@ namespace SephPlanner.Plugin
             };
         }
 
+        public static string CheckSimulation()
+        {
+            var avatar = FindLocalPlayer();
+            return avatar?.Inventory == null ? null : SimulationVerifier.Check(avatar.Inventory);
+        }
+
         private static PlayerAvatar FindLocalPlayer()
         {
             var identity = NetworkClient.localPlayer;
@@ -86,6 +92,8 @@ namespace SephPlanner.Plugin
                     Position = new GridPos(tablet.xIdx, tablet.yIdx),
                     Rotation = tablet.rotation,
                     IsApplied = tablet.IsApplied,
+                    Query = tablet.isCustomTablet ? tablet.GetQuery(tablet.instanceID) : null,
+                    ConditionQuery = tablet.isCustomTablet ? tablet.GetConditionQuery(tablet.instanceID) : null,
                 });
             }
 

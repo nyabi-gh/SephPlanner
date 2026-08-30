@@ -60,6 +60,10 @@ namespace SephPlanner.Core.Ipc
         public GridPos Position { get; set; }
         public int Rotation { get; set; }
         public bool IsApplied { get; set; }
+
+        /// <summary>커스텀 석판만 채워진다. 질의가 인스턴스마다 다르기 때문이다.</summary>
+        public string? Query { get; set; }
+        public string? ConditionQuery { get; set; }
     }
 
     public sealed class OfferedItem

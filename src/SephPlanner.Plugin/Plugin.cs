@@ -20,6 +20,7 @@ namespace SephPlanner.Plugin
         private float _nextPoll;
         private string _lastJson;
         private bool _catalogChecked;
+        private string _lastSimulationIssue;
 
         private void Awake()
         {
@@ -69,6 +70,8 @@ namespace SephPlanner.Plugin
                 var snapshot = GameReader.TryRead();
                 if (snapshot == null) return;
 
+                VerifySimulation();
+
                 var timestamp = snapshot.TimestampMs;
                 snapshot.TimestampMs = 0;
                 var json = JsonConvert.SerializeObject(snapshot);
@@ -84,6 +87,15 @@ namespace SephPlanner.Plugin
                 Logger.LogError("스냅샷 생성 실패: " + ex);
                 _nextPoll = Time.unscaledTime + 5f;
             }
+        }
+
+        private void VerifySimulation()
+        {
+            var issue = GameReader.CheckSimulation();
+            if (issue == _lastSimulationIssue) return;
+
+            _lastSimulationIssue = issue;
+            if (issue != null) Logger.LogWarning("시뮬레이터 불일치: " + issue);
         }
 
         private void OnDestroy() => _server?.Dispose();

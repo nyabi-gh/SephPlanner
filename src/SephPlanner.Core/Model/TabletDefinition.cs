@@ -42,6 +42,9 @@ namespace SephPlanner.Core.Model
         public Rarity Rarity { get; set; }
         public bool IsRotatable { get; set; }
 
+        /// <summary>참이면 질의가 프리팹이 아니라 런 도중 인스턴스별로 정해진다.</summary>
+        public bool IsCustom { get; set; }
+
         /// <summary>레벨 증감과 칸 비활성화를 지정하는 질의.</summary>
         public string Query { get; set; } = "";
 
