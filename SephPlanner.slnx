@@ -5,4 +5,7 @@
     <Project Path="src/SephPlanner.Overlay/SephPlanner.Overlay.csproj" />
     <Project Path="src/SephPlanner.Plugin/SephPlanner.Plugin.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SephPlanner.Tests/SephPlanner.Tests.csproj" />
+  </Folder>
 </Solution>

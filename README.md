@@ -12,6 +12,7 @@ SephPlanner.Core      도메인 모델 + IPC 계약 (netstandard2.1)
 SephPlanner.Plugin    BepInEx 플러그인. 게임 상태를 읽어 명명 파이프로 내보낸다 (읽기 전용)
 SephPlanner.Overlay   WPF 오버레이. 파이프에 붙어 화면에 표시한다 (net10.0-windows)
 SephPlanner.DataTool  게임 로컬라이제이션에서 이름/설명 텍스트를 추출하는 CLI
+SephPlanner.Tests     Core 단위 테스트. 게임 없이 돈다
 ```
 
 게임 ↔ 오버레이 통신에 localhost HTTP 대신 **명명 파이프**를 쓴다. 방화벽 팝업이 뜨지 않고,
@@ -24,6 +25,12 @@ SephPlanner.DataTool  게임 로컬라이제이션에서 이름/설명 텍스트
 ```powershell
 $env:SEPHIRIA_DIR = "D:\SteamLibrary\steamapps\common\Sephiria"
 dotnet build
+```
+
+테스트는 게임 없이 돈다.
+
+```powershell
+dotnet test
 ```
 
 데이터 추출:
