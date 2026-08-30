@@ -23,13 +23,16 @@ namespace SephPlanner.Plugin
                 if (inventory.UnitAvatar is PlayerAvatar) continue;
                 if (Vector3.Distance(origin, inventory.transform.position) > radius) continue;
 
-                Collect(snapshot.Offers, inventory);
+                Collect(snapshot.Offers, inventory, player);
             }
         }
 
-        private static void Collect(List<OfferedItem> offers, GridInventory inventory)
+        private static void Collect(List<OfferedItem> offers, GridInventory inventory, PlayerAvatar buyer)
         {
+            // 상자와 바닥에 떨어진 꾸러미는 주인이 없어 그냥 집으면 되고, 주인이 있는 인벤토리는 사야 한다.
+            var seller = inventory.UnitAvatar;
             var seen = new HashSet<int>();
+
             foreach (var pair in inventory.inventoryMatrix)
             {
                 var instance = pair.Value;
@@ -42,10 +45,24 @@ namespace SephPlanner.Plugin
                 {
                     DefinitionId = instance.EntityID,
                     Kind = KindOf(entity.type),
-                    Price = entity.cost,
+                    Price = PriceOf(entity, seller, buyer),
                     SlotIndex = offers.Count,
                 });
             }
+        }
+
+        /// <summary>
+        /// 원가가 아니라 실제로 내야 하는 값. 게임은 파는 쪽과 사는 쪽의 협상 스탯 차이로
+        /// 원가의 0.66배에서 3배까지 조정한다(<c>ItemDatabase.GetItemBuyPrice</c>).
+        /// </summary>
+        private static int PriceOf(ItemEntity entity, UnitAvatar seller, PlayerAvatar buyer)
+        {
+            if (seller == null) return 0;
+
+            return ItemDatabase.GetItemBuyPrice(
+                entity,
+                seller.GetCustomStat(ECustomStat.Negotiation),
+                buyer.GetCustomStat(ECustomStat.Negotiation));
         }
 
         private static string KindOf(EItemType type)

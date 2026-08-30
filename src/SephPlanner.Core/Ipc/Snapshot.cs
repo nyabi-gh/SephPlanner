@@ -23,8 +23,10 @@ namespace SephPlanner.Core.Ipc
 
     public sealed class RunState
     {
-        public int Floor { get; set; }
+        /// <summary>장착한 무기 종류(<c>EWeaponType</c> 이름). 무기 연동 아티팩트의 발동 여부를 가른다.</summary>
         public string WeaponId { get; set; } = "";
+
+        /// <summary>소지금. 살 수 없는 후보를 가려내는 데 쓴다.</summary>
         public int Gold { get; set; }
     }
 
@@ -70,7 +72,10 @@ namespace SephPlanner.Core.Ipc
     {
         public int DefinitionId { get; set; }
         public string Kind { get; set; } = "";
+
+        /// <summary>실제 구매가. 상자나 바닥에 떨어진 것처럼 그냥 집으면 되는 것은 0이다.</summary>
         public int Price { get; set; }
+
         public int SlotIndex { get; set; }
     }
 }

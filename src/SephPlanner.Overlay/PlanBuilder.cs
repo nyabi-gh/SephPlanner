@@ -99,7 +99,8 @@ public static class PlanBuilder
 
         var current = PlacementSolver.Score(problem, layout, positions);
         var best = PlacementSolver.Solve(problem);
-        var offers = OfferAdvisor.Rank(problem, best.Score, Candidates(snapshot, catalog, weapon));
+        var offers = OfferAdvisor.Rank(
+            problem, best.Score, Candidates(snapshot, catalog, weapon), snapshot.Run?.Gold ?? int.MaxValue);
 
         return new Plan
         {

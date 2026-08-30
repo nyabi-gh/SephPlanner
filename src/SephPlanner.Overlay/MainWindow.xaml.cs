@@ -111,7 +111,7 @@ public partial class MainWindow : Window
 
         AutoExpand(plan);
         RenderGrid(snapshot, plan);
-        RenderOffers(plan);
+        RenderOffers(plan, snapshot.Run?.Gold ?? 0);
         LegendText.Visibility = plan.Moves.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
         // 제안이 그대로면 목록을 다시 만들지 않는다. 스냅샷마다 깜빡이는 것을 막는다.
@@ -167,16 +167,26 @@ public partial class MainWindow : Window
         UpdateNextMoveVisibility();
     }
 
-    private void RenderOffers(Plan plan)
+    private static readonly Brush OfferName = new SolidColorBrush(Color.FromRgb(0xC3, 0xBB, 0xD8));
+    private static readonly Brush OfferNameDim = new SolidColorBrush(Color.FromRgb(0x6B, 0x62, 0x85));
+    private static readonly Brush PriceText = new SolidColorBrush(Color.FromRgb(0x8A, 0x7F, 0xA6));
+
+    private void RenderOffers(Plan plan, int gold)
     {
         _offers.Clear();
         foreach (var advice in plan.Offers.Take(6))
         {
             var gain = advice.Gain;
+            var price = advice.Candidate.Price;
+
             _offers.Add(new OfferView(
                 advice.Candidate.Name,
+                price > 0 ? $"{price}골드" : "",
                 gain > 0.001 ? $"+{gain:0.#}" : gain < -0.001 ? $"{gain:0.#}" : "0",
-                gain > 0.001 ? Brushes.PaleGreen : gain < -0.001 ? Brushes.Salmon : Brushes.Gray));
+                gain > 0.001 ? Brushes.PaleGreen : gain < -0.001 ? Brushes.Salmon : Brushes.Gray,
+                advice.Affordable ? OfferName : OfferNameDim,
+                advice.Affordable ? PriceText : Brushes.Salmon,
+                advice.Affordable ? "" : $"소지금 {gold}골드로는 살 수 없습니다."));
         }
         OfferPanel.Visibility = _offers.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -278,7 +288,12 @@ public partial class MainWindow : Window
 
 public sealed record MoveView(string Label, string Detail);
 
-public sealed record OfferView(string Name, string Gain, Brush Tone);
+public sealed record OfferView(
+    string Name, string Price, string Gain, Brush Tone, Brush NameTone, Brush PriceTone, string Tooltip)
+{
+    /// <summary>살 수 있는 후보에 빈 도움말이 뜨지 않게 한다.</summary>
+    public bool HasTooltip => Tooltip.Length > 0;
+}
 
 public sealed class CellView : INotifyPropertyChanged
 {

@@ -88,11 +88,15 @@
                     <ItemsControl x:Name="OfferList">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <DockPanel Margin="0,0,0,3">
+                                <DockPanel Margin="0,0,0,3" ToolTip="{Binding Tooltip}"
+                                           ToolTipService.IsEnabled="{Binding HasTooltip}">
                                     <TextBlock DockPanel.Dock="Right" Text="{Binding Gain}"
                                                Foreground="{Binding Tone}" FontSize="11" FontWeight="SemiBold"
                                                Margin="8,0,0,0" />
-                                    <TextBlock Text="{Binding Name}" Foreground="#C3BBD8" FontSize="11"
+                                    <TextBlock DockPanel.Dock="Right" Text="{Binding Price}"
+                                               Foreground="{Binding PriceTone}" FontSize="10"
+                                               Margin="8,1,0,0" />
+                                    <TextBlock Text="{Binding Name}" Foreground="{Binding NameTone}" FontSize="11"
                                                TextTrimming="CharacterEllipsis" />
                                 </DockPanel>
                             </DataTemplate>

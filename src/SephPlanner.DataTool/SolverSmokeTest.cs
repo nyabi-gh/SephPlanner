@@ -68,7 +68,8 @@ public static class SolverSmokeTest
             candidates.Add(new OfferCandidate { DefinitionId = charm.EntityId, Kind = "charm", Name = charm.Id, Charm = charm });
 
         var started = System.Diagnostics.Stopwatch.StartNew();
-        var advice = OfferAdvisor.Rank(problem, baseScore, candidates);
+        // 스모크 테스트에는 소지금이 없다. 값이 파이프라인을 도는지만 보므로 다 살 수 있다고 둔다.
+        var advice = OfferAdvisor.Rank(problem, baseScore, candidates, gold: int.MaxValue);
         started.Stop();
 
         Console.WriteLine();

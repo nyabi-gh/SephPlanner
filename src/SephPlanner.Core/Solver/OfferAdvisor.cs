@@ -21,6 +21,9 @@ namespace SephPlanner.Core.Solver
     {
         public OfferCandidate Candidate { get; set; } = new OfferCandidate();
         public double Gain { get; set; }
+
+        /// <summary>지금 소지금으로 살 수 있는지. 그냥 집으면 되는 것은 항상 참이다.</summary>
+        public bool Affordable { get; set; }
     }
 
     /// <summary>
@@ -35,7 +38,7 @@ namespace SephPlanner.Core.Solver
         private static readonly SolverOptions Faster = new() { BeamWidth = 150, ExactCandidates = 40 };
 
         public static List<OfferAdvice> Rank(
-            PlacementProblem problem, double baseScore, IReadOnlyList<OfferCandidate> candidates)
+            PlacementProblem problem, double baseScore, IReadOnlyList<OfferCandidate> candidates, int gold)
         {
             var advice = new List<OfferAdvice>();
             var nextInstanceId = -1;
@@ -67,10 +70,18 @@ namespace SephPlanner.Core.Solver
                 }
 
                 var solved = PlacementSolver.Solve(trial, Faster);
-                advice.Add(new OfferAdvice { Candidate = candidate, Gain = solved.Score - baseScore });
+                advice.Add(new OfferAdvice
+                {
+                    Candidate = candidate,
+                    Gain = solved.Score - baseScore,
+                    Affordable = candidate.Price <= gold,
+                });
             }
 
-            return advice.OrderByDescending(entry => entry.Gain).ToList();
+            // 살 수 없는 것은 아무리 좋아도 지금 고를 수 없다. 지우지는 않고 아래로 내린다.
+            return advice.OrderByDescending(entry => entry.Affordable)
+                         .ThenByDescending(entry => entry.Gain)
+                         .ToList();
         }
 
         private static PlacementProblem Clone(PlacementProblem problem) => new()

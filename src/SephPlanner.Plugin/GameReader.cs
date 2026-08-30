@@ -69,8 +69,9 @@ namespace SephPlanner.Plugin
         }
 
         /// <summary>
-        /// 배치와 무관하지만 점수에 영향을 주는 런 상태. 무기 연동 아티팩트는 해당 무기를 들고
-        /// 있어야 효과가 켜지므로(<c>Charm_Basic.RefreshCharm</c>) 장착 무기를 함께 보낸다.
+        /// 배치와 무관하지만 추천에 영향을 주는 런 상태. 무기 연동 아티팩트는 해당 무기를 들고
+        /// 있어야 효과가 켜지므로(<c>Charm_Basic.RefreshCharm</c>) 장착 무기를 싣고, 살 수 없는
+        /// 후보를 가려내려고 소지금도 함께 보낸다.
         /// </summary>
         private static RunState ReadRun(PlayerAvatar avatar)
         {
@@ -80,6 +81,7 @@ namespace SephPlanner.Plugin
                 WeaponId = weapons != null && weapons.currentWeapon != null
                     ? weapons.currentWeapon.weaponType.ToString()
                     : "",
+                Gold = avatar.Money,
             };
         }
 

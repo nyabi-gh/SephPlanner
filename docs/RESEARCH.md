@@ -220,15 +220,34 @@ ilspycmd -t GridInventory "<게임경로>/Sephiria_Data/Managed/Assembly-CSharp.
 같은 증상이 다시 나오면 그 시점에 F10으로 받은 덤프가 있어야 한다. 덤프에는 칸별 좌표, 엔티티
 번호, 아이템 종류, `activeType`, 이름 키, 컴포넌트 유무가 그대로 남는다.
 
-## 아직 반영하지 않은 것
+## 무기 연동 아티팩트
 
-무기 연동 아티팩트를 **들고 있는 무기와 무관하게 활성으로 친다.** 게임은
-`isWeaponRelatedCharm`인 아티팩트에 대해 `relatedWeapon`과 `WeaponController.currentWeapon.weaponType`이
-같은지 보고, 다르면 효과를 끈다. 지금은 스냅샷에 장착 무기가 없어서 이 판정을 할 수 없다.
+`isWeaponRelatedCharm`이 참인 아티팩트는 `relatedWeapon`과 지금 든 무기의 종류가 같아야 효과가
+켜진다. 판정은 `Charm_Basic.RefreshCharm`에 있고, 무기는 아바타의 `WeaponControllerSimple`이
+들고 있다.
 
-그 결과 현재 배치 점수가 부풀고, 무기가 맞지 않아 아무 효과도 없는 아티팩트를 집으라고 추천할 수
-있다. 카탈로그에 `relatedWeapon`을 싣고 스냅샷의 `RunState`에 장착 무기를 채우면 풀린다.
-`CharmDefinition.IsWeaponRelated`와 `RunState.WeaponId`는 자리만 잡아 두었고 아직 아무도 쓰지 않는다.
+```
+PlayerAvatar -> GetComponent<WeaponControllerSimple>() -> currentWeapon.weaponType  (EWeaponType)
+```
+
+`EWeaponType`은 `SwordAndShield`, `GreatSword`, `Dagger`, `Crossbow`, `StaffMagic`, `Katana`,
+`Golem`, `Staff`, `Random` 9종이다. 카탈로그가 `relatedWeapon`을 이름 그대로 싣고, 스냅샷의
+`RunState.WeaponId`가 장착 무기를 실어 보낸다.
+
+판정할 근거가 없을 때는 켜져 있는 것으로 둔다. 무기를 모르거나(런 밖) 카탈로그가 연동 무기를
+기록하기 전 버전이면, 비교했다가는 무기 연동 아티팩트를 전부 0점으로 보게 되기 때문이다.
+
+## 가격과 소지금
+
+상점 가격은 **원가가 아니다.** `ItemDatabase.GetItemBuyPrice`가 파는 쪽과 사는 쪽의
+`ECustomStat.Negotiation` 차이로 원가를 조정한다. 차이가 0 이상이면 1배에서 3배까지,
+음수면 1배에서 0.66배까지 선형으로 움직인다. 그래서 `ItemEntity.cost`를 그대로 쓰면 최대 3배까지
+어긋난다.
+
+값을 치러야 하는지 아닌지는 인벤토리의 주인으로 가른다. 상자(`ItemChest`)와 바닥에 떨어진
+꾸러미(`DroppedInventory`)는 `GridInventory.UnitAvatar`가 없고, 상인은 있다. 주인이 없으면 값은 0이다.
+
+소지금은 `UnitAvatar.Money`다.
 
 ## 제안이 흔들리지 않게 하는 것
 
