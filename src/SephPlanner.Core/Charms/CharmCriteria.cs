@@ -6,6 +6,10 @@ namespace SephPlanner.Core.Charms
     /// <summary>
     /// 아티팩트가 스스로 요구하는 배치 조건. 게임의 <c>CharmActivateCriteria</c> 파생 클래스에 대응하며,
     /// 이름은 프리팹에서 읽은 타입 이름을 그대로 쓴다.
+    ///
+    /// 판정 로직은 각 클래스의 <c>GetCriteria</c>를 디컴파일해 그대로 옮긴 것이다. 아래에 보이는
+    /// 5, 6, 7 같은 상수는 게임 코드 자체의 하드코딩이라(폭이 항상 6이라는 전제) grid.Width 로
+    /// "고치면" 오히려 게임과 어긋난다. BothSidesAreEmpty 의 부분 행 판정도 게임과 동일하다.
     /// </summary>
     public enum CharmCriteriaKind
     {

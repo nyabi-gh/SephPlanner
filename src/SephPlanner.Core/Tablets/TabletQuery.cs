@@ -76,6 +76,8 @@ namespace SephPlanner.Core.Tablets
 
             foreach (var line in query.Split(LineSeparators, StringSplitOptions.RemoveEmptyEntries))
             {
+                // 게임 ParseQuery 와 같은 분할이다. 빈 토큰을 거르지 않는 것까지 동일해서,
+                // 연속 공백의 처리(빈 값 토큰)도 게임과 같은 결과가 된다.
                 var parts = line.Split(' ');
                 if (parts.Length < 2) continue;
                 Emit(cells, parts, grid, origin, rotation);

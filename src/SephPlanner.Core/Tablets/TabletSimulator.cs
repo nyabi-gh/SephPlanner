@@ -23,6 +23,9 @@ namespace SephPlanner.Core.Tablets
         public int EffectiveLevel(GridPos position, int enchant)
         {
             var level = LevelAt(position) + enchant;
+
+            // 배수는 게임과 같이 덧셈으로 쌓인다(MUL/2 + MUL/3 = x5). 합이 0이면 게임의
+            // ReleasePermission 도 곱셈을 건너뛰므로(x0 이 아니라 x1) 같은 가드를 둔다.
             if (MultiplyLevel.TryGetValue(position, out var multiplier) && multiplier != 0) level *= multiplier;
             return level;
         }
@@ -92,6 +95,8 @@ namespace SephPlanner.Core.Tablets
                         placed = cell.Position == placement.Position;
                         break;
                     default:
+                        // 해석되지 않는 값은 게임도 조건을 만족한 것으로 친다
+                        // (StoneTablet.ApplyEffect 의 default: flag4 = true, flag5 = true).
                         hit = true;
                         placed = true;
                         break;

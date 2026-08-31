@@ -120,9 +120,9 @@ public void Swap(sbyte xLeft, sbyte yLeft, sbyte xRight, sbyte yRight)
 분리한 이유다.
 
 회전은 인스턴스 단위로 잠길 수 있다(`DungeonManager.IsTabletRotatable(instanceID, isRotatable)`).
-솔버는 카탈로그의 `IsRotatable`만 보므로 잠긴 인스턴스에 회전을 제안할 수 있고, 적용기는 그런
-회전을 건너뛰고 로그에 남긴다. 스냅샷에 인스턴스별 회전 가능 여부를 실어 솔버에 알리는 것이
-다음 과제다.
+스냅샷의 `PlacedTablet.IsRotatable`이 인스턴스별 잠금을 실어 보내고 솔버가 이를 존중한다
+(잠긴 석판은 지금 각도 그대로만 쓴다). 적용기는 계산 이후 잠겼을 가능성에 대비해 적용 직전에
+한 번 더 확인하고, 잠긴 회전은 건너뛰며 결과에 남긴다.
 
 ### 게임 내장 자동 정리
 
@@ -237,6 +237,11 @@ ilspycmd -t GridInventory "<게임경로>/Sephiria_Data/Managed/Assembly-CSharp.
 `NeighborsAreFull`, `Near8MagicBook`은 이웃 칸의 내용을 본다. `FullHP`만 배치와 무관한
 전투 중 상태라 배치 탐색에서는 만족한 것으로 둔다.
 
+주의: 이 판정들의 게임 구현에는 격자 폭이 항상 6이라는 전제의 **하드코딩이 섞여 있다.**
+`SideEnd`는 `x == 0 || x == 5`, `BottomInInventory`/`Outlined`는 `storage - 6`,
+`Inside`는 `+ 7` 을 그대로 쓴다. Core 의 `CharmCriteria`는 이를 "고치지" 않고 그대로
+옮겼다 — 정리하면 게임과 어긋난다. 각 클래스의 `GetCriteria` 디컴파일로 확인했다.
+
 ## 레벨이 정해지는 순서
 
 `GridInventory.ReleasePermission`이 `levelMatrix`를 만드는 순서다. 순서가 중요한 이유는 배수가
@@ -246,7 +251,10 @@ ilspycmd -t GridInventory "<게임경로>/Sephiria_Data/Managed/Assembly-CSharp.
    `"{instanceID}/Enchant"` 키로 인스턴스마다 따로 들어 있다.
 2. **고정 각인**(`fixedEngravingsOnServer`)의 고정 레벨·비활성·조건무시·배수를 더한다.
 3. **석판과 각인**(`stoneTablets`, `engravings`)의 `ApplyEffect`.
-4. **배수 행렬을 곱한다.** 여기까지 더해진 값 전체에 곱한다.
+4. **배수 행렬을 곱한다.** 여기까지 더해진 값 전체에 곱한다. 배수는 `multiplyLevelMatrix`에
+   **덧셈으로 쌓인다** — `MUL/2`와 `MUL/3`이 겹치면 ×6이 아니라 ×5다. 쌓인 합이 0이면
+   `ReleasePermission`이 곱셈 자체를 건너뛰므로 ×0이 아니라 ×1이 된다. 디컴파일로 확인했고
+   시뮬레이터가 같은 규칙을 쓴다.
 
 배치 보너스는 이 파이프라인 뒤에 돌지만 레벨을 바꾸지 않는다(아래 참고).
 
@@ -336,8 +344,9 @@ fixedMultiplyLevel)를 들고 있고, 배수는 석판과 같은 `multiplyLevelM
 뿐이기 때문이다. 레벨만 세면 **꺼지는 칸(레벨 음수)과 레벨 0 칸이 똑같이 0점**이 되어, 아티팩트를
 꺼진 채로 두고도 최적이라고 말하게 된다. 실제로 그런 화면이 나온 적이 있다.
 
-아직 모든 아티팩트의 1점을 같게 친다. 레벨 3짜리 사소한 아티팩트가 레벨 1짜리 핵심 아티팩트보다
-높게 나오는 문제가 남아 있다. 레어도나 카테고리로 가중치를 주는 것이 다음 과제다.
+아티팩트 사이의 우열은 레어도 가중치로 가른다(`Worth.OfRarity`, 1.1~1.7배). 사용자가 우클릭으로
+강화 우선을 지정하면 그 위에 2배가 더 곱해진다. 카테고리(콤보) 가치는 배치 점수에 섞지 않고
+후보 추천에서만 따로 계산한다.
 
 ## 배치 최적화
 
