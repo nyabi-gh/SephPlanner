@@ -27,6 +27,11 @@ public partial class MainWindow : Window
     private readonly CancellationTokenSource _shutdown = new();
     private readonly UserSettings _settings = UserSettings.Load();
 
+    /// <summary>--preview 에서만 쓰는 내장 카탈로그. 덤프가 없는 PC에서도 화면이 나와야 한다.</summary>
+    private readonly ICatalog? _previewCatalog;
+
+    private ICatalog ActiveCatalog => _previewCatalog ?? (ICatalog)_catalog;
+
     /// <summary>계산 스레드가 읽으므로 통째로 갈아끼우고 제자리에서 바꾸지 않는다.</summary>
     private volatile PlanPreferences _preferences = PlanPreferences.None;
 
@@ -61,6 +66,7 @@ public partial class MainWindow : Window
         if (Environment.GetCommandLineArgs().Contains("--preview"))
         {
             StatusText.Text = "미리보기";
+            _previewCatalog = PreviewSnapshot.Catalog();
             OnSnapshot(PreviewSnapshot.Build());
             return;
         }
@@ -111,13 +117,13 @@ public partial class MainWindow : Window
             {
                 while (Interlocked.Exchange(ref _pending, null) is { } snapshot)
                 {
-                    if (!_catalog.Refresh())
+                    if (_previewCatalog is null && !_catalog.Refresh())
                     {
                         Dispatcher.Invoke(() => ShowNotice("게임을 한 번 실행해 데이터를 만들어 주세요. (게임 안에서 F9)"));
                         continue;
                     }
 
-                    var plan = PlanBuilder.Build(snapshot, _catalog, _preferences);
+                    var plan = PlanBuilder.Build(snapshot, ActiveCatalog, _preferences);
                     Dispatcher.Invoke(() => Render(snapshot, plan));
                 }
             }
@@ -164,8 +170,18 @@ public partial class MainWindow : Window
         _plan = null;
     }
 
+    /// <summary>마지막으로 아이콘 캐시를 비웠을 때의 카탈로그 버전.</summary>
+    private int _iconCatalogVersion;
+
     private void Render(GameSnapshot snapshot, Plan? plan)
     {
+        // F9 재덤프로 아이콘이 바뀌었을 수 있다. 카탈로그가 다시 읽힌 시점에 함께 비운다.
+        if (_catalog.Version != _iconCatalogVersion)
+        {
+            _iconCatalogVersion = _catalog.Version;
+            IconStore.Clear();
+        }
+
         if (plan is null)
         {
             // "탐험"은 게임 자체가 쓰는 말이다 ("탐험 시작 시", "탐험 중" - ko-KR.json).
@@ -430,7 +446,7 @@ public partial class MainWindow : Window
     {
         if (!shown.Add(categoryId)) return;
 
-        var combo = _catalog.Combo(categoryId);
+        var combo = ActiveCatalog.Combo(categoryId);
         if (combo is null) return;
 
         var selected = _preferences.PriorityCategories.Contains(categoryId);

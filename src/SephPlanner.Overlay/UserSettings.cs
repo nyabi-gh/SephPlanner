@@ -43,9 +43,10 @@ public sealed class UserSettings
                 if (loaded is not null) return loaded;
             }
         }
-        catch (Exception ex) when (ex is IOException or JsonException)
+        catch (Exception)
         {
-            // 설정이 깨졌으면 기본값으로 시작한다. 다음 저장 때 새로 쓰인다.
+            // 설정이 깨졌거나 읽을 수 없으면 기본값으로 시작한다. Load 는 창 생성 시점에 불리므로
+            // 권한 문제(UnauthorizedAccessException) 같은 예외 하나로 앱이 못 뜨면 안 된다.
         }
         return new UserSettings();
     }
@@ -55,10 +56,15 @@ public sealed class UserSettings
         try
         {
             Directory.CreateDirectory(IpcContract.DataDirectory);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(this));
+
+            // 바로 덮어쓰면 쓰는 도중 크래시에 잘린 JSON 이 남아 설정 전체가 날아간다.
+            var temp = FilePath + ".tmp";
+            File.WriteAllText(temp, JsonSerializer.Serialize(this));
+            File.Move(temp, FilePath, overwrite: true);
         }
-        catch (IOException)
+        catch (Exception)
         {
+            // 저장 실패로 오버레이가 죽으면 안 된다. 다음 조작 때 다시 시도된다.
         }
     }
 

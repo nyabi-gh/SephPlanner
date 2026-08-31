@@ -1,5 +1,6 @@
 using SephPlanner.Core.Ipc;
 using SephPlanner.Core.Model;
+using SephPlanner.Core.Planning;
 
 namespace SephPlanner.Overlay;
 
@@ -9,6 +10,43 @@ namespace SephPlanner.Overlay;
 /// </summary>
 public static class PreviewSnapshot
 {
+    /// <summary>
+    /// 미리보기 전용 카탈로그. 진짜 덤프에 기대면 게임을 한 번도 안 돌린 PC에서는 미리보기가
+    /// 안내문만 띄우고 끝난다. 이름과 수치는 전부 지어낸 것이다 - 게임 데이터를 코드에 넣으면
+    /// 저장소에 게임 저작물이 들어가는 셈이 된다 (docs/LEGAL.md).
+    /// </summary>
+    public static ICatalog Catalog() => new Catalog(
+        new[]
+        {
+            new TabletDefinition { EntityId = 2025, Id = "PreviewA", IsRotatable = true, Query = "RIGHT 2\nDOWN 1", Names = { ["current"] = "미리보기 석판 A" } },
+            new TabletDefinition { EntityId = 2044, Id = "PreviewB", Query = "LEFT -1\nRIGHT 3", Names = { ["current"] = "미리보기 석판 B" } },
+            new TabletDefinition { EntityId = 12000, Id = "PreviewC", IsRotatable = true, Query = "HORIZONTAL 1", Rarity = Rarity.Legend, Names = { ["current"] = "미리보기 석판 C" } },
+            new TabletDefinition { EntityId = 2001, Id = "PreviewD", Query = "DOWN 2", Names = { ["current"] = "미리보기 석판 D" } },
+        },
+        new[]
+        {
+            new CharmDefinition { EntityId = 1237, Id = "PreviewCharmA", MaxLevel = 3, Rarity = Rarity.Rare, Categories = { "EMBER" }, Names = { ["current"] = "미리보기 아티팩트 A" } },
+            new CharmDefinition { EntityId = 3002, Id = "PreviewCharmB", MaxLevel = 4, Categories = { "FLAMESWORD" }, Names = { ["current"] = "미리보기 아티팩트 B" } },
+            new CharmDefinition { EntityId = 3012, Id = "PreviewCharmC", MaxLevel = 3, Categories = { "EMBER" }, Names = { ["current"] = "미리보기 아티팩트 C" } },
+        },
+        new[]
+        {
+            new ComboDefinition
+            {
+                Id = "EMBER", Thresholds = { 2, 5, 8 }, Names = { ["current"] = "미리보기 콤보 A" },
+                Effects =
+                {
+                    new ComboEffectLine { Threshold = 2, Text = "미리보기 효과 첫 단계" },
+                    new ComboEffectLine { Threshold = 5, Text = "미리보기 효과 둘째 단계" },
+                },
+            },
+            new ComboDefinition
+            {
+                Id = "FLAMESWORD", Thresholds = { 3, 6 }, Names = { ["current"] = "미리보기 콤보 B" },
+                Effects = { new ComboEffectLine { Threshold = 3, Text = "미리보기 효과" } },
+            },
+        });
+
     public static GameSnapshot Build() => new()
     {
         Run = new RunState { WeaponId = "", Gold = 260 },
