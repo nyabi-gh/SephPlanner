@@ -250,6 +250,34 @@
                             </ItemsControl>
                         </StackPanel>
 
+                        <StackPanel x:Name="MixPanel" Margin="0,12,0,0" Visibility="Collapsed">
+                            <TextBlock Text="석판 합성기" Style="{StaticResource SectionHeader}"
+                                       Foreground="{x:Static local:Theme.Mint}" />
+                            <ItemsControl x:Name="MixList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <DockPanel Margin="0,0,0,3" ToolTip="{Binding Tooltip}">
+                                            <TextBlock DockPanel.Dock="Right" Text="{Binding Gain}"
+                                                       Foreground="{Binding Tone}" FontSize="12"
+                                                       Margin="8,0,0,0" />
+                                            <TextBlock DockPanel.Dock="Right" Text="{Binding Price}"
+                                                       Foreground="{Binding PriceTone}"
+                                                       FontFamily="{x:Static local:Theme.Small}" FontSize="10"
+                                                       FontWeight="Normal" Margin="8,2,0,0" />
+                                            <TextBlock DockPanel.Dock="Right" Text="{Binding Turn}"
+                                                       Foreground="{x:Static local:Theme.Amber}"
+                                                       FontFamily="{x:Static local:Theme.Small}" FontSize="10"
+                                                       FontWeight="Normal" Margin="8,2,0,0" />
+                                            <TextBlock Text="{Binding Pair}" Foreground="{Binding NameTone}"
+                                                       FontSize="12" TextTrimming="CharacterEllipsis"
+                                                       VerticalAlignment="Center" />
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock x:Name="MixNote" Style="{StaticResource Hint}" TextWrapping="Wrap" />
+                        </StackPanel>
+
                         <StackPanel x:Name="BuildPanel" Margin="0,12,0,0" Visibility="Collapsed">
                             <TextBlock Text="빌드 우선" Style="{StaticResource SectionHeader}" />
 

@@ -97,9 +97,17 @@ namespace SephPlanner.Core.Planning
             var best = PlacementSolver.Solve(problem);
 
             var offers = new List<OfferAdvice>();
+            var mixes = new List<MixAdvice>();
             var skippedOffers = 0;
             if (preferences.Recommendations)
             {
+                // 합성기를 이미 썼으면 이 층에서는 더 권할 것이 없다.
+                if (snapshot.Mixer is { Used: false } mixer)
+                {
+                    mixes = TabletMixAdvisor.Rank(
+                        problem, catalog, mixer.Cost, snapshot.Run?.Gold ?? int.MaxValue);
+                }
+
                 var candidates = Candidates(snapshot, catalog, weapon, out skippedOffers);
                 offers = OfferAdvisor.Rank(
                     problem, candidates, snapshot.Run?.Gold ?? int.MaxValue,
@@ -114,6 +122,7 @@ namespace SephPlanner.Core.Planning
                 Best = best,
                 Moves = Moves(problem, current, best),
                 Offers = offers,
+                Mixes = mixes,
                 SkippedOffers = skippedOffers,
                 Names = NamesByCell(problem, best),
                 Charms = CharmsByCell(problem, best),

@@ -67,6 +67,52 @@ namespace SephPlanner.Core.Tablets
 
         private static readonly char[] LineSeparators = { '\r', '\n' };
 
+        /// <summary>회전한 오프셋으로 토큰 이름을 되찾는다. 28종이 좌표와 일대일이라 늘 찾아진다.</summary>
+        private static readonly Dictionary<(int X, int Y), string> OffsetNames = BuildOffsetNames();
+
+        private static Dictionary<(int X, int Y), string> BuildOffsetNames()
+        {
+            var map = new Dictionary<(int, int), string>();
+            foreach (var pair in Offsets) map[pair.Value] = pair.Key;
+            return map;
+        }
+
+        /// <summary>
+        /// 질의를 돌려 새 질의 문자열로 만든다. 게임의 <c>StoneTablet.GetRotatedQuery</c>와 같은
+        /// 일이며, 석판 합성이 재료의 회전을 결과 질의에 구워 넣기 때문에 필요하다.
+        ///
+        /// <see cref="Parse"/>가 읽을 때 돌리는 것과 결과가 같아야 한다. 즉 a 만큼 돌린 질의를
+        /// b 로 읽은 것이 원본을 a+b 로 읽은 것과 같다(TabletQueryTests 가 고정해 둔다).
+        /// </summary>
+        public static string Rotated(string query, int rotation)
+        {
+            if (string.IsNullOrEmpty(query)) return query;
+
+            rotation = ((rotation % 4) + 4) % 4;
+            if (rotation == 0) return query;
+
+            var lines = new List<string>();
+            foreach (var line in query.Split(LineSeparators, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var parts = line.Split(' ');
+                if (parts.Length >= 1) parts[0] = RotatedToken(parts[0], rotation);
+                lines.Add(string.Join(" ", parts));
+            }
+            return string.Join("\n", lines);
+        }
+
+        /// <summary>토큰 하나의 회전. 아는 토큰이 아니면 그대로 둔다 - 읽는 쪽도 그렇게 한다.</summary>
+        private static string RotatedToken(string token, int rotation)
+        {
+            if (Offsets.TryGetValue(token, out var offset))
+            {
+                var (dx, dy) = Rotate(offset, rotation);
+                return OffsetNames.TryGetValue((dx, dy), out var name) ? name : token;
+            }
+
+            return RotatedNames.TryGetValue(token, out var names) ? names[rotation] : token;
+        }
+
         public static List<QueryCell> Parse(string query, GridSpec grid, GridPos origin, int rotation)
         {
             var cells = new List<QueryCell>();

@@ -31,6 +31,7 @@ namespace SephPlanner.Plugin
 
             snapshot.Run = ReadRun(avatar);
             snapshot.Inventory = ReadInventory(avatar.Inventory);
+            snapshot.Mixer = ReadMixer();
             OfferReader.Fill(snapshot, avatar, offerRadius);
             return snapshot;
         }
@@ -78,6 +79,29 @@ namespace SephPlanner.Plugin
         /// 있어야 효과가 켜지므로(<c>Charm_Basic.RefreshCharm</c>) 장착 무기를 싣고, 살 수 없는
         /// 후보를 가려내려고 소지금도 함께 보낸다.
         /// </summary>
+        /// <summary>
+        /// 이 층의 석판 합성기. 거리를 보지 않는 것은 의도다 - 미니맵에 뜨는 고정물이라 층에
+        /// 있다는 사실 자체가 이미 보이는 정보이고, 무엇을 합칠지는 합성기 앞에 서기 전에 정해
+        /// 두는 편이 쓸모 있다.
+        ///
+        /// <c>LocalUsed</c>는 나 자신이 썼는지다. 합성기는 사람마다 층에 한 번씩 쓸 수 있다.
+        /// </summary>
+        private static MixerState ReadMixer()
+        {
+            foreach (var mixer in UnityEngine.Object.FindObjectsByType<TabletMix>(FindObjectsSortMode.None))
+            {
+                if (mixer == null) continue;
+
+                // 여럿이면 아직 쓸 수 있는 쪽이 답이다.
+                if (!mixer.LocalUsed) return new MixerState { Cost = mixer.mixCost, Used = false };
+            }
+
+            foreach (var mixer in UnityEngine.Object.FindObjectsByType<TabletMix>(FindObjectsSortMode.None))
+                if (mixer != null) return new MixerState { Cost = mixer.mixCost, Used = true };
+
+            return null;
+        }
+
         private static RunState ReadRun(PlayerAvatar avatar)
         {
             var weapons = avatar.GetComponent<WeaponControllerSimple>();

@@ -57,6 +57,9 @@ public static class PreviewSnapshot
     public static GameSnapshot Build() => new()
     {
         Run = new RunState { WeaponId = "", Gold = 260 },
+
+        // 합성기가 있는 층을 흉내 낸다. 없으면 석판 합성 추천이 미리보기에 아예 안 나온다.
+        Mixer = new MixerState { Cost = 200 },
         Inventory = new InventoryState
         {
             Width = 6,

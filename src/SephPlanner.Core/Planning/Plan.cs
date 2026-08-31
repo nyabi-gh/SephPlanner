@@ -65,6 +65,11 @@ namespace SephPlanner.Core.Planning
         public List<OfferAdvice> Offers { get; set; } = new List<OfferAdvice>();
 
         /// <summary>
+        /// 가진 석판 중 합치면 좋은 쌍. 합성기가 이 층에 있고 아직 쓰지 않았을 때만 채워진다.
+        /// </summary>
+        public List<MixAdvice> Mixes { get; set; } = new List<MixAdvice>();
+
+        /// <summary>
         /// 후보가 너무 많아 평가하지 못하고 넘어간 수. 조용히 빠뜨리면 화면에 없는 선택지를
         /// 없는 셈 치게 된다.
         /// </summary>

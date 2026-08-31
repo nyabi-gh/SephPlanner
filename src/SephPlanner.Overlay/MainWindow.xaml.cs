@@ -22,6 +22,7 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<CellView> _cells = new();
     private readonly ObservableCollection<MoveView> _moves = new();
     private readonly ObservableCollection<OfferView> _offers = new();
+    private readonly ObservableCollection<MixView> _mixes = new();
     private readonly ObservableCollection<ComboChipView> _chips = new();
     private readonly CatalogStore _catalog = new();
     private readonly CancellationTokenSource _shutdown = new();
@@ -54,6 +55,7 @@ public partial class MainWindow : Window
         GridCells.ItemsSource = _cells;
         MoveList.ItemsSource = _moves;
         OfferList.ItemsSource = _offers;
+        MixList.ItemsSource = _mixes;
         ChipList.ItemsSource = _chips;
         _preferences = _settings.ToPreferences();
         RestorePosition();
@@ -161,9 +163,11 @@ public partial class MainWindow : Window
         _cells.Clear();
         _moves.Clear();
         _offers.Clear();
+        _mixes.Clear();
         _chips.Clear();
         BuildPanel.Visibility = Visibility.Collapsed;
         OfferPanel.Visibility = Visibility.Collapsed;
+        MixPanel.Visibility = Visibility.Collapsed;
         MovePanel.Visibility = Visibility.Collapsed;
         LegendRow.Visibility = Visibility.Collapsed;
         _lastPlanned = "";
@@ -207,6 +211,7 @@ public partial class MainWindow : Window
         AutoExpand(plan);
         RenderGrid(snapshot, plan);
         RenderOffers(plan, snapshot.Run?.Gold ?? 0);
+        RenderMixes(plan, snapshot.Mixer);
         RenderChips(snapshot);
 
         LegendText.Text = plan.Moves.Count > 0
@@ -336,6 +341,70 @@ public partial class MainWindow : Window
                 Explain(advice, gold)));
         }
         OfferPanel.Visibility = _offers.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// 합칠 만한 석판 쌍. 사람이 따라 해야 하는 일이라 무엇을 어느 각도로 넣는지까지 적는다.
+    /// </summary>
+    private void RenderMixes(Plan plan, MixerState? mixer)
+    {
+        _mixes.Clear();
+        foreach (var advice in plan.Mixes.Take(4))
+        {
+            var gain = advice.Gain;
+
+            _mixes.Add(new MixView(
+                $"{advice.NameA} + {advice.NameB}",
+                Turn(advice),
+                mixer is { Cost: > 0 } ? $"{mixer.Cost}골드" : "",
+                gain > 0.001 ? $"+{gain:0.#}" : gain < -0.001 ? $"{gain:0.#}" : "0",
+                gain > 0.001 ? Theme.Good : gain < -0.001 ? Theme.Bad : Theme.TextDim,
+                advice.Affordable ? Theme.Text : Theme.TextDim,
+                advice.Affordable ? Theme.TextDim : Theme.Bad,
+                Explain(advice)));
+        }
+
+        // 합성기가 있는데 권할 쌍이 하나도 없으면 그 사실을 말한다. 빈 자리는 아무 말도 안 한다.
+        MixNote.Text = mixer is not null && _mixes.Count == 0
+            ? "합칠 만한 짝이 없습니다. 조건 질의가 서로 다르면 합쳐지지 않습니다."
+            : "";
+        MixPanel.Visibility = mixer is not null && (_mixes.Count > 0 || MixNote.Text.Length > 0)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    /// <summary>합성 전에 재료를 돌려 놓아야 하는지. 돌릴 것이 없으면 빈 문자열이다.</summary>
+    private static string Turn(MixAdvice advice)
+    {
+        var parts = new List<string>();
+        if (advice.RotationA != 0) parts.Add($"{advice.NameA} {advice.RotationA * 90}°");
+        if (advice.RotationB != 0) parts.Add($"{advice.NameB} {advice.RotationB * 90}°");
+        return parts.Count > 0 ? "돌려서: " + string.Join(", ", parts) : "";
+    }
+
+    private static string Explain(MixAdvice advice)
+    {
+        var lines = new List<string>
+        {
+            $"{advice.NameA} 와(과) {advice.NameB} 을(를) 합칩니다. 재료 둘은 사라집니다.",
+        };
+
+        if (advice.RotationA != 0 || advice.RotationB != 0)
+        {
+            lines.Add("합성기에 넣기 전에 " + Turn(advice).Replace("돌려서: ", "") +
+                      " 만큼 돌려 두어야 이 결과가 나옵니다.");
+        }
+
+        lines.Add(advice.Rotatable
+            ? "결과는 돌릴 수 있습니다 (재료가 둘 다 돌아가므로)."
+            : "결과는 돌릴 수 없습니다 (재료 중 하나가 돌아가지 않으므로).");
+
+        var reach = Reach(advice.Effect);
+        if (reach.Length > 0) lines.Add($"결과가 미치는 범위: {reach}");
+
+        if (!advice.Affordable) lines.Add("소지금이 모자랍니다.");
+
+        return string.Join(Environment.NewLine, lines);
     }
 
     /// <summary>
@@ -764,6 +833,10 @@ public partial class MainWindow : Window
 public sealed record MoveView(string Label, string Detail);
 
 public sealed record ComboChipView(string CategoryId, string Text, Brush Foreground, string Tooltip);
+
+public sealed record MixView(
+    string Pair, string Turn, string Price, string Gain,
+    Brush Tone, Brush NameTone, Brush PriceTone, string Tooltip);
 
 public sealed record OfferView(
     string Name, string Reach, string Combo, string Price, string Gain,

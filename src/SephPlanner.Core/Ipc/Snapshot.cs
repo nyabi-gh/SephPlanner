@@ -19,6 +19,25 @@ namespace SephPlanner.Core.Ipc
         public List<OfferedItem> Offers { get; set; } = new List<OfferedItem>();
 
         public RunState? Run { get; set; }
+
+        /// <summary>
+        /// 이 층의 석판 합성기. 없으면 null 이다.
+        ///
+        /// 거리를 보지 않는다. 합성기는 미니맵에 표시되는 고정물이라 이 층에 있다는 사실 자체가
+        /// 이미 화면에 보이는 정보이고, 무엇을 합칠지는 합성기 앞에 서기 전에 정해 두는 편이
+        /// 쓸모 있기 때문이다. 상자 속 내용물과 달리 숨은 정보가 아니다.
+        /// </summary>
+        public MixerState? Mixer { get; set; }
+    }
+
+    /// <summary>석판 합성기의 상태. 한 사람이 층마다 한 번만 쓸 수 있다.</summary>
+    public sealed class MixerState
+    {
+        /// <summary>합성 비용(골드).</summary>
+        public int Cost { get; set; }
+
+        /// <summary>내가 이미 이 층에서 썼는지. 썼으면 더 권할 것이 없다.</summary>
+        public bool Used { get; set; }
     }
 
     public sealed class RunState
