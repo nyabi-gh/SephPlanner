@@ -330,8 +330,7 @@ namespace SephPlanner.Core.Solver
             if (result.IgnoreCriteria.TryGetValue(cell, out var ignore) && ignore > 0)
                 return CharmInactiveReason.None;
 
-            var kind = CharmCriteria.FromTypeName(charm.Definition.CriteriaType);
-            return CharmCriteria.IsSatisfied(kind, cell, grid, occupancy)
+            return CharmCriteria.IsSatisfied(charm.Criteria, cell, grid, occupancy)
                 ? CharmInactiveReason.None
                 : CharmInactiveReason.Criteria;
         }
@@ -428,6 +427,15 @@ namespace SephPlanner.Core.Solver
 
                 arrangement.EffectiveLevels[position] = Math.Max(0, Math.Min(charm.Definition.MaxLevel, level));
                 arrangement.Score += Value(problem, charm, position, result, occupancy, neighbors);
+            }
+
+            // 아티팩트가 놓인 칸은 인챈트가 더해진 위 값을, 나머지 칸은 시뮬레이션 값을 쓴다.
+            for (var index = 0; index < problem.Grid.Storage; index++)
+            {
+                var cell = problem.Grid.ToPosition(index);
+                arrangement.CellLevels[cell] = arrangement.Levels.TryGetValue(cell, out var withEnchant)
+                    ? withEnchant
+                    : result.EffectiveLevel(cell, 0);
             }
             return arrangement;
         }

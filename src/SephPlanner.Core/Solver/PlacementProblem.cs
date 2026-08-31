@@ -28,6 +28,14 @@ namespace SephPlanner.Core.Solver
         /// 조건 판정에서는 여전히 아티팩트로 세므로 <see cref="IsFiller"/>와 다르다.
         /// </summary>
         public bool IsDormant { get; set; }
+
+        private CharmCriteriaKind? _criteria;
+
+        /// <summary>
+        /// 배치 조건의 종류. 배정 비용 행렬을 채우는 최내곽 루프에서 쓰이므로, 매번 타입 이름을
+        /// 문자열로 풀지 않고 한 번만 해석해 둔다. Definition 은 생성 직후 바뀌지 않는다.
+        /// </summary>
+        public CharmCriteriaKind Criteria => _criteria ??= CharmCriteria.FromTypeName(Definition.CriteriaType);
     }
 
     public sealed class TabletSlot
@@ -122,8 +130,14 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         public int UnplacedTablets { get; set; }
 
-        /// <summary>칸별 최종 레벨.</summary>
+        /// <summary>아티팩트가 놓인 칸의 최종 레벨. 화면 표시에 쓴다.</summary>
         public Dictionary<GridPos, int> Levels { get; } = new Dictionary<GridPos, int>();
+
+        /// <summary>
+        /// 열린 칸 전체의 레벨. 게임 levelMatrix 와의 대조용이다. 아티팩트가 놓인 칸만 대조하면
+        /// 빈 칸에 걸린 효과(각인 등)의 어긋남을 놓쳐 "점수를 믿어도 되는가"의 신호가 절반이 된다.
+        /// </summary>
+        public Dictionary<GridPos, int> CellLevels { get; } = new Dictionary<GridPos, int>();
 
         /// <summary>
         /// 그 칸의 아티팩트가 실제로 받는 레벨. 아티팩트마다 상한이 달라 칸의 레벨보다 낮을 수 있다.

@@ -211,7 +211,7 @@ namespace SephPlanner.Core.Planning
         private static int CountLevelMismatches(InventoryState inventory, Arrangement current)
         {
             var mismatches = 0;
-            foreach (var pair in current.Levels)
+            foreach (var pair in current.CellLevels)
             {
                 var key = pair.Key.X + "," + pair.Key.Y;
                 if (!inventory.LevelMatrix.TryGetValue(key, out var reported)) continue;

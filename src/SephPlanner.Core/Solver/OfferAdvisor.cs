@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using SephPlanner.Core.Model;
+using SephPlanner.Core.Planning;
 using SephPlanner.Core.Tablets;
 
 namespace SephPlanner.Core.Solver
@@ -170,9 +171,7 @@ namespace SephPlanner.Core.Solver
                 if (completes) advice.ComboCompletes = true;
                 advice.ComboBonus += step * worth;
 
-                var name = combo.Names.TryGetValue("current", out var text) && text.Length > 0
-                    ? text
-                    : combo.Id;
+                var name = Naming.Of(combo.Names, combo.Id, "?");
                 parts.Add($"{name} {current + 1}/{goal}");
             }
             advice.ComboText = string.Join(" ", parts);
@@ -205,11 +204,8 @@ namespace SephPlanner.Core.Solver
                 if (charm.InstanceId == candidateId) continue;
                 if (solved.CharmPositions.ContainsKey(charm.InstanceId)) continue;
 
-                if (charm.Definition.Names.TryGetValue("current", out var name) && name.Length > 0)
-                    return name;
-                return charm.Definition.Id.Length > 0
-                    ? charm.Definition.Id
-                    : charm.IsFiller ? "아이템" : "아티팩트";
+                return Naming.Of(
+                    charm.Definition.Names, charm.Definition.Id, charm.IsFiller ? "아이템" : "아티팩트");
             }
             return "";
         }

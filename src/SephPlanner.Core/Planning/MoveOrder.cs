@@ -31,9 +31,16 @@ namespace SephPlanner.Core.Planning
 
             // 지금 차 있는 칸. 제자리에 두는 것도 자리를 막으므로 함께 센다.
             var occupied = new HashSet<GridPos>(stationary);
-            foreach (var item in pending) occupied.Add(item.From);
+            var remaining = new List<Relocation>();
+            foreach (var item in pending)
+            {
+                occupied.Add(item.From);
 
-            var remaining = new List<Relocation>(pending);
+                // 위치는 그대로고 회전만 바뀌는 것은 자리 경쟁과 무관하니 바로 내보낸다.
+                // 아래 루프에 넣으면 자기 From 에 막힌 것으로 보여 불필요한 대피 두 걸음이 된다.
+                if (item.From == item.To) moves.Add(Describe(item, item.To, parked: false));
+                else remaining.Add(item);
+            }
 
             while (remaining.Count > 0)
             {
@@ -54,7 +61,7 @@ namespace SephPlanner.Core.Planning
                 if (movedSomething) continue;
 
                 // 남은 것들이 서로의 자리를 물고 있다. 하나를 빈 칸으로 빼서 고리를 끊는다.
-                var shelter = Shelter(grid, occupied, remaining);
+                var shelter = Shelter(grid, occupied);
                 if (shelter is null) break;
 
                 var victim = remaining[0];
@@ -71,22 +78,17 @@ namespace SephPlanner.Core.Planning
         }
 
         /// <summary>
-        /// 잠시 비켜둘 칸. 다른 물건이 가야 할 자리를 쓰면 그 물건이 다시 막히므로 피한다.
+        /// 잠시 비켜둘 빈 칸. 이 지점에 왔다는 것은 남은 모든 목표 칸이 차 있다는 뜻이라,
+        /// 빈 칸은 어떤 것의 목표도 아니어서 아무 칸이나 골라도 다른 물건을 막지 않는다.
         /// </summary>
-        private static GridPos? Shelter(GridSpec grid, HashSet<GridPos> occupied, List<Relocation> remaining)
+        private static GridPos? Shelter(GridSpec grid, HashSet<GridPos> occupied)
         {
-            var wanted = new HashSet<GridPos>(remaining.Select(item => item.To));
-
-            GridPos? fallback = null;
             for (var index = 0; index < grid.Storage; index++)
             {
                 var cell = grid.ToPosition(index);
-                if (occupied.Contains(cell)) continue;
-
-                if (!wanted.Contains(cell)) return cell;
-                fallback ??= cell;
+                if (!occupied.Contains(cell)) return cell;
             }
-            return fallback;
+            return null;
         }
 
         private static Move Describe(Relocation item, GridPos destination, bool parked)

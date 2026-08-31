@@ -82,6 +82,48 @@ public class MoveOrderTests
         Assert.Contains(plan.Moves, move => move.Detail.Contains("잠시 비켜두기"));
     }
 
+    private const int SpinTablet = 101;
+
+    [Fact]
+    public void ARotationInPlaceIsOneStepNotAParkAndReturn()
+    {
+        // 자리는 그대로 두고 회전만 바꾸면 되는 석판. 자리 경쟁이 없으니 대피를 끼울 이유가 없다.
+        var catalog = new Catalog(
+            new[]
+            {
+                new TabletDefinition
+                {
+                    Id = "S", EntityId = SpinTablet, IsRotatable = true, Query = "RIGHT 2\nLEFT 1",
+                },
+            },
+            new[]
+            {
+                new CharmDefinition { Id = "A", EntityId = SmallCharm, MaxLevel = 5 },
+                new CharmDefinition { Id = "B", EntityId = BigCharm, MaxLevel = 5 },
+            });
+
+        var inventory = new InventoryState { Width = 6, Height = 7, Storage = 18 };
+        inventory.Tablets.Add(new PlacedTablet
+        {
+            DefinitionId = SpinTablet,
+            InstanceId = 1,
+            Position = new GridPos(1, 1),
+            Rotation = 0,
+            IsApplied = true,
+        });
+
+        // 위아래 이웃에 아티팩트가 이미 있어, 석판을 90도 돌리기만 하면 둘 다 레벨을 받는다.
+        inventory.Items.Add(new PlacedItem { DefinitionId = SmallCharm, InstanceId = 10, Position = new GridPos(1, 0) });
+        inventory.Items.Add(new PlacedItem { DefinitionId = BigCharm, InstanceId = 11, Position = new GridPos(1, 2) });
+
+        var plan = PlanBuilder.Build(new GameSnapshot { Inventory = inventory }, catalog);
+
+        Assert.NotNull(plan);
+        var move = Assert.Single(plan!.Moves);
+        Assert.Equal(move.From, move.To);
+        Assert.Contains("회전", move.Detail);
+    }
+
     [Fact]
     public void NothingIsLostWhenThereIsNowhereToPark()
     {
