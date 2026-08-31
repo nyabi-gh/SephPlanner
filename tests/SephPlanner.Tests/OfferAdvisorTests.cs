@@ -32,7 +32,7 @@ public class OfferAdvisorTests
     [Fact]
     public void WithEnoughGoldTheBestOfferComesFirst()
     {
-        var advice = OfferAdvisor.Rank(BaseProblem(), baseScore: 0, Candidates(), gold: 1000);
+        var advice = OfferAdvisor.Rank(BaseProblem(), Candidates(), gold: 1000);
 
         Assert.Equal("expensive", advice[0].Candidate.Name);
         Assert.All(advice, entry => Assert.True(entry.Affordable));
@@ -42,7 +42,7 @@ public class OfferAdvisorTests
     public void AnOfferYouCannotAffordDropsBelowOneYouCan()
     {
         // 지우지는 않는다. 지금 못 살 뿐이지 알아 둘 값어치는 있다.
-        var advice = OfferAdvisor.Rank(BaseProblem(), baseScore: 0, Candidates(), gold: 100);
+        var advice = OfferAdvisor.Rank(BaseProblem(), Candidates(), gold: 100);
 
         Assert.Equal("cheap", advice[0].Candidate.Name);
         Assert.True(advice[0].Affordable);
@@ -58,7 +58,7 @@ public class OfferAdvisorTests
         // 상자와 바닥에 떨어진 것은 값이 0이라 소지금이 없어도 집을 수 있다.
         var free = new List<OfferCandidate> { Tablet("free", "HORIZONTAL 2", price: 0) };
 
-        var advice = OfferAdvisor.Rank(BaseProblem(), baseScore: 0, free, gold: 0);
+        var advice = OfferAdvisor.Rank(BaseProblem(), free, gold: 0);
 
         Assert.True(advice[0].Affordable);
     }
@@ -90,7 +90,7 @@ public class OfferAdvisorTests
         var candidates = new List<OfferCandidate> { Charm("plain"), Charm("ember", "EMBER") };
         var counts = new Dictionary<string, int> { ["EMBER"] = 4 };
 
-        var advice = OfferAdvisor.Rank(BaseProblem(), baseScore: 0, candidates, gold: 0, counts, FindCombo);
+        var advice = OfferAdvisor.Rank(BaseProblem(), candidates, gold: 0, counts, FindCombo);
 
         Assert.Equal("ember", advice[0].Candidate.Name);
         Assert.True(advice[0].ComboCompletes);
@@ -104,7 +104,7 @@ public class OfferAdvisorTests
         var candidates = new List<OfferCandidate> { Charm("ember", "EMBER") };
         var counts = new Dictionary<string, int> { ["EMBER"] = 2 };
 
-        var advice = OfferAdvisor.Rank(BaseProblem(), baseScore: 0, candidates, gold: 0, counts, FindCombo);
+        var advice = OfferAdvisor.Rank(BaseProblem(), candidates, gold: 0, counts, FindCombo);
 
         Assert.False(advice[0].ComboCompletes);
         Assert.Equal("잉걸불 3/5", advice[0].ComboText);
@@ -120,7 +120,7 @@ public class OfferAdvisorTests
         var priorities = new HashSet<string> { "EMBER" };
 
         var advice = OfferAdvisor.Rank(
-            BaseProblem(), baseScore: 0, candidates, gold: 0, counts, FindCombo, priorities);
+            BaseProblem(), candidates, gold: 0, counts, FindCombo, priorities);
 
         Assert.Equal("ember", advice[0].Candidate.Name);
         Assert.True(advice[0].MatchesPriority);
@@ -134,9 +134,9 @@ public class OfferAdvisorTests
         var candidates = new List<OfferCandidate> { Charm("ember", "EMBER") };
         var counts = new Dictionary<string, int> { ["EMBER"] = 2 };
 
-        var plain = OfferAdvisor.Rank(BaseProblem(), 0, candidates, 0, counts, FindCombo);
+        var plain = OfferAdvisor.Rank(BaseProblem(), candidates, 0, counts, FindCombo);
         var pushed = OfferAdvisor.Rank(
-            BaseProblem(), 0, candidates, 0, counts, FindCombo, new HashSet<string> { "EMBER" });
+            BaseProblem(), candidates, 0, counts, FindCombo, new HashSet<string> { "EMBER" });
 
         Assert.True(pushed[0].ComboBonus > plain[0].ComboBonus);
     }
@@ -163,7 +163,7 @@ public class OfferAdvisorTests
             new() { Kind = "charm", Name = "new", Charm = new CharmDefinition { MaxLevel = 5, Rarity = Rarity.Rare } },
         };
 
-        var advice = OfferAdvisor.Rank(problem, baseScore: 0, offered, gold: 0);
+        var advice = OfferAdvisor.Rank(problem, offered, gold: 0);
 
         // 레어도가 낮은 쪽이 밀려나야 하고, 그 이름이 그대로 나와야 한다.
         Assert.Equal("낡은 반지", advice[0].Displaced);
@@ -178,10 +178,31 @@ public class OfferAdvisorTests
             new() { Kind = "charm", Name = "eternal", Charm = new CharmDefinition { MaxLevel = 5, Rarity = Rarity.Eternal } },
         };
 
-        var advice = OfferAdvisor.Rank(BaseProblem(), baseScore: 0, candidates, gold: 0);
+        var advice = OfferAdvisor.Rank(BaseProblem(), candidates, gold: 0);
 
         Assert.Equal("eternal", advice[0].Candidate.Name);
         Assert.True(advice[0].Gain > advice[1].Gain);
+    }
+
+    [Fact]
+    public void ACandidateThatChangesNothingHasZeroGain()
+    {
+        // 효과가 꺼진(무기 불일치) 후보는 빈 칸에 놓일 뿐 점수를 바꾸지 않는다. 기준과 후보를
+        // 서로 다른 탐색 강도로 풀면 이런 후보에도 강도 차이만큼 가짜 증가분이 나온다.
+        var candidates = new List<OfferCandidate>
+        {
+            new()
+            {
+                Kind = "charm",
+                Name = "dormant",
+                Charm = new CharmDefinition { MaxLevel = 5 },
+                CharmIsDormant = true,
+            },
+        };
+
+        var advice = OfferAdvisor.Rank(BaseProblem(), candidates, gold: 0);
+
+        Assert.True(Math.Abs(advice[0].Gain) < 0.001, $"증가분이 0이어야 하는데 {advice[0].Gain}");
     }
 
     [Fact]
@@ -191,7 +212,7 @@ public class OfferAdvisorTests
         var candidates = new List<OfferCandidate> { Charm("ember", "EMBER") };
         var counts = new Dictionary<string, int> { ["EMBER"] = 8 };
 
-        var advice = OfferAdvisor.Rank(BaseProblem(), baseScore: 0, candidates, gold: 0, counts, FindCombo);
+        var advice = OfferAdvisor.Rank(BaseProblem(), candidates, gold: 0, counts, FindCombo);
 
         Assert.Equal("", advice[0].ComboText);
         Assert.Equal(0, advice[0].ComboBonus);

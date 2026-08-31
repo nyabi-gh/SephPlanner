@@ -160,4 +160,35 @@ public class PlacementSolverTests
         Assert.True(arrangement.CharmPositions.ContainsKey(11));
         Assert.NotEqual(arrangement.CharmPositions[10], arrangement.CharmPositions[11]);
     }
+
+    [Fact]
+    public void ATabletWithoutRoomIsReportedNotSilentlyDropped()
+    {
+        // 열린 칸이 2개뿐인데 석판이 3개다. 하나는 놓을 수 없고, 그 사실이 점수와 함께
+        // 조용히 사라지면 존재하는 석판을 무시한 배치를 최적이라고 말하게 된다.
+        var problem = new PlacementProblem { Grid = new GridSpec(2, 1, 2) };
+        problem.Tablets.Add(Tablet(1, "RIGHT 1"));
+        problem.Tablets.Add(Tablet(2, "RIGHT 1"));
+        problem.Tablets.Add(Tablet(3, "RIGHT 1"));
+
+        var arrangement = PlacementSolver.Solve(problem);
+
+        Assert.Equal(1, arrangement.UnplacedTablets);
+        Assert.Equal(2, arrangement.Tablets.Count);
+    }
+
+    [Fact]
+    public void ACompleteLayoutIsNeverTradedForAnIncompleteOne()
+    {
+        // 모든 석판이 실제로 격자에 있는 평범한 상태. 빠진 석판이 있다고 보고되면 안 된다.
+        var problem = new PlacementProblem { Grid = OneRow };
+        problem.Tablets.Add(Tablet(1, "RIGHT 2"));
+        problem.Tablets.Add(Tablet(2, "LEFT 1"));
+        problem.Charms.Add(Charm(10));
+
+        var arrangement = PlacementSolver.Solve(problem);
+
+        Assert.Equal(0, arrangement.UnplacedTablets);
+        Assert.Equal(2, arrangement.Tablets.Count);
+    }
 }

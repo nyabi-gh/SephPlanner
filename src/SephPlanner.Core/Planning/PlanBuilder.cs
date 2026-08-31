@@ -98,7 +98,7 @@ namespace SephPlanner.Core.Planning
             {
                 var candidates = Candidates(snapshot, catalog, weapon, out skippedOffers);
                 offers = OfferAdvisor.Rank(
-                    problem, best.Score, candidates, snapshot.Run?.Gold ?? int.MaxValue,
+                    problem, candidates, snapshot.Run?.Gold ?? int.MaxValue,
                     inventory.ComboCounts, catalog.Combo, preferences.PriorityCategories);
             }
 
@@ -112,7 +112,8 @@ namespace SephPlanner.Core.Planning
                 SkippedOffers = skippedOffers,
                 Names = NamesByCell(problem, best),
                 Charms = CharmsByCell(problem, best),
-                Targets = Targets(problem, best),
+                // 석판이 빠진 배치를 게임에 적용하면 빠진 석판이 있던 자리가 임의로 뒤섞인다.
+                Targets = best.UnplacedTablets > 0 ? new List<PlanTarget>() : Targets(problem, best),
             };
         }
 

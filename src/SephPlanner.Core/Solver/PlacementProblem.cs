@@ -116,6 +116,12 @@ namespace SephPlanner.Core.Solver
 
         public double Score { get; set; }
 
+        /// <summary>
+        /// 놓을 자리가 모자라 배치에서 빠진 석판 수. 0이 아니면 점수가 실제 인벤토리를 다
+        /// 반영하지 못한 것이므로, 이 배치를 자동 배치로 적용하면 안 된다.
+        /// </summary>
+        public int UnplacedTablets { get; set; }
+
         /// <summary>칸별 최종 레벨.</summary>
         public Dictionary<GridPos, int> Levels { get; } = new Dictionary<GridPos, int>();
 

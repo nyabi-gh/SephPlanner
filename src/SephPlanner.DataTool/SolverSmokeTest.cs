@@ -53,13 +53,12 @@ public static class SolverSmokeTest
         Console.WriteLine($"  배치된 아티팩트 {arrangement.CharmPositions.Count}개, " +
                           $"효과 꺼진 아티팩트 {arrangement.InactiveCharms.Count}개");
         PrintGrid(problem, arrangement);
-        RankOffers(problem, arrangement.Score, tablets, charms);
+        RankOffers(problem, tablets, charms);
         return 0;
     }
 
     private static void RankOffers(
-        PlacementProblem problem, double baseScore,
-        List<TabletDefinition> tablets, List<CharmDefinition> charms)
+        PlacementProblem problem, List<TabletDefinition> tablets, List<CharmDefinition> charms)
     {
         var candidates = new List<OfferCandidate>();
         foreach (var tablet in tablets.Where(t => !t.IsCustom && t.Query.Length > 0).Skip(3).Take(3))
@@ -69,7 +68,7 @@ public static class SolverSmokeTest
 
         var started = System.Diagnostics.Stopwatch.StartNew();
         // 스모크 테스트에는 소지금이 없다. 값이 파이프라인을 도는지만 보므로 다 살 수 있다고 둔다.
-        var advice = OfferAdvisor.Rank(problem, baseScore, candidates, gold: int.MaxValue);
+        var advice = OfferAdvisor.Rank(problem, candidates, gold: int.MaxValue);
         started.Stop();
 
         Console.WriteLine();

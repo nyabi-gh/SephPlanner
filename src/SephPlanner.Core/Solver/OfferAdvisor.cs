@@ -67,11 +67,15 @@ namespace SephPlanner.Core.Solver
         private const double PriorityWorth = 0.5;
 
         public static List<OfferAdvice> Rank(
-            PlacementProblem problem, double baseScore, IReadOnlyList<OfferCandidate> candidates, int gold,
+            PlacementProblem problem, IReadOnlyList<OfferCandidate> candidates, int gold,
             IReadOnlyDictionary<string, int>? comboCounts = null,
             Func<string, ComboDefinition?>? combos = null,
             IReadOnlyCollection<string>? priorityCategories = null)
         {
+            // 기준과 후보를 같은 탐색 강도로 풀어야 증가분이 순수하게 후보의 몫이 된다. 기준만
+            // 촘촘한 탐색으로 풀면, 명백히 좋은 후보에도 탐색 강도 차이만큼 음수가 나온다.
+            var baseScore = PlacementSolver.Solve(problem, Faster).Score;
+
             var advice = new List<OfferAdvice>();
             var nextInstanceId = -1;
 
@@ -210,15 +214,24 @@ namespace SephPlanner.Core.Solver
             return "";
         }
 
-        private static PlacementProblem Clone(PlacementProblem problem) => new()
+        private static PlacementProblem Clone(PlacementProblem problem)
         {
-            Grid = problem.Grid,
-            Charms = new List<CharmSlot>(problem.Charms),
-            Tablets = new List<TabletSlot>(problem.Tablets),
-            FixedTablets = problem.FixedTablets,
-            FixedEffects = problem.FixedEffects,
-            ComboCounts = problem.ComboCounts,
-            Combos = problem.Combos,
-        };
+            var clone = new PlacementProblem
+            {
+                Grid = problem.Grid,
+                Charms = new List<CharmSlot>(problem.Charms),
+                Tablets = new List<TabletSlot>(problem.Tablets),
+                FixedTablets = problem.FixedTablets,
+                FixedEffects = problem.FixedEffects,
+                ComboCounts = problem.ComboCounts,
+                Combos = problem.Combos,
+            };
+
+            // 현재 위치를 빼먹으면 후보 쪽 풀이만 현 배치 후보와 안정 보너스를 잃어,
+            // 기준과 후보가 서로 다른 조건으로 풀리게 된다.
+            foreach (var pair in problem.CurrentTablets) clone.CurrentTablets[pair.Key] = pair.Value;
+            foreach (var pair in problem.CurrentCharms) clone.CurrentCharms[pair.Key] = pair.Value;
+            return clone;
+        }
     }
 }

@@ -37,13 +37,24 @@ namespace SephPlanner.Core.Solver
                                   .Select(problem.Grid.ToPosition)
                                   .ToList();
 
-            var candidates = SearchTabletLayouts(problem, cells, options)
+            var searched = SearchTabletLayouts(problem, cells, options);
+
+            // 놓을 자리가 모자라면 탐색이 석판 일부를 뺀 배치를 내놓는다. 그런 배치를 그대로
+            // 채점하면 존재하는 석판을 무시한 점수를 최적이라고 말하게 되므로, 완전한 배치가
+            // 하나라도 있으면 불완전한 것은 버린다.
+            var candidates = searched
+                .Where(layout => layout.Count == problem.Tablets.Count)
                 .Take(options.ExactCandidates)
                 .ToList();
 
             // 탐색이 현재 배치를 후보에서 떨어뜨리면, 이미 최적인 배치를 두고도 옮기라고 하게 된다.
             var asIs = CurrentLayout(problem);
             if (asIs != null) candidates.Insert(0, asIs);
+
+            // 완전한 배치가 아예 없으면(석판이 열린 칸보다 많은 극단) 놓을 수 있는 만큼이라도
+            // 평가하되, Describe 가 빠진 수를 UnplacedTablets 로 남겨 호출자가 알 수 있게 한다.
+            if (candidates.Count == 0)
+                candidates = searched.Take(options.ExactCandidates).ToList();
 
             Arrangement? best = null;
             foreach (var layout in candidates)
@@ -189,13 +200,17 @@ namespace SephPlanner.Core.Solver
 
             for (var iteration = 0; iteration < options.FixpointIterations; iteration++)
             {
-                result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid, problem.FixedEffects);
                 var next = Assign(problem, free, result, occupancy, neighbors);
                 if (SamePositions(positions, next)) break;
 
                 positions = next;
                 occupancy = OccupancyFrom(layout, positions, problem);
                 neighbors = CharmsByCell(problem, positions);
+
+                // 배정이 바뀔 때마다 그 배치 기준으로 다시 시뮬레이션한다. 반복이 소진돼 수렴하지
+                // 못하고 빠져나가도, result 는 언제나 마지막 positions 와 같은 상태를 보고 있어야
+                // 보고되는 점수가 실제 배치의 점수가 된다.
+                result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid, problem.FixedEffects);
             }
 
             return Describe(problem, layout, positions, occupancy, result);
@@ -380,6 +395,7 @@ namespace SephPlanner.Core.Solver
         {
             var arrangement = new Arrangement();
             arrangement.Tablets.AddRange(layout);
+            arrangement.UnplacedTablets = problem.Tablets.Count - layout.Count;
             arrangement.Score += Familiarity(problem, layout);
 
             // 하얀 종이 같은 이웃 의존 가치를 최종 배치 기준으로 다시 매긴다.
