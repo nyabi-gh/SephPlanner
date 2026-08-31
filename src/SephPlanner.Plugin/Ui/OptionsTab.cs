@@ -37,6 +37,23 @@ namespace SephPlanner.Plugin.Ui
     {
         private const string TabName = "플래너";
 
+        /// <summary>
+        /// 창 그림(<c>OptionUi00</c>, 489x280)의 검은 안쪽이 가운데에서 ±222.5 까지다. 스프라이트를
+        /// 열어 픽셀로 쟀다 - 바깥의 흙·풀 테두리가 그 밖을 두르고 있어서, 여기를 넘기면 우리 탭이
+        /// 창 밖 게임 화면 위에 뜬다(실제로 그렇게 보였다).
+        /// </summary>
+        private const float InteriorRatio = 222.5f / 489f;
+
+        /// <summary>
+        /// 탭 내용 그림(<c>OptionUi_Tab*</c>, 420x218) 위쪽에서 돌기가 차지하는 높이. 위 22px 띠에만
+        /// 돌기가 있고 그 아래부터 프레임이 시작한다.
+        /// </summary>
+        private const float BumpRatio = 22f / 218f;
+
+        // 돌기 그림에서 그대로 뽑은 색이다. 흰 테두리 (236,236,244), 남색 속 (48,48,70).
+        private static readonly Color Selected = new Color(48f / 255f, 48f / 255f, 70f / 255f);
+        private static readonly Color Interior = Color.black;
+
         private readonly Action<string> _log;
         private UI_OptionsPanel _panel;
         private UI_TabContent _content;
@@ -46,6 +63,10 @@ namespace SephPlanner.Plugin.Ui
         private RectTransform _rightGlyph;
         private Vector2 _rightGlyphHome;
         private Vector2 _rowSize;
+        private RectTransform _stale;
+        private RectTransform _mine;
+        private TextMeshProUGUI _label;
+        private float _labelSize;
         private bool _reported;
         private readonly List<Bound> _rows = new List<Bound>();
         private bool _wasOpen;
@@ -115,6 +136,7 @@ namespace SephPlanner.Plugin.Ui
             {
                 LayoutRow();
                 Canvas.ForceUpdateCanvases();
+                PlaceBumps();
                 Report();
             }
             _wasPanelOpen = panelOpen;
@@ -156,9 +178,12 @@ namespace SephPlanner.Plugin.Ui
             var spacing = group != null ? group.spacing : 0f;
             if (group != null) group.childAlignment = TextAnchor.MiddleLeft;
 
-            // 창 폭과 줄 폭 사이에 남는 자리가 우리 몫이다. 창은 탭 줄의 할아버지다.
+            // 창의 검은 안쪽과 줄 사이에 남는 자리가 우리 몫이다. 창 그림의 rect 가 아니라 안쪽
+            // 경계를 봐야 한다 - rect 끝까지 쓰면 바깥 테두리 그림 위로 삐져나간다.
             var window = _buttons.parent != null ? _buttons.parent.parent as RectTransform : null;
-            var room = window != null ? (window.rect.width - _buttons.rect.width) / 2f - spacing : 0f;
+            var room = window != null
+                ? window.rect.width * InteriorRatio - _buttons.rect.width / 2f - spacing
+                : 0f;
 
             var width = _sourceButton != null ? _sourceButton.rect.width : _ourButton.rect.width;
             if (room > 0f && room < width) width = room;
@@ -171,6 +196,22 @@ namespace SephPlanner.Plugin.Ui
             element.flexibleWidth = 0f;
             _ourButton.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, width);
 
+            // 이름표가 버튼과 따로 놀면 좁힌 상자 밖으로 글자가 삐져나간다. 상자에 맞춰 두고,
+            // 그래도 넘치면 글자 크기를 줄여 담는다 - 우리 탭만 게임 탭보다 좁기 때문이다.
+            // 들어가면 원래 크기 그대로이므로, 넉넉할 때 굳이 작아지지는 않는다.
+            if (_label != null)
+            {
+                var text = _label.rectTransform;
+                text.anchorMin = Vector2.zero;
+                text.anchorMax = Vector2.one;
+                text.offsetMin = Vector2.zero;
+                text.offsetMax = Vector2.zero;
+
+                _label.enableAutoSizing = true;
+                _label.fontSizeMax = _labelSize;
+                _label.fontSizeMin = _labelSize * 0.6f;
+            }
+
             // 컨트롤러 안내 글리프는 줄 오른쪽 끝에 붙어 있다. 우리 탭이 그 자리에 들어가므로
             // 그만큼 밀어 준다. 원래 자리에서 다시 재므로 창을 여러 번 열어도 밀리지 않는다.
             if (_rightGlyph != null)
@@ -178,6 +219,42 @@ namespace SephPlanner.Plugin.Ui
 
             LayoutRebuilder.MarkLayoutForRebuild(_buttons);
             _log($"탭 줄을 잡았습니다 - 우리 탭 폭 {width:0.#}, 남은 자리 {room:0.#}, 줄 {_buttons.rect.width:0.#}.");
+        }
+
+        /// <summary>
+        /// 돌기 두 개를 제자리에 놓는다. 버튼 자리가 정해진 뒤라야 하므로 줄을 잡고 나서 부른다.
+        /// 우리 내용의 자식이라 우리 탭이 열려 있을 때만 함께 보인다 - 돌기가 보여야 할 때와
+        /// 정확히 같은 순간이다.
+        /// </summary>
+        private void PlaceBumps()
+        {
+            var host = _content != null ? _content.transform as RectTransform : null;
+            if (host == null) return;
+
+            var bump = host.rect.height * BumpRatio;
+            Cover(_stale, _sourceButton, host, bump);
+            Cover(_mine, _ourButton, host, bump);
+        }
+
+        /// <summary>
+        /// <paramref name="target"/>이 있는 자리를 <paramref name="host"/> 안의 좌표로 옮겨 덮는다.
+        /// 높이는 버튼이 아니라 돌기의 높이를 쓴다 - 돌기가 버튼보다 조금 아래까지 내려와 있어,
+        /// 버튼 높이로만 덮으면 아래쪽 흰 줄이 남는다.
+        /// </summary>
+        private static void Cover(RectTransform image, RectTransform target, RectTransform host, float height)
+        {
+            if (image == null || target == null) return;
+
+            var corners = new Vector3[4];
+            target.GetWorldCorners(corners);
+            var left = (Vector2)host.InverseTransformPoint(corners[0]) - host.rect.min;
+            var right = (Vector2)host.InverseTransformPoint(corners[2]) - host.rect.min;
+
+            image.anchorMin = Vector2.zero;
+            image.anchorMax = Vector2.zero;
+            image.pivot = Vector2.zero;
+            image.sizeDelta = new Vector2(right.x - left.x, height);
+            image.anchoredPosition = new Vector2(left.x, host.rect.height - height);
         }
 
         public void Refresh()
@@ -275,6 +352,12 @@ namespace SephPlanner.Plugin.Ui
             // 통째로 가린다 - 실제로 "게임플레이" 탭이 사라져 있었다. 탭 줄 바로 앞에 끼운다.
             clone.transform.SetSiblingIndex(_buttons.GetSiblingIndex());
 
+            // 우리 내용 그림에는 원본 탭 자리의 돌기가 박혀 있다. 탭 상자는 속이 비친 테두리라
+            // 그 돌기가 그대로 비쳐, 우리 탭을 골랐는데 "게임플레이"가 선택된 것처럼 보였다.
+            // 그 자리를 창 안쪽 색으로 덮고, 우리 자리에는 같은 남색을 깔아 선택 표시를 만든다.
+            _stale = Widgets.Fill("StaleBump", clone.transform, Interior).rectTransform;
+            _mine = Widgets.Fill("SelectedBump", clone.transform, Selected).rectTransform;
+
             content.parent = panel;
 
             // 원래 가리키던 줄은 방금 지웠다. 그대로 두면 탭을 열 때 사라진 것을 고르려 든다.
@@ -341,6 +424,8 @@ namespace SephPlanner.Plugin.Ui
             text.AppendLine($"[our button] {Describe(_ourButton)}");
             text.AppendLine($"[source button] {Describe(_sourceButton)}");
             text.AppendLine($"[right glyph] {Describe(_rightGlyph)} home={_rightGlyphHome}");
+            text.AppendLine($"[stale bump] {Describe(_stale)}");
+            text.AppendLine($"[our bump] {Describe(_mine)}");
             text.AppendLine(
                 $"[window] {Describe(_buttons.parent != null ? _buttons.parent.parent as RectTransform : null)}");
 
@@ -404,7 +489,7 @@ namespace SephPlanner.Plugin.Ui
             return text != null && text.valueText != null ? text.valueText.text : null;
         }
 
-        private static UI_TabButton BuildButton(UI_Tab tab, UI_OptionsPanel panel)
+        private UI_TabButton BuildButton(UI_Tab tab, UI_OptionsPanel panel)
         {
             var index = tab.tabButtons.Length;
             var origin = tab.tabButtons[index - 1];
@@ -413,12 +498,16 @@ namespace SephPlanner.Plugin.Ui
 
             var button = clone.GetComponent<UI_TabButton>();
             Strip(clone);
-            var label = clone.GetComponentInChildren<TextMeshProUGUI>(true);
-            if (label != null) label.text = TabName;
+            _label = clone.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (_label != null)
+            {
+                _label.text = TabName;
+                _labelSize = _label.fontSize;
+            }
 
             // 게임 탭의 아이콘을 그대로 달고 있으면 남의 탭처럼 보인다. 글자가 있는 자리라야
             // 아이콘을 뗀다 - 둘 다 없으면 빈 버튼이 된다.
-            if (label != null) button.SetTabIcon(null);
+            if (_label != null) button.SetTabIcon(null);
             button.SetTabButtonSprite(false);
 
             var clickable = clone.GetComponent<Button>();
