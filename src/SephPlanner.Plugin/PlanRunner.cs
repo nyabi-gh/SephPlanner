@@ -18,16 +18,14 @@ namespace SephPlanner.Plugin
     internal sealed class PlanRunner
     {
         private readonly ICatalog _catalog;
-        private readonly PlanPreferences _preferences;
         private int _busy;
 
         private volatile Plan _latest;
         private volatile string _error;
 
-        public PlanRunner(ICatalog catalog, PlanPreferences preferences)
+        public PlanRunner(ICatalog catalog)
         {
             _catalog = catalog;
-            _preferences = preferences;
         }
 
         /// <summary>마지막으로 풀린 배치. 아직 한 번도 못 풀었으면 null 이다.</summary>
@@ -36,7 +34,11 @@ namespace SephPlanner.Plugin
         /// <summary>마지막 풀이가 실패했으면 그 이유. 성공하면 지워진다.</summary>
         public string Error => _error;
 
-        public void Submit(GameSnapshot snapshot)
+        /// <summary>
+        /// 설정은 풀 때마다 새로 받는다. 설정 탭에서 바뀐 값이 다음 풀이부터 곧바로 걸리고,
+        /// 백그라운드 스레드가 읽는 동안 메인 스레드가 같은 것을 고치는 일도 없다.
+        /// </summary>
+        public void Submit(GameSnapshot snapshot, PlanPreferences preferences)
         {
             if (snapshot == null) return;
             if (Interlocked.CompareExchange(ref _busy, 1, 0) != 0) return;
@@ -45,7 +47,7 @@ namespace SephPlanner.Plugin
             {
                 try
                 {
-                    _latest = PlanBuilder.Build(snapshot, _catalog, _preferences);
+                    _latest = PlanBuilder.Build(snapshot, _catalog, preferences);
                     _error = null;
                 }
                 catch (Exception ex)

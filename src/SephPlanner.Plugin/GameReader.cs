@@ -130,6 +130,12 @@ namespace SephPlanner.Plugin
                 if (instance == null || instance.StoneTablet != null) continue;
                 if (!seenItems.Add(instance.InstanceID)) continue;
 
+                // 포션 벨트는 같은 딕셔너리를 쓰지만 격자가 아니라 y=100 줄에 산다
+                // (x 는 0..numberOfPotionStorage-1). 석판 배치와는 아무 상관이 없는 자리이므로
+                // 아이템 목록에 섞으면 "가방에 아이템 몇 개" 같은 셈이 조용히 어긋난다.
+                // 진단이 필요할 때는 F10 덤프가 딕셔너리를 있는 그대로 보여준다.
+                if (!IsOnGrid(instance.XIdx, instance.YIdx, inv)) continue;
+
                 state.Items.Add(new PlacedItem
                 {
                     DefinitionId = instance.EntityID,
@@ -230,6 +236,13 @@ namespace SephPlanner.Plugin
             ConditionQuery = tablet.isCustomTablet ? tablet.GetConditionQuery(tablet.instanceID) : null,
             Name = DungeonManager.GetItemName(tablet.instanceID, null),
         };
+
+        /// <summary>
+        /// 본 격자 안의 자리인가. 격자 밖 좌표는 포션 벨트(y=100)이고, 보조 가방은 아예 다른
+        /// 딕셔너리(<c>subBagMatrix</c>)라 여기 오지 않는다.
+        /// </summary>
+        private static bool IsOnGrid(sbyte x, sbyte y, GridInventory inv) =>
+            x >= 0 && x < inv.Width && y >= 0 && y < inv.Height;
 
         private static int LookupMatrix(SyncDictionary<ItemPosition, int> matrix, sbyte x, sbyte y)
         {

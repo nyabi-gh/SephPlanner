@@ -235,15 +235,19 @@ namespace SephPlanner.Core.Planning
             foreach (var offer in snapshot.Offers)
             {
                 if (!seen.Add(offer.DefinitionId)) continue;
+
+                var charm = offer.Kind == "charm" ? catalog.Charm(offer.DefinitionId) : null;
+                var tablet = offer.Kind == "tablet" ? catalog.Tablet(offer.DefinitionId) : null;
+                if (charm is null && tablet is null) continue;
+
+                // 상한은 평가할 수 있는 것에만 건다. 포션처럼 애초에 평가 대상이 아닌 물건을
+                // 먼저 세면, 상점에 포션이 늘어선 것만으로 "몇 개는 평가하지 못했습니다"라고
+                // 알리게 된다. 실제로 빠진 것이 없는데 경고만 뜨는 셈이다.
                 if (candidates.Count >= MaxCandidates)
                 {
                     skipped++;
                     continue;
                 }
-
-                var charm = offer.Kind == "charm" ? catalog.Charm(offer.DefinitionId) : null;
-                var tablet = offer.Kind == "tablet" ? catalog.Tablet(offer.DefinitionId) : null;
-                if (charm is null && tablet is null) continue;
 
                 candidates.Add(new OfferCandidate
                 {
@@ -277,7 +281,10 @@ namespace SephPlanner.Core.Planning
             return mismatches;
         }
 
-        /// <summary>보조 가방처럼 본 격자 밖에 있는 자리는 배치 대상이 아니다.</summary>
+        /// <summary>
+        /// 본 격자 안이면서 열려 있는 칸인가. 격자 밖 좌표는 포션 벨트(게임이 y=100 줄에 둔다)
+        /// 같은 다른 보관함이라 배치 대상이 아니다.
+        /// </summary>
         private static bool IsOnGrid(GridPos position, GridSpec grid) =>
             position.X >= 0 && position.X < grid.Width &&
             position.Y >= 0 && position.Y < grid.Height &&

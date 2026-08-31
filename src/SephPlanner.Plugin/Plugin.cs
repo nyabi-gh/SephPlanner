@@ -20,21 +20,7 @@ namespace SephPlanner.Plugin
 
         private SnapshotPipeServer _server;
         private CommandPipeServer _commands;
-        private ConfigEntry<float> _pollInterval;
-        private ConfigEntry<KeyboardShortcut> _dumpKey;
-        private ConfigEntry<float> _offerRadius;
-        private ConfigEntry<KeyboardShortcut> _diagnosticsKey;
-        private ConfigEntry<bool> _nativePanel;
-        private ConfigEntry<PanelCorner> _nativePanelCorner;
-        private ConfigEntry<float> _nativePanelMarginX;
-        private ConfigEntry<float> _nativePanelMarginY;
-        private ConfigEntry<float> _nativePanelWidth;
-        private ConfigEntry<float> _nativePanelScale;
-        private ConfigEntry<float> _nativePanelOpacity;
-        private ConfigEntry<KeyboardShortcut> _expandKey;
-        private ConfigEntry<KeyboardShortcut> _autoPlaceKey;
-        private ConfigEntry<KeyboardShortcut> _opacityKey;
-        private ConfigEntry<KeyboardShortcut> _moveKey;
+        private PluginSettings _settings;
         private float _nextPoll;
         private string _lastJson;
         private bool _catalogChecked;
@@ -43,10 +29,16 @@ namespace SephPlanner.Plugin
         private int _verifiedTablets;
 
         private readonly NativeHud _hud = new NativeHud();
+        private OptionsTab _options;
         private PlanRunner _runner;
         private GameSnapshot _lastSnapshot;
         private string _lastPanelOrigin;
         private string _lastPanelBlocker;
+        private string _lastTabOrigin;
+        private string _lastTabBlocker;
+        private string _builtLayout;
+        private bool _tabFailed;
+        private float _appliedOpacity = -1f;
         private bool _expanded;
         private bool _hadOffers;
         private bool _moving;
@@ -55,117 +47,23 @@ namespace SephPlanner.Plugin
 
         private void Awake()
         {
-            _pollInterval = Config.Bind(
-                "General", "PollIntervalSeconds", 0.25f,
-                "인벤토리를 다시 읽는 주기(초).");
-            _dumpKey = Config.Bind(
-                "General", "DumpCatalogKey", new KeyboardShortcut(KeyCode.F9),
-                "석판/아티팩트 데이터를 다시 덤프하고 질의 파서를 검증하는 단축키.");
-            _diagnosticsKey = Config.Bind(
-                "General", "DumpInventoryKey", new KeyboardShortcut(KeyCode.F10),
-                "인벤토리 내용을 그대로 파일로 남기는 단축키. 인식 문제를 확인할 때 쓴다.");
-            _offerRadius = Config.Bind(
-                "General", "OfferRadius", 12f,
-                "선택지로 볼 상자/상점까지의 거리. 넓히면 멀리 있는 것까지 추천에 들어온다.");
-            _nativePanel = Config.Bind(
-                "NativePanel", "Enabled", true,
-                "게임 HUD 안에 점수 패널을 직접 그린다. 별도 오버레이 창과 함께 써도 된다.");
-            // 열쇠 이름이 예전과 다르다. 뜻이 바뀌었는데 이름을 그대로 두면 저장된 옛 값이
-            // 쓰여 화면이 엉뚱한 곳으로 간다.
-            _nativePanelCorner = Config.Bind(
-                "NativePanel", "Corner", PanelCorner.TopRight,
-                "화면을 붙일 모서리. 게임 HUD 와 겹치면 옮긴다.");
-            _nativePanelMarginX = Config.Bind(
-                "NativePanel", "MarginX", 1.5f,
-                "모서리에서 가로로 띄울 거리. 게임 HUD 글자 크기의 배수라 해상도가 달라도 같게 보인다.");
-            _nativePanelMarginY = Config.Bind(
-                "NativePanel", "MarginY", 1.5f,
-                "모서리에서 세로로 띄울 거리. 이동 모드로 옮기면 여기에 저장된다.");
-            _nativePanelWidth = Config.Bind(
-                "NativePanel", "WidthScale", 26f,
-                "화면의 가로 폭. 역시 게임 HUD 글자 크기의 배수다. 글씨가 잘리면 키운다.");
-            _nativePanelScale = Config.Bind(
-                "NativePanel", "Scale", 1.0f,
-                "화면 전체의 크기 배율. 1 이 게임 HUD 글자와 같은 크기다.");
-            _nativePanelOpacity = Config.Bind(
-                "NativePanel", "Opacity", 1.0f,
-                "화면의 불투명도(0~1).");
-            // 게임이 쓰지 않는 키로 고른다. 게임은 수정키를 보지 않으므로 Ctrl+Alt 를 붙여도
-            // 글자 키는 게임 조작을 함께 발동시킨다(docs/RESEARCH.md 의 "게임 단축키").
-            // F 키는 게임이 하나도 쓰지 않으며 F9/F10 이 이미 같은 이유로 쓰이고 있다.
-            _expandKey = Config.Bind(
-                "NativePanel", "ExpandKey", new KeyboardShortcut(KeyCode.F7),
-                "패널을 접고 펴는 단축키. 상자·상점을 열면 저절로 펼쳐진다.");
-            _autoPlaceKey = Config.Bind(
-                "NativePanel", "AutoPlaceKey", new KeyboardShortcut(KeyCode.F8),
-                "제안된 배치를 게임에 적용하는 단축키. 싱글플레이에서만 동작한다.");
-            _opacityKey = Config.Bind(
-                "NativePanel", "OpacityKey", new KeyboardShortcut(KeyCode.F5),
-                "불투명도를 차례로 바꾸는 단축키.");
-            _moveKey = Config.Bind(
-                "NativePanel", "MoveKey", new KeyboardShortcut(KeyCode.F6),
-                "이동 모드. 한 번 누르면 화면이 커서를 따라오고, 다시 누르면 그 자리에 고정된다.");
-
-            Retire(_expandKey, new KeyboardShortcut(KeyCode.P, KeyCode.LeftControl, KeyCode.LeftAlt));
-            Retire(_autoPlaceKey, new KeyboardShortcut(KeyCode.Return, KeyCode.LeftControl, KeyCode.LeftAlt));
-            WarnIfGameKey(_expandKey, "ExpandKey");
-            WarnIfGameKey(_autoPlaceKey, "AutoPlaceKey");
-
+            _settings = new PluginSettings(Config, Logger.LogInfo);
+            _options = new OptionsTab(Logger.LogInfo);
             _server = new SnapshotPipeServer(Logger.LogInfo);
             _commands = new CommandPipeServer(Logger.LogInfo);
             Logger.LogInfo("SephPlanner 브리지 시작");
         }
 
-        /// <summary>
-        /// 게임이 실제로 읽는 키. `sharedassets0.assets` 의 InputActionAsset 바인딩에서 뽑았다
-        /// (docs/RESEARCH.md 의 "게임 단축키"). 게임은 수정키를 보지 않으므로 Ctrl·Alt 를 붙여도
-        /// 여기 걸린 키는 게임 조작을 함께 발동시킨다. F 키는 하나도 쓰지 않는다.
-        /// </summary>
-        private static readonly System.Collections.Generic.HashSet<KeyCode> GameKeys =
-            new System.Collections.Generic.HashSet<KeyCode>
-            {
-                KeyCode.Alpha1, KeyCode.Alpha2, KeyCode.Alpha3, KeyCode.Alpha4,
-                KeyCode.Alpha5, KeyCode.Alpha6, KeyCode.Alpha7, KeyCode.Alpha8,
-                KeyCode.A, KeyCode.B, KeyCode.C, KeyCode.D, KeyCode.E, KeyCode.F, KeyCode.G,
-                KeyCode.P, KeyCode.Q, KeyCode.R, KeyCode.S, KeyCode.V, KeyCode.W, KeyCode.X, KeyCode.Z,
-                KeyCode.BackQuote, KeyCode.Slash, KeyCode.Space, KeyCode.Tab,
-                KeyCode.Return, KeyCode.KeypadEnter, KeyCode.Escape,
-                KeyCode.LeftArrow, KeyCode.RightArrow, KeyCode.UpArrow, KeyCode.DownArrow,
-                KeyCode.LeftControl, KeyCode.LeftShift,
-            };
-
-        /// <summary>
-        /// 기본값을 옮겨도 설정 파일에 남은 옛 값이 그대로 쓰인다. 그 값이 게임 키와 겹쳐서 옮긴
-        /// 것이므로 남아 있으면 옮긴 뜻이 없다. 정확히 그 값일 때만 새 기본값으로 되돌린다 -
-        /// 사용자가 손으로 정한 것은 건드리지 않는다.
-        /// </summary>
-        private void Retire(ConfigEntry<KeyboardShortcut> entry, KeyboardShortcut retired)
-        {
-            if (entry.Value.ToString() != retired.ToString()) return;
-
-            entry.Value = (KeyboardShortcut)entry.DefaultValue;
-            Logger.LogInfo($"{entry.Definition.Key} 가 게임 키와 겹쳐 {entry.Value} 로 옮겼습니다.");
-        }
-
-        private void WarnIfGameKey(ConfigEntry<KeyboardShortcut> entry, string name)
-        {
-            if (!GameKeys.Contains(entry.Value.MainKey)) return;
-
-            Logger.LogWarning(
-                $"{name} 의 {entry.Value.MainKey} 키는 게임도 쓰는 키라 게임 조작이 함께 발동합니다. " +
-                "F 키는 게임이 쓰지 않습니다.");
-        }
-
         private void Update()
         {
-            if (_dumpKey.Value.IsDown()) StartDump();
-            if (_diagnosticsKey.Value.IsDown()) DumpInventory();
-            if (_nativePanel.Value)
+            if (_settings.DumpKey.Value.IsDown()) StartDump();
+            if (_settings.InventoryDumpKey.Value.IsDown()) DumpInventory();
+            if (_settings.Panel.Value)
             {
-                if (_expandKey.Value.IsDown()) _expanded = !_expanded;
-                if (_autoPlaceKey.Value.IsDown()) AutoPlace();
-                if (_opacityKey.Value.IsDown()) CycleOpacity();
-                if (_moveKey.Value.IsDown()) ToggleMove();
+                if (_settings.ExpandKey.Value.IsDown()) _expanded = !_expanded;
+                if (_settings.AutoPlaceKey.Value.IsDown()) AutoPlace();
+                if (_settings.OpacityKey.Value.IsDown()) _settings.CycleOpacity();
+                if (_settings.MoveKey.Value.IsDown()) ToggleMove();
                 if (_moving) _hud.DragTo(Cursor());
             }
 
@@ -178,9 +76,10 @@ namespace SephPlanner.Plugin
 
             DrainCommands();
             UpdateNativePanel();
+            UpdateOptionsTab();
 
             if (Time.unscaledTime < _nextPoll) return;
-            _nextPoll = Time.unscaledTime + Mathf.Max(0.05f, _pollInterval.Value);
+            _nextPoll = Time.unscaledTime + Mathf.Max(0.05f, _settings.PollInterval.Value);
             PublishSnapshot();
         }
 
@@ -264,7 +163,7 @@ namespace SephPlanner.Plugin
         {
             try
             {
-                var path = GameReader.DumpInventory(_offerRadius.Value);
+                var path = GameReader.DumpInventory(_settings.OfferRadius.Value);
                 Logger.LogInfo(path == null ? "읽을 인벤토리가 없습니다." : "인벤토리 덤프: " + path);
             }
             catch (Exception ex)
@@ -277,7 +176,7 @@ namespace SephPlanner.Plugin
         {
             try
             {
-                var snapshot = GameReader.Read(_offerRadius.Value);
+                var snapshot = GameReader.Read(_settings.OfferRadius.Value);
                 VerifySimulation();
                 ReportSephirites(snapshot);
 
@@ -338,18 +237,26 @@ namespace SephPlanner.Plugin
         private void FeedNativePanel(GameSnapshot snapshot, bool changed)
         {
             _lastSnapshot = snapshot;
-            if (!_nativePanel.Value) return;
+            if (!_settings.Panel.Value) return;
 
             if (_runner == null)
             {
                 // 카탈로그를 짓는 일은 리소스를 통째로 훑는 것이라 무겁다. 덤프가 끝나 정의가
                 // 갖춰진 뒤에 한 번만 짓는다.
                 if (_dumping || !CatalogDump.HasCatalog()) return;
-                _runner = new PlanRunner(CatalogSource.Get(), new PlanPreferences());
+                _runner = new PlanRunner(CatalogSource.Get());
             }
 
-            if (changed || _runner.Latest == null) _runner.Submit(snapshot);
+            if (changed || _runner.Latest == null) _runner.Submit(snapshot, Preferences());
         }
+
+        /// <summary>
+        /// 지금 설정으로 푼다. 후보 추천을 끄면 가리는 것이 아니라 계산 자체를 건너뛴다 -
+        /// 배치(정렬)는 손으로도 할 수 있는 일의 대행이지만 무엇을 집을지에 대한 조언은 판단을
+        /// 빌려주는 것이라, 끄겠다고 한 사람에게는 답을 만들지도 않는 편이 정직하다.
+        /// </summary>
+        private PlanPreferences Preferences() =>
+            new PlanPreferences { Recommendations = _settings.Recommendations.Value };
 
         /// <summary>
         /// 화면을 만들고 최신 배치를 그린다. 만드는 것은 UI 가 준비된 뒤라야 되고, 씬이 바뀌면
@@ -357,16 +264,20 @@ namespace SephPlanner.Plugin
         /// </summary>
         private void UpdateNativePanel()
         {
-            if (!_nativePanel.Value)
+            if (!_settings.Panel.Value)
             {
                 _hud.SetVisible(false);
                 return;
             }
 
+            // 자리·크기는 지을 때 한 번 정해진다. 설정 탭이나 설정 파일에서 바뀌었으면 지금 것을
+            // 버리고 다시 짓는 것이, 살아 있는 화면을 부분부분 고치는 것보다 어긋날 여지가 없다.
+            if (_hud.IsAlive && _builtLayout != _settings.LayoutSignature) _hud.Destroy();
+
             if (!_hud.TryCreate(
-                    _nativePanelCorner.Value,
-                    new Vector2(_nativePanelMarginX.Value, _nativePanelMarginY.Value),
-                    _nativePanelWidth.Value, _nativePanelScale.Value))
+                    _settings.Corner.Value,
+                    new Vector2(_settings.MarginX.Value, _settings.MarginY.Value),
+                    _settings.Width.Value, _settings.Scale.Value))
             {
                 // 런이 도는데도 못 붙었으면 무엇이 없어서인지 한 번은 남긴다. 조용히 안 뜨면
                 // 게임 안에서는 확인할 길이 없다.
@@ -377,11 +288,23 @@ namespace SephPlanner.Plugin
                 }
                 return;
             }
-            if (_hud.Origin != _lastPanelOrigin)
+
+            if (_builtLayout != _settings.LayoutSignature)
             {
-                _lastPanelOrigin = _hud.Origin;
-                Logger.LogInfo("인게임 화면 생성 - " + _hud.Origin);
-                _hud.SetOpacity(_nativePanelOpacity.Value);
+                _builtLayout = _settings.LayoutSignature;
+                _appliedOpacity = -1f;
+                if (_hud.Origin != _lastPanelOrigin)
+                {
+                    _lastPanelOrigin = _hud.Origin;
+                    Logger.LogInfo("인게임 화면 생성 - " + _hud.Origin);
+                }
+            }
+
+            // 불투명도는 짓지 않고도 바뀐다(단축키·설정 탭·설정 파일). 값이 달라졌을 때만 건다.
+            if (Mathf.Abs(_appliedOpacity - _settings.Opacity.Value) > 0.001f)
+            {
+                _appliedOpacity = _settings.Opacity.Value;
+                _hud.SetOpacity(_appliedOpacity);
             }
             _hud.SetVisible(true);
 
@@ -412,6 +335,50 @@ namespace SephPlanner.Plugin
         }
 
         /// <summary>
+        /// 게임 설정 창에 우리 탭을 붙인다. 화면이 꺼져 있어도 붙인다 - 다시 켜는 자리가 거기다.
+        /// </summary>
+        private void UpdateOptionsTab()
+        {
+            if (_tabFailed) return;
+
+            // 줄 목록을 만드는 것은 붙일 때 한 번이면 된다. 이미 붙어 있는데 매 프레임 만들면
+            // 쓰지도 않을 것을 프레임마다 쌓는 셈이다.
+            if (_options.IsAttached)
+            {
+                _options.Update();
+                return;
+            }
+
+            try
+            {
+                if (!_options.TryAttach(_settings.Rows()))
+                {
+                    // 설정 창은 씬에 따라 없을 수 있으므로 경고가 아니라 기록이다.
+                    if (_options.Blocker != _lastTabBlocker)
+                    {
+                        _lastTabBlocker = _options.Blocker;
+                        Logger.LogInfo("설정 탭을 붙이지 못했습니다 - " + _options.Blocker);
+                    }
+                    return;
+                }
+
+                if (_options.Origin != _lastTabOrigin)
+                {
+                    _lastTabOrigin = _options.Origin;
+                    Logger.LogInfo("설정 탭 생성 - " + _options.Origin);
+                }
+            }
+            catch (Exception ex)
+            {
+                // 게임 설정 창의 구조가 바뀌면 여기서 터진다. 설정 탭은 곁다리이므로 게임도
+                // 나머지 기능도 함께 죽이지 않는다. 매 프레임 같은 예외를 되풀이하며 로그를
+                // 채우지 않도록 한 번 실패하면 더 시도하지 않는다.
+                _tabFailed = true;
+                Logger.LogError("설정 탭 실패: " + ex);
+            }
+        }
+
+        /// <summary>
         /// 무엇을 집을지 고르는 순간에는 격자와 후보를 다 봐야 한다. 상자나 상점이 열리면 저절로
         /// 펼치고 닫히면 되돌린다. 그 사이에 직접 접거나 편 것은 상황이 바뀔 때까지 그대로 둔다.
         /// </summary>
@@ -435,39 +402,20 @@ namespace SephPlanner.Plugin
             if (_moving)
             {
                 var cursor = Cursor();
-                return $"이동 중 - {Describe(_moveKey.Value)} 로 고정   커서 {cursor.x:0},{cursor.y:0}";
+                return $"이동 중 - {Describe(_settings.MoveKey)} 로 고정   커서 {cursor.x:0},{cursor.y:0}";
             }
 
             if (Time.unscaledTime < _autoPlaceShownUntil) return _autoPlaceResult;
 
-            var expand = Describe(_expandKey.Value) + (_expanded ? " 접기" : " 펼치기");
-            var look = Describe(_opacityKey.Value) + " 불투명도   " + Describe(_moveKey.Value) + " 이동";
+            var expand = Describe(_settings.ExpandKey) + (_expanded ? " 접기" : " 펼치기");
+            var look = Describe(_settings.OpacityKey) + " 불투명도   " + Describe(_settings.MoveKey) + " 이동";
             if (_lastSnapshot != null && _lastSnapshot.IsMultiplayer) return expand + "   " + look;
 
-            return expand + "   " + Describe(_autoPlaceKey.Value) + " 자동 배치   " + look;
+            return expand + "   " + Describe(_settings.AutoPlaceKey) + " 자동 배치   " + look;
         }
 
-        private static string Describe(KeyboardShortcut shortcut)
-        {
-            var text = "";
-            foreach (var modifier in shortcut.Modifiers) text += Short(modifier) + "+";
-            return text + Short(shortcut.MainKey);
-        }
-
-        private static string Short(KeyCode key)
-        {
-            switch (key)
-            {
-                case KeyCode.LeftControl:
-                case KeyCode.RightControl: return "Ctrl";
-                case KeyCode.LeftAlt:
-                case KeyCode.RightAlt: return "Alt";
-                case KeyCode.LeftShift:
-                case KeyCode.RightShift: return "Shift";
-                case KeyCode.Return: return "Enter";
-                default: return key.ToString();
-            }
-        }
+        private static string Describe(ConfigEntry<KeyboardShortcut> entry) =>
+            PluginSettings.Describe(entry.Value);
 
         /// <summary>
         /// 제안된 배치를 게임에 적용한다. 화면이 마우스를 받지 않으므로 버튼이 아니라 단축키다.
@@ -509,24 +457,6 @@ namespace SephPlanner.Plugin
             return mouse != null ? mouse.position.ReadValue() : (Vector2)Input.mousePosition;
         }
 
-        private static readonly float[] OpacitySteps = { 1.0f, 0.85f, 0.7f, 0.55f };
-
-        private void CycleOpacity()
-        {
-            var next = 0;
-            for (var i = 0; i < OpacitySteps.Length; i++)
-            {
-                if (Mathf.Abs(OpacitySteps[i] - _nativePanelOpacity.Value) > 0.01f) continue;
-
-                next = (i + 1) % OpacitySteps.Length;
-                break;
-            }
-
-            _nativePanelOpacity.Value = OpacitySteps[next];
-            _hud.SetOpacity(_nativePanelOpacity.Value);
-            Report($"불투명도 {_nativePanelOpacity.Value * 100:0}%");
-        }
-
         /// <summary>
         /// 화면을 커서로 옮긴다. 끌어서 옮기려면 마우스를 받아야 하는데 그러면 게임 조작을
         /// 가로채게 되므로, 잡고 놓는 것만 단축키로 하고 그 사이에는 커서 위치를 읽기만 한다.
@@ -539,14 +469,18 @@ namespace SephPlanner.Plugin
             if (_moving)
             {
                 _hud.BeginDrag(Cursor());
-                Report("이동 중 - 마우스로 옮기고 " + Describe(_moveKey.Value) + " 로 고정");
+                Report("이동 중 - 마우스로 옮기고 " + Describe(_settings.MoveKey) + " 로 고정");
                 Logger.LogInfo($"이동 모드 시작 - 커서 {Cursor()}");
                 return;
             }
 
             var margin = _hud.Margin;
-            _nativePanelMarginX.Value = margin.x;
-            _nativePanelMarginY.Value = margin.y;
+            _settings.MarginX.Value = margin.x;
+            _settings.MarginY.Value = margin.y;
+
+            // 화면은 이미 그 자리에 가 있다. 여백이 바뀌었다고 다시 짓게 두면 같은 자리에
+            // 같은 것을 짓느라 한 프레임 깜빡일 뿐이다.
+            _builtLayout = _settings.LayoutSignature;
             Report("자리를 기억했습니다.");
 
             // 커서가 움직이지 않으면 화면도 제자리에 선다. 그때 무엇이 잘못인지는 좌표를 봐야 안다.
