@@ -49,6 +49,15 @@ public partial class MainWindow : Window
     /// <summary>상자나 상점이 열리고 닫히는 순간에만 저절로 펼치고 접는다.</summary>
     private bool _hadOffers;
 
+    /// <summary>
+    /// 미리보기로 골라 둔 후보. 스냅샷이 올 때마다 계획을 다시 풀므로 객체가 아니라 열쇠로
+    /// 들고 있다가 새 계획에서 같은 후보를 다시 찾는다. 그래야 손을 대지 않았는데 미리보기가
+    /// 저절로 풀리지 않는다.
+    /// </summary>
+    private string _previewKey = "";
+
+    private PlanPreview? _preview;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -172,6 +181,8 @@ public partial class MainWindow : Window
         LegendRow.Visibility = Visibility.Collapsed;
         _lastPlanned = "";
         _plan = null;
+        _previewKey = "";
+        _preview = null;
     }
 
     /// <summary>마지막으로 아이콘 캐시를 비웠을 때의 카탈로그 버전.</summary>
@@ -209,14 +220,23 @@ public partial class MainWindow : Window
         CurrentScoreText.Foreground = improved ? Theme.TextDim : Theme.TextBright;
 
         AutoExpand(plan);
+
+        // 고른 후보가 새 계획에도 남아 있는지 먼저 확인한다. 사라졌으면 미리보기를 접는다.
+        var previewed = plan.Offers.FirstOrDefault(entry => KeyOf(entry) == _previewKey);
+        _preview = previewed?.Preview;
+        if (previewed is null) _previewKey = "";
+
         RenderGrid(snapshot, plan);
         RenderOffers(plan, snapshot.Run?.Gold ?? 0);
         RenderMixes(plan, snapshot.Mixer);
         RenderChips(snapshot);
 
-        LegendText.Text = plan.Moves.Count > 0
-            ? "노란 테두리 = 옮겨야 할 자리 · 아티팩트 우클릭 = 강화 우선"
-            : "아티팩트 우클릭 = 강화 우선 지정";
+        LegendText.Text = previewed is not null
+            ? $"미리보기 - {previewed.Candidate.Name} 을(를) 집었을 때 · 노란 테두리 = 달라지는 자리 · 다시 누르면 돌아옵니다"
+            : plan.Moves.Count > 0
+                ? "노란 테두리 = 옮겨야 할 자리 · 아티팩트 우클릭 = 강화 우선"
+                : "아티팩트 우클릭 = 강화 우선 지정";
+        LegendText.Foreground = previewed is not null ? Theme.Mint : Theme.TextDim;
         LegendRow.Visibility = Visibility.Visible;
 
         // 제안이 그대로면 목록을 다시 만들지 않는다. 스냅샷마다 깜빡이는 것을 막는다.
@@ -338,9 +358,31 @@ public partial class MainWindow : Window
                 advice.Affordable ? Theme.TextDim : Theme.Bad,
                 advice.ComboCompletes ? Theme.Good : Theme.Mint,
                 _settings.IconMode ? IconStore.Get(advice.Candidate.DefinitionId) : null,
-                Explain(advice, gold)));
+                Explain(advice, gold),
+                KeyOf(advice),
+                KeyOf(advice) == _previewKey ? Theme.RowPicked : Theme.Hit));
         }
         OfferPanel.Visibility = _offers.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// 후보를 가리키는 열쇠. 계획은 스냅샷마다 새로 풀리므로 객체로는 같은 후보를 못 알아본다.
+    /// 후보는 종류가 같으면 하나로 묶여 오지만, 합성 석판처럼 엔티티가 같고 이름이 다른 것이
+    /// 있어 이름까지 넣는다.
+    /// </summary>
+    private static string KeyOf(OfferAdvice advice) =>
+        $"{advice.Candidate.Kind}:{advice.Candidate.DefinitionId}:{advice.Candidate.Name}";
+
+    /// <summary>
+    /// 후보를 눌러 그걸 집었을 때의 격자를 본다. 다시 누르면 돌아온다. 솔버가 후보마다 이미
+    /// 배치를 풀어 두었으므로 여기서는 그 결과를 꺼내 그리기만 한다.
+    /// </summary>
+    private void OnPreviewOffer(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: OfferView view }) return;
+
+        _previewKey = _previewKey == view.Key ? "" : view.Key;
+        if (_lastSnapshot is { } snapshot) OnSnapshot(snapshot);
     }
 
     /// <summary>
@@ -478,10 +520,23 @@ public partial class MainWindow : Window
         while (_cells.Count < total) _cells.Add(new CellView());
         while (_cells.Count > total) _cells.RemoveAt(_cells.Count - 1);
 
-        var tabletCells = plan.Best.Tablets
+        // 미리보기를 고르면 그 후보를 집었을 때의 배치를 대신 그린다. 솔버가 이미 푼 결과라
+        // 다시 계산하지 않는다.
+        var tablets = _preview?.Tablets ?? plan.Best.Tablets;
+        var levels = _preview?.Levels ?? plan.Best.Levels;
+        var effectiveLevels = _preview?.EffectiveLevels ?? plan.Best.EffectiveLevels;
+        var inactiveCells = _preview?.InactiveCells ?? plan.Best.InactiveCells;
+        var names = _preview?.Names ?? plan.Names;
+        var charms = _preview?.Charms ?? plan.Charms;
+
+        var tabletCells = tablets
             .GroupBy(placement => placement.Position)
             .ToDictionary(group => group.Key, group => group.First());
-        var moved = new HashSet<GridPos>(plan.Moves.Select(m => m.To));
+
+        // 평소에는 옮겨야 할 자리를, 미리보기에서는 달라지는 자리를 같은 금색 테두리로 짚는다.
+        var moved = _preview is not null
+            ? new HashSet<GridPos>(_preview.Changed)
+            : new HashSet<GridPos>(plan.Moves.Select(m => m.To));
 
         for (var index = 0; index < _cells.Count; index++)
         {
@@ -495,12 +550,12 @@ public partial class MainWindow : Window
                 cell.SetTablet(name, tablet.Rotation, moved.Contains(position),
                     _settings.IconMode ? IconStore.Get(tablet.Definition.EntityId) : null);
             }
-            else if (plan.Best.Levels.TryGetValue(position, out var level))
+            else if (levels.TryGetValue(position, out var level))
             {
-                plan.Best.EffectiveLevels.TryGetValue(position, out var effective);
-                plan.Best.InactiveCells.TryGetValue(position, out var reason);
-                plan.Names.TryGetValue(position, out var name);
-                plan.Charms.TryGetValue(position, out var charmId);
+                effectiveLevels.TryGetValue(position, out var effective);
+                inactiveCells.TryGetValue(position, out var reason);
+                names.TryGetValue(position, out var name);
+                charms.TryGetValue(position, out var charmId);
                 cell.SetCharm(
                     name ?? "", level, effective, reason, moved.Contains(position),
                     charmId, _preferences.PinnedCharms.Contains(charmId),
@@ -841,7 +896,7 @@ public sealed record MixView(
 public sealed record OfferView(
     string Name, string Reach, string Combo, string Price, string Gain,
     Brush Tone, Brush NameTone, Brush PriceTone, Brush ComboTone,
-    ImageSource? Icon, string Tooltip)
+    ImageSource? Icon, string Tooltip, string Key, Brush RowFill)
 {
     /// <summary>살 수 있는 후보에 빈 도움말이 뜨지 않게 한다.</summary>
     public bool HasTooltip => Tooltip.Length > 0;

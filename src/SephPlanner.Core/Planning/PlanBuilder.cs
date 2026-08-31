@@ -113,6 +113,10 @@ namespace SephPlanner.Core.Planning
                     problem, candidates, snapshot.Run?.Gold ?? int.MaxValue,
                     inventory.ComboCounts, catalog.Combo, preferences.PriorityCategories,
                     preferences.PresetCharms, values);
+
+                // 후보마다 이미 배치를 다 풀어 두었다. 그 결과를 버리지 않고 화면이 쓸 모양으로
+                // 옮겨 두면, 증가분이라는 숫자 하나 대신 무엇이 어떻게 달라지는지 보여줄 수 있다.
+                FillPreviews(offers, best);
             }
 
             return new Plan
@@ -129,6 +133,45 @@ namespace SephPlanner.Core.Planning
                 // 석판이 빠진 배치를 게임에 적용하면 빠진 석판이 있던 자리가 임의로 뒤섞인다.
                 Targets = best.UnplacedTablets > 0 ? new List<PlanTarget>() : Targets(problem, best),
             };
+        }
+
+        /// <summary>
+        /// 후보를 집었을 때의 격자를 채운다. 지금 최선과 견주어 달라지는 칸도 함께 표시한다 -
+        /// 미리보기의 요점은 배치 전체가 아니라 무엇이 바뀌는가이기 때문이다.
+        /// </summary>
+        private static void FillPreviews(List<OfferAdvice> offers, Arrangement best)
+        {
+            foreach (var advice in offers)
+            {
+                if (advice.Trial is not { } trial || advice.Solved is not { } solved) continue;
+
+                var preview = new PlanPreview
+                {
+                    Score = solved.Score,
+                    Names = NamesByCell(trial, solved),
+                    Charms = CharmsByCell(trial, solved),
+                };
+                preview.Tablets.AddRange(solved.Tablets);
+                foreach (var pair in solved.Levels) preview.Levels[pair.Key] = pair.Value;
+                foreach (var pair in solved.EffectiveLevels) preview.EffectiveLevels[pair.Key] = pair.Value;
+                foreach (var pair in solved.InactiveCells) preview.InactiveCells[pair.Key] = pair.Value;
+
+                var current = NamesByCell(trial, best);
+                foreach (var pair in preview.Names)
+                {
+                    if (!current.TryGetValue(pair.Key, out var was) || was != pair.Value)
+                        preview.Changed.Add(pair.Key);
+                }
+                foreach (var placement in solved.Tablets)
+                {
+                    if (!best.Tablets.Any(t => t.Position == placement.Position && t.Rotation == placement.Rotation))
+                        preview.Changed.Add(placement.Position);
+                }
+
+                advice.Preview = preview;
+                advice.Trial = null;
+                advice.Solved = null;
+            }
         }
 
         /// <summary>자동 배치 명령에 실을 최종 배치. 걸음 순서는 살아 있는 상태를 아는 플러그인이 정한다.</summary>

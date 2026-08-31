@@ -76,11 +76,14 @@ public readonly SyncDictionary<ItemPosition, StoneTablet>        stoneTablets;
 
 ```
 결과 = entityID 2101 짜리 새 아이템 (새 instanceID)
-  질의      = GetRotatedQuery(A, 회전A) + "
-" + GetRotatedQuery(B, 회전B)
-  조건질의  = 둘이 같아야 한다 (다르면 TABLET_MIX_FAILED / DIFFERENT_CONDITION_QUERY)
+  질의      = GetRotatedQuery(A, 회전A) + 줄바꿈 + GetRotatedQuery(B, 회전B)
+  조건질의  = 양쪽이 다 있을 때만 같아야 한다 (다르면 TABLET_MIX_FAILED / DIFFERENT_CONDITION_QUERY)
+              한쪽이 비어 있으면 있는 쪽이 그대로 결과의 조건이 된다
   회전가능  = A와 B가 둘 다 회전 가능할 때만
   이름      = 플레이어가 직접 입력
+  비용      = TabletMix.mixCost (기본 200골드). UI_TabletMixPanel 이 HasMoney/SubMoney 로 받는다
+  제약      = 재료의 엔티티가 2101 이면 안 된다 - 합성 석판은 다시 합성하지 못한다
+  사용 제한 = 사람마다 층에 한 번 (TabletMix.LocalUsed, guid 로 판정)
 ```
 
 값은 셋 다 인스턴스 단위로 `DungeonManager`에 저장된다 — `customTabletQuery`,
@@ -105,6 +108,26 @@ public readonly SyncDictionary<ItemPosition, StoneTablet>        stoneTablets;
 
 `QueryVerifier`는 카탈로그 정의 68종을 도는데 2101의 질의가 비어 있어, **합성으로 생긴 인스턴스
 질의는 게임 원본과 대조된 적이 없다.** 분할 코드가 같아 위험은 낮지만 검증 공백으로 남아 있다.
+
+### 합성 추천
+
+어느 둘을 합치면 좋은지는 `TabletMixAdvisor`가 답한다. 후보 추천과 같은 방식이다 - 합친 상태로
+배치를 다시 풀어 점수 증가분을 본다. 재료 둘이 사라지고 칸이 하나 비는 것까지 증가분에 들어간다.
+
+**회전이 답의 일부다.** 합성이 재료의 회전을 결과 질의에 구워 넣으므로 "무엇과 무엇을"만으로는
+결과가 정해지지 않는다. 그래서 `TabletQuery.Rotated`가 게임의 `GetRotatedQuery`와 같은 일을 한다 -
+오프셋 토큰은 좌표를 돌린 뒤 이름을 되찾고, 격자 토큰은 이름표를 갈아 끼운다. 오프셋 토큰 28종이
+좌표와 일대일이라 회전한 좌표에 늘 대응 토큰이 있다(빠짐없이 확인했다).
+
+읽을 때 돌리는 것(`Parse`의 rotation 인자)과 결과가 같아야 한다. **a 만큼 구운 질의를 b 로 읽은
+것이 원본을 a+b 로 읽은 것과 같다**는 성질을 `TabletMixAdvisorTests`가 회전 16조합으로 고정한다.
+
+탐색 범위는 작다. 쌍이 n(n-1)/2 이고 회전 조합은 넷을 넘지 않는다 - 둘 다 돌릴 수 있으면 결과도
+돌릴 수 있어 절대 회전이 아니라 사이 각도만 결과를 가르므로, 한쪽을 고정해도 나올 모양은 다 나온다.
+
+합성기는 거리를 보지 않고 읽는다. 미니맵에 뜨는 고정물(`minimapElementName`)이라 층에 있다는
+사실 자체가 이미 보이는 정보이고, 무엇을 합칠지는 합성기 앞에 서기 전에 정해 두는 편이 쓸모
+있기 때문이다. 상자 속 내용물과 달리 숨은 정보가 아니다.
 
 ### `NewItemOwnInstance` / `ItemEntity`
 

@@ -48,6 +48,22 @@ public static class Theme
     /// <summary>스킬 패널 프레임의 민트. 후보 목록 머리글에만 쓴다.</summary>
     public static readonly Brush Mint = Frozen(0x9B, 0xD6, 0xAD);
 
+    /// <summary>
+    /// 색이 아니라 마우스를 받기 위한 배경. WPF 는 배경이 없는 영역에서는 클릭이 통과해 버려
+    /// 줄 전체를 누를 수 없다.
+    /// </summary>
+    public static readonly Brush Hit = Transparent();
+
+    /// <summary>미리보기로 골라 둔 줄. 가방 슬롯과 같은 벽돌색이라 새 색을 들이지 않는다.</summary>
+    public static readonly Brush RowPicked = SlotFill;
+
+    private static SolidColorBrush Transparent()
+    {
+        var brush = new SolidColorBrush(Colors.Transparent);
+        brush.Freeze();
+        return brush;
+    }
+
     private static SolidColorBrush Frozen(byte r, byte g, byte b)
     {
         var brush = new SolidColorBrush(Color.FromRgb(r, g, b));

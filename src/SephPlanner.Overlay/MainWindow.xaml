@@ -221,7 +221,9 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <DockPanel Margin="0,0,0,3" ToolTip="{Binding Tooltip}"
-                                                   ToolTipService.IsEnabled="{Binding HasTooltip}">
+                                                   ToolTipService.IsEnabled="{Binding HasTooltip}"
+                                                   Background="{Binding RowFill}" Cursor="Hand"
+                                                   MouseLeftButtonUp="OnPreviewOffer">
                                             <TextBlock DockPanel.Dock="Right" Text="{Binding Gain}"
                                                        Foreground="{Binding Tone}" FontSize="12"
                                                        Margin="8,0,0,0" />

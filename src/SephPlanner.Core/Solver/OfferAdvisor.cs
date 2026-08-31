@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using SephPlanner.Core.Charms;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Tablets;
@@ -51,6 +52,33 @@ namespace SephPlanner.Core.Solver
 
         /// <summary>가방이 차 있어 이 후보를 집으면 자리를 내줘야 하는 것의 이름. 없으면 빈 문자열.</summary>
         public string Displaced { get; set; } = "";
+
+        /// <summary>
+        /// 이 후보를 집었을 때의 격자. 증가분이라는 숫자 하나로는 무엇이 어떻게 달라지는지
+        /// 알 수 없어, 이미 푼 결과를 버리지 않고 들고 있다가 화면에 그대로 보여준다.
+        /// </summary>
+        public PlanPreview? Preview { get; set; }
+
+        /// <summary>미리보기를 만들 재료. 채우는 것은 <c>PlanBuilder</c> 몫이다.</summary>
+        internal PlacementProblem? Trial { get; set; }
+        internal Arrangement? Solved { get; set; }
+    }
+
+    /// <summary>후보를 집었다고 쳤을 때의 배치. 화면이 그리는 데 필요한 것만 담는다.</summary>
+    public sealed class PlanPreview
+    {
+        public List<TabletPlacement> Tablets { get; set; } = new List<TabletPlacement>();
+        public Dictionary<GridPos, string> Names { get; set; } = new Dictionary<GridPos, string>();
+        public Dictionary<GridPos, int> Charms { get; set; } = new Dictionary<GridPos, int>();
+        public Dictionary<GridPos, int> Levels { get; set; } = new Dictionary<GridPos, int>();
+        public Dictionary<GridPos, int> EffectiveLevels { get; set; } = new Dictionary<GridPos, int>();
+        public Dictionary<GridPos, CharmInactiveReason> InactiveCells { get; set; } =
+            new Dictionary<GridPos, CharmInactiveReason>();
+
+        /// <summary>지금 배치와 달라지는 칸. 무엇이 바뀌는지가 미리보기의 요점이다.</summary>
+        public HashSet<GridPos> Changed { get; set; } = new HashSet<GridPos>();
+
+        public double Score { get; set; }
     }
 
     /// <summary>
@@ -128,6 +156,8 @@ namespace SephPlanner.Core.Solver
                     Affordable = candidate.Price <= gold,
                     Effect = EffectOf(candidate, trial, solved),
                     Displaced = DisplacedBy(trial, solved, candidateId),
+                    Trial = trial,
+                    Solved = solved,
                 };
                 EvaluateCombo(entry, comboCounts, combos, priorityCategories, presetCharms);
                 advice.Add(entry);
