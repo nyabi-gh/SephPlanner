@@ -41,6 +41,13 @@ dotnet test
 dotnet run --project src/SephPlanner.DataTool -- --check <스냅샷.json>
 ```
 
+콤보 한 단계가 아티팩트 레벨 몇 개 값어치인지 잰다. `Worth`의 상수를 짐작으로 두지 않기 위한
+것이며, 게임을 한 번 켜서 카탈로그를 다시 덤프한 뒤에 돌아간다(방법은 docs/RESEARCH.md 참고).
+
+```powershell
+dotnet run --project src/SephPlanner.DataTool -- --measure
+```
+
 데이터 추출:
 
 ```powershell
