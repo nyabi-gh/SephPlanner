@@ -22,10 +22,13 @@ namespace SephPlanner.Plugin
                 GameVersion = Application.version,
             };
 
+            // 아바타가 없거나 죽어서 일찍 돌아가는 스냅샷도 멀티 여부는 정확해야 한다.
+            // 여기서 기본값 false 로 나가면 오버레이의 멀티 잠금이 열린 쪽으로 무너진다.
+            snapshot.IsMultiplayer = IsMultiplayerSession();
+
             var avatar = FindLocalPlayer();
             if (avatar == null || avatar.Inventory == null || avatar.IsDead) return snapshot;
 
-            snapshot.IsMultiplayer = IsMultiplayerSession();
             snapshot.Run = ReadRun(avatar);
             snapshot.Inventory = ReadInventory(avatar.Inventory);
             OfferReader.Fill(snapshot, avatar, offerRadius);
