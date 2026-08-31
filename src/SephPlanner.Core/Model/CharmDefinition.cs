@@ -44,6 +44,16 @@ namespace SephPlanner.Core.Model
         public List<double> NeighborLevelBonus { get; set; } = new List<double>();
 
         /// <summary>
+        /// 게임이 매겨 둔 원가(<c>ItemEntity.cost</c>). 상점 표시가는 흥정 능력치로 조정되므로
+        /// 이것과 다르다. 개발사가 아이템마다 직접 넣은 값이라, 능력치로 잴 수 없는 아티팩트의
+        /// 값어치를 가늠할 후보다.
+        /// </summary>
+        public int Cost { get; set; }
+
+        /// <summary>주머니 차원의 사파이어 해금가(<c>ItemEntity.sapphirePrice</c>). 역시 손으로 매긴 값이다.</summary>
+        public int SapphirePrice { get; set; }
+
+        /// <summary>
         /// 레벨별 값어치. 게임의 레벨별 능력치 표를 레벨 단위로 옮긴 것이며 색인이 곧 레벨이다.
         /// 능력치를 주지 않는 아티팩트에서는 비어 있고, 그때 점수는 레어도 어림값으로 물러선다.
         /// 계산은 <c>CharmStatWorth</c>가 하고 덤프가 결과만 실어 온다.

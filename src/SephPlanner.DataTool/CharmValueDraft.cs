@@ -75,6 +75,7 @@ public static class CharmValueDraft
         Console.WriteLine();
 
         Quantiles(measured);
+        PriceProxy.Report(charms);
 
         var lowConfidence = measured.Where(c => c.StatWorthConfidence < 0.5).ToList();
         if (lowConfidence.Count > 0)

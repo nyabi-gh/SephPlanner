@@ -56,6 +56,8 @@ namespace SephPlanner.Plugin
                     Id = IdFromKey(entity.aName?.key, "Item_", entity.id),
                     EntityId = entity.id,
                     Rarity = (Rarity)(int)entity.rarity,
+                    Cost = entity.cost,
+                    SapphirePrice = entity.sapphirePrice,
                     MaxLevel = charm != null ? charm.maxLevel : 5,
                     CriteriaType = charm != null && charm.criteria != null ? charm.criteria.GetType().Name : "",
                     IsMagic = charm is Charm_Magic,
