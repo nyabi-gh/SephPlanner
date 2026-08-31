@@ -103,6 +103,9 @@ namespace SephPlanner.Plugin.Ui
             Blocker = "";
             Skin = NativeSkin.Borrow(root);
             Base = Skin.BaseSize;
+
+            // 창이 밖에서 파괴됐으면 Destroy() 를 거치지 않았다. 죽은 줄 위에 덧짓지 않는다.
+            Cleared();
             Build(root);
             Origin = Skin.Origin;
             return true;

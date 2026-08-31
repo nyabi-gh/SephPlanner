@@ -146,6 +146,10 @@ namespace SephPlanner.Plugin.Ui
 
         private void Build(UIRoot root, PanelCorner corner, Vector2 margin, float widthScale)
         {
+            // 캔버스가 밖에서 파괴되면 Destroy() 를 거치지 않는다. 죽은 셀을 재사용하면 안 된다.
+            _cells.Clear();
+            _hover.Clear();
+
             // 장미빛 테두리 한 겹과 그 안의 어두운 속. 오버레이 패널의 골격을 옮긴 것이다.
             var frame = Widgets.Fill("SephPlannerHud", root.transform, NativeSkin.Frame);
             _root = frame.gameObject;

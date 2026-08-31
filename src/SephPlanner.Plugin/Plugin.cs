@@ -52,6 +52,9 @@ namespace SephPlanner.Plugin
 
         /// <summary>마지막으로 풀 때 쓴 빌드 지정. 달라졌으면 스냅샷이 그대로여도 다시 푼다.</summary>
         private int _solvedRevision = -1;
+
+        /// <summary>솔버가 바빠 받아주지 못한 변경이 남아 있다. 받아줄 때까지 다시 낸다.</summary>
+        private bool _resubmit;
         private string _autoPlaceResult = "";
         private float _autoPlaceShownUntil;
 
@@ -70,10 +73,11 @@ namespace SephPlanner.Plugin
         {
             if (_settings.DumpKey.Value.IsDown()) StartDump();
             if (_settings.InventoryDumpKey.Value.IsDown()) DumpInventory();
+            // 화면 스위치 밖이어야 한다. 화면을 끈 뒤 이 키까지 죽으면 되켤 길이 없다.
+            if (_settings.SettingsKey.Value.IsDown()) ToggleWindow(_window, _settings.SettingsKey, "설정 창");
+            if (_settings.BuildKey.Value.IsDown()) ToggleWindow(_build, _settings.BuildKey, "빌드 창");
             if (_settings.Panel.Value)
             {
-                if (_settings.SettingsKey.Value.IsDown()) ToggleWindow(_window, _settings.SettingsKey, "설정 창");
-                if (_settings.BuildKey.Value.IsDown()) ToggleWindow(_build, _settings.BuildKey, "빌드 창");
                 if (_settings.PreviewKey.Value.IsDown()) CyclePreview();
                 if (_settings.HideKey.Value.IsDown()) ToggleHidden();
                 if (_settings.ExpandKey.Value.IsDown())
@@ -290,11 +294,19 @@ namespace SephPlanner.Plugin
             // 빌드 지정이 바뀌면 스냅샷이 그대로여도 답이 달라진다. 그대로 두면 창에서 콤보를
             // 켠 것이 다음에 물건을 옮길 때까지 아무 일도 하지 않는 것처럼 보인다.
             var stale = _solvedRevision != _prefs.Revision;
-            if (!changed && !stale && _runner.Latest != null) return;
+            if (!changed && !stale && !_resubmit && _runner.Latest != null) return;
 
-            // 이미 풀고 있는 중이면 이번 것은 받아들여지지 않는다. 그때 푼 것으로 쳐 두면 그
-            // 지정은 다음에 뭔가 또 바뀔 때까지 반영되지 않는다.
-            if (_runner.Submit(snapshot, Preferences())) _solvedRevision = _prefs.Revision;
+            // 거절된 변경은 _lastJson 이 이미 갱신돼 다음 폴링에 "그대로"로 보인다.
+            // 받아들여질 때까지 최신 스냅샷으로 다시 낸다.
+            if (_runner.Submit(snapshot, Preferences()))
+            {
+                _solvedRevision = _prefs.Revision;
+                _resubmit = false;
+            }
+            else
+            {
+                _resubmit = true;
+            }
         }
 
         /// <summary>빌드 창이 목록을 채울 재료. 창은 열려 있는 동안 시간이 멈추므로 그때 한 번 읽는다.</summary>

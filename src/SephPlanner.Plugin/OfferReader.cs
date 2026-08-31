@@ -121,10 +121,13 @@ namespace SephPlanner.Plugin
                 if (sephirite == null) continue;
 
                 var distance = Vector3.Distance(origin, sephirite.transform.position);
+
+                // own: 멀티에서는 세피라이트가 플레이어마다 겹쳐 스폰되고 내 것만 열린다
+                // (SephiriteSpawner.TrySpawnForConnection). 남의 것 앞의 "후보 0개"를 가리는 값이다.
                 report.Append($"[{sephirite.type} d={distance:0.0} gen={sephirite.isGenerated} ")
                       .Append($"acq={sephirite.isAcquired} n={sephirite.Rewards.Count} ")
                       .Append($"active={sephirite.gameObject.activeInHierarchy} ")
-                      .Append($"shown={sephirite == showing}] ");
+                      .Append($"own={sephirite.isOwned} shown={sephirite == showing}] ");
 
                 if (sephirite != showing) continue;
                 if (sephirite.isAcquired || !sephirite.isGenerated) continue;
