@@ -85,7 +85,7 @@ try {
             "SephPlanner/LICENSE.txt",
             "SephPlanner/manifest.json")
         foreach ($entry in $required) {
-            if (-not ($archive.Entries | Where-Object { $_.FullName -eq $entry })) {
+            if (-not ($archive.Entries | Where-Object { $_.FullName.Replace("\", "/") -eq $entry })) {
                 throw "릴리스 파일 누락: $entry"
             }
         }
