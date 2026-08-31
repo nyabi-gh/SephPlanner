@@ -222,7 +222,7 @@ public partial class MainWindow : Window
         AutoExpand(plan);
 
         // 고른 후보가 새 계획에도 남아 있는지 먼저 확인한다. 사라졌으면 미리보기를 접는다.
-        var previewed = plan.Offers.FirstOrDefault(entry => KeyOf(entry) == _previewKey);
+        var previewed = plan.Offers.FirstOrDefault(entry => entry.Key == _previewKey);
         _preview = previewed?.Preview;
         if (previewed is null) _previewKey = "";
 
@@ -348,7 +348,7 @@ public partial class MainWindow : Window
 
             _offers.Add(new OfferView(
                 advice.Candidate.Name,
-                Reach(advice.Effect),
+                Explain.Reach(advice.Effect),
                 advice.ComboText,
                 price > 0 ? $"{price}골드" : "",
                 gain > 0.001 ? $"+{gain:0.#}" : gain < -0.001 ? $"{gain:0.#}" : "0",
@@ -358,9 +358,9 @@ public partial class MainWindow : Window
                 advice.Affordable ? Theme.TextDim : Theme.Bad,
                 advice.ComboCompletes ? Theme.Good : Theme.Mint,
                 _settings.IconMode ? IconStore.Get(advice.Candidate.DefinitionId) : null,
-                Explain(advice, gold),
-                KeyOf(advice),
-                KeyOf(advice) == _previewKey ? Theme.RowPicked : Theme.Hit));
+                Tip(advice, gold),
+                advice.Key,
+                advice.Key == _previewKey ? Theme.RowPicked : Theme.Hit));
         }
         RenderOfferNotice(plan);
         OfferPanel.Visibility = _offers.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -390,14 +390,6 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 후보를 가리키는 열쇠. 계획은 스냅샷마다 새로 풀리므로 객체로는 같은 후보를 못 알아본다.
-    /// 후보는 종류가 같으면 하나로 묶여 오지만, 합성 석판처럼 엔티티가 같고 이름이 다른 것이
-    /// 있어 이름까지 넣는다.
-    /// </summary>
-    private static string KeyOf(OfferAdvice advice) =>
-        $"{advice.Candidate.Kind}:{advice.Candidate.DefinitionId}:{advice.Candidate.Name}";
-
-    /// <summary>
     /// 후보를 눌러 그걸 집었을 때의 격자를 본다. 다시 누르면 돌아온다. 솔버가 후보마다 이미
     /// 배치를 풀어 두었으므로 여기서는 그 결과를 꺼내 그리기만 한다.
     /// </summary>
@@ -421,13 +413,13 @@ public partial class MainWindow : Window
 
             _mixes.Add(new MixView(
                 $"{advice.NameA} + {advice.NameB}",
-                Turn(advice),
+                Explain.Turn(advice),
                 mixer is { Cost: > 0 } ? $"{mixer.Cost}골드" : "",
                 gain > 0.001 ? $"+{gain:0.#}" : gain < -0.001 ? $"{gain:0.#}" : "0",
                 gain > 0.001 ? Theme.Good : gain < -0.001 ? Theme.Bad : Theme.TextDim,
                 advice.Affordable ? Theme.Text : Theme.TextDim,
                 advice.Affordable ? Theme.TextDim : Theme.Bad,
-                Explain(advice)));
+                Tip(advice)));
         }
 
         // 합성기가 있는데 권할 쌍이 하나도 없으면 그 사실을 말한다. 빈 자리는 아무 말도 안 한다.
@@ -439,103 +431,14 @@ public partial class MainWindow : Window
             : Visibility.Collapsed;
     }
 
-    /// <summary>합성 전에 재료를 돌려 놓아야 하는지. 돌릴 것이 없으면 빈 문자열이다.</summary>
-    private static string Turn(MixAdvice advice)
-    {
-        var parts = new List<string>();
-        if (advice.RotationA != 0) parts.Add($"{advice.NameA} {advice.RotationA * 90}°");
-        if (advice.RotationB != 0) parts.Add($"{advice.NameB} {advice.RotationB * 90}°");
-        return parts.Count > 0 ? "돌려서: " + string.Join(", ", parts) : "";
-    }
-
-    private static string Explain(MixAdvice advice)
-    {
-        var lines = new List<string>
-        {
-            $"{advice.NameA} 와(과) {advice.NameB} 을(를) 합칩니다. 재료 둘은 사라집니다.",
-        };
-
-        if (advice.RotationA != 0 || advice.RotationB != 0)
-        {
-            lines.Add("합성기에 넣기 전에 " + Turn(advice).Replace("돌려서: ", "") +
-                      " 만큼 돌려 두어야 이 결과가 나옵니다.");
-        }
-
-        lines.Add(advice.Rotatable
-            ? "결과는 돌릴 수 있습니다 (재료가 둘 다 돌아가므로)."
-            : "결과는 돌릴 수 없습니다 (재료 중 하나가 돌아가지 않으므로).");
-
-        var reach = Reach(advice.Effect);
-        if (reach.Length > 0) lines.Add($"결과가 미치는 범위: {reach}");
-
-        if (!advice.Affordable) lines.Add("소지금이 모자랍니다.");
-
-        return string.Join(Environment.NewLine, lines);
-    }
+    private static string Tip(MixAdvice advice) => Explain.Join(Explain.Mix(advice));
 
     /// <summary>
-    /// 석판이 실제로 미치는 범위. 증가분이 같아 보일 때 무엇이 다른지 이 줄에서 드러난다.
+    /// 툴팁 문장은 <see cref="Explain"/>이 만든다. 인게임 화면이 같은 것을 설명하므로 문장을
+    /// 한 자리에 두었다 - 갈라 두면 한쪽만 고쳐져 두 화면이 다른 말을 한다.
     /// </summary>
-    private static string Reach(TabletEffectSummary effect)
-    {
-        if (effect.IsEmpty) return "";
-
-        var text = effect.RaisedCells > 0 ? $"{effect.RaisedCells}칸 +{effect.RaisedTotal}" : "";
-        if (effect.LoweredCells > 0) text += $" −{effect.LoweredTotal}";
-        if (effect.DisabledCells > 0) text += $" 막힘{effect.DisabledCells}";
-        return text.Trim();
-    }
-
-    /// <summary>
-    /// 아티팩트가 무슨 일을 하는지, 그리고 우리가 그 값어치를 어떻게 정했는지. 잰 값일 때는
-    /// 굳이 말하지 않고, 근거가 레어도뿐일 때만 밝힌다 - 그 자리가 추천이 가장 흔들리는 곳이라
-    /// 사용자가 "왜 이게 위에 있지"라고 물을 지점이다.
-    /// </summary>
-    private static IReadOnlyList<string> Describe(CharmDefinition? definition)
-    {
-        if (definition is null) return Array.Empty<string>();
-
-        var lines = new List<string>(definition.EffectLines);
-        var worth = CharmWorth.Resolve(definition, CharmValueStore.Book.Of(definition));
-
-        var note = CharmValueStore.Book.Of(definition)?.Note ?? "";
-        if (worth.Source == CharmWorthSource.Curated && note.Length > 0) lines.Add(note);
-
-        if (worth.Source == CharmWorthSource.Rarity)
-            lines.Add("값어치는 레어도로 어림잡은 것입니다. 효과의 세기는 아직 점수에 없습니다.");
-
-        return lines;
-    }
-
-    private static string Explain(OfferAdvice advice, int gold)
-    {
-        var lines = new List<string>();
-        lines.AddRange(Describe(advice.Candidate.Charm));
-
-        if (!advice.Affordable) lines.Add($"소지금 {gold}골드로는 살 수 없습니다.");
-
-        if (advice.MatchesPreset) lines.Add("가져온 빌드가 즐겨찾기로 찍어 둔 아티팩트입니다.");
-        if (advice.MatchesPriority) lines.Add("밀고 있는 빌드의 아티팩트입니다.");
-        if (advice.Displaced.Length > 0) lines.Add($"가방이 차 있어, 집으면 빠지는 것: {advice.Displaced}");
-
-        if (advice.ComboText.Length > 0)
-        {
-            lines.Add(advice.ComboCompletes
-                ? $"콤보가 발동합니다: {advice.ComboText}"
-                : $"콤보 진행: {advice.ComboText}");
-        }
-
-        var effect = advice.Effect;
-        if (!effect.IsEmpty)
-        {
-            if (effect.RaisedCells > 0) lines.Add($"{effect.RaisedCells}칸의 레벨을 모두 합쳐 {effect.RaisedTotal} 올립니다.");
-            if (effect.LoweredCells > 0) lines.Add($"{effect.LoweredCells}칸은 합쳐 {effect.LoweredTotal} 내립니다.");
-            if (effect.DisabledCells > 0) lines.Add($"{effect.DisabledCells}칸은 쓸 수 없게 만듭니다.");
-            if (effect.MultipliedCells > 0) lines.Add($"{effect.MultipliedCells}칸에 배수가 걸립니다.");
-            if (effect.IgnoreCriteriaCells > 0) lines.Add($"{effect.IgnoreCriteriaCells}칸은 배치 조건을 무시합니다.");
-        }
-        return string.Join(Environment.NewLine, lines);
-    }
+    private static string Tip(OfferAdvice advice, int gold) =>
+        Explain.Join(Explain.Offer(advice, gold, CharmValueStore.Book));
 
     private void RenderGrid(GameSnapshot snapshot, Plan plan)
     {
@@ -584,7 +487,7 @@ public partial class MainWindow : Window
                     name ?? "", level, effective, reason, moved.Contains(position),
                     charmId, _preferences.PinnedCharms.Contains(charmId),
                     _settings.IconMode ? IconStore.Get(charmId) : null,
-                    Describe(ActiveCatalog.Charm(charmId)));
+                    ActiveCatalog.Charm(charmId));
             }
             else cell.SetEmpty();
         }
@@ -1034,7 +937,7 @@ public sealed class CellView : INotifyPropertyChanged
     public void SetCharm(
         string name, int level, int effective, CharmInactiveReason reason, bool moved,
         int charmId = 0, bool pinned = false, ImageSource? icon = null,
-        IReadOnlyList<string>? effectLines = null)
+        CharmDefinition? definition = null)
     {
         CharmId = charmId;
         Icon = icon;
@@ -1043,26 +946,20 @@ public sealed class CellView : INotifyPropertyChanged
         // 아이콘 모드에서는 이름 줄이 숨으므로 강화 표시가 레벨 줄로 내려온다.
         var star = pinned && icon is not null ? "★" : "";
 
-        // 이름 다음에 무슨 아티팩트인지가 오고, 이 자리에서만 해당하는 이야기는 그 뒤에 온다.
-        var lines = new List<string> { name };
-        if (effectLines is not null) lines.AddRange(effectLines);
+        var lines = Explain.Cell(name, level, effective, reason, definition, CharmValueStore.Book);
+        if (pinned) lines.Add(PinNote);
 
         if (reason != CharmInactiveReason.None)
         {
-            lines.Add(Explain(reason));
-            if (pinned) lines.Add(PinNote);
-
-            Fill(title, star + "꺼짐", string.Join(Environment.NewLine, lines), Theme.Bad, Theme.SlotFill);
+            Fill(title, star + "꺼짐", Explain.Join(lines), Theme.Bad, Theme.SlotFill);
             SetEdge(moved);
             return;
         }
 
         var wasted = level > effective;
         var label = effective > 0 ? $"+{effective}" : level < 0 ? level.ToString() : "0";
-        if (wasted) lines.Add($"칸 레벨 {level}, 이 아티팩트는 {effective}까지만 반영됩니다");
-        if (pinned) lines.Add(PinNote);
 
-        Fill(title, star + label, string.Join(Environment.NewLine, lines),
+        Fill(title, star + label, Explain.Join(lines),
             level < 0 ? Theme.Bad : wasted ? Theme.Orange : effective > 0 ? Theme.Good : Theme.TextDim,
             Theme.SlotFill);
         SetEdge(moved);
@@ -1079,15 +976,6 @@ public sealed class CellView : INotifyPropertyChanged
         Foreground = foreground;
         Background = background;
     }
-
-    private static string Explain(CharmInactiveReason reason) => reason switch
-    {
-        CharmInactiveReason.Weapon => "연동된 무기를 들고 있지 않아 꺼져 있습니다. 옮겨도 켜지지 않습니다.",
-        CharmInactiveReason.Disabled => "석판이 이 칸을 사용 불가로 만들었습니다.",
-        CharmInactiveReason.NegativeLevel => "레벨이 0 미만이라 꺼져 있습니다.",
-        CharmInactiveReason.Criteria => "이 아티팩트의 배치 조건을 만족하지 못했습니다.",
-        _ => "",
-    };
 
     private void SetEdge(bool moved, Brush? quiet = null)
     {

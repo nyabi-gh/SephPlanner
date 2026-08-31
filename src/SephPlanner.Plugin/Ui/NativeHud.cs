@@ -21,6 +21,29 @@ namespace SephPlanner.Plugin.Ui
     }
 
     /// <summary>
+    /// 한 번 그리는 데 필요한 것 전부. 인자가 늘어날 때마다 서명을 고치는 대신 여기에 담는다.
+    /// </summary>
+    internal sealed class HudFrame
+    {
+        public GameSnapshot Snapshot;
+        public Plan Plan;
+        public ICatalog Catalog;
+        public PluginPreferences Prefs;
+        public CharmValueBook Values = CharmValueBook.Empty;
+        public bool Expanded;
+        public bool Recommendations = true;
+        public string Hint = "";
+
+        /// <summary>안내 줄이 지금 미리보기를 설명하고 있는가. 그때는 색이 달라야 눈에 든다.</summary>
+        public bool HintIsPreview;
+
+        /// <summary>보고 있는 후보의 <see cref="OfferAdvice.Key"/>. 빈 문자열이면 미리보기가 없다.</summary>
+        public string PreviewKey = "";
+
+        public int Gold => Snapshot?.Run?.Gold ?? 0;
+    }
+
+    /// <summary>
     /// 게임 HUD 캔버스 안에 직접 그리는 화면. 오버레이 창이 하던 표시를 게임 안으로 옮긴 것이다.
     ///
     /// 게임 UI 의 일부라서 전용 전체화면에서도 보이고, 게임 UI 배율을 따르며, 게임이 UI 를 감출 때
@@ -33,12 +56,25 @@ namespace SephPlanner.Plugin.Ui
     /// <b>입력은 가져가지 않는다.</b> <c>UIBase</c>를 상속하지 않아 컨트롤 스택에 들어가지 않으므로
     /// ESC 와 키보드를 뺏지 않고, <see cref="Widgets"/>가 그리는 것마다 <c>raycastTarget</c>을 꺼서
     /// 마우스도 통과시킨다. 그래서 이 화면에는 누르는 것이 없고, 조작은 전부 단축키로 받는다.
+    ///
+    /// 다만 <b>커서 위치는 읽는다</b> - 화면을 옮길 때와 쪽지(<see cref="Tooltip"/>)를 띄울 때다.
+    /// 읽기만 하는 것이라 게임에서 가져가는 입력은 여전히 없다.
     /// </summary>
     internal sealed class NativeHud
     {
         private const int MoveRows = 6;
-        private const int OfferRows = 6;
+        /// <summary>후보 목록에 보이는 줄 수. 미리보기 순환도 여기까지만 돈다 - 화면에 없는
+        /// 후보로 넘어가면 무엇을 보고 있는지 알 수 없다.</summary>
+        public const int OfferRows = 6;
         private const int MixRows = 3;
+
+        /// <summary>커서가 올라오면 설명할 것 하나. 그리는 자리마다 여기에 등록한다.</summary>
+        private struct HoverTarget
+        {
+            public RectTransform Rect;
+            public string Title;
+            public string Body;
+        }
 
         private NativeSkin _skin;
         private GameObject _root;
@@ -56,6 +92,8 @@ namespace SephPlanner.Plugin.Ui
         private float _base;
 
         private TextMeshProUGUI _hint;
+        private LayoutElement _hintSize;
+        private LayoutElement _chipSize;
         private TextMeshProUGUI _score;
         private TextMeshProUGUI _gain;
         private TextMeshProUGUI _notice;
@@ -71,6 +109,10 @@ namespace SephPlanner.Plugin.Ui
         private Section _mixes;
         private TextMeshProUGUI _offerNotice;
         private TextMeshProUGUI _chips;
+
+        private readonly Tooltip _tooltip = new Tooltip();
+        private readonly List<HoverTarget> _hover = new List<HoverTarget>();
+        private bool _hoverable;
 
         public string Origin { get; private set; } = "";
         public string Blocker { get; private set; } = "";
@@ -152,7 +194,11 @@ namespace SephPlanner.Plugin.Ui
             _moves = new Section(_detail, _skin, _base, "옮길 것", NativeSkin.TextDim, MoveRows, detail);
             BuildOffers(_detail, detail);
             _mixes = new Section(_detail, _skin, _base, "석판 합성기", NativeSkin.Mint, MixRows, detail);
-            _chips = Line(_detail, S(0.8f), NativeSkin.TextDim);
+            _chips = Widgets.Paragraph("Chips", _detail, _skin, S(0.8f), NativeSkin.TextDim);
+            _chips.richText = true;
+            _chipSize = Widgets.Fixed(_chips.rectTransform, S(1.1f));
+
+            _tooltip.Create(root, _skin, _base);
         }
 
         private static void Place(RectTransform rect, PanelCorner corner, Vector2 margin)
@@ -216,8 +262,10 @@ namespace SephPlanner.Plugin.Ui
             _gain = Widgets.Label("Gain", row, _skin, S(0.9f), NativeSkin.Good, TextAlignmentOptions.MidlineRight);
             Widgets.Fixed(_gain.rectTransform, S(1.5f), S(4f));
 
-            _hint = Widgets.Label("Hint", parent, _skin, S(0.75f), NativeSkin.TextDim);
-            Widgets.Fixed(_hint.rectTransform, S(1f));
+            // 안내 줄은 접혔다 펴지며 길이가 크게 달라진다. 한 줄로 잘라 내면 뒤쪽 단축키가
+            // 통째로 사라져, 누를 것이 없는 화면에서 조작을 알 길이 없어진다.
+            _hint = Widgets.Paragraph("Hint", parent, _skin, S(0.75f), NativeSkin.TextDim);
+            _hintSize = Widgets.Fixed(_hint.rectTransform, S(1f));
         }
 
         private void BuildGrid(RectTransform parent)
@@ -276,14 +324,27 @@ namespace SephPlanner.Plugin.Ui
             Widgets.SetActive(_notice, false);
             Widgets.SetActive(_detail, false);
             SetCompact(true);
+
+            _hover.Clear();
+            _hoverable = false;
+            _tooltip.Hide();
         }
 
-        public void Render(GameSnapshot snapshot, Plan plan, bool expanded, string hint)
+        public void Render(HudFrame frame)
         {
             if (!IsAlive) return;
 
-            _hint.text = hint;
-            Widgets.SetActive(_hint, hint.Length > 0);
+            var snapshot = frame.Snapshot;
+            var plan = frame.Plan;
+            var expanded = frame.Expanded;
+
+            _hint.text = frame.Hint;
+            _hint.color = frame.HintIsPreview ? NativeSkin.Mint : NativeSkin.TextDim;
+            Widgets.FitHeight(_hint, _hintSize, _inner);
+            Widgets.SetActive(_hint, frame.Hint.Length > 0);
+
+            _hover.Clear();
+            _hoverable = expanded;
 
             var improved = plan.Gain > 0.001;
             _score.text = $"{plan.Current.Score:0.#} / {plan.Best.Score:0.#}";
@@ -301,13 +362,73 @@ namespace SephPlanner.Plugin.Ui
 
             Widgets.SetActive(_detail, expanded);
             SetCompact(!expanded);
-            if (!expanded) return;
+            if (!expanded)
+            {
+                _tooltip.Hide();
+                return;
+            }
 
-            RenderGrid(snapshot, plan);
+            // 고른 후보가 새 계획에도 남아 있는지 먼저 본다. 사라졌으면 미리보기를 접는다.
+            var previewed = Previewed(plan, frame.PreviewKey);
+
+            RenderGrid(snapshot, plan, previewed?.Preview, frame);
             RenderMoves(plan);
-            RenderOffers(plan);
+            RenderOffers(plan, frame, previewed);
             RenderMixes(plan, snapshot.Mixer);
-            RenderChips(snapshot);
+            RenderChips(snapshot, frame);
+        }
+
+        private static OfferAdvice Previewed(Plan plan, string key)
+        {
+            if (string.IsNullOrEmpty(key)) return null;
+
+            foreach (var advice in plan.Offers)
+            {
+                if (advice.Key == key && advice.Preview != null) return advice;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// 커서가 무엇 위에 있는지 보고 쪽지를 띄운다. 펼쳐져 있을 때만 센다 - 접힌 화면은 곁눈질용
+        /// 한 줄이고, 그때 쪽지가 뜨면 플레이를 가린다.
+        /// </summary>
+        public void UpdateHover(Vector2 cursor, bool enabled)
+        {
+            if (!IsAlive || !_tooltip.IsAlive) return;
+            if (!enabled || !_hoverable || !_root.activeSelf || _group.alpha <= 0.01f)
+            {
+                _tooltip.Hide();
+                return;
+            }
+
+            var camera = _canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : _canvas.worldCamera;
+            foreach (var target in _hover)
+            {
+                if (target.Rect == null || !target.Rect.gameObject.activeInHierarchy) continue;
+                if (!RectTransformUtility.RectangleContainsScreenPoint(target.Rect, cursor, camera)) continue;
+
+                _tooltip.Show(target.Title, target.Body, cursor);
+                return;
+            }
+            _tooltip.Hide();
+        }
+
+        private void Hover(RectTransform rect, string title, IReadOnlyList<string> lines)
+        {
+            if (rect == null) return;
+
+            var body = Explain.Join(lines);
+
+            // 할 말이 없으면 달지 않는다. 빈 쪽지가 뜨면 커서를 옮길 때마다 빈 상자가 깜빡인다.
+            if (title.Length == 0 && body.Length == 0) return;
+
+            _hover.Add(new HoverTarget
+            {
+                Rect = rect,
+                Title = title,
+                Body = body,
+            });
         }
 
         /// <summary>
@@ -328,7 +449,11 @@ namespace SephPlanner.Plugin.Ui
             return snapshot.IsMultiplayer ? "멀티플레이 세션 - 제안만 표시합니다." : "";
         }
 
-        private void RenderGrid(GameSnapshot snapshot, Plan plan)
+        /// <summary>
+        /// 격자를 그린다. 미리보기를 고르면 그 후보를 집었을 때의 배치를 대신 그린다 - 솔버가
+        /// 후보마다 이미 푼 결과라 여기서 다시 계산하지 않는다.
+        /// </summary>
+        private void RenderGrid(GameSnapshot snapshot, Plan plan, PlanPreview preview, HudFrame frame)
         {
             var inventory = snapshot.Inventory;
             var total = inventory.Width * inventory.Height;
@@ -338,11 +463,20 @@ namespace SephPlanner.Plugin.Ui
             while (_cells.Count < total) _cells.Add(new Cell(_grid, _skin, _base));
             for (var i = total; i < _cells.Count; i++) _cells[i].Hide();
 
-            var tabletCells = new Dictionary<GridPos, TabletPlacement>();
-            foreach (var placement in plan.Best.Tablets) tabletCells[placement.Position] = placement;
+            var tablets = preview != null ? preview.Tablets : plan.Best.Tablets;
+            var levels = preview != null ? preview.Levels : plan.Best.Levels;
+            var effectiveLevels = preview != null ? preview.EffectiveLevels : plan.Best.EffectiveLevels;
+            var inactiveCells = preview != null ? preview.InactiveCells : plan.Best.InactiveCells;
+            var names = preview != null ? preview.Names : plan.Names;
+            var charms = preview != null ? preview.Charms : plan.Charms;
 
-            var moved = new HashSet<GridPos>();
-            foreach (var move in plan.Moves) moved.Add(move.To);
+            var tabletCells = new Dictionary<GridPos, TabletPlacement>();
+            foreach (var placement in tablets) tabletCells[placement.Position] = placement;
+
+            // 평소에는 옮겨야 할 자리를, 미리보기에서는 달라지는 자리를 같은 금색 테두리로 짚는다.
+            var marked = new HashSet<GridPos>();
+            if (preview != null) marked.UnionWith(preview.Changed);
+            else foreach (var move in plan.Moves) marked.Add(move.To);
 
             for (var index = 0; index < total; index++)
             {
@@ -356,24 +490,44 @@ namespace SephPlanner.Plugin.Ui
                 }
                 else if (tabletCells.TryGetValue(position, out var tablet))
                 {
+                    var name = Naming.OfTablet(tablet);
                     cell.SetTablet(
-                        Naming.OfTablet(tablet), tablet.Rotation, moved.Contains(position),
+                        name, tablet.Rotation, marked.Contains(position),
                         IconOf(tablet.Definition.EntityId));
+                    Hover(cell.Rect, name, new[] { "회전 " + tablet.Rotation * 90 + "°" });
                 }
-                else if (plan.Best.Levels.TryGetValue(position, out var level))
+                else if (levels.TryGetValue(position, out var level))
                 {
-                    plan.Best.EffectiveLevels.TryGetValue(position, out var effective);
-                    plan.Best.InactiveCells.TryGetValue(position, out var reason);
-                    plan.Names.TryGetValue(position, out var name);
-                    plan.Charms.TryGetValue(position, out var charmId);
+                    effectiveLevels.TryGetValue(position, out var effective);
+                    inactiveCells.TryGetValue(position, out var reason);
+                    names.TryGetValue(position, out var name);
+                    charms.TryGetValue(position, out var charmId);
+
+                    var pinned = frame.Prefs != null && frame.Prefs.IsPinned(charmId);
                     cell.SetCharm(
-                        name ?? "", level, effective, reason, moved.Contains(position), IconOf(charmId));
+                        name ?? "", level, effective, reason, marked.Contains(position),
+                        IconOf(charmId), pinned);
+                    HoverCell(cell, name ?? "", level, effective, reason, charmId, pinned, frame);
                 }
                 else
                 {
                     cell.SetEmpty();
                 }
             }
+        }
+
+        private void HoverCell(
+            Cell cell, string name, int level, int effective, CharmInactiveReason reason,
+            int charmId, bool pinned, HudFrame frame)
+        {
+            var definition = frame.Catalog != null ? frame.Catalog.Charm(charmId) : null;
+            var lines = Explain.Cell(name, level, effective, reason, definition, frame.Values);
+
+            // 첫 줄은 쪽지의 제목으로 올라간다.
+            lines.RemoveAt(0);
+            if (pinned) lines.Add("강화 우선으로 지정돼 있습니다. 가치를 2배로 칩니다.");
+
+            Hover(cell.Rect, name, lines);
         }
 
         /// <summary>
@@ -403,7 +557,7 @@ namespace SephPlanner.Plugin.Ui
             _moves.End();
         }
 
-        private void RenderOffers(Plan plan)
+        private void RenderOffers(Plan plan, HudFrame frame, OfferAdvice previewed)
         {
             _offers.Begin();
 
@@ -412,10 +566,18 @@ namespace SephPlanner.Plugin.Ui
             {
                 var advice = plan.Offers[i];
                 var charm = advice.Candidate.Charm;
-                if (charm != null &&
-                    CharmWorth.Resolve(charm).Source == CharmWorthSource.Rarity) guessed++;
 
-                _offers.Add(advice.Candidate.Name, Detail(advice), NameTone(advice));
+                // 손으로 채운 가치를 함께 넘긴다. 빠뜨리면 채워 넣은 아티팩트까지 "레어도로
+                // 어림잡았다"고 세어, 화면이 실제보다 못 미더운 말을 하게 된다.
+                if (charm != null &&
+                    CharmWorth.Resolve(charm, frame.Values.Of(charm)).Source == CharmWorthSource.Rarity)
+                    guessed++;
+
+                var picked = previewed != null && previewed.Key == advice.Key;
+                var row = _offers.Add(
+                    (picked ? "> " : "") + advice.Candidate.Name, Detail(advice),
+                    picked ? NativeSkin.GoldEdge : NameTone(advice));
+                Hover(row, advice.Candidate.Name, Explain.Offer(advice, frame.Gold, frame.Values));
             }
             _offers.End();
 
@@ -477,11 +639,13 @@ namespace SephPlanner.Plugin.Ui
             for (var i = 0; i < plan.Mixes.Count && i < MixRows; i++)
             {
                 var advice = plan.Mixes[i];
-                _mixes.Add(
-                    advice.NameA + " + " + advice.NameB,
+                var name = advice.NameA + " + " + advice.NameB;
+                var row = _mixes.Add(
+                    name,
                     Turn(advice) + Tint($"+{advice.Gain:0.#}",
                         advice.Gain > 0.001 ? NativeSkin.Good : NativeSkin.TextDim),
                     advice.Affordable ? NativeSkin.Text : NativeSkin.TextDim);
+                Hover(row, name, Explain.Mix(advice));
             }
             _mixes.End();
 
@@ -499,7 +663,13 @@ namespace SephPlanner.Plugin.Ui
             return Tint($"회전 {advice.RotationA}/{advice.RotationB}", NativeSkin.Amber) + "  ";
         }
 
-        private void RenderChips(GameSnapshot snapshot)
+        /// <summary>
+        /// 지금 걸려 있는 콤보. 밀고 있는 빌드로 지정한 것은 앞에 점을 찍는다 - 지정은 빌드
+        /// 창에서 하고, 여기는 그것이 실제로 걸려 있는지를 보여주는 자리다.
+        ///
+        /// 이름은 카탈로그에서 가져온다. 내부 식별자를 그대로 띄우면 무엇인지 알 수 없다.
+        /// </summary>
+        private void RenderChips(GameSnapshot snapshot, HudFrame frame)
         {
             var counts = snapshot.Inventory?.ComboCounts;
             if (counts == null || counts.Count == 0)
@@ -508,15 +678,34 @@ namespace SephPlanner.Plugin.Ui
                 return;
             }
 
-            var text = new StringBuilder();
+            // 사전의 순서는 물건을 옮기면 바뀐다. 줄이 매번 뒤섞이지 않도록 여기서 고정한다.
+            var ids = new List<string>();
             foreach (var pair in counts)
             {
-                if (pair.Value <= 0) continue;
-                if (text.Length > 0) text.Append(" · ");
-                text.Append(pair.Key).Append(' ').Append(pair.Value);
+                if (pair.Value > 0) ids.Add(pair.Key);
+            }
+            ids.Sort((a, b) =>
+            {
+                var byCount = counts[b].CompareTo(counts[a]);
+                return byCount != 0 ? byCount : string.CompareOrdinal(a, b);
+            });
+
+            var marks = frame.Recommendations && frame.Prefs != null;
+            var text = new StringBuilder();
+            foreach (var id in ids)
+            {
+                var combo = frame.Catalog != null ? frame.Catalog.Combo(id) : null;
+                var name = combo != null ? Naming.Of(combo.Names, combo.Id, id) : id;
+                var priority = marks && frame.Prefs.IsPriority(id);
+
+                if (text.Length > 0) text.Append("  ");
+                text.Append(Tint(
+                    (priority ? "● " : "") + name + " " + counts[id],
+                    priority ? NativeSkin.Mint : NativeSkin.TextDim));
             }
 
             _chips.text = text.ToString();
+            Widgets.FitHeight(_chips, _chipSize, _inner);
             Widgets.SetActive(_chips, text.Length > 0);
         }
 
@@ -539,15 +728,22 @@ namespace SephPlanner.Plugin.Ui
 
         public void SetVisible(bool visible)
         {
-            if (IsAlive && _root.activeSelf != visible) _root.SetActive(visible);
+            if (!IsAlive) return;
+            if (_root.activeSelf != visible) _root.SetActive(visible);
+
+            // 쪽지는 HUD 밖(캔버스 바로 밑)에 달려 있어서 함께 꺼지지 않는다. 숨긴 화면 옆에
+            // 쪽지만 남으면 어디서 나온 것인지 알 수 없다.
+            if (!visible) _tooltip.Hide();
         }
 
         public void Destroy()
         {
+            _tooltip.Destroy();
             if (_root != null) Object.Destroy(_root);
 
             _root = null;
             _cells.Clear();
+            _hover.Clear();
         }
 
         internal static string Tint(string text, Color color) =>
@@ -595,15 +791,17 @@ namespace SephPlanner.Plugin.Ui
 
             public void Begin() => _used = 0;
 
-            public void Add(string label, string detail, Color tone)
+            /// <summary>채운 줄을 돌려준다. 커서가 그 줄 위에 있는지 세려면 사각형이 필요하다.</summary>
+            public RectTransform Add(string label, string detail, Color tone)
             {
-                if (_used >= _rows.Count) return;
+                if (_used >= _rows.Count) return null;
 
                 var row = _rows[_used++];
                 row.Label.text = label;
                 row.Label.color = tone;
                 row.Detail.text = detail;
                 Widgets.SetActive(row.Label.transform.parent, true);
+                return (RectTransform)row.Label.transform.parent;
             }
 
             public void End()
@@ -659,6 +857,9 @@ namespace SephPlanner.Plugin.Ui
                 rect.offsetMax = new Vector2(-margin, -margin);
             }
 
+            /// <summary>커서가 이 칸 위에 있는지 세는 데 쓴다.</summary>
+            public RectTransform Rect => _border.rectTransform;
+
             public void Show() => Widgets.SetActive(_border, true);
             public void Hide() => Widgets.SetActive(_border, false);
 
@@ -685,21 +886,25 @@ namespace SephPlanner.Plugin.Ui
             }
 
             public void SetCharm(
-                string name, int level, int effective, CharmInactiveReason reason, bool moved, Sprite icon)
+                string name, int level, int effective, CharmInactiveReason reason, bool moved,
+                Sprite icon, bool pinned)
             {
                 Paint(moved ? NativeSkin.GoldEdge : NativeSkin.SlotEdge, NativeSkin.SlotFill, moved);
                 SetIcon(icon);
-                _name.text = icon == null ? name : "";
+                _name.text = icon == null ? (pinned ? "★ " + name : name) : "";
                 _name.color = NativeSkin.Text;
+
+                // 아이콘이 있으면 이름 줄이 비므로 강화 표시가 레벨 줄로 내려온다.
+                var star = pinned && icon != null ? "★" : "";
 
                 if (reason != CharmInactiveReason.None)
                 {
-                    _level.text = "꺼짐";
+                    _level.text = star + "꺼짐";
                     _level.color = NativeSkin.Bad;
                     return;
                 }
 
-                _level.text = effective > 0 ? "+" + effective : effective.ToString();
+                _level.text = star + (effective > 0 ? "+" + effective : effective.ToString());
 
                 // 상한을 넘겨 흘리는 레벨은 값어치가 없다. 색으로만 알린다.
                 _level.color = level > effective ? NativeSkin.Orange : NativeSkin.TextBright;

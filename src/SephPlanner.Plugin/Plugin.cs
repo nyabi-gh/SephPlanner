@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using BepInEx;
 using BepInEx.Configuration;
 using Newtonsoft.Json;
@@ -29,7 +30,9 @@ namespace SephPlanner.Plugin
         private int _verifiedTablets;
 
         private readonly NativeHud _hud = new NativeHud();
-        private readonly SettingsWindow _window = new SettingsWindow();
+        private SettingsWindow _window;
+        private BuildWindow _build;
+        private PluginPreferences _prefs;
         private PlanRunner _runner;
         private GameSnapshot _lastSnapshot;
         private string _lastPanelOrigin;
@@ -42,12 +45,21 @@ namespace SephPlanner.Plugin
         private bool _hidden;
         private bool _hadOffers;
         private bool _moving;
+
+        /// <summary>지금 미리보고 있는 후보. 빈 문자열이면 미리보기가 꺼져 있다.</summary>
+        private string _previewKey = "";
+
+        /// <summary>마지막으로 풀 때 쓴 빌드 지정. 달라졌으면 스냅샷이 그대로여도 다시 푼다.</summary>
+        private int _solvedRevision = -1;
         private string _autoPlaceResult = "";
         private float _autoPlaceShownUntil;
 
         private void Awake()
         {
             _settings = new PluginSettings(Config, Logger.LogInfo);
+            _prefs = PluginPreferences.Load(Logger.LogWarning);
+            _window = new SettingsWindow(_settings.Rows);
+            _build = new BuildWindow(_prefs, CurrentBuild);
             _server = new SnapshotPipeServer(Logger.LogInfo);
             _commands = new CommandPipeServer(Logger.LogInfo);
             Logger.LogInfo("SephPlanner 브리지 시작");
@@ -59,7 +71,9 @@ namespace SephPlanner.Plugin
             if (_settings.InventoryDumpKey.Value.IsDown()) DumpInventory();
             if (_settings.Panel.Value)
             {
-                if (_settings.SettingsKey.Value.IsDown()) ToggleSettings();
+                if (_settings.SettingsKey.Value.IsDown()) ToggleWindow(_window, _settings.SettingsKey, "설정 창");
+                if (_settings.BuildKey.Value.IsDown()) ToggleWindow(_build, _settings.BuildKey, "빌드 창");
+                if (_settings.PreviewKey.Value.IsDown()) CyclePreview();
                 if (_settings.HideKey.Value.IsDown()) ToggleHidden();
                 if (_settings.ExpandKey.Value.IsDown())
                 {
@@ -72,6 +86,10 @@ namespace SephPlanner.Plugin
                 if (_settings.OpacityKey.Value.IsDown()) _settings.CycleOpacity();
                 if (_settings.MoveKey.Value.IsDown()) ToggleMove();
                 if (_moving) _hud.DragTo(Cursor());
+
+                // 커서를 읽기만 한다. 그려 둔 사각형과 겹치는지 우리가 세므로 raycastTarget 을
+                // 켤 필요가 없고, HUD 가 게임 입력을 가져가지 않는다는 보장이 그대로 남는다.
+                _hud.UpdateHover(Cursor(), !_hidden && !_moving && !_window.IsOpen && !_build.IsOpen);
             }
 
             // 리소스는 부팅 직후 준비되므로 첫 프레임에 확인한다.
@@ -253,8 +271,23 @@ namespace SephPlanner.Plugin
                 _runner = new PlanRunner(CatalogSource.Get());
             }
 
-            if (changed || _runner.Latest == null) _runner.Submit(snapshot, Preferences());
+            // 빌드 지정이 바뀌면 스냅샷이 그대로여도 답이 달라진다. 그대로 두면 창에서 콤보를
+            // 켠 것이 다음에 물건을 옮길 때까지 아무 일도 하지 않는 것처럼 보인다.
+            var stale = _solvedRevision != _prefs.Revision;
+            if (!changed && !stale && _runner.Latest != null) return;
+
+            _solvedRevision = _prefs.Revision;
+            _runner.Submit(snapshot, Preferences());
         }
+
+        /// <summary>빌드 창이 목록을 채울 재료. 창은 열려 있는 동안 시간이 멈추므로 그때 한 번 읽는다.</summary>
+        private BuildContext CurrentBuild() => new BuildContext
+        {
+            Catalog = _runner != null ? CatalogSource.Get() : null,
+            Snapshot = _lastSnapshot,
+            Plan = _runner != null ? _runner.Latest : null,
+            Recommendations = _settings.Recommendations.Value,
+        };
 
         /// <summary>
         /// 지금 설정으로 푼다. 후보 추천을 끄면 가리는 것이 아니라 계산 자체를 건너뛴다 -
@@ -262,7 +295,7 @@ namespace SephPlanner.Plugin
         /// 빌려주는 것이라, 끄겠다고 한 사람에게는 답을 만들지도 않는 편이 정직하다.
         /// </summary>
         private PlanPreferences Preferences() =>
-            new PlanPreferences { Recommendations = _settings.Recommendations.Value };
+            _prefs.ToPreferences(_settings.Recommendations.Value);
 
         /// <summary>
         /// 화면을 만들고 최신 배치를 그린다. 만드는 것은 UI 가 준비된 뒤라야 되고, 씬이 바뀌면
@@ -341,34 +374,103 @@ namespace SephPlanner.Plugin
             }
 
             AutoExpand(plan);
-            _hud.Render(_lastSnapshot, plan, _expanded, Hint());
+
+            var preview = PreviewName(plan);
+            _hud.Render(new HudFrame
+            {
+                Snapshot = _lastSnapshot,
+                Plan = plan,
+                Catalog = CatalogSource.Get(),
+                Prefs = _prefs,
+                Values = CharmValueSource.Book,
+                Expanded = _expanded,
+                Recommendations = _settings.Recommendations.Value,
+                Hint = Hint(plan, preview),
+                HintIsPreview = preview != null,
+                PreviewKey = _previewKey,
+            });
         }
 
         /// <summary>
-        /// 설정 창을 열고 닫는다. 화면이 꺼져 있어도 열린다 - 다시 켜는 자리가 거기다.
+        /// 지금 미리보고 있는 후보의 이름. 고른 것이 새 계획에서 사라졌으면 미리보기를 접는다 -
+        /// 상자를 닫았는데 없는 후보의 격자를 계속 보여주면 그것이 지금 배치인 줄 알게 된다.
         /// </summary>
-        private void ToggleSettings()
+        private string PreviewName(Plan plan)
+        {
+            if (_previewKey.Length == 0) return null;
+
+            foreach (var advice in plan.Offers)
+            {
+                if (advice.Key == _previewKey && advice.Preview != null) return advice.Candidate.Name;
+            }
+
+            _previewKey = "";
+            return null;
+        }
+
+        /// <summary>
+        /// 후보를 차례로 미리본다. 마지막 다음은 미리보기 없음이라, 한 키만으로 켜고 끌 수 있다.
+        /// 자리를 번호가 아니라 후보의 열쇠로 기억하는 것은, 계획이 다시 풀려 순서가 달라져도
+        /// 보고 있던 것을 계속 보고 있어야 하기 때문이다.
+        /// </summary>
+        private void CyclePreview()
+        {
+            var plan = _runner != null ? _runner.Latest : null;
+            var keys = new List<string>();
+            if (plan != null)
+            {
+                for (var i = 0; i < plan.Offers.Count && i < NativeHud.OfferRows; i++)
+                {
+                    if (plan.Offers[i].Preview != null) keys.Add(plan.Offers[i].Key);
+                }
+            }
+
+            if (keys.Count == 0)
+            {
+                _previewKey = "";
+                Report(_settings.Recommendations.Value
+                    ? "미리볼 후보가 없습니다."
+                    : "후보 추천이 꺼져 있습니다. " + Describe(_settings.SettingsKey) + " 에서 켤 수 있습니다.");
+                return;
+            }
+
+            var index = keys.IndexOf(_previewKey);
+            _previewKey = index + 1 < keys.Count ? keys[index + 1] : "";
+
+            // 펼쳐 두지 않으면 격자가 보이지 않아 미리보기가 아무것도 바꾸지 않는 것처럼 보인다.
+            if (_previewKey.Length > 0) _expanded = true;
+        }
+
+        /// <summary>
+        /// 창을 열고 닫는다. 화면이 꺼져 있어도 열린다 - 다시 켜는 자리가 거기다.
+        /// </summary>
+        private void ToggleWindow(PlannerWindow window, ConfigEntry<KeyboardShortcut> key, string label)
         {
             try
             {
-                _window.Toggle(_settings.Rows(), Describe(_settings.SettingsKey) + " 또는 ESC 로 닫기");
+                window.Toggle(Describe(key) + " 또는 ESC 로 닫기");
 
-                if (_window.Blocker.Length > 0 && _window.Blocker != _lastWindowBlocker)
+                if (window.Blocker.Length > 0)
                 {
-                    _lastWindowBlocker = _window.Blocker;
-                    Logger.LogWarning("설정 창을 만들지 못했습니다 - " + _window.Blocker);
+                    var blocker = label + " - " + window.Blocker;
+                    if (blocker == _lastWindowBlocker) return;
+
+                    _lastWindowBlocker = blocker;
+                    Logger.LogWarning(label + "을 만들지 못했습니다 - " + window.Blocker);
                     return;
                 }
-                if (_window.Origin != _lastWindowOrigin)
+
+                var origin = label + " - " + window.Origin;
+                if (origin != _lastWindowOrigin)
                 {
-                    _lastWindowOrigin = _window.Origin;
-                    Logger.LogInfo("설정 창 생성 - " + _window.Origin);
+                    _lastWindowOrigin = origin;
+                    Logger.LogInfo(label + " 생성 - " + window.Origin);
                 }
             }
             catch (Exception ex)
             {
-                // 설정 창은 곁다리다. 여기서 터져도 표시와 자동 배치는 계속 돌아야 한다.
-                Logger.LogError("설정 창 실패: " + ex);
+                // 창은 곁다리다. 여기서 터져도 표시와 자동 배치는 계속 돌아야 한다.
+                Logger.LogError(label + " 실패: " + ex);
             }
         }
 
@@ -389,7 +491,7 @@ namespace SephPlanner.Plugin
         /// 아래 한 줄. 누를 것이 없는 화면이라 무엇을 눌러야 하는지는 여기서만 알 수 있다.
         /// 자동 배치 결과도 잠깐 이 자리에 띄운다 - 로그에만 남기면 무음 실패가 된다.
         /// </summary>
-        private string Hint()
+        private string Hint(Plan plan, string preview)
         {
             // 이동 중에는 커서 좌표를 그대로 보여준다. 화면이 따라오지 않을 때 커서를 못 읽는
             // 것인지 자리가 안 먹는 것인지, 로그를 뒤지지 않고 화면에서 바로 갈린다.
@@ -401,21 +503,40 @@ namespace SephPlanner.Plugin
 
             if (Time.unscaledTime < _autoPlaceShownUntil) return _autoPlaceResult;
 
+            // 미리보기는 화면이 지금 무엇을 그리고 있는지를 바꾼다. 그 사실이 늘 보이지 않으면
+            // 미리보기 격자를 지금 배치로 착각하게 된다.
+            if (preview != null)
+            {
+                return $"미리보기 - {preview} 을(를) 집었을 때   금색 테두리 = 달라지는 자리   " +
+                       Describe(_settings.PreviewKey) + " 로 다음 후보";
+            }
+
             // 접었을 때는 안내 줄도 접는다. 게임 화면을 가리지 않는 것이 접는 이유인데 안내가
             // 늘 붙어 있으면 줄어드는 것이 반뿐이다. 키를 누르면 잠깐 다시 뜬다.
             return _expanded ? Guide() : "";
         }
 
+        /// <summary>
+        /// 무엇을 누르면 되는지. 지금 할 수 있는 것만 적는다 - 멀티에서 자동 배치를, 후보가
+        /// 없을 때 미리보기를 적어 두면 눌러도 아무 일이 없는 키를 알려주는 셈이 된다.
+        /// </summary>
         private string Guide()
         {
-            var expand = Describe(_settings.ExpandKey) + (_expanded ? " 접기" : " 펼치기");
-            var look = Describe(_settings.OpacityKey) + " 불투명도   " +
-                       Describe(_settings.MoveKey) + " 이동   " +
-                       Describe(_settings.HideKey) + " 숨기기   " +
-                       Describe(_settings.SettingsKey) + " 설정";
-            if (_lastSnapshot != null && _lastSnapshot.IsMultiplayer) return expand + "   " + look;
+            var plan = _runner != null ? _runner.Latest : null;
+            var text = Describe(_settings.ExpandKey) + (_expanded ? " 접기" : " 펼치기");
 
-            return expand + "   " + Describe(_settings.AutoPlaceKey) + " 자동 배치   " + look;
+            if (_lastSnapshot == null || !_lastSnapshot.IsMultiplayer)
+                text += "   " + Describe(_settings.AutoPlaceKey) + " 자동 배치";
+
+            if (plan != null && plan.Offers.Count > 0)
+                text += "   " + Describe(_settings.PreviewKey) + " 후보 미리보기";
+
+            return text +
+                   "   " + Describe(_settings.BuildKey) + " 빌드" +
+                   "   " + Describe(_settings.OpacityKey) + " 불투명도" +
+                   "   " + Describe(_settings.MoveKey) + " 이동" +
+                   "   " + Describe(_settings.HideKey) + " 숨기기" +
+                   "   " + Describe(_settings.SettingsKey) + " 설정";
         }
 
         /// <summary>
@@ -518,6 +639,7 @@ namespace SephPlanner.Plugin
         {
             _hud.Destroy();
             _window.Destroy();
+            _build.Destroy();
             _server?.Dispose();
             _commands?.Dispose();
         }

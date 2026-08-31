@@ -7,9 +7,12 @@ using UnityEngine;
 namespace SephPlanner.Plugin
 {
     /// <summary>
-    /// 플러그인 설정 전부. BepInEx 설정 파일이 원본이고, 게임 설정 창의 우리 탭
-    /// (<see cref="OptionsTab"/>)이 <see cref="Rows"/>로 같은 값을 읽고 쓴다. 두 길이 같은
-    /// ConfigEntry 를 보므로 어느 쪽으로 고쳐도 어긋나지 않는다.
+    /// 표시 설정과 단축키 전부. BepInEx 설정 파일이 원본이고, 설정 창(<see cref="SettingsWindow"/>)이
+    /// <see cref="Rows"/>로 같은 값을 읽고 쓴다. 두 길이 같은 ConfigEntry 를 보므로 어느 쪽으로
+    /// 고쳐도 어긋나지 않는다.
+    ///
+    /// 빌드 지정(콤보·강화 우선·프리셋 코드)은 여기가 아니라 <see cref="PluginPreferences"/>에
+    /// 있다. 목록과 긴 문자열이라 한 줄짜리 설정 항목으로 담기지 않는다.
     /// </summary>
     internal sealed class PluginSettings
     {
@@ -33,6 +36,8 @@ namespace SephPlanner.Plugin
         public ConfigEntry<KeyboardShortcut> MoveKey { get; }
         public ConfigEntry<KeyboardShortcut> HideKey { get; }
         public ConfigEntry<KeyboardShortcut> SettingsKey { get; }
+        public ConfigEntry<KeyboardShortcut> BuildKey { get; }
+        public ConfigEntry<KeyboardShortcut> PreviewKey { get; }
 
         private readonly Action<string> _log;
         private readonly List<ConfigEntry<KeyboardShortcut>> _shortcuts =
@@ -110,6 +115,14 @@ namespace SephPlanner.Plugin
                 "NativePanel", "HideKey", new KeyboardShortcut(KeyCode.F4),
                 "화면을 통째로 숨겼다가 다시 보여준다. 숨어 있어도 계산은 계속 돌아서 다시 " +
                 "켜면 곧바로 최신 배치가 뜬다.");
+            BuildKey = config.Bind(
+                "NativePanel", "BuildKey", new KeyboardShortcut(KeyCode.F2),
+                "빌드 창을 여는 단축키. 프리셋 코드 가져오기, 밀고 있는 콤보 지정, 강화 우선 " +
+                "아티팩트 지정을 여기서 한다.");
+            PreviewKey = config.Bind(
+                "NativePanel", "PreviewKey", new KeyboardShortcut(KeyCode.F1),
+                "후보를 차례로 미리보는 단축키. 그 후보를 집었을 때의 격자를 대신 보여주고, " +
+                "마지막 다음은 미리보기 없음으로 돌아온다.");
 
             _shortcuts.Add(ExpandKey);
             _shortcuts.Add(AutoPlaceKey);
@@ -117,6 +130,8 @@ namespace SephPlanner.Plugin
             _shortcuts.Add(MoveKey);
             _shortcuts.Add(HideKey);
             _shortcuts.Add(SettingsKey);
+            _shortcuts.Add(BuildKey);
+            _shortcuts.Add(PreviewKey);
             _shortcuts.Add(DumpKey);
             _shortcuts.Add(InventoryDumpKey);
 
@@ -168,6 +183,8 @@ namespace SephPlanner.Plugin
                 Switch("후보 추천", Recommendations),
                 Key("접기/펼치기", ExpandKey, keys, keyNames, divider: true),
                 Key("자동 배치", AutoPlaceKey, keys, keyNames),
+                Key("후보 미리보기", PreviewKey, keys, keyNames),
+                Key("빌드 창", BuildKey, keys, keyNames),
                 Key("불투명도 바꾸기", OpacityKey, keys, keyNames),
                 Key("이동 모드", MoveKey, keys, keyNames),
                 Key("숨기기", HideKey, keys, keyNames),

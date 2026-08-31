@@ -18,6 +18,12 @@
     <ProjectReference Include="..\SephPlanner.Core\SephPlanner.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- 손으로 채운 아티팩트 가치. 오버레이와 같은 파일을 같은 이름으로 품는다 - 한쪽만 읽으면
+         같은 배치를 두고 두 화면이 다른 점수를 말한다. -->
+    <EmbeddedResource Include="..\..\data\values\charms.json" LogicalName="SephPlanner.Values.Charms.json" />
+  </ItemGroup>
+
   <!-- 게임 어셈블리 참조. SEPHIRIA_DIR 환경변수로 경로를 바꿀 수 있다. -->
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
@@ -71,6 +77,14 @@
     </Reference>
     <Reference Include="Unity.InputSystem">
       <HintPath>$(SephiriaManagedDir)\Unity.InputSystem.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!--
+      클립보드(GUIUtility.systemCopyBuffer). 게임도 프리셋 코드를 클립보드로 주고받으므로,
+      빌드 창은 입력 칸 없이 복사해 둔 코드를 그대로 받는다.
+    -->
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(SephiriaManagedDir)\UnityEngine.IMGUIModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>

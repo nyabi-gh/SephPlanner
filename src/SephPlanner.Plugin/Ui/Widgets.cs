@@ -81,6 +81,65 @@ namespace SephPlanner.Plugin.Ui
             return text;
         }
 
+        /// <summary>
+        /// 누를 수 있는 한 줄. 이름과 값이 따로 있는 목록에서는 글자 하나가 아니라 줄 전체가
+        /// 눌려야 하므로, 줄의 바탕칠 자체를 버튼의 그래픽으로 삼는다. 안에 넣는 글자는
+        /// <see cref="Label"/>로 만들어 <c>raycastTarget</c>이 꺼져 있으니 클릭이 뒤로 통과한다.
+        ///
+        /// <see cref="Clickable"/>과 같은 이유로 플레이어가 일부러 연 창에서만 쓴다.
+        /// </summary>
+        public static Image ClickableRow(
+            string name, Transform parent, Color fill, UnityEngine.Events.UnityAction onClick)
+        {
+            var image = Fill(name, parent, fill);
+            image.raycastTarget = true;
+
+            var button = image.gameObject.AddComponent<Button>();
+            button.targetGraphic = image;
+
+            // 바탕칠에 곱해지는 값이다. 평소를 어둡게 두어야 마우스를 올렸을 때 밝아지는 것이 보인다.
+            var colors = button.colors;
+            colors.normalColor = new Color(0.6f, 0.6f, 0.6f);
+            colors.highlightedColor = Color.white;
+            colors.selectedColor = new Color(0.6f, 0.6f, 0.6f);
+            colors.pressedColor = new Color(0.45f, 0.45f, 0.45f);
+            button.colors = colors;
+            button.onClick.AddListener(onClick);
+            return image;
+        }
+
+        /// <summary>
+        /// 여러 줄로 흐르는 글. <see cref="Label"/>은 한 줄로 두고 넘치면 잘라내는데, 툴팁처럼
+        /// 문장이 오는 자리는 접혀야 한다. 높이는 <see cref="FitHeight"/>로 재어 걸어 준다.
+        /// </summary>
+        public static TextMeshProUGUI Paragraph(
+            string name, Transform parent, NativeSkin skin, float size, Color color)
+        {
+            var text = Label(name, parent, skin, size, color, TextAlignmentOptions.TopLeft);
+            text.textWrappingMode = TextWrappingModes.Normal;
+            text.overflowMode = TextOverflowModes.Overflow;
+            return text;
+        }
+
+        /// <summary>
+        /// 접히는 글의 높이를 정한다.
+        ///
+        /// 세로 배치 안에서 TMP 에게 높이를 물어보게 두면(<c>ContentSizeFitter</c>와 겹칠 때 특히)
+        /// 폭이 정해지기 전에 재는 순번이 생겨 한 줄로 눌리거나 0 이 된다. 그래서 폭을 우리가
+        /// 넘겨 주고 높이를 직접 받아 고정한다 - 순번에 기대지 않으니 결과가 늘 같다.
+        /// </summary>
+        public static void FitHeight(TextMeshProUGUI text, LayoutElement element, float width)
+        {
+            if (text == null || element == null) return;
+
+            var height = text.text.Length == 0
+                ? 0f
+                : text.GetPreferredValues(text.text, width, 0f).y;
+
+            element.minHeight = height;
+            element.preferredHeight = height;
+        }
+
         public static VerticalLayoutGroup Column(
             RectTransform rect, float spacing, RectOffset padding = null)
         {

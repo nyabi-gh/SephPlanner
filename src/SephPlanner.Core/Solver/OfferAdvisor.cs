@@ -62,6 +62,13 @@ namespace SephPlanner.Core.Solver
         /// <summary>미리보기를 만들 재료. 채우는 것은 <c>PlanBuilder</c> 몫이다.</summary>
         internal PlacementProblem? Trial { get; set; }
         internal Arrangement? Solved { get; set; }
+
+        /// <summary>
+        /// 이 후보를 가리키는 열쇠. 계획은 스냅샷마다 새로 풀리므로 객체로는 같은 후보를 다시
+        /// 알아볼 수 없는데, 미리보기는 고른 것을 판이 바뀌어도 붙들고 있어야 한다. 종류가 같은
+        /// 후보는 하나로 묶여 오지만 합성 석판처럼 엔티티가 같고 이름이 다른 것이 있어 이름까지 넣는다.
+        /// </summary>
+        public string Key => $"{Candidate.Kind}:{Candidate.DefinitionId}:{Candidate.Name}";
     }
 
     /// <summary>후보를 집었다고 쳤을 때의 배치. 화면이 그리는 데 필요한 것만 담는다.</summary>
