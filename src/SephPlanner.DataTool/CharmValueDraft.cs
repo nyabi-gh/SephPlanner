@@ -15,6 +15,9 @@ namespace SephPlanner.DataTool;
 /// </summary>
 public static class CharmValueDraft
 {
+    /// <summary>이 번호 위쪽은 일반 아이템 풀이 아니라 기적 보상 같은 특수 경로로만 들어온다.</summary>
+    private const int SpecialPathFrom = 3000;
+
     private static readonly JsonSerializerOptions Read = new() { PropertyNameCaseInsensitive = true };
 
     private static readonly JsonSerializerOptions Write = new()
@@ -83,10 +86,24 @@ public static class CharmValueDraft
             Console.WriteLine();
         }
 
+        // 142종을 순서 없이 늘어놓으면 어디부터 손대야 할지 알 수 없다. 실제로 자주 만나는
+        // 것부터 오도록, 도감 밖 경로로만 들어오는 아티팩트를 뒤로 미루고 레어도 높은 순으로 둔다.
+        var ordered = blank
+            .OrderBy(c => c.EntityId >= SpecialPathFrom ? 1 : 0)
+            .ThenByDescending(c => (int)c.Rarity)
+            .ThenBy(c => c.EntityId)
+            .ToList();
+
+        var mainstream = ordered.Count(c => c.EntityId < SpecialPathFrom);
+        Console.WriteLine($"채울 몫 {ordered.Count}종의 차림 - 앞에서부터 채우면 된다");
+        Console.WriteLine($"  자주 만나는 것        {mainstream,4}종");
+        Console.WriteLine($"  도감 밖 경로로만 오는 것 {ordered.Count - mainstream,4}종  (기적 보상 등. 뒤로 미뤄 두었다)");
+        Console.WriteLine();
+
         var draft = new CharmValueFile
         {
             Version = 1,
-            Charms = blank.OrderBy(c => c.EntityId).Select(charm => new CharmValueEntry
+            Charms = ordered.Select(charm => new CharmValueEntry
             {
                 Id = charm.Id,
                 EntityId = charm.EntityId,
