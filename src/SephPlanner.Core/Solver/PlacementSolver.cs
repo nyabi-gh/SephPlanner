@@ -48,7 +48,8 @@ namespace SephPlanner.Core.Solver
                                   .Select(problem.Grid.ToPosition)
                                   .ToList();
 
-            var searched = SearchTabletLayouts(problem, cells, options);
+            EstimateStats(problem, out var scoring, out var levelCap, out var anyMagic);
+            var searched = SearchTabletLayouts(problem, cells, options, scoring, levelCap, anyMagic);
 
             // 놓을 자리가 모자라면 탐색이 석판 일부를 뺀 배치를 내놓는다. 그런 배치를 그대로
             // 채점하면 존재하는 석판을 무시한 점수를 최적이라고 말하게 되므로, 완전한 배치가
@@ -64,7 +65,7 @@ namespace SephPlanner.Core.Solver
 
             // 직전 제안의 배치도 마찬가지다. 빔이 떨어뜨리면 같은 점수의 다른 배치로 갈아타
             // 따라가던 계획이 통째로 다시 쓰인다.
-            var asPlanned = Layout(problem, problem.PlannedTablets);
+            var asPlanned = PlannedLayout(problem, cells, scoring, levelCap, anyMagic);
             if (asPlanned != null) candidates.Insert(0, asPlanned);
 
             // 완전한 배치가 아예 없으면(석판이 열린 칸보다 많은 극단) 놓을 수 있는 만큼이라도
@@ -164,13 +165,11 @@ namespace SephPlanner.Core.Solver
             public override bool HasMagicCharm(GridPos position) => _anyMagic && HasCharm(position);
         }
 
-        private static List<List<TabletPlacement>> SearchTabletLayouts(
-            PlacementProblem problem, List<GridPos> cells, SolverOptions options)
+        private static void EstimateStats(
+            PlacementProblem problem, out int scoring, out int levelCap, out bool anyMagic)
         {
-            var beam = new List<List<TabletPlacement>> { new List<TabletPlacement>() };
-
-            var scoring = 0;
-            var levelCap = 0;
+            scoring = 0;
+            levelCap = 0;
             foreach (var charm in problem.Charms)
             {
                 if (charm.IsFiller || charm.IsDormant) continue;
@@ -178,7 +177,76 @@ namespace SephPlanner.Core.Solver
                 levelCap = Math.Max(levelCap, charm.Definition.MaxLevel);
             }
             if (scoring == 0) levelCap = 5;
-            var anyMagic = problem.Charms.Any(c => c.Definition.IsMagic);
+            anyMagic = problem.Charms.Any(c => c.Definition.IsMagic);
+        }
+
+        /// <summary>
+        /// 직전 제안의 배치를 후보로 되살린다. 계획에 없는 새 석판이 끼면 계획된 자리는 그대로
+        /// 두고 새 것만 남는 칸에서 탐욕으로 앉힌다 - 새 석판이 올 때마다 앵커가 통째로 사라지면,
+        /// 정확히 개편이 가장 큰 그 순간에 계획이 다시 쓰인다(실측 녹화에서 그랬다).
+        /// </summary>
+        private static List<TabletPlacement>? PlannedLayout(
+            PlacementProblem problem, List<GridPos> cells, int scoring, int levelCap, bool anyMagic)
+        {
+            if (problem.Tablets.Count == 0 || problem.PlannedTablets.Count == 0) return null;
+
+            var reserved = new HashSet<GridPos>();
+            foreach (var slot in problem.Tablets)
+            {
+                if (problem.PlannedTablets.TryGetValue(slot.InstanceId, out var spot) &&
+                    !reserved.Add(spot.Position))
+                {
+                    return null;
+                }
+            }
+
+            // 후보 배치는 problem.Tablets 순서를 지켜야 한다. Describe 와 Targets 가 같은
+            // 순번끼리 짝짓는다.
+            var layout = new List<TabletPlacement>(problem.Tablets.Count);
+            foreach (var slot in problem.Tablets)
+            {
+                if (problem.PlannedTablets.TryGetValue(slot.InstanceId, out var spot))
+                {
+                    layout.Add(slot.At(spot.Position, spot.Rotation));
+                    continue;
+                }
+
+                var currentRotation = problem.CurrentTablets.TryGetValue(slot.InstanceId, out var current)
+                    ? current.Rotation
+                    : 0;
+                var rotations = DistinctRotations(slot, currentRotation);
+
+                List<TabletPlacement>? grown = null;
+                var bestScore = double.NegativeInfinity;
+                var bestCell = default(GridPos);
+                foreach (var cell in cells)
+                {
+                    if (reserved.Contains(cell)) continue;
+                    foreach (var rotation in rotations)
+                    {
+                        var trial = new List<TabletPlacement>(layout) { slot.At(cell, rotation) };
+                        var estimate = Estimate(problem, cells, trial, scoring, levelCap, anyMagic);
+                        if (estimate > bestScore)
+                        {
+                            bestScore = estimate;
+                            grown = trial;
+                            bestCell = cell;
+                        }
+                    }
+                }
+                if (grown == null) return null;
+
+                layout = grown;
+                reserved.Add(bestCell);
+            }
+            return layout;
+        }
+
+        private static List<List<TabletPlacement>> SearchTabletLayouts(
+            PlacementProblem problem, List<GridPos> cells, SolverOptions options,
+            int scoring, int levelCap, bool anyMagic)
+        {
+            var beam = new List<List<TabletPlacement>> { new List<TabletPlacement>() };
 
             foreach (var slot in problem.Tablets)
             {
