@@ -1,3 +1,5 @@
+using System;
+using System.Collections;
 using System.IO;
 using Newtonsoft.Json;
 using SephPlanner.Core.Ipc;
@@ -7,39 +9,61 @@ namespace SephPlanner.Plugin
     /// <summary>
     /// 게임에서 읽은 정적 데이터를 오버레이가 쓸 수 있는 위치에 저장한다.
     /// 저장 위치는 사용자 PC 안이며, 배포물에는 포함하지 않는다.
+    ///
+    /// 아이콘 인코딩과 질의 전수 검증이 무거워서 한 프레임에 다 하면 게임이 수 초 멈춘다.
+    /// 그래서 코루틴으로 프레임에 나눠 돌린다. 첫 실행마다 모든 사용자가 겪는 경로다.
     /// </summary>
     internal static class CatalogDump
     {
-        public static string Write()
+        public static IEnumerator WriteRoutine(Action<string> report)
         {
             Directory.CreateDirectory(IpcContract.DataDirectory);
 
             var tablets = ItemCatalog.LoadTablets();
+            yield return null;
             var charms = ItemCatalog.LoadCharms();
+            yield return null;
             var combos = ItemCatalog.LoadCombos();
+            yield return null;
 
             WriteJson(IpcContract.TabletDbFile, tablets);
             WriteJson(IpcContract.CharmDbFile, charms);
             WriteJson(IpcContract.ComboDbFile, combos);
+            yield return null;
 
-            var icons = IconDump.Write();
+            var icons = 0;
+            foreach (var count in IconDump.WriteBatched())
+            {
+                icons = count;
+                yield return null;
+            }
 
-            var report = QueryVerifier.Run(tablets);
-            File.WriteAllText(
-                Path.Combine(IpcContract.DataDirectory, IpcContract.VerificationReportFile),
-                QueryVerifier.Format(report));
+            var verification = new QueryVerifier.Report();
+            foreach (var _ in QueryVerifier.RunBatched(tablets, verification))
+                yield return null;
+            WriteText(IpcContract.VerificationReportFile, QueryVerifier.Format(verification));
 
-            return $"석판 {tablets.Count}종, 아티팩트 {charms.Count}종, 콤보 {combos.Count}종, " +
-                   $"아이콘 {icons}개 저장. 질의 검증 {report.Comparisons}건 중 불일치 {report.Mismatches}건.";
+            report($"석판 {tablets.Count}종, 아티팩트 {charms.Count}종, 콤보 {combos.Count}종, " +
+                   $"아이콘 {icons}개 저장. 질의 검증 {verification.Comparisons}건 중 불일치 {verification.Mismatches}건.");
         }
 
         public static bool HasCatalog() =>
             File.Exists(Path.Combine(IpcContract.DataDirectory, IpcContract.TabletDbFile));
 
-        private static void WriteJson(string fileName, object value)
+        private static void WriteJson(string fileName, object value) =>
+            WriteText(fileName, JsonConvert.SerializeObject(value, Formatting.Indented));
+
+        /// <summary>
+        /// 임시 파일에 쓰고 바꿔치기한다. 바로 덮어쓰면 오버레이가 반쯤 쓰인 파일을 읽을 수 있다.
+        /// </summary>
+        private static void WriteText(string fileName, string content)
         {
             var path = Path.Combine(IpcContract.DataDirectory, fileName);
-            File.WriteAllText(path, JsonConvert.SerializeObject(value, Formatting.Indented));
+            var temp = path + ".tmp";
+            File.WriteAllText(temp, content);
+
+            if (File.Exists(path)) File.Replace(temp, path, null);
+            else File.Move(temp, path);
         }
     }
 }

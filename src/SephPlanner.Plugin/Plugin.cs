@@ -50,14 +50,14 @@ namespace SephPlanner.Plugin
 
         private void Update()
         {
-            if (_dumpKey.Value.IsDown()) DumpCatalog();
+            if (_dumpKey.Value.IsDown()) StartDump();
             if (_diagnosticsKey.Value.IsDown()) DumpInventory();
 
             // 리소스는 부팅 직후 준비되므로 첫 프레임에 확인한다.
             if (!_catalogChecked)
             {
                 _catalogChecked = true;
-                if (!CatalogDump.HasCatalog()) DumpCatalog();
+                if (!CatalogDump.HasCatalog()) StartDump();
             }
 
             DrainCommands();
@@ -71,6 +71,15 @@ namespace SephPlanner.Plugin
         {
             while (_commands.TryDequeue(out var pending))
             {
+                // 파이프 쪽 응답 대기는 이미 시간을 넘겼다. 층 이동 등으로 한참 뒤에야 꺼낸
+                // 명령을 실행하면 그 사이 바뀐 인벤토리에 낡은 배치를 적용하게 된다.
+                if (pending.AgeSeconds > 10)
+                {
+                    Logger.LogInfo("오래된 자동 배치 명령을 건너뜁니다.");
+                    pending.Complete("명령이 너무 오래 기다려 실행하지 않았습니다. 다시 시도하세요.");
+                    continue;
+                }
+
                 string result;
                 try
                 {
@@ -91,16 +100,43 @@ namespace SephPlanner.Plugin
             }
         }
 
-        private void DumpCatalog()
+        private bool _dumping;
+
+        /// <summary>
+        /// 아이콘 인코딩과 질의 전수 검증이 무거워, 한 프레임에 다 하면 게임이 수 초 멈춘다.
+        /// 코루틴으로 프레임에 나눠 돌린다.
+        /// </summary>
+        private void StartDump()
         {
-            try
+            if (_dumping)
             {
-                Logger.LogInfo(CatalogDump.Write());
+                Logger.LogInfo("데이터 덤프가 이미 진행 중입니다.");
+                return;
             }
-            catch (Exception ex)
+            StartCoroutine(DumpRoutine());
+        }
+
+        private System.Collections.IEnumerator DumpRoutine()
+        {
+            _dumping = true;
+
+            // 이터레이터 안에서 던진 예외를 그대로 두면 코루틴이 죽으면서 _dumping 이 영영 참으로
+            // 남는다. 한 걸음씩 감싸서 실패해도 플래그를 되돌린다.
+            var steps = CatalogDump.WriteRoutine(Logger.LogInfo);
+            while (true)
             {
-                Logger.LogError("데이터 덤프 실패: " + ex);
+                try
+                {
+                    if (!steps.MoveNext()) break;
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("데이터 덤프 실패: " + ex);
+                    break;
+                }
+                yield return steps.Current;
             }
+            _dumping = false;
         }
 
         private void DumpInventory()

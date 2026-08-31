@@ -128,7 +128,7 @@ static void Put(
 static string FindRepoRoot()
 {
     var dir = AppContext.BaseDirectory;
-    while (dir is not null && !File.Exists(Path.Combine(dir, "SephPlanner.sln")))
+    while (dir is not null && !File.Exists(Path.Combine(dir, "SephPlanner.slnx")))
         dir = Path.GetDirectoryName(dir);
     return dir ?? Directory.GetCurrentDirectory();
 }

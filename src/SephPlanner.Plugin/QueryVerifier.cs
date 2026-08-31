@@ -26,13 +26,22 @@ namespace SephPlanner.Plugin
         public static Report Run(IEnumerable<TabletDefinition> tablets)
         {
             var report = new Report();
+            foreach (var _ in RunBatched(tablets, report)) { }
+            return report;
+        }
 
+        /// <summary>
+        /// 석판 하나 분량씩 끊어 검증한다. 전수 대조는 십만 회 규모라 한 프레임에 다 돌리면
+        /// 게임이 멈추므로, 코루틴이 한 번 받을 때마다 한 프레임 쉬는 식으로 소비한다.
+        /// </summary>
+        public static IEnumerable<object> RunBatched(IEnumerable<TabletDefinition> tablets, Report report)
+        {
             foreach (var tablet in tablets)
             {
                 CompareQuery(report, tablet, tablet.Query, "query");
                 CompareQuery(report, tablet, tablet.ConditionQuery, "conditionQuery");
+                yield return null;
             }
-            return report;
         }
 
         private static void CompareQuery(Report report, TabletDefinition tablet, string query, string label)

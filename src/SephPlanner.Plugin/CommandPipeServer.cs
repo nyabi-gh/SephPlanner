@@ -15,11 +15,15 @@ namespace SephPlanner.Plugin
     internal sealed class PendingCommand
     {
         private readonly ManualResetEventSlim _done = new ManualResetEventSlim(false);
+        private readonly System.DateTime _created = System.DateTime.UtcNow;
         private volatile string _result;
 
         public PendingCommand(ApplyPlanCommand command) => Command = command;
 
         public ApplyPlanCommand Command { get; }
+
+        /// <summary>큐에서 기다린 시간. 너무 오래된 명령은 실행하지 않고 버린다.</summary>
+        public double AgeSeconds => (System.DateTime.UtcNow - _created).TotalSeconds;
 
         public void Complete(string result)
         {

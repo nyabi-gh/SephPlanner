@@ -43,7 +43,10 @@ public static class SnapshotCheck
             return 1;
         }
 
-        var catalog = new Catalog(tablets, charms);
+        // 콤보를 빼고 만들면 오버레이와 다른 점수가 나온다. 진단 도구가 실제 동작과 어긋나면
+        // 여기서 통과한 것이 실사용에서 재현되지 않는다. 콤보 파일은 없을 수 있어 선택이다.
+        var combos = Load<List<ComboDefinition>>(IpcContract.ComboDbFile);
+        var catalog = new Catalog(tablets, charms, combos);
         var plan = PlanBuilder.Build(snapshot, catalog);
         if (plan is null)
         {
