@@ -155,6 +155,10 @@ namespace SephPlanner.Plugin.Ui
             _canvas = root.Canvas;
             _canvasRect = (RectTransform)root.transform;
 
+            // 게임 창들 위에 그린다. 보상 창과 레벨업 창이 우리보다 위 캔버스에 있어서, 이것이
+            // 없으면 무엇을 집을지 고르는 바로 그 순간에 화면이 덮여 보이지 않는다.
+            Widgets.Layer(_root, Layers.Hud, clickable: false);
+
             // 불투명도 전용. UIRoot 자신의 CanvasGroup 은 게임이 UI 를 감출 때 쓰므로 건드리지 않는다.
             _group = _root.AddComponent<CanvasGroup>();
             _group.interactable = false;

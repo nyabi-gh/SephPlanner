@@ -119,6 +119,10 @@ namespace SephPlanner.Plugin.Ui
             go.AddComponent<CanvasGroup>();
             go.AddComponent<SephPlannerWidget>();
 
+            // 게임 창 위에 뜬다. 보상 창을 열어 둔 채로 빌드 창을 열 수 있어야 하기 때문이다.
+            // 여기는 누를 것이 있으므로 레이캐스터도 함께 올린다.
+            Widgets.Layer(go, Layers.Window, clickable: true);
+
             _panel = go.AddComponent<PlannerPanel>();
             _panel.hasControl = true;
             _panel.canCloseControlWithESC = true;

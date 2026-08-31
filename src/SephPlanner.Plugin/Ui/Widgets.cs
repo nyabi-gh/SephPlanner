@@ -11,8 +11,47 @@ namespace SephPlanner.Plugin.Ui
     /// <b>그리는 것마다 <c>raycastTarget</c>이 꺼져 있다.</b> 마우스를 그대로 통과시켜야 게임
     /// 조작을 방해하지 않는다. 여기를 거치지 않고 직접 Image/Text 를 붙이면 그 보장이 깨진다.
     /// </summary>
+    /// <summary>
+    /// 우리 화면이 게임 UI 중 어디쯤에 그려지는지.
+    ///
+    /// 값은 게임에서 잰 것이다(인벤토리 덤프의 <c>[ui]</c> 절). 게임의 화면 공간 캔버스는
+    /// <c>InteractableHUD</c>/<c>DynamicHUD</c> -2, <c>HUD</c> 0, <c>Panels</c> 2,
+    /// <c>System</c> 10 이다.
+    ///
+    /// <b>Panels 위, System 아래에 둔다.</b> 세피라이트 보상 창과 레벨업 창이 <c>Panels</c>(2)에
+    /// 있어서, 우리가 <c>HUD</c>(0) 그대로 있으면 무엇을 집을지 고르는 바로 그 순간에 덮여
+    /// 보이지 않는다. 반대로 <c>System</c>(10)에는 게임 자신의 툴팁과 알림이 있으므로 그것까지
+    /// 가리지는 않는다.
+    /// </summary>
+    internal static class Layers
+    {
+        public const int Hud = 5;
+        public const int Window = 6;
+        public const int Tooltip = 7;
+    }
+
     internal static class Widgets
     {
+        /// <summary>
+        /// 이 조각을 제 캔버스에 올려 그리는 순서를 정한다.
+        ///
+        /// 게임 HUD 밑에 그냥 달아 두면 부모 캔버스의 순서를 따르므로 <c>Panels</c> 에 가린다.
+        /// 중첩 캔버스로 올리면 순서를 우리가 정할 수 있고, 부모의 <c>CanvasGroup</c> 은 그대로
+        /// 상속되므로 게임이 UI 를 감출 때 함께 감춰지는 것은 유지된다.
+        ///
+        /// <paramref name="clickable"/> 은 누를 것이 있는 창에만 켠다. 레이캐스트는 캔버스 단위라
+        /// 중첩 캔버스로 올리면 부모의 <c>GraphicRaycaster</c> 가 우리 안까지 훑지 않는다 -
+        /// 켜지 않으면 창의 버튼이 눌리지 않는다.
+        /// </summary>
+        public static void Layer(GameObject go, int order, bool clickable)
+        {
+            var canvas = go.AddComponent<Canvas>();
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = order;
+
+            if (clickable) go.AddComponent<GraphicRaycaster>();
+        }
+
         public static RectTransform Rect(string name, Transform parent)
         {
             var go = new GameObject(name, typeof(RectTransform));

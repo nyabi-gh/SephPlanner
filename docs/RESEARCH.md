@@ -843,6 +843,31 @@ public 이다.**
   풀링 부모는 `None/HUD/DynamicHUD/World/AltWorld/GroundWorld` 여섯이다.
 - **게임이 UI 를 감출 때 함께 감춰진다.** `UIManager.Hide()`가 하는 일이 `uiRoots` 각각의
   CanvasGroup 알파를 0 으로 만드는 것이라, 밑에 달려 있으면 딸려간다. 흉내 낼 필요가 없다.
+
+### 창이 열리면 감춰지는 것이 아니라 덮인다
+
+세피라이트 보상 창과 레벨업 창이 열리면 우리 화면이 안 보였다. **처음에는 위의 `Hide()`가
+알파를 0 으로 만든 것으로 짐작했는데 틀렸다.** 보상 창을 열어 둔 채 인벤토리 덤프를 떠 보니
+`root HUD alpha=1` 이고 `ours SephPlannerHud active=True alpha=1` 이었다. 감춰진 것이 아니라
+**더 위 캔버스에 그려지는 창에 덮인 것**이다.
+
+잰 값 - 화면 공간 캔버스의 정렬 순서다.
+
+```
+[UI] InteractableHUD  -2
+[UI] DynamicHUD       -2
+[UI] HUD               0     <- 우리가 달려 있던 곳
+[UI] Panels            2     <- UI_SephiriteRewardPanel, UI_CharacterStatusPanel, UI_ItemIcon
+[UI] System           10     <- 게임 자신의 툴팁·알림 (UI_HUDLogViewer, UI_NewItemPicker 등)
+```
+
+그래서 우리 것들을 중첩 캔버스(`overrideSorting`)로 올려 **Panels 위, System 아래**에 둔다
+(`Widgets.Layer`, `Layers`). 부모의 `CanvasGroup` 은 그대로 상속되므로 `Hide()` 로 함께
+감춰지는 성질은 유지된다. 누를 것이 있는 창에는 `GraphicRaycaster` 를 함께 올려야 한다 -
+레이캐스트가 캔버스 단위라 부모의 것이 중첩 캔버스 안까지 훑지 않는다.
+
+이 진단을 뜨는 것은 `UiDiagnostics` 이고 인벤토리 덤프(F10)의 `[ui]` 절로 나온다. 화면이 안
+보이는 문제가 또 생기면 짐작하지 말고 창을 열어 둔 채 한 번 뜬다.
 - **입력을 뺏지 않는 것도 구조가 보장한다.** 컨트롤 스택에는 `UIBase`를 단 것만 `AddControl`로
   들어가고(`UIManager.Awake`가 Awake 시점의 UIRoot 자식만 훑는다), ESC 처리도 그 스택을 탄다.
   `UIBase`를 상속하지 않고 그리는 것마다 `raycastTarget`을 끄면 키보드도 마우스도 통과한다.

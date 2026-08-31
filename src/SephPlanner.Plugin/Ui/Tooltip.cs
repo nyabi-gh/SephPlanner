@@ -42,6 +42,7 @@ namespace SephPlanner.Plugin.Ui
             var frame = Widgets.Fill("SephPlannerTooltip", root.transform, NativeSkin.Frame);
             _root = frame.gameObject;
             _root.AddComponent<SephPlannerWidget>();
+            Widgets.Layer(_root, Layers.Tooltip, clickable: false);
             _root.SetActive(false);
 
             _rect = frame.rectTransform;
