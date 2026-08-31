@@ -877,6 +877,12 @@ public 이다.**
 
 이 진단을 뜨는 것은 `UiDiagnostics` 이고 인벤토리 덤프(F10)의 `[ui]` 절로 나온다. 화면이 안
 보이는 문제가 또 생기면 짐작하지 말고 창을 열어 둔 채 한 번 뜬다.
+
+**화면 내용이 비면 Player.log 부터 본다.** `Update` 안에서 난 예외는 유니티가
+`%USERPROFILE%\AppData\LocalLow\TEAMHORAY\Sephiria\Player.log` 에만 남기고 BepInEx
+LogOutput.log 는 조용하다. 실제로 씬 전환 뒤 죽은 격자 셀을 재사용하는 버그가 매 프레임
+NullReferenceException 을 3만 번 넘게 쌓는 동안(제목 줄만 나오고 격자·목록이 비는 증상)
+우리 로그에는 아무것도 없었다. 지금은 그리기 예외를 잡아 같은 것 한 번씩 우리 로그에도 남긴다.
 - **입력을 뺏지 않는 것도 구조가 보장한다.** 컨트롤 스택에는 `UIBase`를 단 것만 `AddControl`로
   들어가고(`UIManager.Awake`가 Awake 시점의 UIRoot 자식만 훑는다), ESC 처리도 그 스택을 탄다.
   `UIBase`를 상속하지 않고 그리는 것마다 `raycastTarget`을 끄면 키보드도 마우스도 통과한다.

@@ -37,6 +37,7 @@ namespace SephPlanner.Plugin
         private GameSnapshot _lastSnapshot;
         private string _lastPanelOrigin;
         private string _lastPanelBlocker;
+        private string _lastRenderError;
         private string _lastWindowOrigin;
         private string _lastCatalogError = "";
         private string _lastWindowBlocker;
@@ -405,6 +406,24 @@ namespace SephPlanner.Plugin
             AutoExpand(plan);
 
             var preview = PreviewName(plan);
+            try
+            {
+                Render(plan, preview);
+            }
+            catch (Exception ex)
+            {
+                // 유니티 쪽 예외는 Player.log 에만 쌓여 우리 로그가 조용하다. 매 프레임 도는
+                // 자리라 같은 예외는 한 번만 남긴다.
+                var message = ex.GetType().Name + ": " + ex.Message;
+                if (message == _lastRenderError) return;
+
+                _lastRenderError = message;
+                Logger.LogError("화면 그리기 실패 - " + ex);
+            }
+        }
+
+        private void Render(Plan plan, string preview)
+        {
             _hud.Render(new HudFrame
             {
                 Snapshot = _lastSnapshot,
