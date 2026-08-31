@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Reflection;
 using System.Text;
 using SephPlanner.Core.Ipc;
 using UnityEngine;
@@ -25,20 +26,65 @@ namespace SephPlanner.Plugin
             // 석판이 통째로 잘려 나간다. 석판은 대개 세피라이트로만 나오므로 이쪽이 우선이다.
             CollectSephirites(snapshot.Offers, origin, radius);
 
+            var shown = ShownInventory();
             foreach (var inventory in UnityEngine.Object.FindObjectsByType<GridInventory>(FindObjectsSortMode.None))
             {
                 if (inventory == null || inventory == playerInventory) continue;
                 if (inventory.UnitAvatar is PlayerAvatar) continue;
                 if (Vector3.Distance(origin, inventory.transform.position) > radius) continue;
-
-                // 닫힌 상자의 내용물도 동기화는 되어 있지만, 열기 전에는 사람이 알 수 없는 정보다.
-                // 그대로 보여주면 수동 플레이로는 불가능한 이득이 된다. 연 뒤에만 후보로 삼는다.
-                var chest = inventory.GetComponentInParent<ItemChest>();
-                if (chest != null && !chest.isOpened) continue;
+                if (!IsVisible(inventory, shown)) continue;
 
                 Collect(snapshot.Offers, inventory, player);
             }
         }
+
+        /// <summary>
+        /// 지금 플레이어가 볼 수 있는 인벤토리인가. 동기화돼 있어서 읽을 수 있는 것과 화면에
+        /// 보이는 것은 다르고, 보이지 않는 것을 알려주는 순간 손으로도 할 수 있는 일의 대행이
+        /// 아니게 된다.
+        ///
+        /// <b>상점이 그 예다.</b> 상점 재고는 상인의 <c>CurrentSelling</c> 인벤토리에 있는데
+        /// 세상에 진열되는 것이 아니라 <c>UI_ShopPanel</c> 안에서만 그려진다. 그래서 가까이
+        /// 가기만 해도 후보가 뜨는 것은 열기 전 상자를 들여다보는 것과 같다. 실제로 그렇게
+        /// 보인다는 제보를 받고 고쳤다.
+        /// </summary>
+        private static bool IsVisible(GridInventory inventory, GridInventory shown)
+        {
+            if (inventory == shown) return true;
+
+            // 상자는 뚜껑이 열렸는지가 곧 보이는지다.
+            var chest = inventory.GetComponentInParent<ItemChest>();
+            if (chest != null) return chest.isOpened;
+
+            // 바닥에 떨어진 꾸러미는 보이던 인벤토리가 통째로 떨어진 것이라 숨길 이유가 없다.
+            return inventory.GetComponentInParent<DroppedInventory>() != null;
+        }
+
+        /// <summary>
+        /// 게임이 지금 창에 띄워 놓은 인벤토리. 상점은 공개 속성이 있고, 금고·시체를 여는
+        /// 인벤토리 창은 비공개라 리플렉션으로 읽는다 - 읽기만 하고, 못 읽으면 "보이지 않는 것"
+        /// 으로 물러선다(덜 보여주는 쪽이 안전하다).
+        /// </summary>
+        private static GridInventory ShownInventory()
+        {
+            var ui = UIManager.Instance;
+            if (ui == null) return null;
+
+            var shop = ui.GetElement<UI_ShopPanel>();
+            if (shop != null && shop.IsOpened && shop.Shop != null) return shop.Shop;
+
+            var viewer = ui.GetElement<UI_InventoryViewer>();
+            if (viewer == null || !viewer.IsOpened) return null;
+
+            if (_viewerInventory == null)
+            {
+                _viewerInventory = typeof(UI_InventoryViewer).GetProperty(
+                    "Inventory", BindingFlags.NonPublic | BindingFlags.Instance);
+            }
+            return _viewerInventory?.GetValue(viewer, null) as GridInventory;
+        }
+
+        private static PropertyInfo _viewerInventory;
 
         /// <summary>
         /// 세피라이트 안에 든 후보들. 제단에서 무엇이 나올지는 고르기 전까지 서버만 알지만,

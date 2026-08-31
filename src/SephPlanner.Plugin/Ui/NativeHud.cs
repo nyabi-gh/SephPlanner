@@ -48,6 +48,7 @@ namespace SephPlanner.Plugin.Ui
         private CanvasGroup _group;
         private ContentSizeFitter _fitter;
         private float _width;
+        private float _inner;
         private bool _compact;
         private Vector2 _grab;
 
@@ -129,6 +130,10 @@ namespace SephPlanner.Plugin.Ui
 
             var body = Widgets.Fill("Body", rect, NativeSkin.PanelFill);
             var pad = Mathf.RoundToInt(S(0.6f));
+
+            // 안쪽에 실제로 쓸 수 있는 폭. 격자와 오른쪽 열이 이 값을 넘으면 테두리 밖으로
+            // 삐져나가 화면이 깨진다 - 폭을 좁게 잡았을 때 실제로 그랬다.
+            _inner = _width - 2f * (edge + pad);
             var content = body.rectTransform;
             Widgets.Column(content, S(0.2f), new RectOffset(pad, pad, pad, pad));
 
@@ -139,10 +144,11 @@ namespace SephPlanner.Plugin.Ui
             _detail = Widgets.Rect("Detail", content);
             Widgets.Column(_detail, S(0.3f));
 
+            var detail = Mathf.Min(S(12f), _inner * 0.55f);
             BuildGrid(_detail);
-            _moves = new Section(_detail, _skin, _base, "옮길 것", NativeSkin.TextDim, MoveRows);
-            BuildOffers(_detail);
-            _mixes = new Section(_detail, _skin, _base, "석판 합성기", NativeSkin.Mint, MixRows);
+            _moves = new Section(_detail, _skin, _base, "옮길 것", NativeSkin.TextDim, MoveRows, detail);
+            BuildOffers(_detail, detail);
+            _mixes = new Section(_detail, _skin, _base, "석판 합성기", NativeSkin.Mint, MixRows, detail);
             _chips = Line(_detail, S(0.8f), NativeSkin.TextDim);
         }
 
@@ -215,15 +221,30 @@ namespace SephPlanner.Plugin.Ui
         {
             _grid = Widgets.Rect("Grid", parent);
             _gridLayout = _grid.gameObject.AddComponent<GridLayoutGroup>();
-            _gridLayout.cellSize = new Vector2(S(3.4f), S(2.6f));
             _gridLayout.spacing = new Vector2(S(0.15f), S(0.15f));
             _gridLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             _gridLayout.constraintCount = GridSpec.DefaultWidth;
+            SizeCells(GridSpec.DefaultWidth);
         }
 
-        private void BuildOffers(RectTransform parent)
+        /// <summary>
+        /// 칸 크기는 폭에서 나온다. 고정 크기로 두면 폭을 좁게 잡았을 때 격자가 테두리를 뚫고
+        /// 나간다. 넓을 때까지 따라 커지지는 않게 원래 크기를 상한으로 둔다.
+        /// </summary>
+        private void SizeCells(int columns)
         {
-            _offers = new Section(parent, _skin, _base, "지금 집을 수 있는 것", NativeSkin.Mint, OfferRows);
+            columns = Mathf.Max(1, columns);
+            var spacing = _gridLayout.spacing.x;
+            var cell = Mathf.Min(S(3.4f), (_inner - spacing * (columns - 1)) / columns);
+            if (cell <= 0f) cell = S(3.4f);
+
+            _gridLayout.cellSize = new Vector2(cell, cell * (2.6f / 3.4f));
+        }
+
+        private void BuildOffers(RectTransform parent, float detail)
+        {
+            _offers = new Section(
+                parent, _skin, _base, "지금 집을 수 있는 것", NativeSkin.Mint, OfferRows, detail);
 
             // 순위를 그대로 믿으면 안 된다는 것은 늘 보여야 한다. 머리글 바로 밑이라야 목록을
             // 읽기 전에 눈에 들어온다.
@@ -309,6 +330,7 @@ namespace SephPlanner.Plugin.Ui
             var inventory = snapshot.Inventory;
             var total = inventory.Width * inventory.Height;
             _gridLayout.constraintCount = inventory.Width;
+            SizeCells(inventory.Width);
 
             while (_cells.Count < total) _cells.Add(new Cell(_grid, _skin, _base));
             for (var i = total; i < _cells.Count; i++) _cells[i].Hide();
@@ -539,7 +561,8 @@ namespace SephPlanner.Plugin.Ui
             public RectTransform Body { get; }
 
             public Section(
-                RectTransform parent, NativeSkin skin, float b, string title, Color titleColor, int rows)
+                RectTransform parent, NativeSkin skin, float b, string title, Color titleColor, int rows,
+                float detailWidth)
             {
                 Root = Widgets.Rect(title, parent);
                 Widgets.Column(Root, b * 0.15f);
@@ -561,7 +584,7 @@ namespace SephPlanner.Plugin.Ui
                     var detail = Widgets.Label(
                         "Detail", row, skin, b * 0.8f, NativeSkin.TextDim, TextAlignmentOptions.MidlineRight);
                     detail.richText = true;
-                    Widgets.Fixed(detail.rectTransform, b * 1.2f, b * 12f);
+                    Widgets.Fixed(detail.rectTransform, b * 1.2f, detailWidth);
 
                     _rows.Add((label, detail));
                 }
