@@ -75,6 +75,53 @@
    데이터)이 이 경로를 전제하고 있었으므로, 다시 열 때는 가치 데이터만 별도 공개 저장소로
    떼는 방법을 함께 검토한다.
 
+## TEAM HORAY의 공식 모드 정책
+
+개발사가 공식 디스코드 FAQ 로 밝혀 둔 내용이다 (2026-08-31 확인, 원문 영어).
+
+> **Q. Are mods currently allowed in the community? What kinds of mods may result in sanctions?**
+>
+> A. Official mod support is not yet available, and using mods is entirely at your own risk.
+> We cannot assist with issues such as security risks, bugs, or data corruption caused by mods.
+>
+> Within the community, the following types of mods may result in sanctions:
+> - Mods created or distributed for commercial purposes (sales, donations, subscriptions, etc.)
+> - Mods that infringe on others' copyrights or include illegal assets
+> - Mods that interfere with multiplayer or disrupt other users' experiences
+>
+> **Q. What exactly does "mods that interfere with multiplayer" mean?**
+>
+> A. Multiplayer modding is only permitted when all participants agree.
+>
+> Allowed examples:
+> - The host clearly states "This is a 6-player mod room," and users join with that knowledge.
+> - Players create a private room and use a multiplayer mod by mutual agreement.
+>
+> Not allowed examples:
+> - Joining a public lobby where the host secretly enabled a mod (e.g., altering stats, changing
+>   difficulty, forcing 6 players).
+> - Any multiplayer environment modified without participant consent.
+
+**제재 사유 셋 중 우리가 걸리는 것은 없다.**
+
+| 제재 사유 | 이 프로젝트 |
+|---|---|
+| 상업적 목적 (판매·후원·구독) | 광고·후원·유료 요소가 전혀 없다. 비영리 결정이 여기에 정확히 맞는다 |
+| 타인 저작권 침해·불법 에셋 | 게임 에셋을 배포물에 넣지 않는다. 아이콘·텍스트는 각 유저 PC에서 생성한다 |
+| 멀티플레이 방해 | 멀티 세션에서는 쓰기 기능을 잠근다. 읽기와 표시만 남는다 |
+
+두 번째 답변이 **멀티플레이를 금지가 아니라 "참가자 전원 동의" 조건으로 규정한다.** 즉 우리가
+멀티에서 자동 배치를 잠가 두는 근거는 약관이 아니라 안정성뿐임이 확인됐다(위 2번 참고). 나중에
+Mirror 동기화가 안전하다고 확인되면, 사설 방에서 참가자가 합의한 경우에 한해 여는 것이 정책과
+어긋나지 않는다.
+
+첫 답변의 "모드 사용은 전적으로 사용자 책임이며 개발사가 도와줄 수 없다"는 대목은 배포 시
+사용자에게 그대로 알려야 한다(`docs/INSTALL.md`).
+
+**이 정책이 답하지 않는 것이 하나 남는다 — 싱글플레이에서 게임 상태를 쓰는 것(자동 배치).**
+제재 목록에 없고 "at your own risk" 라는 표현은 묵인에 가깝지만, 명시적으로 허락받은 것은
+아니다. 문의는 이 한 가지에 집중한다.
+
 ## 남은 리스크와 해소 방법
 
 가장 확실한 해소책은 **TEAM HORAY에 직접 확인받는 것**이다. 세피리아는 안티치트가 없고 이미
@@ -96,33 +143,40 @@
 
 - [ ] TEAM HORAY에 문의 (미완료)
 
-보낼 문구 초안:
+보낼 문구 초안. 공식 FAQ 가 제재 사유를 이미 밝혀 두었으므로, 넓게 묻는 대신 **그 세 항목에
+대한 우리 상태를 먼저 보이고 FAQ 가 답하지 않는 하나만 묻는다.**
 
-> 안녕하세요, 세피리아를 재미있게 하고 있는 유저입니다. 인벤토리를 읽어 석판 배치를 계산해
-> 주는 비공식 컴패니언 오버레이(BepInEx 플러그인 + 별도 창)를 만들었고, 커뮤니티에 무료로
-> 공개해도 괜찮을지 미리 여쭙고 싶습니다.
+> 안녕하세요. 세피리아 인벤토리를 읽어 석판 배치를 계산해 주는 비공식 컴패니언 오버레이를
+> 만들었고(BepInEx 플러그인 + 별도 창), 커뮤니티에 무료로 공개하기 전에 한 가지 확인받고
+> 싶어 연락드립니다.
 >
-> 무엇을 하는 도구인지:
+> 디스코드의 모드 FAQ를 먼저 읽었고, 제재 사유로 드신 세 가지에 대해서는 이렇게 맞춰
+> 두었습니다.
 >
-> - 플러그인이 인벤토리 상태를 읽어 별도 오버레이 창으로 넘기고, 오버레이가 석판·아티팩트의
->   최적 배치와 지금 집을 만한 선택지를 보여 줍니다.
-> - **게임 상태를 바꾸는 기능은 "자동 배치" 하나뿐입니다.** 계산해 둔 배치대로 본인 인벤토리를
->   정리해 주는 것이고, 손으로 드래그하는 것과 같은 `GridInventory.Swap` 경로만 씁니다.
->   손으로도 똑같이 할 수 있는 일의 대행이라고 보고 넣었습니다.
-> - **멀티플레이에서는 자동 배치가 잠깁니다.** 다른 분들의 세션에 영향을 줄 여지를 두지
->   않으려는 것이고, 동기화가 안전한지 확인되기 전까지는 열지 않을 생각입니다.
-> - 상자를 열기 전의 내용물처럼 **플레이어가 화면에서 볼 수 없는 정보는 보여주지 않습니다.**
->   기술적으로 읽을 수 있어도 의도적으로 뺐습니다.
-> - 게임 에셋(아이콘·텍스트)은 배포물에 넣지 않고 각 유저 PC의 게임에서 생성합니다.
->   BepInEx나 게임 파일도 재배포하지 않습니다.
-> - 광고·후원·유료 요소가 없는 완전 무료입니다.
+> - **상업적 목적**: 광고·후원·구독·유료 요소가 전혀 없는 무료 배포입니다.
+> - **저작권·에셋**: 게임 파일을 재배포하지 않습니다. 아이콘과 텍스트는 배포물에 넣지 않고
+>   각 사용자 PC에 설치된 게임에서 생성합니다. BepInEx도 재배포하지 않고 직접 설치하도록
+>   안내합니다.
+> - **멀티플레이**: 멀티 세션에서는 게임 상태를 바꾸는 기능이 전부 잠깁니다. 읽어서 화면에
+>   보여 주기만 합니다.
 >
-> 한 가지 미리 말씀드리면, **소스 코드는 공개하지 않고 빌드된 파일만 배포할 예정입니다.**
-> 그래서 위 내용을 코드로 보여 드리기 어려운데, 동작에 대해 궁금하신 점이 있으면 무엇이든
-> 자세히 설명드리겠습니다. 필요하시면 빌드를 먼저 보내 드리거나 직접 보여 드릴 수도 있습니다.
+> 또한 상자를 열기 전의 내용물처럼 **플레이어가 화면에서 볼 수 없는 정보는 보여주지
+> 않습니다.** 기술적으로는 읽을 수 있지만 의도적으로 뺐습니다.
 >
-> 이런 형태의 공개가 괜찮은지, 특히 자동 배치 기능을 넣어도 되는지 확인받고 싶습니다.
-> 문제가 되는 부분이 있으면 알려주시면 바로 빼거나 고치겠습니다.
+> **여쭙고 싶은 것은 한 가지입니다. 싱글플레이에서 본인 인벤토리를 자동으로 정리해 주는
+> 기능("자동 배치")을 넣어도 괜찮을까요?**
+>
+> 계산해 둔 배치대로 아이템을 옮겨 주는 기능이고, 손으로 드래그하는 것과 같은
+> `GridInventory.Swap` 경로만 사용합니다. 손으로도 똑같이 할 수 있는 일을 대신 해 주는 것이라
+> 판단해 넣었지만, 게임 상태를 쓰는 유일한 기능이라 FAQ의 제재 목록에 없더라도 먼저
+> 여쭙는 것이 맞다고 생각했습니다. 멀티플레이에서는 잠가 두었고, 나중에 열더라도 FAQ에
+> 적어 주신 대로 참가자가 모두 동의한 방에서만 열 생각입니다.
+>
+> 한 가지 미리 말씀드리면 소스 코드는 공개하지 않고 빌드된 파일만 배포할 예정이라, 위 내용을
+> 코드로 보여 드리기 어렵습니다. 동작에 대해 궁금하신 점은 무엇이든 자세히 설명드리고,
+> 필요하시면 빌드를 먼저 보내 드리거나 직접 보여 드리겠습니다.
+>
+> 문제가 되는 부분이 있으면 알려주시면 바로 빼거나 고치겠습니다. 감사합니다.
 
 답을 받으면 날짜와 함께 이 문서에 기록한다.
 
