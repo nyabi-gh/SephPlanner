@@ -173,10 +173,12 @@ namespace SephPlanner.Core.Solver
             // 살 수 없는 것은 아무리 좋아도 지금 고를 수 없다. 지우지는 않고 아래로 내린다.
             // 콤보 가치는 배치 점수에 안 잡히므로 여기서 더해 줄을 세운다. 증가분까지 같으면
             // 여력이 큰 쪽을 위로 올린다. 아티팩트가 적을 때는 여러 석판이 똑같이 최대치를
-            // 뽑아내 증가분만으로는 우열이 드러나지 않는다.
+            // 뽑아내 증가분만으로는 우열이 드러나지 않는다. 그래도 같으면 정의 번호로 가른다 -
+            // 입력 순서는 게임의 오브젝트 열거 순서라 폴링마다 흔들릴 수 있다.
             return advice.OrderByDescending(entry => entry.Affordable)
                          .ThenByDescending(entry => entry.Gain + entry.ComboBonus)
                          .ThenByDescending(entry => entry.Effect.Reach)
+                         .ThenBy(entry => entry.Candidate.DefinitionId)
                          .ToList();
         }
 

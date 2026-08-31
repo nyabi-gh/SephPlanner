@@ -63,6 +63,29 @@ public class OfferAdvisorTests
         Assert.True(advice[0].Affordable);
     }
 
+    private static OfferCandidate PlainCharm(int definitionId) => new()
+    {
+        Kind = "charm",
+        DefinitionId = definitionId,
+        Name = "C" + definitionId,
+        Charm = new CharmDefinition { MaxLevel = 5 },
+    };
+
+    [Fact]
+    public void EqualOffersKeepAStableOrderRegardlessOfArrivalOrder()
+    {
+        // 게임의 오브젝트 열거 순서는 비보장이다. 증가분까지 같은 후보가 입력 순서로 줄을 서면
+        // 아무것도 달라지지 않았는데 화면 순위가 흔들린다.
+        var forward = OfferAdvisor.Rank(
+            BaseProblem(), new List<OfferCandidate> { PlainCharm(7), PlainCharm(5) }, gold: 0);
+        var backward = OfferAdvisor.Rank(
+            BaseProblem(), new List<OfferCandidate> { PlainCharm(5), PlainCharm(7) }, gold: 0);
+
+        Assert.Equal(
+            forward.Select(entry => entry.Candidate.DefinitionId),
+            backward.Select(entry => entry.Candidate.DefinitionId));
+    }
+
     private static OfferCandidate Charm(string name, params string[] categories) => new()
     {
         Kind = "charm",

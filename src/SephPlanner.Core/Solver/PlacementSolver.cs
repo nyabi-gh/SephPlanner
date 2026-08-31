@@ -270,7 +270,14 @@ namespace SephPlanner.Core.Solver
             PlacementProblem problem, CharmSlot charm, GridPos cell,
             SimulationResult result, GridOccupancy occupancy, Dictionary<GridPos, CharmSlot>? neighbors)
         {
-            if (charm.IsFiller) return 0;
+            // 필러도 자리 유지 몫은 받아야 한다. 없으면 전 칸이 0점 동률이라 배정 순서에 따라
+            // 필러끼리 자리를 맞바꾸는 제안이 나온다.
+            if (charm.IsFiller)
+            {
+                return problem.CurrentCharms.TryGetValue(charm.InstanceId, out var kept) && kept == cell
+                    ? StabilityBonus
+                    : 0;
+            }
             if (Reason(charm, cell, result, problem.Grid, occupancy) != CharmInactiveReason.None) return 0;
 
             var level = result.EffectiveLevel(cell, charm.Enchant);

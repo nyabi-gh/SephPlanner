@@ -27,6 +27,7 @@ namespace SephPlanner.Plugin
             CollectSephirites(snapshot.Offers, origin, radius);
 
             var shown = ShownInventory();
+            var nearby = new List<GridInventory>();
             foreach (var inventory in UnityEngine.Object.FindObjectsByType<GridInventory>(FindObjectsSortMode.None))
             {
                 if (inventory == null || inventory == playerInventory) continue;
@@ -34,8 +35,13 @@ namespace SephPlanner.Plugin
                 if (Vector3.Distance(origin, inventory.transform.position) > radius) continue;
                 if (!IsVisible(inventory, shown)) continue;
 
-                Collect(snapshot.Offers, inventory, player);
+                nearby.Add(inventory);
             }
+
+            // FindObjectsByType 의 순서는 비보장이다. 순서만 흔들려도 스냅샷이 "변경"으로 보여
+            // 재계산이 돌고 후보 순번이 바뀐다.
+            nearby.Sort((a, b) => a.netId.CompareTo(b.netId));
+            foreach (var inventory in nearby) Collect(snapshot.Offers, inventory, player);
         }
 
         /// <summary>
@@ -157,12 +163,20 @@ namespace SephPlanner.Plugin
             // 상자와 바닥에 떨어진 꾸러미는 주인이 없어 그냥 집으면 되고, 주인이 있는 인벤토리는 사야 한다.
             var seller = inventory.UnitAvatar;
             var seen = new HashSet<int>();
+            var instances = new List<NewItemOwnInstance>();
 
             foreach (var pair in inventory.inventoryMatrix)
             {
                 var instance = pair.Value;
                 if (instance == null || !seen.Add(instance.InstanceID)) continue;
+                instances.Add(instance);
+            }
 
+            // 딕셔너리 열거 순서도 보장이 아니다. 줄이 흔들리면 후보 순번이 흔들린다.
+            instances.Sort((a, b) => a.InstanceID.CompareTo(b.InstanceID));
+
+            foreach (var instance in instances)
+            {
                 var entity = instance.Entity;
                 if (entity == null) continue;
 
