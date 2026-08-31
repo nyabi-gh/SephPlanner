@@ -38,7 +38,8 @@ namespace SephPlanner.Plugin
         private readonly List<ConfigEntry<KeyboardShortcut>> _shortcuts =
             new List<ConfigEntry<KeyboardShortcut>>();
 
-        public static readonly float[] OpacitySteps = { 1.0f, 0.85f, 0.7f, 0.55f };
+        // 오름차순이어야 설정 창에서 왼쪽이 흐리게, 오른쪽이 진하게가 된다.
+        public static readonly float[] OpacitySteps = { 0.55f, 0.7f, 0.85f, 1.0f };
         private static readonly float[] ScaleSteps = { 0.8f, 0.9f, 1.0f, 1.15f, 1.3f, 1.5f };
         private static readonly float[] WidthSteps = { 18f, 22f, 26f, 30f, 36f };
 
@@ -129,9 +130,14 @@ namespace SephPlanner.Plugin
             $"{Corner.Value}/{MarginX.Value:0.###}/{MarginY.Value:0.###}/" +
             $"{Width.Value:0.###}/{Scale.Value:0.###}";
 
+        /// <summary>
+        /// 단축키는 누를 때마다 흐려진다. 값 목록은 오름차순이라 거꾸로 훑는다 - 진하게 켜 두고
+        /// 가릴 때 한 번씩 누르는 것이 실제 쓰임이라, 그 방향이 한 번 눌러 얻는 값이 크다.
+        /// </summary>
         public void CycleOpacity()
         {
-            var next = (Nearest(OpacitySteps, Opacity.Value) + 1) % OpacitySteps.Length;
+            var next = Nearest(OpacitySteps, Opacity.Value) - 1;
+            if (next < 0) next = OpacitySteps.Length - 1;
             Opacity.Value = OpacitySteps[next];
         }
 
@@ -158,7 +164,7 @@ namespace SephPlanner.Plugin
                 Steps("크기", Scale, ScaleSteps, new[] { "80%", "90%", "100%", "115%", "130%", "150%" }),
                 Steps("폭", Width, WidthSteps,
                     new[] { "아주 좁게", "좁게", "보통", "넓게", "아주 넓게" }),
-                Steps("불투명도", Opacity, OpacitySteps, new[] { "100%", "85%", "70%", "55%" }),
+                Steps("불투명도", Opacity, OpacitySteps, new[] { "55%", "70%", "85%", "100%" }),
                 Switch("후보 추천", Recommendations),
                 Key("접기/펼치기", ExpandKey, keys, keyNames, divider: true),
                 Key("자동 배치", AutoPlaceKey, keys, keyNames),

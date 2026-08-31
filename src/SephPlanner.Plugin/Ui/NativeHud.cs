@@ -107,6 +107,9 @@ namespace SephPlanner.Plugin.Ui
             // 장미빛 테두리 한 겹과 그 안의 어두운 속. 오버레이 패널의 골격을 옮긴 것이다.
             var frame = Widgets.Fill("SephPlannerHud", root.transform, NativeSkin.Frame);
             _root = frame.gameObject;
+
+            // 다음에 크기를 빌릴 때 우리 글자를 세지 않도록 표시해 둔다.
+            _root.AddComponent<SephPlannerWidget>();
             _canvas = root.Canvas;
             _canvasRect = (RectTransform)root.transform;
 

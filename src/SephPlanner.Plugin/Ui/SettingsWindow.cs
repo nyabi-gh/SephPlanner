@@ -112,6 +112,7 @@ namespace SephPlanner.Plugin.Ui
             // 잡아 두는데, 켜진 채로 붙이면 그 전에 Awake 가 돌아 버린다.
             go.SetActive(false);
             go.AddComponent<CanvasGroup>();
+            go.AddComponent<SephPlannerWidget>();
 
             _panel = go.AddComponent<SettingsPanel>();
             _panel.hasControl = true;
@@ -219,16 +220,12 @@ namespace SephPlanner.Plugin.Ui
             }
 
             /// <summary>
-            /// 양끝에서 멈추지 않고 돌아간다. 화살표 두 개뿐이라 끝에서 막히면 되돌아갈 길이
-            /// 반대쪽 화살표를 여러 번 누르는 것밖에 없다.
+            /// 양끝에서 멈춘다. 돌아가게 두었더니 불투명도 100%에서 왼쪽을 누르는 순간 55%로
+            /// 떨어졌다 - 순서가 있는 값에서는 끝에서 반대쪽으로 튀는 것이 고장으로 읽힌다.
             /// </summary>
             private void Step(int delta)
             {
-                var count = _row.Choices.Length;
-                if (count == 0) return;
-
-                var index = (_row.Read() + delta) % count;
-                if (index < 0) index += count;
+                var index = Mathf.Clamp(_row.Read() + delta, 0, _row.Choices.Length - 1);
                 _row.Write(index);
             }
 
@@ -247,7 +244,38 @@ namespace SephPlanner.Plugin.Ui
     /// </summary>
     internal sealed class SettingsPanel : UIBase
     {
+        private bool _paused;
+
         // 도감처럼 타입 이름으로 찾는 게임 UI 목록에 우리 것을 끼워 넣을 이유가 없다.
         public override bool CanBeSearchedByTypeHash => false;
+
+        /// <summary>
+        /// 여는 동안 시간을 멈춘다. 게임에서 설정을 만지는 길은 ESC 일시정지 창을 거치는 것이라,
+        /// 그때는 아래에서 일시정지 창이 이미 시간을 멈춰 두고 있다(<c>UI_PausePanel.OnOpened</c>가
+        /// <c>GameTimeManager.Pause</c>를 부른다). 우리 창만 시간이 흐르면 설정을 만지는 사이에
+        /// 얻어맞는다. 새로 주는 이득도 아니다 - ESC 로 언제든 멈출 수 있는 것이 게임 자신의 설계다.
+        ///
+        /// 멀티에서는 <c>GameTimeManager.Pause</c>가 스스로 아무것도 하지 않는다.
+        /// </summary>
+        public override void OnOpened()
+        {
+            base.OnOpened();
+
+            // 이미 멈춰 있으면(일시정지 창이나 튜토리얼 팝업 위에서 열렸으면) 건드리지 않는다.
+            // 우리가 닫으면서 남의 정지를 풀어 버리면 안 된다.
+            if (GameTimeManager.Instance == null || Time.timeScale <= 0f) return;
+
+            _paused = true;
+            GameTimeManager.Instance.Pause();
+        }
+
+        public override void OnClosed()
+        {
+            base.OnClosed();
+            if (!_paused) return;
+
+            _paused = false;
+            if (GameTimeManager.Instance != null) GameTimeManager.Instance.ResetTimeScaleTo1();
+        }
     }
 }

@@ -19,6 +19,14 @@ namespace SephPlanner.Plugin.Ui
     /// "창틀"인지 게임 데이터만으로는 가릴 수가 없다. 색은 오버레이가 게임 패널에서 채집해 둔
     /// 값이 이미 있으므로 그것으로 직접 그린다.
     /// </summary>
+    /// <summary>
+    /// 우리가 만든 화면임을 알리는 표시. 게임에서 크기를 빌릴 때 우리 글자를 걸러내는 데 쓴다.
+    /// 붙이는 것 말고는 하는 일이 없다.
+    /// </summary>
+    internal sealed class SephPlannerWidget : MonoBehaviour
+    {
+    }
+
     internal sealed class NativeSkin
     {
         public TMP_FontAsset Font { get; private set; }
@@ -59,6 +67,12 @@ namespace SephPlanner.Plugin.Ui
             foreach (var text in root.GetComponentsInChildren<TMP_Text>(true))
             {
                 if (text == null || text.font == null || text.fontSize <= 0) continue;
+
+                // 우리 글자는 세지 않는다. 우리 것은 기준 크기의 배수(0.65~1.2배)로 만들어지므로,
+                // 다시 세면 중앙값이 우리 쪽으로 끌려 내려가고 그 값으로 또 만들게 된다. 화면을
+                // 다시 지을 때마다 조금씩 작아지는 버그가 실제로 이것이었다 - 폭을 바꿀 때마다
+                // 다시 짓기 때문에 눈에 띄게 줄어들었다.
+                if (text.GetComponentInParent<SephPlannerWidget>(true) != null) continue;
 
                 sizes.Add(text.fontSize);
                 if (skin.Font != null) continue;
