@@ -12,6 +12,10 @@ using SephPlanner.DataTool;
 if (args.Contains("--solve"))
     return SolverSmokeTest.Run(tabletCount: 3, charmCount: 12);
 
+// 콤보 한 단계가 아티팩트 레벨 몇 개 값어치인지 잰다. 플러그인이 떠 둔 능력치 표를 읽는다.
+if (args.Contains("--measure"))
+    return ComboMeasure.Run();
+
 // 저장해 둔 스냅샷으로 우리 레벨 계산을 게임 값과 견준다. 게임을 다시 켜지 않고 확인할 수 있다.
 var checkIndex = Array.IndexOf(args, "--check");
 if (checkIndex >= 0)

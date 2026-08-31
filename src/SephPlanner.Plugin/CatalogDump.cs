@@ -25,10 +25,13 @@ namespace SephPlanner.Plugin
             yield return null;
             var combos = ItemCatalog.LoadCombos();
             yield return null;
+            var measurement = ItemCatalog.LoadStatMeasurement();
+            yield return null;
 
             WriteJson(IpcContract.TabletDbFile, tablets);
             WriteJson(IpcContract.CharmDbFile, charms);
             WriteJson(IpcContract.ComboDbFile, combos);
+            WriteJson(IpcContract.StatMeasurementFile, measurement);
             WriteText(IpcContract.CatalogVersionFile, IpcContract.CatalogVersion.ToString());
             yield return null;
 

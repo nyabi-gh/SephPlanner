@@ -36,6 +36,13 @@ namespace SephPlanner.Core.Model
         /// </summary>
         public List<string> EffectLines { get; set; } = new List<string>();
 
+        /// <summary>
+        /// 조화의 수정 계열(<c>Charm_NearLevelDamage</c>)의 레벨별 배수. 이웃 8칸 아티팩트의
+        /// 유효 레벨 합에 이 값을 곱한 만큼 전체 피해가 오른다. 자기 레벨로 색인한다.
+        /// 다른 아티팩트에서는 비어 있다.
+        /// </summary>
+        public List<double> NeighborLevelBonus { get; set; } = new List<double>();
+
         public List<string> Categories { get; set; } = new List<string>();
         public Dictionary<string, string> Names { get; set; } = new Dictionary<string, string>();
     }

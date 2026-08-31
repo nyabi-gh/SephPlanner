@@ -49,8 +49,16 @@
 
 ## 백로그 (순서 미정)
 
-- **이웃 의존 아티팩트 가치 모델 확장.** 12종 중 하얀 종이만 완료. 조화의 수정
-  (`Charm_NearLevelDamage`, 이웃 8칸 유효 레벨 합 비례)이 다음 후보. RESEARCH.md 참고.
+- **이웃 의존 아티팩트 가치 모델 확장.** 12종 중 하얀 종이와 조화의 수정을 넣었다. 남은 열은
+  `Charm_UpCharmDamage`, `Charm_AutoMagic`, `Charm_ReduceMPCost`,
+  `Charm_RightSpellCooldownHelper`, `Charm_NearMagicBullet`, `Charm_PlanetModule`,
+  `Charm_WoodenBox`, `Charm_MagicCoolDownBonusByTag`, `Charm_BoltMagicMultiShot`,
+  `Charm_CompanionChaos`. 각자 로직이 달라 하나씩 봐야 한다. RESEARCH.md 참고.
+- **콤보 가중치 상수 갱신 (측정 대기).** 재는 길은 만들었다 —
+  `dotnet run --project src/SephPlanner.DataTool -- --measure`. 다만 **게임을 한 번 켜서 카탈로그를
+  다시 덤프해야** 원자료(`stat-measure.json`)가 생긴다. 그 결과의 중앙값으로
+  `Worth.ComboThreshold`를, 같은 방식으로 `Worth.DamageBonus`(조화의 수정 환산값)를 정한다.
+  그때까지 두 값은 여전히 설계값이다.
 - **프리셋의 "피하는 콤보" 반영.** 가져오기는 과일 꼬치의 양수 카테고리만 빌드 우선으로 켠다.
   음수(그 카테고리를 피하겠다는 뜻)는 화면에 개수만 보여 주고 점수에는 쓰지 않는다. 콤보 가치를
   깎는 방향이 맞는지 실제 빌드로 확인한 뒤에 붙인다.
@@ -61,14 +69,12 @@
 - **로컬 런 기록.** 런 종료 시 최종 격자·점수·콤보를 로컬 JSON으로. 백엔드 없음 원칙 유지.
 - **후보 미리보기(what-if).** 후보 클릭 시 그걸 집었을 때의 격자를 잠깐 표시. 솔버가 이미
   계산하므로 표시만 추가.
-- **콤보 가중치 실측.** `Worth.cs`의 2.0/0.25는 실측 근거 없는 설계값.
 - **다국어.** `Naming.CurrentLanguage = "current"` 단일 언어 구조. 15개 언어 데이터는 이미
   추출 가능하므로 배관만 남음.
 
 ## 배포 전 필수
 
 - **TEAM HORAY 문의.** LEGAL.md에 초안까지 있고 미발송. 배포 전에 보낸다.
-- **저장소 LICENSE 파일.** 프로젝트 자체 코드의 라이선스가 없다(폰트 라이선스만 있음).
 - **멀티플레이 자동 배치 검증(2단계).** Mirror 동기화 확인 전까지 잠금 유지.
 
 ## 성능 여지 (체감 문제 생기면)

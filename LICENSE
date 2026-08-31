@@ -1,0 +1,87 @@
+SephPlanner 최종 사용자 라이선스
+
+저작권 (c) 2026 nyattic. 모든 권리 보유(All rights reserved).
+
+이 문서의 한국어 본문이 정본이며, 아래 영문은 편의를 위한 번역이다.
+
+
+1. 허용되는 것
+
+   배포된 바이너리를 개인적·비상업적 목적으로 설치하고 사용할 수 있다. 사용료는 없다.
+
+2. 허용되지 않는 것
+
+   아래 행위는 저작권자의 사전 서면 허락 없이 할 수 없다.
+
+   a. 이 소프트웨어 또는 그 일부의 재배포·전송·판매·대여.
+   b. 수정, 개작, 파생물 제작.
+   c. 역컴파일, 역어셈블, 그 밖의 리버스 엔지니어링.
+   d. 상업적 이용. 이 소프트웨어를 유료로 제공하거나, 광고·후원 등 수익을 얻는 수단과
+      함께 배포하는 것을 포함한다.
+
+   소스 코드는 공개하지 않는다. 이 라이선스는 소스 코드에 대한 어떠한 권리도 부여하지 않는다.
+
+3. 보증의 부인과 책임의 제한
+
+   이 소프트웨어는 "있는 그대로" 제공되며, 상품성·특정 목적 적합성·비침해를 포함한 어떠한
+   명시적·묵시적 보증도 하지 않는다. 저작권자는 이 소프트웨어의 사용 또는 사용 불능으로
+   발생한 어떠한 손해에 대해서도 책임지지 않는다. 저장 데이터의 손상이나 게임 계정에 생길 수
+   있는 불이익도 여기에 포함된다.
+
+4. 제3자 구성요소
+
+   이 소프트웨어에는 Galmuri 글꼴이 포함되어 있다. Galmuri 는 SIL Open Font License 1.1 로
+   배포되며, 해당 라이선스 사본을 배포물에 함께 담는다. 그 글꼴에 대해서는 이 문서가 아니라
+   OFL-1.1 이 적용된다.
+
+   BepInEx, 게임 클라이언트, 그 밖에 이 소프트웨어가 동작하기 위해 필요한 제3자 구성요소는
+   이 배포물에 포함되지 않으며, 사용자가 각 배포처에서 직접 구해 각자의 약관에 따라 사용한다.
+
+5. 게임과의 관계
+
+   SephPlanner 는 세피리아(Sephiria)의 비공식 팬 제작 도구이며, TEAM HORAY 및 Valve 와
+   아무런 제휴·후원·승인 관계가 없다. 세피리아와 관련된 모든 상표와 저작물은 각 권리자의
+   것이다.
+
+6. 종료
+
+   이 라이선스의 조건을 위반하면 부여된 권리는 자동으로 소멸한다.
+
+
+--------------------------------------------------------------------------------
+
+SephPlanner End User License (English translation; the Korean text above governs)
+
+Copyright (c) 2026 nyattic. All rights reserved.
+
+1. Permitted. You may install and use the distributed binaries for personal,
+   non-commercial purposes, free of charge.
+
+2. Not permitted, without prior written permission of the copyright holder:
+   (a) redistributing, transmitting, selling or renting this software or any
+   part of it; (b) modifying, adapting or creating derivative works; (c)
+   decompiling, disassembling or otherwise reverse engineering it; (d)
+   commercial use, including charging for it or distributing it alongside
+   advertising, subscriptions or donations.
+
+   The source code is not published. This license grants no rights to it.
+
+3. No warranty. This software is provided "as is", without warranty of any
+   kind, express or implied, including merchantability, fitness for a
+   particular purpose and non-infringement. The copyright holder is not liable
+   for any damages arising from its use or inability to be used, including
+   damage to saved data or any disadvantage to a game account.
+
+4. Third-party components. The Galmuri font is included under the SIL Open
+   Font License 1.1, whose text ships with the distribution; OFL-1.1 governs
+   that font rather than this document. BepInEx, the game client and any other
+   third-party components needed to run this software are not included here;
+   obtain them from their own distributors under their own terms.
+
+5. Relationship to the game. SephPlanner is an unofficial, fan-made tool for
+   Sephiria and is not affiliated with, sponsored by or endorsed by TEAM HORAY
+   or Valve. All related trademarks and works belong to their respective
+   owners.
+
+6. Termination. Rights granted here end automatically if these terms are
+   breached.

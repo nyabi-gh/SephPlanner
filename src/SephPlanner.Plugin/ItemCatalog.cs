@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using SephPlanner.Core.Model;
+using SephPlanner.Core.Solver;
 using UnityEngine;
 
 namespace SephPlanner.Plugin
@@ -64,6 +65,7 @@ namespace SephPlanner.Plugin
                         : "",
                     Behavior = charm != null ? charm.GetType().Name : "",
                     EffectLines = EffectLines(charm),
+                    NeighborLevelBonus = NeighborLevelBonus(charm),
                     Categories = entity.categories ?? new List<string>(),
                     Names = DisplayName(entity),
                 });
@@ -109,6 +111,77 @@ namespace SephPlanner.Plugin
                     Effects = EffectLines(combo),
                 });
             }
+            return result;
+        }
+
+        /// <summary>
+        /// 콤보 가중치를 재기 위한 원자료. 아티팩트가 레벨마다 올려 주는 능력치와, 콤보가 임계값에서
+        /// 주는 능력치를 게임에서 그대로 떠 온다. 두 쪽이 같은 <c>StatusDatabase</c> 체계를 쓰므로
+        /// 능력치별로 "레벨 하나당 얼마"를 구하면 콤보를 레벨 단위로 옮길 수 있다.
+        /// 해석은 게임 밖(<c>ComboWorthMeasure</c>)에서 한다.
+        /// </summary>
+        public static StatMeasurement LoadStatMeasurement()
+        {
+            var measurement = new StatMeasurement();
+
+            foreach (var entity in Resources.LoadAll<ItemEntity>("Item"))
+            {
+                if (entity.type != EItemType.Charm) continue;
+                if (entity.activeType == EItemActiveType.Disabled) continue;
+                if (entity.resourcePrefab == null) continue;
+
+                var charm = entity.resourcePrefab.GetComponent<Charm_StatusInstance>();
+                if (charm == null || charm.stats == null) continue;
+
+                foreach (var group in charm.stats)
+                {
+                    if (group == null || group.valuesByLevel == null) continue;
+
+                    var table = new CharmStatTable { EntityId = entity.id, StatusId = group.statusID };
+                    foreach (var value in group.valuesByLevel) table.ValuesByLevel.Add(value);
+                    measurement.CharmStats.Add(table);
+                }
+            }
+
+            foreach (var category in Resources.LoadAll<ItemCategoryEntity>("ItemCategory"))
+            {
+                if (!category.isEnabled || category.comboEffectPrefab == null) continue;
+
+                var combo = category.comboEffectPrefab.GetComponent<ComboEffectBase>();
+                if (combo == null) continue;
+
+                foreach (var stat in combo.addStatByCombo)
+                {
+                    if (stat == null || stat.status == null) continue;
+
+                    foreach (var entry in stat.status)
+                    {
+                        // 게임의 CreateStatusEntity 와 같은 분해다. 값이 없는 능력치는 잴 수 없다.
+                        var parts = (entry ?? "").Split('/');
+                        if (parts.Length < 2 || !int.TryParse(parts[1], out var value)) continue;
+
+                        measurement.ComboStats.Add(new ComboStatGrant
+                        {
+                            CategoryId = category.id,
+                            Threshold = stat.comboCount,
+                            StatusId = parts[0],
+                            Value = value,
+                        });
+                    }
+                }
+            }
+            return measurement;
+        }
+
+        /// <summary>
+        /// 조화의 수정 계열의 레벨별 배수. 이웃 여덟 칸의 유효 레벨 합에 곱해지는 값이라, 솔버가
+        /// 이 아티팩트의 자리 가치를 계산하려면 이 표가 있어야 한다.
+        /// </summary>
+        private static List<double> NeighborLevelBonus(Charm_Basic charm)
+        {
+            var result = new List<double>();
+            if (charm is Charm_NearLevelDamage near && near.allDamageBonusByLevel != null)
+                foreach (var value in near.allDamageBonusByLevel) result.Add(value);
             return result;
         }
 

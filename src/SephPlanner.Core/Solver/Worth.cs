@@ -16,6 +16,14 @@ namespace SephPlanner.Core.Solver
         /// <summary>아직 임계값에 못 미치지만 한 걸음 다가가는 가치.</summary>
         public const double ComboProgress = 0.25;
 
+        /// <summary>
+        /// 전체 피해 보너스 1점을 점수(레벨) 단위로 환산하는 값. 조화의 수정처럼 효과가 이웃에
+        /// 달린 아티팩트를 점수에 넣으려면 다른 단위를 옮겨 와야 한다.
+        ///
+        /// 이 값도 아직 실측 근거가 없다. `--measure` 가 콤보와 함께 재는 대상이다.
+        /// </summary>
+        public const double DamageBonus = 0.05;
+
         public static double OfRarity(Rarity rarity) => rarity switch
         {
             Rarity.Uncommon => 1.1,

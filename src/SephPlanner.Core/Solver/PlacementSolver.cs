@@ -280,6 +280,9 @@ namespace SephPlanner.Core.Solver
             if (charm.Definition.Behavior == "Charm_WhitePaper")
                 value += WhitePaperWorth(problem, charm, cell, neighbors);
 
+            if (charm.Definition.Behavior == "Charm_NearLevelDamage")
+                value += NearLevelDamageWorth(charm, cell, effective, result, neighbors);
+
             // 점수가 같은 배치가 여럿일 때 지금 자리를 지킨다. 채점할 때만 더하면 배정기가 이미
             // 자리를 바꿔 놓은 뒤라, 이득이 없는데도 맞바꾸라는 제안이 나온다.
             if (problem.CurrentCharms.TryGetValue(charm.InstanceId, out var current) && current == cell)
@@ -314,6 +317,50 @@ namespace SephPlanner.Core.Solver
                 worth += Worth.OfComboStep(combo, count, out _, out _);
             }
             return worth;
+        }
+
+        /// <summary>이웃 여덟 칸. 게임 <c>Charm_NearLevelDamage.directions</c>와 같은 집합이다.</summary>
+        private static readonly (int X, int Y)[] Around =
+        {
+            (-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (1, -1), (-1, 1), (1, 1),
+        };
+
+        /// <summary>
+        /// 조화의 수정은 이웃 여덟 칸에 있는 아티팩트들의 유효 레벨을 모두 더한 만큼 전체 피해를
+        /// 올린다(게임 <c>Charm_NearLevelDamage</c>: 칸마다 <c>min(레벨, 상한)</c>을 더하고 자기
+        /// 레벨에 해당하는 배수를 곱한다). 자기 레벨만 보는 점수로는 이 아티팩트를 구석에 두든
+        /// 한가운데 두든 똑같아 보이므로, 자리 가치를 여기서 되살린다.
+        ///
+        /// 하얀 종이와 같은 근사가 걸린다 — 이웃은 직전 반복의 배정 결과라, 이웃을 이 아티팩트
+        /// 주위로 다시 모으는 탐색까지는 하지 못하고 이미 모여 있는 자리를 찾아간다.
+        /// </summary>
+        private static double NearLevelDamageWorth(
+            CharmSlot charm, GridPos cell, int ownLevel,
+            SimulationResult result, Dictionary<GridPos, CharmSlot>? neighbors)
+        {
+            var table = charm.Definition.NeighborLevelBonus;
+            if (neighbors is null || table.Count == 0) return 0;
+
+            var perLevel = table[Math.Min(Math.Max(ownLevel, 0), table.Count - 1)];
+            if (perLevel == 0) return 0;
+
+            var sum = 0;
+            foreach (var (dx, dy) in Around)
+            {
+                var spot = cell.Offset(dx, dy);
+                if (!neighbors.TryGetValue(spot, out var neighbor)) continue;
+
+                // 직전 반복에서 자기가 서 있던 칸이 이웃으로 잡히는 경우다. 그대로 세면 자기를
+                // 세는 셈이고 건너뛰면 빈 칸으로 치는데, 배정은 자리 맞바꾸기라 실제로는 지금
+                // 목표 칸에 있는 아티팩트가 그 자리를 채우게 된다. 그것으로 갈음한다.
+                if (neighbor == charm && !neighbors.TryGetValue(cell, out neighbor)) continue;
+                if (neighbor == charm || neighbor.IsFiller) continue;
+
+                // 게임은 상한만 씌우고 아래로는 자르지 않는다. 음수 레벨 이웃은 오히려 깎는다.
+                sum += Math.Min(
+                    result.EffectiveLevel(spot, neighbor.Enchant), neighbor.Definition.MaxLevel);
+            }
+            return perLevel * sum * Worth.DamageBonus;
         }
 
         /// <summary>
