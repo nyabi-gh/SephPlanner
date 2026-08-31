@@ -66,6 +66,7 @@ scripts/make-release.ps1
 - [docs/INSTALL.md](docs/INSTALL.md) — 사용자용 설치 안내 (배포 zip에 포함)
 - [docs/RESEARCH.md](docs/RESEARCH.md) — 게임 내부 구조 조사 결과
 - [docs/LEGAL.md](docs/LEGAL.md) — 약관·저작권 검토와 그에 따른 설계 제약
+- [docs/ROADMAP.md](docs/ROADMAP.md) — 남은 작업과 우선순위, 고치지 않기로 한 것
 
 ## 원칙
 
