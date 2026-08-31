@@ -43,8 +43,9 @@ namespace SephPlanner.Plugin.Ui
         private RectTransform _buttons;
         private RectTransform _ourButton;
         private RectTransform _sourceButton;
-        private RectTransform _notch;
-        private float _notchOffset;
+        private RectTransform _rightGlyph;
+        private Vector2 _rightGlyphHome;
+        private Vector2 _rowSize;
         private bool _reported;
         private readonly List<Bound> _rows = new List<Bound>();
         private bool _wasOpen;
@@ -112,11 +113,8 @@ namespace SephPlanner.Plugin.Ui
             var panelOpen = _panel.IsOpened;
             if (panelOpen && !_wasPanelOpen)
             {
-                FitButtons();
-
-                // 폭을 고친 결과가 좌표에 반영된 뒤라야 노치를 맞출 수 있다.
+                LayoutRow();
                 Canvas.ForceUpdateCanvases();
-                AlignNotch();
                 Report();
             }
             _wasPanelOpen = panelOpen;
@@ -127,61 +125,59 @@ namespace SephPlanner.Plugin.Ui
         }
 
         /// <summary>
-        /// 탭이 하나 늘면 버튼 줄이 창 밖으로 밀린다 - 실제로 첫 탭과 우리 탭이 프레임 바깥으로
-        /// 잘려 나갔다. 넘칠 때만 버튼 폭을 똑같이 나눠 창 안에 들어오게 한다. 줄이 이미 들어가는
-        /// 경우에는 손대지 않으므로, 게임이 탭을 줄이는 패치를 해도 생김새가 그대로 남는다.
+        /// 탭 줄을 다시 잡는다. 게임 탭 다섯 개는 손대지 않고 우리 것만 오른쪽 여백에 끼운다.
         ///
-        /// 창을 열 때마다 다시 재는 것은 해상도와 UI 배율이 그 사이 바뀌었을 수 있어서다.
+        /// <b>게임 탭을 옮기면 안 되는 이유가 있다.</b> 탭 내용마다 프레임 그림이 따로 있고,
+        /// 선택된 탭에 붙는 <b>흰 돌기가 그 그림에 이미 박혀 있다</b> - 탭 다섯이 각각 다른
+        /// 스프라이트를 쓰는 것을 게임 에셋에서 확인했다. 그림 속 돌기는 옮길 수 없으므로 버튼을
+        /// 조금이라도 움직이면 게임 탭들이 제 돌기와 어긋난다. 여섯 개를 폭에 맞춰 고르게 나누면
+        /// 최대 58 단위(화면에서 300px 가까이) 어긋난다.
+        ///
+        /// 그래서 <c>ContentSizeFitter</c>를 꺼서 줄이 제 폭(부모 - 51)으로 돌아가게 하고 정렬을
+        /// 왼쪽으로 두어 게임 탭 다섯이 원래 자리에 그대로 서게 한다. 우리 버튼은 줄 오른쪽으로
+        /// 넘치는데, 창(<c>Base</c>)과 줄 사이에 남는 여백에 들어갈 만큼 좁힌다.
+        ///
+        /// 창을 열 때마다 다시 잡는 것은 해상도와 UI 배율이 그 사이 바뀌었을 수 있어서다.
         /// </summary>
-        private void FitButtons()
+        private void LayoutRow()
         {
-            if (_buttons == null) return;
+            if (_buttons == null || _ourButton == null) return;
 
-            var children = new List<RectTransform>();
-            for (var i = 0; i < _buttons.childCount; i++)
+            // 줄이 내용만큼 늘어나면 가운데 정렬이 되며 게임 탭이 통째로 왼쪽으로 밀린다.
+            // 끄는 것만으로는 부족하다 - 이미 덮어쓴 크기가 그대로 남으므로 원래 값을 되돌린다.
+            var fitter = _buttons.GetComponent<ContentSizeFitter>();
+            if (fitter != null)
             {
-                var child = _buttons.GetChild(i) as RectTransform;
-                if (child != null && child.gameObject.activeSelf) children.Add(child);
+                fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+                _buttons.sizeDelta = new Vector2(_rowSize.x, _buttons.sizeDelta.y);
             }
-            if (children.Count < 2) return;
 
-            var grid = _buttons.GetComponent<GridLayoutGroup>();
-            var row = _buttons.GetComponent<HorizontalLayoutGroup>();
-            var spacing = grid != null ? grid.spacing.x : row != null ? row.spacing : 0f;
-            var padding = grid != null ? grid.padding.horizontal
-                : row != null ? row.padding.horizontal : 0;
+            var group = _buttons.GetComponent<HorizontalLayoutGroup>();
+            var spacing = group != null ? group.spacing : 0f;
+            if (group != null) group.childAlignment = TextAnchor.MiddleLeft;
 
-            var inner = _buttons.rect.width - padding - spacing * (children.Count - 1);
-            if (inner <= 0f) return;
+            // 창 폭과 줄 폭 사이에 남는 자리가 우리 몫이다. 창은 탭 줄의 할아버지다.
+            var window = _buttons.parent != null ? _buttons.parent.parent as RectTransform : null;
+            var room = window != null ? (window.rect.width - _buttons.rect.width) / 2f - spacing : 0f;
 
-            var total = 0f;
-            foreach (var child in children) total += child.rect.width;
-            if (total <= inner) return;
+            var width = _sourceButton != null ? _sourceButton.rect.width : _ourButton.rect.width;
+            if (room > 0f && room < width) width = room;
 
-            var width = inner / children.Count;
-            if (grid != null)
-            {
-                grid.cellSize = new Vector2(width, grid.cellSize.y);
-            }
-            else
-            {
-                // 가로 레이아웃이 자식 폭을 제 손으로 정하는지 아닌지에 따라 보는 값이 다르다.
-                // 둘 다 맞춰 두면 어느 쪽이든 같은 폭이 나온다.
-                foreach (var child in children)
-                {
-                    var element = child.GetComponent<LayoutElement>();
-                    if (element == null) element = child.gameObject.AddComponent<LayoutElement>();
+            var element = _ourButton.GetComponent<LayoutElement>();
+            if (element == null) element = _ourButton.gameObject.AddComponent<LayoutElement>();
 
-                    element.minWidth = width;
-                    element.preferredWidth = width;
-                    element.flexibleWidth = 0f;
-                    child.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, width);
-                }
-            }
+            element.minWidth = width;
+            element.preferredWidth = width;
+            element.flexibleWidth = 0f;
+            _ourButton.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, width);
+
+            // 컨트롤러 안내 글리프는 줄 오른쪽 끝에 붙어 있다. 우리 탭이 그 자리에 들어가므로
+            // 그만큼 밀어 준다. 원래 자리에서 다시 재므로 창을 여러 번 열어도 밀리지 않는다.
+            if (_rightGlyph != null)
+                _rightGlyph.anchoredPosition = _rightGlyphHome + new Vector2(width + spacing, 0f);
 
             LayoutRebuilder.MarkLayoutForRebuild(_buttons);
-            _log($"탭 버튼 {children.Count}개를 폭 {width:0} 으로 맞췄습니다 " +
-                 $"(줄 {inner:0}, 원래 {total:0}, 레이아웃 {(grid != null ? "격자" : row != null ? "가로" : "없음")}).");
+            _log($"탭 줄을 잡았습니다 - 우리 탭 폭 {width:0.#}, 남은 자리 {room:0.#}, 줄 {_buttons.rect.width:0.#}.");
         }
 
         public void Refresh()
@@ -263,18 +259,21 @@ namespace SephPlanner.Plugin.Ui
                 UnityEngine.Object.Destroy(go);
             }
 
+            // 줄의 원래 크기를 우리 버튼을 붙이기 전에 적어 둔다. ContentSizeFitter 가 내용에
+            // 맞춰 sizeDelta 를 덮어쓰기 때문에, 나중에는 원래 값을 알 길이 없다.
+            _buttons = tab.tabButtons[tab.tabButtons.Length - 1].transform.parent as RectTransform;
+            if (_buttons != null) _rowSize = _buttons.sizeDelta;
+
             var button = BuildButton(tab, panel);
             _buttons = button.transform.parent as RectTransform;
             _ourButton = button.transform as RectTransform;
             _sourceButton = tab.tabButtons[source.Content].transform as RectTransform;
+            RememberGlyph();
 
-            // 선택된 탭에 붙는 흰 탭 모양은 탭 내용 쪽에 있고, 복제본은 원본 탭 자리를 가리킨
-            // 채로 온다. 실제로 게임에서 우리 탭을 골랐는데 흰 모양이 첫 탭 위에 얹혀 옆 탭
-            // 글자를 반씩 가렸다. 원본 탭에 대해 어긋나 있던 만큼을 기억해 두었다가 우리 탭
-            // 자리에 그대로 옮겨 준다.
-            _notch = FindNotch(clone.transform);
-            if (_notch != null && _sourceButton != null)
-                _notchOffset = _notch.position.x - _sourceButton.position.x;
+            // 새 자식은 맨 뒤에 붙는데, 게임은 탭 줄을 탭 내용들보다 뒤(그래서 위)에 그린다.
+            // 그대로 두면 우리 내용이 탭 줄을 덮어, 우리 내용 그림에 박힌 흰 돌기가 첫 탭 버튼을
+            // 통째로 가린다 - 실제로 "게임플레이" 탭이 사라져 있었다. 탭 줄 바로 앞에 끼운다.
+            clone.transform.SetSiblingIndex(_buttons.GetSiblingIndex());
 
             content.parent = panel;
 
@@ -295,51 +294,23 @@ namespace SephPlanner.Plugin.Ui
         }
 
         /// <summary>
-        /// 흰 탭 모양을 우리 탭 자리로 옮긴다. 창을 열 때마다 절대 위치로 다시 놓으므로 여러 번
-        /// 불려도 같은 자리에 선다.
+        /// 줄 오른쪽 끝의 컨트롤러 안내 글리프. 우리 탭이 들어갈 자리라 원래 자리를 기억해 둔다.
+        /// 이름이 아니라 "탭 버튼이 아닌 것 중 제일 오른쪽"으로 고르는 것은, 이름이 게임 패치로
+        /// 바뀌어도 자리로는 알아볼 수 있어서다.
         /// </summary>
-        private void AlignNotch()
+        private void RememberGlyph()
         {
-            if (_notch == null || _ourButton == null) return;
-
-            var position = _notch.position;
-            _notch.position = new Vector3(_ourButton.position.x + _notchOffset, position.y, position.z);
-        }
-
-        /// <summary>
-        /// 탭 내용에서 흰 탭 모양을 찾는다. 내용 판때기보다 위로 삐져나온 것이 그것이다 -
-        /// 탭 줄까지 올라가 붙어야 하는 물건이라 혼자만 위쪽으로 넘친다.
-        /// </summary>
-        private static RectTransform FindNotch(Transform content)
-        {
-            var root = content as RectTransform;
-            if (root == null) return null;
-
-            var corners = new Vector3[4];
-            root.GetWorldCorners(corners);
-            var top = corners[1].y;
-
-            var width = corners[2].x - corners[0].x;
-
-            RectTransform found = null;
-            var highest = top + 1f;
-
-            for (var i = 0; i < content.childCount; i++)
+            var best = float.NegativeInfinity;
+            for (var i = 0; i < _buttons.childCount; i++)
             {
-                var child = content.GetChild(i) as RectTransform;
-                if (child == null) continue;
+                var child = _buttons.GetChild(i) as RectTransform;
+                if (child == null || child.GetComponent<UI_TabButton>() != null) continue;
+                if (child.anchoredPosition.x <= best) continue;
 
-                child.GetWorldCorners(corners);
-                if (corners[1].y <= highest) continue;
-
-                // 탭 하나 너비의 돌기여야 한다. 내용 판때기 자체가 제일 위까지 차 있는 구조라면
-                // 그것을 옆으로 밀게 되므로, 넓은 것은 후보로 삼지 않는다.
-                if (corners[2].x - corners[0].x > width * 0.5f) continue;
-
-                highest = corners[1].y;
-                found = child;
+                best = child.anchoredPosition.x;
+                _rightGlyph = child;
             }
-            return found;
+            if (_rightGlyph != null) _rightGlyphHome = _rightGlyph.anchoredPosition;
         }
 
         /// <summary>
@@ -363,13 +334,15 @@ namespace SephPlanner.Plugin.Ui
             for (var i = 0; i < _content.transform.childCount; i++)
             {
                 var child = _content.transform.GetChild(i) as RectTransform;
-                text.AppendLine($"  {(child == _notch ? "*" : " ")}{i}: {Describe(child)}");
+                text.AppendLine($"  {i}: {Describe(child)}");
             }
 
             text.AppendLine();
-            text.AppendLine($"[notch] {Describe(_notch)} offset={_notchOffset:0.#}");
             text.AppendLine($"[our button] {Describe(_ourButton)}");
             text.AppendLine($"[source button] {Describe(_sourceButton)}");
+            text.AppendLine($"[right glyph] {Describe(_rightGlyph)} home={_rightGlyphHome}");
+            text.AppendLine(
+                $"[window] {Describe(_buttons.parent != null ? _buttons.parent.parent as RectTransform : null)}");
 
             try
             {
@@ -457,7 +430,15 @@ namespace SephPlanner.Plugin.Ui
                     clickable.onClick.SetPersistentListenerState(i, UnityEventCallState.Off);
 
                 clickable.onClick.RemoveAllListeners();
-                clickable.onClick.AddListener(() => panel.SelectTab(index));
+                clickable.onClick.AddListener(() =>
+                {
+                    panel.SelectTab(index);
+
+                    // 게임은 선택된 탭의 버튼 그림을 끄고, 그 자리를 탭 내용 그림에 박힌 흰
+                    // 돌기가 채운다. 우리 자리의 돌기는 어느 그림에도 없으므로 그대로 두면
+                    // 고르는 순간 탭이 사라진 것처럼 구멍이 난다. 상자를 그대로 둔다.
+                    if (button.butttonImage != null) button.butttonImage.enabled = true;
+                });
             }
             return button;
         }

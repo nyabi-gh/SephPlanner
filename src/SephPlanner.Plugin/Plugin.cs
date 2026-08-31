@@ -40,6 +40,7 @@ namespace SephPlanner.Plugin
         private bool _tabFailed;
         private float _appliedOpacity = -1f;
         private bool _expanded;
+        private bool _hidden;
         private bool _hadOffers;
         private bool _moving;
         private string _autoPlaceResult = "";
@@ -60,7 +61,14 @@ namespace SephPlanner.Plugin
             if (_settings.InventoryDumpKey.Value.IsDown()) DumpInventory();
             if (_settings.Panel.Value)
             {
-                if (_settings.ExpandKey.Value.IsDown()) _expanded = !_expanded;
+                if (_settings.HideKey.Value.IsDown()) ToggleHidden();
+                if (_settings.ExpandKey.Value.IsDown())
+                {
+                    _expanded = !_expanded;
+
+                    // 접으면 안내 줄이 사라진다. 접는 순간만큼은 어떻게 되돌리는지 보여야 한다.
+                    Report(Guide());
+                }
                 if (_settings.AutoPlaceKey.Value.IsDown()) AutoPlace();
                 if (_settings.OpacityKey.Value.IsDown()) _settings.CycleOpacity();
                 if (_settings.MoveKey.Value.IsDown()) ToggleMove();
@@ -264,7 +272,7 @@ namespace SephPlanner.Plugin
         /// </summary>
         private void UpdateNativePanel()
         {
-            if (!_settings.Panel.Value)
+            if (!_settings.Panel.Value || _hidden)
             {
                 _hud.SetVisible(false);
                 return;
@@ -293,6 +301,10 @@ namespace SephPlanner.Plugin
             {
                 _builtLayout = _settings.LayoutSignature;
                 _appliedOpacity = -1f;
+
+                // 접힌 화면은 안내 줄을 물고 있지 않다. 처음 뜰 때 잠깐 보여 주지 않으면
+                // 무엇을 눌러야 하는지 알 길이 없다.
+                Report(Guide());
                 if (_hud.Origin != _lastPanelOrigin)
                 {
                     _lastPanelOrigin = _hud.Origin;
@@ -407,11 +419,37 @@ namespace SephPlanner.Plugin
 
             if (Time.unscaledTime < _autoPlaceShownUntil) return _autoPlaceResult;
 
+            // 접었을 때는 안내 줄도 접는다. 게임 화면을 가리지 않는 것이 접는 이유인데 안내가
+            // 늘 붙어 있으면 줄어드는 것이 반뿐이다. 키를 누르면 잠깐 다시 뜬다.
+            return _expanded ? Guide() : "";
+        }
+
+        private string Guide()
+        {
             var expand = Describe(_settings.ExpandKey) + (_expanded ? " 접기" : " 펼치기");
-            var look = Describe(_settings.OpacityKey) + " 불투명도   " + Describe(_settings.MoveKey) + " 이동";
+            var look = Describe(_settings.OpacityKey) + " 불투명도   " +
+                       Describe(_settings.MoveKey) + " 이동   " +
+                       Describe(_settings.HideKey) + " 숨기기";
             if (_lastSnapshot != null && _lastSnapshot.IsMultiplayer) return expand + "   " + look;
 
             return expand + "   " + Describe(_settings.AutoPlaceKey) + " 자동 배치   " + look;
+        }
+
+        /// <summary>
+        /// 화면을 통째로 숨긴다. 계산은 그대로 돌려 둔다 - 다시 켰을 때 "계산 중"부터 보는
+        /// 대신 곧바로 최신 배치가 뜬다. 아예 쓰지 않을 것이면 설정에서 끄는 쪽이 맞다.
+        /// </summary>
+        private void ToggleHidden()
+        {
+            _hidden = !_hidden;
+            if (_hidden)
+            {
+                // 숨긴 뒤에는 화면에 알릴 자리가 없다. 되돌릴 키는 로그에만 남는다.
+                Logger.LogInfo($"인게임 화면을 숨겼습니다. {Describe(_settings.HideKey)} 로 다시 보입니다.");
+                return;
+            }
+
+            Report(Guide());
         }
 
         private static string Describe(ConfigEntry<KeyboardShortcut> entry) =>

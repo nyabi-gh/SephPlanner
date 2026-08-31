@@ -31,6 +31,7 @@ namespace SephPlanner.Plugin
         public ConfigEntry<KeyboardShortcut> AutoPlaceKey { get; }
         public ConfigEntry<KeyboardShortcut> OpacityKey { get; }
         public ConfigEntry<KeyboardShortcut> MoveKey { get; }
+        public ConfigEntry<KeyboardShortcut> HideKey { get; }
 
         private readonly Action<string> _log;
         private readonly List<ConfigEntry<KeyboardShortcut>> _shortcuts =
@@ -100,11 +101,16 @@ namespace SephPlanner.Plugin
             MoveKey = config.Bind(
                 "NativePanel", "MoveKey", new KeyboardShortcut(KeyCode.F6),
                 "이동 모드. 한 번 누르면 화면이 커서를 따라오고, 다시 누르면 그 자리에 고정된다.");
+            HideKey = config.Bind(
+                "NativePanel", "HideKey", new KeyboardShortcut(KeyCode.F4),
+                "화면을 통째로 숨겼다가 다시 보여준다. 숨어 있어도 계산은 계속 돌아서 다시 " +
+                "켜면 곧바로 최신 배치가 뜬다.");
 
             _shortcuts.Add(ExpandKey);
             _shortcuts.Add(AutoPlaceKey);
             _shortcuts.Add(OpacityKey);
             _shortcuts.Add(MoveKey);
+            _shortcuts.Add(HideKey);
             _shortcuts.Add(DumpKey);
             _shortcuts.Add(InventoryDumpKey);
 
@@ -153,6 +159,7 @@ namespace SephPlanner.Plugin
                 Key("자동 배치 키", AutoPlaceKey, keys, keyNames),
                 Key("불투명도 키", OpacityKey, keys, keyNames),
                 Key("이동 키", MoveKey, keys, keyNames),
+                Key("숨기기 키", HideKey, keys, keyNames),
             };
         }
 

@@ -46,6 +46,9 @@ namespace SephPlanner.Plugin.Ui
         private RectTransform _canvasRect;
         private Canvas _canvas;
         private CanvasGroup _group;
+        private ContentSizeFitter _fitter;
+        private float _width;
+        private bool _compact;
         private Vector2 _grab;
 
         /// <summary>기준 크기에 사용자 배율을 곱한 값. 화면의 모든 치수가 여기서 나온다.</summary>
@@ -114,13 +117,15 @@ namespace SephPlanner.Plugin.Ui
             var rect = frame.rectTransform;
             _rect = rect;
             Place(rect, corner, new Vector2(S(margin.x), S(margin.y)));
-            rect.sizeDelta = new Vector2(S(widthScale), 0f);
+            _width = S(widthScale);
+            _compact = false;
+            rect.sizeDelta = new Vector2(_width, 0f);
 
             var edge = Mathf.Max(1, Mathf.RoundToInt(S(0.25f)));
             Widgets.Column(rect, 0f, new RectOffset(edge, edge, edge, edge));
 
             // 높이는 내용이 정한다. 층층이 붙이면 서로 다투므로 맨 바깥에만 둔다.
-            Widgets.Fitter(rect);
+            _fitter = Widgets.Fitter(rect);
 
             var body = Widgets.Fill("Body", rect, NativeSkin.PanelFill);
             var pad = Mathf.RoundToInt(S(0.6f));
@@ -242,9 +247,11 @@ namespace SephPlanner.Plugin.Ui
             _gain.text = "";
             _hint.text = "";
             _nextMove.text = message;
+            Widgets.SetActive(_hint, false);
             Widgets.SetActive(_nextMove, message.Length > 0);
             Widgets.SetActive(_notice, false);
             Widgets.SetActive(_detail, false);
+            SetCompact(true);
         }
 
         public void Render(GameSnapshot snapshot, Plan plan, bool expanded, string hint)
@@ -252,6 +259,7 @@ namespace SephPlanner.Plugin.Ui
             if (!IsAlive) return;
 
             _hint.text = hint;
+            Widgets.SetActive(_hint, hint.Length > 0);
 
             var improved = plan.Gain > 0.001;
             _score.text = $"{plan.Current.Score:0.#} / {plan.Best.Score:0.#}";
@@ -268,6 +276,7 @@ namespace SephPlanner.Plugin.Ui
             Widgets.SetActive(_nextMove, !expanded && next != null);
 
             Widgets.SetActive(_detail, expanded);
+            SetCompact(!expanded);
             if (!expanded) return;
 
             RenderGrid(snapshot, plan);
@@ -484,6 +493,23 @@ namespace SephPlanner.Plugin.Ui
 
             _chips.text = text.ToString();
             Widgets.SetActive(_chips, text.Length > 0);
+        }
+
+        /// <summary>
+        /// 접었을 때는 폭도 내용에 맞춰 줄인다. 접는 이유가 게임 화면을 가리지 않는 것인데,
+        /// 펼쳤을 때의 폭을 그대로 쥐고 있으면 한 줄짜리 내용이 넓은 띠로 남는다.
+        /// </summary>
+        private void SetCompact(bool compact)
+        {
+            if (_fitter == null || _compact == compact) return;
+
+            _compact = compact;
+            _fitter.horizontalFit = compact
+                ? ContentSizeFitter.FitMode.PreferredSize
+                : ContentSizeFitter.FitMode.Unconstrained;
+
+            // Unconstrained 로 돌아오면 폭을 정해 주는 쪽이 없다. 지을 때 쓴 값을 다시 건다.
+            if (!compact) _rect.sizeDelta = new Vector2(_width, _rect.sizeDelta.y);
         }
 
         public void SetVisible(bool visible)
