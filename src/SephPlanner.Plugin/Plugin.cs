@@ -166,7 +166,7 @@ namespace SephPlanner.Plugin
                 if (_autoPlaceKey.Value.IsDown()) AutoPlace();
                 if (_opacityKey.Value.IsDown()) CycleOpacity();
                 if (_moveKey.Value.IsDown()) ToggleMove();
-                if (_moving) _hud.DragTo(Input.mousePosition);
+                if (_moving) _hud.DragTo(Cursor());
             }
 
             // 리소스는 부팅 직후 준비되므로 첫 프레임에 확인한다.
@@ -430,6 +430,14 @@ namespace SephPlanner.Plugin
         /// </summary>
         private string Hint()
         {
+            // 이동 중에는 커서 좌표를 그대로 보여준다. 화면이 따라오지 않을 때 커서를 못 읽는
+            // 것인지 자리가 안 먹는 것인지, 로그를 뒤지지 않고 화면에서 바로 갈린다.
+            if (_moving)
+            {
+                var cursor = Cursor();
+                return $"이동 중 - {Describe(_moveKey.Value)} 로 고정   커서 {cursor.x:0},{cursor.y:0}";
+            }
+
             if (Time.unscaledTime < _autoPlaceShownUntil) return _autoPlaceResult;
 
             var expand = Describe(_expandKey.Value) + (_expanded ? " 접기" : " 펼치기");
@@ -490,6 +498,17 @@ namespace SephPlanner.Plugin
             _nextPoll = 0;
         }
 
+        /// <summary>
+        /// 커서 위치. 게임이 새 InputSystem 을 쓰므로 그쪽을 먼저 본다. 구식 <c>Input</c> 은
+        /// 프로젝트 설정에 따라 마우스만 죽어 있을 수 있고, 그러면 화면이 커서를 따라오지 않고
+        /// 제자리에 선다. 단축키가 구식으로도 잘 먹으므로 폴백으로 남긴다.
+        /// </summary>
+        private static Vector2 Cursor()
+        {
+            var mouse = UnityEngine.InputSystem.Mouse.current;
+            return mouse != null ? mouse.position.ReadValue() : (Vector2)Input.mousePosition;
+        }
+
         private static readonly float[] OpacitySteps = { 1.0f, 0.85f, 0.7f, 0.55f };
 
         private void CycleOpacity()
@@ -519,8 +538,9 @@ namespace SephPlanner.Plugin
             _moving = !_moving;
             if (_moving)
             {
-                _hud.BeginDrag(Input.mousePosition);
+                _hud.BeginDrag(Cursor());
                 Report("이동 중 - 마우스로 옮기고 " + Describe(_moveKey.Value) + " 로 고정");
+                Logger.LogInfo($"이동 모드 시작 - 커서 {Cursor()}");
                 return;
             }
 
@@ -528,6 +548,9 @@ namespace SephPlanner.Plugin
             _nativePanelMarginX.Value = margin.x;
             _nativePanelMarginY.Value = margin.y;
             Report("자리를 기억했습니다.");
+
+            // 커서가 움직이지 않으면 화면도 제자리에 선다. 그때 무엇이 잘못인지는 좌표를 봐야 안다.
+            Logger.LogInfo($"이동 모드 끝 - 커서 {Cursor()} 여백 {margin}");
         }
 
         private void Report(string message)

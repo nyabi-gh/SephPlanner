@@ -61,9 +61,16 @@
       <HintPath>$(SephiriaManagedDir)\Unity.TextMeshPro.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <!-- 이동 모드에서 커서 위치를 읽는다. BepInEx 단축키도 같은 구식 입력을 쓴다. -->
+    <!--
+      이동 모드에서 커서 위치를 읽는다. 게임이 새 InputSystem 을 쓰므로 그쪽을 먼저 보고,
+      구식 Input 은 BepInEx 단축키가 쓰는 길이라 폴백으로 남긴다.
+    -->
     <Reference Include="UnityEngine.InputLegacyModule">
       <HintPath>$(SephiriaManagedDir)\UnityEngine.InputLegacyModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.InputSystem">
+      <HintPath>$(SephiriaManagedDir)\Unity.InputSystem.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>
