@@ -29,15 +29,14 @@ namespace SephPlanner.Plugin
         private int _verifiedTablets;
 
         private readonly NativeHud _hud = new NativeHud();
-        private OptionsTab _options;
+        private readonly SettingsWindow _window = new SettingsWindow();
         private PlanRunner _runner;
         private GameSnapshot _lastSnapshot;
         private string _lastPanelOrigin;
         private string _lastPanelBlocker;
-        private string _lastTabOrigin;
-        private string _lastTabBlocker;
+        private string _lastWindowOrigin;
+        private string _lastWindowBlocker;
         private string _builtLayout;
-        private bool _tabFailed;
         private float _appliedOpacity = -1f;
         private bool _expanded;
         private bool _hidden;
@@ -49,7 +48,6 @@ namespace SephPlanner.Plugin
         private void Awake()
         {
             _settings = new PluginSettings(Config, Logger.LogInfo);
-            _options = new OptionsTab(Logger.LogInfo);
             _server = new SnapshotPipeServer(Logger.LogInfo);
             _commands = new CommandPipeServer(Logger.LogInfo);
             Logger.LogInfo("SephPlanner 브리지 시작");
@@ -61,6 +59,7 @@ namespace SephPlanner.Plugin
             if (_settings.InventoryDumpKey.Value.IsDown()) DumpInventory();
             if (_settings.Panel.Value)
             {
+                if (_settings.SettingsKey.Value.IsDown()) ToggleSettings();
                 if (_settings.HideKey.Value.IsDown()) ToggleHidden();
                 if (_settings.ExpandKey.Value.IsDown())
                 {
@@ -84,7 +83,6 @@ namespace SephPlanner.Plugin
 
             DrainCommands();
             UpdateNativePanel();
-            UpdateOptionsTab();
 
             if (Time.unscaledTime < _nextPoll) return;
             _nextPoll = Time.unscaledTime + Mathf.Max(0.05f, _settings.PollInterval.Value);
@@ -347,46 +345,30 @@ namespace SephPlanner.Plugin
         }
 
         /// <summary>
-        /// 게임 설정 창에 우리 탭을 붙인다. 화면이 꺼져 있어도 붙인다 - 다시 켜는 자리가 거기다.
+        /// 설정 창을 열고 닫는다. 화면이 꺼져 있어도 열린다 - 다시 켜는 자리가 거기다.
         /// </summary>
-        private void UpdateOptionsTab()
+        private void ToggleSettings()
         {
-            if (_tabFailed) return;
-
-            // 줄 목록을 만드는 것은 붙일 때 한 번이면 된다. 이미 붙어 있는데 매 프레임 만들면
-            // 쓰지도 않을 것을 프레임마다 쌓는 셈이다.
-            if (_options.IsAttached)
-            {
-                _options.Update();
-                return;
-            }
-
             try
             {
-                if (!_options.TryAttach(_settings.Rows()))
+                _window.Toggle(_settings.Rows(), Describe(_settings.SettingsKey) + " 또는 ESC 로 닫기");
+
+                if (_window.Blocker.Length > 0 && _window.Blocker != _lastWindowBlocker)
                 {
-                    // 설정 창은 씬에 따라 없을 수 있으므로 경고가 아니라 기록이다.
-                    if (_options.Blocker != _lastTabBlocker)
-                    {
-                        _lastTabBlocker = _options.Blocker;
-                        Logger.LogInfo("설정 탭을 붙이지 못했습니다 - " + _options.Blocker);
-                    }
+                    _lastWindowBlocker = _window.Blocker;
+                    Logger.LogWarning("설정 창을 만들지 못했습니다 - " + _window.Blocker);
                     return;
                 }
-
-                if (_options.Origin != _lastTabOrigin)
+                if (_window.Origin != _lastWindowOrigin)
                 {
-                    _lastTabOrigin = _options.Origin;
-                    Logger.LogInfo("설정 탭 생성 - " + _options.Origin);
+                    _lastWindowOrigin = _window.Origin;
+                    Logger.LogInfo("설정 창 생성 - " + _window.Origin);
                 }
             }
             catch (Exception ex)
             {
-                // 게임 설정 창의 구조가 바뀌면 여기서 터진다. 설정 탭은 곁다리이므로 게임도
-                // 나머지 기능도 함께 죽이지 않는다. 매 프레임 같은 예외를 되풀이하며 로그를
-                // 채우지 않도록 한 번 실패하면 더 시도하지 않는다.
-                _tabFailed = true;
-                Logger.LogError("설정 탭 실패: " + ex);
+                // 설정 창은 곁다리다. 여기서 터져도 표시와 자동 배치는 계속 돌아야 한다.
+                Logger.LogError("설정 창 실패: " + ex);
             }
         }
 
@@ -429,7 +411,8 @@ namespace SephPlanner.Plugin
             var expand = Describe(_settings.ExpandKey) + (_expanded ? " 접기" : " 펼치기");
             var look = Describe(_settings.OpacityKey) + " 불투명도   " +
                        Describe(_settings.MoveKey) + " 이동   " +
-                       Describe(_settings.HideKey) + " 숨기기";
+                       Describe(_settings.HideKey) + " 숨기기   " +
+                       Describe(_settings.SettingsKey) + " 설정";
             if (_lastSnapshot != null && _lastSnapshot.IsMultiplayer) return expand + "   " + look;
 
             return expand + "   " + Describe(_settings.AutoPlaceKey) + " 자동 배치   " + look;
@@ -534,6 +517,7 @@ namespace SephPlanner.Plugin
         private void OnDestroy()
         {
             _hud.Destroy();
+            _window.Destroy();
             _server?.Dispose();
             _commands?.Dispose();
         }

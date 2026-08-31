@@ -32,6 +32,7 @@ namespace SephPlanner.Plugin
         public ConfigEntry<KeyboardShortcut> OpacityKey { get; }
         public ConfigEntry<KeyboardShortcut> MoveKey { get; }
         public ConfigEntry<KeyboardShortcut> HideKey { get; }
+        public ConfigEntry<KeyboardShortcut> SettingsKey { get; }
 
         private readonly Action<string> _log;
         private readonly List<ConfigEntry<KeyboardShortcut>> _shortcuts =
@@ -101,6 +102,9 @@ namespace SephPlanner.Plugin
             MoveKey = config.Bind(
                 "NativePanel", "MoveKey", new KeyboardShortcut(KeyCode.F6),
                 "이동 모드. 한 번 누르면 화면이 커서를 따라오고, 다시 누르면 그 자리에 고정된다.");
+            SettingsKey = config.Bind(
+                "NativePanel", "SettingsKey", new KeyboardShortcut(KeyCode.F3),
+                "설정 창을 여는 단축키. 여는 동안에는 게임 조작이 멈추고 ESC 로도 닫힌다.");
             HideKey = config.Bind(
                 "NativePanel", "HideKey", new KeyboardShortcut(KeyCode.F4),
                 "화면을 통째로 숨겼다가 다시 보여준다. 숨어 있어도 계산은 계속 돌아서 다시 " +
@@ -111,6 +115,7 @@ namespace SephPlanner.Plugin
             _shortcuts.Add(OpacityKey);
             _shortcuts.Add(MoveKey);
             _shortcuts.Add(HideKey);
+            _shortcuts.Add(SettingsKey);
             _shortcuts.Add(DumpKey);
             _shortcuts.Add(InventoryDumpKey);
 
@@ -155,11 +160,12 @@ namespace SephPlanner.Plugin
                     new[] { "아주 좁게", "좁게", "보통", "넓게", "아주 넓게" }),
                 Steps("불투명도", Opacity, OpacitySteps, new[] { "100%", "85%", "70%", "55%" }),
                 Switch("후보 추천", Recommendations),
-                Key("접기/펼치기 키", ExpandKey, keys, keyNames),
-                Key("자동 배치 키", AutoPlaceKey, keys, keyNames),
-                Key("불투명도 키", OpacityKey, keys, keyNames),
-                Key("이동 키", MoveKey, keys, keyNames),
-                Key("숨기기 키", HideKey, keys, keyNames),
+                Key("접기/펼치기", ExpandKey, keys, keyNames, divider: true),
+                Key("자동 배치", AutoPlaceKey, keys, keyNames),
+                Key("불투명도 바꾸기", OpacityKey, keys, keyNames),
+                Key("이동 모드", MoveKey, keys, keyNames),
+                Key("숨기기", HideKey, keys, keyNames),
+                Key("이 창 열기", SettingsKey, keys, keyNames),
             };
         }
 
@@ -181,13 +187,15 @@ namespace SephPlanner.Plugin
         };
 
         private OptionRow Key(
-            string label, ConfigEntry<KeyboardShortcut> entry, List<KeyCode> keys, string[] names)
+            string label, ConfigEntry<KeyboardShortcut> entry, List<KeyCode> keys, string[] names,
+            bool divider = false)
             => new OptionRow
             {
                 Label = label,
                 Choices = names,
                 Read = () => Mathf.Max(0, keys.IndexOf(entry.Value.MainKey)),
                 Write = i => Rebind(entry, keys[i]),
+                Divider = divider,
             };
 
         /// <summary>
@@ -209,6 +217,7 @@ namespace SephPlanner.Plugin
             foreach (var shortcut in _shortcuts)
             {
                 if (shortcut == DumpKey || shortcut == InventoryDumpKey) continue;
+
                 if (!keys.Contains(shortcut.Value.MainKey)) keys.Add(shortcut.Value.MainKey);
             }
             return keys;

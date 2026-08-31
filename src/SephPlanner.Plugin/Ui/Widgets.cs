@@ -54,6 +54,33 @@ namespace SephPlanner.Plugin.Ui
             return text;
         }
 
+        /// <summary>
+        /// 누를 수 있는 글자. <b>여기만 <c>raycastTarget</c>이 켜져 있다.</b> HUD 화면은 입력을
+        /// 하나도 가져가지 않는 것이 게임을 방해하지 않는다는 보장의 근거이므로, 이 손은 설정
+        /// 창처럼 플레이어가 일부러 연 화면에서만 쓴다(<see cref="SettingsWindow"/>).
+        ///
+        /// 글자 자체를 버튼의 그래픽으로 삼는다. 마우스를 올리면 색이 밝아지는 것이 그래서 공짜다.
+        /// </summary>
+        public static TextMeshProUGUI Clickable(
+            string name, Transform parent, NativeSkin skin, float size, Color color,
+            UnityEngine.Events.UnityAction onClick)
+        {
+            var text = Label(name, parent, skin, size, color);
+            text.raycastTarget = true;
+
+            var button = text.gameObject.AddComponent<Button>();
+            button.targetGraphic = text;
+
+            var colors = button.colors;
+            colors.normalColor = new Color(0.72f, 0.72f, 0.72f);
+            colors.highlightedColor = Color.white;
+            colors.selectedColor = Color.white;
+            colors.pressedColor = new Color(0.55f, 0.55f, 0.55f);
+            button.colors = colors;
+            button.onClick.AddListener(onClick);
+            return text;
+        }
+
         public static VerticalLayoutGroup Column(
             RectTransform rect, float spacing, RectOffset padding = null)
         {
