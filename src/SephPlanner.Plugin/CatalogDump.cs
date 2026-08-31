@@ -3,6 +3,7 @@ using System.Collections;
 using System.IO;
 using Newtonsoft.Json;
 using SephPlanner.Core.Ipc;
+using SephPlanner.Core.Solver;
 
 namespace SephPlanner.Plugin
 {
@@ -28,6 +29,11 @@ namespace SephPlanner.Plugin
             var measurement = ItemCatalog.LoadStatMeasurement();
             yield return null;
 
+            // 아티팩트가 레벨마다 실제로 주는 값어치를 여기서 한 번 재어 정의에 실어 둔다.
+            // 오버레이가 매번 다시 재지 않아도 되고, 콤보 가중치와 같은 환산율로 잰 값이 된다.
+            var worth = CharmStatWorth.Apply(charms, measurement);
+            yield return null;
+
             WriteJson(IpcContract.TabletDbFile, tablets);
             WriteJson(IpcContract.CharmDbFile, charms);
             WriteJson(IpcContract.ComboDbFile, combos);
@@ -48,7 +54,8 @@ namespace SephPlanner.Plugin
             WriteText(IpcContract.VerificationReportFile, QueryVerifier.Format(verification));
 
             report($"석판 {tablets.Count}종, 아티팩트 {charms.Count}종, 콤보 {combos.Count}종, " +
-                   $"아이콘 {icons}개 저장. 질의 검증 {verification.Comparisons}건 중 불일치 {verification.Mismatches}건.");
+                   $"아이콘 {icons}개 저장. 아티팩트 가치 {worth.ByEntity.Count}종 측정. " +
+                   $"질의 검증 {verification.Comparisons}건 중 불일치 {verification.Mismatches}건.");
         }
 
         /// <summary>

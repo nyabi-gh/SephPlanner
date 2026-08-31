@@ -351,10 +351,31 @@ public partial class MainWindow : Window
         return text.Trim();
     }
 
+    /// <summary>
+    /// 아티팩트가 무슨 일을 하는지, 그리고 우리가 그 값어치를 어떻게 정했는지. 잰 값일 때는
+    /// 굳이 말하지 않고, 근거가 레어도뿐일 때만 밝힌다 - 그 자리가 추천이 가장 흔들리는 곳이라
+    /// 사용자가 "왜 이게 위에 있지"라고 물을 지점이다.
+    /// </summary>
+    private static IReadOnlyList<string> Describe(CharmDefinition? definition)
+    {
+        if (definition is null) return Array.Empty<string>();
+
+        var lines = new List<string>(definition.EffectLines);
+        var worth = CharmWorth.Resolve(definition, CharmValueStore.Book.Of(definition));
+
+        var note = CharmValueStore.Book.Of(definition)?.Note ?? "";
+        if (worth.Source == CharmWorthSource.Curated && note.Length > 0) lines.Add(note);
+
+        if (worth.Source == CharmWorthSource.Rarity)
+            lines.Add("값어치는 레어도로 어림잡은 것입니다. 효과의 세기는 아직 점수에 없습니다.");
+
+        return lines;
+    }
+
     private static string Explain(OfferAdvice advice, int gold)
     {
         var lines = new List<string>();
-        lines.AddRange(advice.Candidate.Charm?.EffectLines ?? new List<string>());
+        lines.AddRange(Describe(advice.Candidate.Charm));
 
         if (!advice.Affordable) lines.Add($"소지금 {gold}골드로는 살 수 없습니다.");
 
@@ -415,7 +436,7 @@ public partial class MainWindow : Window
                     name ?? "", level, effective, reason, moved.Contains(position),
                     charmId, _preferences.PinnedCharms.Contains(charmId),
                     _settings.IconMode ? IconStore.Get(charmId) : null,
-                    ActiveCatalog.Charm(charmId)?.EffectLines);
+                    Describe(ActiveCatalog.Charm(charmId)));
             }
             else cell.SetEmpty();
         }

@@ -81,7 +81,8 @@ namespace SephPlanner.Core.Solver
             IReadOnlyDictionary<string, int>? comboCounts = null,
             Func<string, ComboDefinition?>? combos = null,
             IReadOnlyCollection<string>? priorityCategories = null,
-            IReadOnlyCollection<int>? presetCharms = null)
+            IReadOnlyCollection<int>? presetCharms = null,
+            CharmValueBook? values = null)
         {
             // 기준과 후보를 같은 탐색 강도로 풀어야 증가분이 순수하게 후보의 몫이 된다. 기준만
             // 촘촘한 탐색으로 풀면, 명백히 좋은 후보에도 탐색 강도 차이만큼 음수가 나온다.
@@ -102,7 +103,7 @@ namespace SephPlanner.Core.Solver
                         Definition = candidate.Charm,
                         InstanceId = candidateId,
                         IsDormant = candidate.CharmIsDormant,
-                        Weight = Worth.OfRarity(candidate.Charm.Rarity),
+                        Worth = CharmWorth.Resolve(candidate.Charm, values?.Of(candidate.Charm)),
                     });
                 }
                 else if (candidate.Tablet is not null)

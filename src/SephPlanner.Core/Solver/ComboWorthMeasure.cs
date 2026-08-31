@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -66,7 +65,8 @@ namespace SephPlanner.Core.Solver
     {
         public static MeasurementReport Run(StatMeasurement measurement)
         {
-            var report = new MeasurementReport { PerLevel = PerLevelByStat(measurement.CharmStats) };
+            var exchange = StatExchange.From(measurement.CharmStats);
+            var report = new MeasurementReport { PerLevel = exchange.PerLevel };
 
             var grouped = measurement.ComboStats
                 .GroupBy(grant => (grant.CategoryId, grant.Threshold))
@@ -83,8 +83,8 @@ namespace SephPlanner.Core.Solver
 
                 foreach (var grant in group)
                 {
-                    if (report.PerLevel.TryGetValue(grant.StatusId, out var perLevel) && perLevel > 0)
-                        worth.Levels += grant.Value / perLevel;
+                    if (exchange.TryConvert(grant.StatusId, grant.Value, out var levels))
+                        worth.Levels += levels;
                     else
                         worth.Unconverted.Add($"{grant.StatusId}/{grant.Value}");
                 }
@@ -95,52 +95,12 @@ namespace SephPlanner.Core.Solver
                 report.Thresholds.Add(worth);
             }
 
-            report.MedianLevels = Median(report.Thresholds
+            report.MedianLevels = StatExchange.Median(report.Thresholds
                 .Where(entry => entry.Levels > 0)
                 .Select(entry => entry.Levels)
                 .ToList());
 
             return report;
-        }
-
-        /// <summary>
-        /// 능력치별로 아티팩트 레벨 하나가 올려 주는 양. 같은 능력치를 주는 아티팩트가 여럿이라
-        /// 중앙값을 쓴다 - 평균은 유별나게 센 아티팩트 하나에 끌려간다.
-        /// </summary>
-        private static Dictionary<string, double> PerLevelByStat(IEnumerable<CharmStatTable> tables)
-        {
-            var samples = new Dictionary<string, List<double>>(StringComparer.Ordinal);
-
-            foreach (var table in tables)
-            {
-                // 레벨 0 은 효과가 꺼진 상태다. 한 걸음의 크기를 재는 것이므로 표의 증가분만 본다.
-                var steps = new List<double>();
-                for (var level = 1; level < table.ValuesByLevel.Count; level++)
-                {
-                    var step = table.ValuesByLevel[level] - table.ValuesByLevel[level - 1];
-                    if (step > 0) steps.Add(step);
-                }
-                if (steps.Count == 0) continue;
-
-                if (!samples.TryGetValue(table.StatusId, out var list))
-                    samples[table.StatusId] = list = new List<double>();
-                list.Add(Median(steps));
-            }
-
-            var result = new Dictionary<string, double>(StringComparer.Ordinal);
-            foreach (var pair in samples) result[pair.Key] = Median(pair.Value);
-            return result;
-        }
-
-        private static double Median(List<double> values)
-        {
-            if (values.Count == 0) return 0;
-
-            var sorted = values.OrderBy(value => value).ToList();
-            var middle = sorted.Count / 2;
-            return sorted.Count % 2 == 1
-                ? sorted[middle]
-                : (sorted[middle - 1] + sorted[middle]) / 2;
         }
     }
 }

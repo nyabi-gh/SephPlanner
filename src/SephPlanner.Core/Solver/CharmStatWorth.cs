@@ -1,0 +1,129 @@
+using System;
+using System.Collections.Generic;
+using SephPlanner.Core.Model;
+
+namespace SephPlanner.Core.Solver
+{
+    /// <summary>한 아티팩트가 레벨마다 실제로 주는 값어치. 레벨 단위다.</summary>
+    public sealed class CharmWorthTable
+    {
+        public int EntityId { get; set; }
+
+        /// <summary>색인이 곧 레벨이다. 게임의 <c>LevelToIdx</c>와 같게 상한에서 자른다.</summary>
+        public List<double> ByLevel { get; set; } = new List<double>();
+
+        /// <summary>
+        /// 환산에 쓴 능력치 중 표본이 넉넉했던 것의 비율(0~1). 낮으면 그 아티팩트만 그 능력치를
+        /// 주어서 "레벨 하나 = 이 아티팩트의 한 걸음"이라는 동어반복에 가깝다는 뜻이다.
+        /// </summary>
+        public double Confidence { get; set; }
+
+        /// <summary>환산율이 없어 값에 반영하지 못한 능력치.</summary>
+        public List<string> Unconverted { get; set; } = new List<string>();
+    }
+
+    public sealed class CharmWorthReport
+    {
+        public StatExchange Exchange { get; set; } = new StatExchange();
+        public Dictionary<int, CharmWorthTable> ByEntity { get; set; } = new Dictionary<int, CharmWorthTable>();
+    }
+
+    /// <summary>
+    /// 아티팩트가 레벨마다 주는 능력치를 레벨 단위 값어치로 옮긴다.
+    ///
+    /// 점수 모델은 아티팩트를 "켜져 있으면 1점, 레벨 하나에 1점"으로 센다. 그 모델은 모든
+    /// 아티팩트가 레벨당 같은 값을 준다고 가정하는데, 실제로 재 보면 그렇지 않다 - 레벨 하나가
+    /// 중앙값의 다섯 배인 것도 있고, 레벨을 올릴수록 나빠지는 것도 있다. 여기서 나온 표가
+    /// 그 가정을 대신한다.
+    ///
+    /// <see cref="ComboWorthMeasure"/>와 같은 <see cref="StatExchange"/>를 쓰므로 결과가
+    /// <see cref="Worth.ComboThreshold"/>·<see cref="Worth.DamageBonus"/>와 같은 자로 잰 값이다.
+    /// </summary>
+    public static class CharmStatWorth
+    {
+        /// <summary>
+        /// <paramref name="maxLevelOf"/>는 아티팩트의 레벨 상한을 돌려준다. 게임이 표를
+        /// 상한에서 자르므로(<c>LevelToIdx</c>) 그보다 위의 칸은 값어치가 늘지 않는다.
+        /// 음수를 돌려주면 상한을 모른다는 뜻이고, 그때는 표 길이를 그대로 쓴다.
+        /// </summary>
+        /// <summary>
+        /// 잰 값을 아티팩트 정의에 실어 둔다. 덤프 시점에 한 번만 하면 되고, 그러면 오버레이와
+        /// 솔버는 표를 그대로 읽기만 한다.
+        /// </summary>
+        public static CharmWorthReport Apply(
+            IReadOnlyCollection<CharmDefinition> charms, StatMeasurement measurement)
+        {
+            var maxLevels = new Dictionary<int, int>();
+            foreach (var charm in charms) maxLevels[charm.EntityId] = charm.MaxLevel;
+
+            var report = Run(measurement, entityId => maxLevels.TryGetValue(entityId, out var max) ? max : -1);
+
+            foreach (var charm in charms)
+            {
+                if (!report.ByEntity.TryGetValue(charm.EntityId, out var worth)) continue;
+
+                charm.StatWorthByLevel = worth.ByLevel;
+                charm.StatWorthConfidence = worth.Confidence;
+            }
+            return report;
+        }
+
+        public static CharmWorthReport Run(StatMeasurement measurement, Func<int, int>? maxLevelOf = null)
+        {
+            var exchange = StatExchange.From(measurement.CharmStats);
+            var report = new CharmWorthReport { Exchange = exchange };
+
+            var byEntity = new Dictionary<int, List<CharmStatTable>>();
+            foreach (var table in measurement.CharmStats)
+            {
+                if (!byEntity.TryGetValue(table.EntityId, out var list))
+                    byEntity[table.EntityId] = list = new List<CharmStatTable>();
+                list.Add(table);
+            }
+
+            foreach (var pair in byEntity)
+            {
+                var tables = pair.Value;
+                var span = 0;
+                foreach (var table in tables) span = Math.Max(span, table.ValuesByLevel.Count);
+
+                // 상한을 모르는 아티팩트(음수)는 표 전체를 쓴다. 상한이 0 이면 레벨을 올려도
+                // 값이 바뀌지 않으므로 한 칸만 남는다.
+                var cap = maxLevelOf?.Invoke(pair.Key) ?? -1;
+                var top = cap >= 0 ? Math.Min(cap, span - 1) : span - 1;
+
+                var worth = new CharmWorthTable { EntityId = pair.Key };
+                double reliable = 0, total = 0;
+
+                for (var level = 0; level <= top; level++)
+                {
+                    double sum = 0;
+                    foreach (var table in tables)
+                    {
+                        if (table.ValuesByLevel.Count == 0) continue;
+
+                        var value = table.ValuesByLevel[Math.Min(level, table.ValuesByLevel.Count - 1)];
+                        if (!exchange.TryConvert(table.StatusId, value, out var levels))
+                        {
+                            if (level == 0 && !worth.Unconverted.Contains(table.StatusId))
+                                worth.Unconverted.Add(table.StatusId);
+                            continue;
+                        }
+
+                        sum += levels;
+
+                        // 값어치가 어디서 왔는지를 크기로 잰다. 부호는 상관없다 - 깎는 능력치도
+                        // 그 환산율을 믿을 수 있어야 깎는 만큼을 믿을 수 있다.
+                        total += Math.Abs(levels);
+                        if (exchange.IsReliable(table.StatusId)) reliable += Math.Abs(levels);
+                    }
+                    worth.ByLevel.Add(sum);
+                }
+
+                worth.Confidence = total > 0 ? reliable / total : 0;
+                report.ByEntity[pair.Key] = worth;
+            }
+            return report;
+        }
+    }
+}

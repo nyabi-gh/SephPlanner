@@ -16,6 +16,10 @@ if (args.Contains("--solve"))
 if (args.Contains("--measure"))
     return ComboMeasure.Run();
 
+// 아티팩트 가치가 어디까지 측정됐는지 보고, 손으로 채울 몫을 초안으로 뽑는다.
+if (args.Contains("--values"))
+    return CharmValueDraft.Run(FindRepoRoot());
+
 // 저장해 둔 스냅샷으로 우리 레벨 계산을 게임 값과 견준다. 게임을 다시 켜지 않고 확인할 수 있다.
 var checkIndex = Array.IndexOf(args, "--check");
 if (checkIndex >= 0)

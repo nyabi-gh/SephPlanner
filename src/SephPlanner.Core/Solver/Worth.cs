@@ -3,11 +3,9 @@ using SephPlanner.Core.Model;
 namespace SephPlanner.Core.Solver
 {
     /// <summary>
-    /// 아티팩트의 상대 가치. 모든 아티팩트의 활성 1점을 같게 치면 레벨 3짜리 잡템이
-    /// 레벨 1짜리 핵심 아티팩트를 이긴다. 레어도를 근사치로 쓴다.
+    /// 콤보와 피해 보너스를 아티팩트 레벨 단위로 옮기는 환산값. 셋 다 <c>--measure</c> 로 실측했다.
     ///
-    /// 레어도 배수는 아직 설계값이다(무엇이 센 아티팩트인지는 게임 데이터로 답이 나오지 않는다 —
-    /// docs/ROADMAP.md 의 보류 항목). 콤보와 피해 환산값은 <c>--measure</c> 로 실측했다.
+    /// 아티팩트 하나하나의 값어치는 여기가 아니라 <see cref="CharmWorth"/>가 답한다.
     /// </summary>
     public static class Worth
     {
@@ -39,6 +37,16 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         public const double DamageBonus = 0.4;
 
+        /// <summary>
+        /// 아무 근거가 없을 때 쓰는 마지막 어림값. 능력치를 주지 않아 잴 수 없고 손으로도 채우지
+        /// 않은 아티팩트에만 쓰인다.
+        ///
+        /// **레어도는 세기의 대리값으로서 좋지 않다.** 잴 수 있는 아티팩트 110종을 재 보니
+        /// 레벨 0의 값어치 중앙값이 커먼 1.50, 언커먼 1.67, 레어 2.00, 레전드 1.47 로 순서가
+        /// 서지 않았다. 같은 레어도 안의 폭(-1.55 ~ 20.00)이 레어도 사이의 차이보다 훨씬 크다.
+        /// 그러니 이 배수는 "레어도가 높으면 조금 낫겠거니"라는 뜻일 뿐이고, 여기에 걸린
+        /// 아티팩트를 줄여 가는 것이 <c>data/values/charms.json</c>을 채우는 목적이다.
+        /// </summary>
         public static double OfRarity(Rarity rarity) => rarity switch
         {
             Rarity.Uncommon => 1.1,

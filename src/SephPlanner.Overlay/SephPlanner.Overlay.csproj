@@ -15,4 +15,9 @@
   <ItemGroup>
     <Resource Include="Fonts\*.ttf" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- 손으로 채운 아티팩트 가치. 오버레이는 단일 파일로 배포되므로 곁의 파일이 아니라
+         실행 파일 안에 넣는다. -->
+    <EmbeddedResource Include="..\..\data\values\charms.json" LogicalName="SephPlanner.Values.Charms.json" />
+  </ItemGroup>
 </Project>

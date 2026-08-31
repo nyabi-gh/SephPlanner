@@ -48,6 +48,13 @@ dotnet run --project src/SephPlanner.DataTool -- --check <스냅샷.json>
 dotnet run --project src/SephPlanner.DataTool -- --measure
 ```
 
+아티팩트 하나하나의 값어치가 어디까지 측정됐는지 보고, 아직 레어도 어림값에 기대고 있는 것들을
+손으로 채울 초안으로 뽑는다. 채우는 법은 [data/values/README.md](data/values/README.md) 참고.
+
+```powershell
+dotnet run --project src/SephPlanner.DataTool -- --values
+```
+
 데이터 추출:
 
 ```powershell

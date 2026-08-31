@@ -14,6 +14,7 @@ namespace SephPlanner.Core.Planning
         public static Plan? Build(GameSnapshot snapshot, ICatalog catalog, PlanPreferences? preferences = null)
         {
             preferences ??= PlanPreferences.None;
+            var values = preferences.CharmValues;
             var inventory = snapshot.Inventory;
             if (inventory is null || inventory.Storage <= 0) return null;
 
@@ -73,18 +74,19 @@ namespace SephPlanner.Core.Planning
 
                 // 아티팩트가 아닌 아이템도 칸을 차지한다. 빼놓으면 솔버가 그 자리를 비어 있다고 본다.
                 var definition = catalog.Charm(item.DefinitionId);
-                problem.Charms.Add(new CharmSlot
+                var slot = new CharmSlot
                 {
                     Definition = definition ?? new CharmDefinition(),
                     InstanceId = item.InstanceId,
                     Enchant = definition is null ? 0 : item.Enchant,
                     IsFiller = definition is null,
                     IsDormant = definition is not null && WeaponMatch.IsDormant(definition, weapon),
-                    Weight = definition is null
-                        ? 1
-                        : Worth.OfRarity(definition.Rarity) *
-                          (preferences.PinnedCharms.Contains(item.DefinitionId) ? PlanPreferences.PinnedWeight : 1),
-                });
+                    Weight = definition is not null && preferences.PinnedCharms.Contains(item.DefinitionId)
+                        ? PlanPreferences.PinnedWeight
+                        : 1,
+                };
+                if (definition is not null) slot.Worth = CharmWorth.Resolve(definition, values.Of(definition));
+                problem.Charms.Add(slot);
                 positions[item.InstanceId] = item.Position;
                 problem.CurrentCharms[item.InstanceId] = item.Position;
             }
@@ -102,7 +104,7 @@ namespace SephPlanner.Core.Planning
                 offers = OfferAdvisor.Rank(
                     problem, candidates, snapshot.Run?.Gold ?? int.MaxValue,
                     inventory.ComboCounts, catalog.Combo, preferences.PriorityCategories,
-                    preferences.PresetCharms);
+                    preferences.PresetCharms, values);
             }
 
             return new Plan

@@ -43,6 +43,19 @@ namespace SephPlanner.Core.Model
         /// </summary>
         public List<double> NeighborLevelBonus { get; set; } = new List<double>();
 
+        /// <summary>
+        /// 레벨별 값어치. 게임의 레벨별 능력치 표를 레벨 단위로 옮긴 것이며 색인이 곧 레벨이다.
+        /// 능력치를 주지 않는 아티팩트에서는 비어 있고, 그때 점수는 레어도 어림값으로 물러선다.
+        /// 계산은 <c>CharmStatWorth</c>가 하고 덤프가 결과만 실어 온다.
+        /// </summary>
+        public List<double> StatWorthByLevel { get; set; } = new List<double>();
+
+        /// <summary>
+        /// 위 표를 얼마나 믿을 만한지(0~1). 그 아티팩트만 주는 능력치는 환산율이 자기 자신에서
+        /// 나와 동어반복이 되므로, 그런 몫이 크면 값이 낮아진다.
+        /// </summary>
+        public double StatWorthConfidence { get; set; }
+
         public List<string> Categories { get; set; } = new List<string>();
         public Dictionary<string, string> Names { get; set; } = new Dictionary<string, string>();
     }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using SephPlanner.Core.Solver;
 
 namespace SephPlanner.Core.Planning
 {
@@ -29,6 +30,12 @@ namespace SephPlanner.Core.Planning
         /// 추천 끄기의 지배를 받고, 배치 가중치에는 관여하지 않는다.
         /// </summary>
         public HashSet<int> PresetCharms { get; set; } = new HashSet<int>();
+
+        /// <summary>
+        /// 손으로 채운 아티팩트 가치. 없으면 게임에서 잰 값과 레어도만으로 판단한다.
+        /// 배치 점수까지 바꾸는 값이라 추천 끄기의 지배를 받지 않는다 - 어디에 놓을지의 문제다.
+        /// </summary>
+        public CharmValueBook CharmValues { get; set; } = CharmValueBook.Empty;
 
         /// <summary>
         /// 거짓이면 후보 평가를 아예 돌리지 않는다. 화면에서 가리기만 하는 것이 아니라 계산도

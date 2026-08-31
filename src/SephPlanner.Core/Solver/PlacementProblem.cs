@@ -14,8 +14,23 @@ namespace SephPlanner.Core.Solver
         /// <summary>인챈트 등으로 붙은 고정 레벨. 석판과 무관하게 더해진다.</summary>
         public int Enchant { get; set; }
 
-        /// <summary>이 아티팩트를 얼마나 중요하게 볼지. 1이 기준이다.</summary>
+        /// <summary>
+        /// 사용자가 얹은 가중치. 1이 기준이고, 강화 우선으로 찍으면 커진다. 아티팩트 사이의
+        /// 본래 우열은 여기가 아니라 <see cref="Worth"/>가 답한다.
+        /// </summary>
         public double Weight { get; set; } = 1;
+
+        private CharmWorth? _worth;
+
+        /// <summary>
+        /// 이 아티팩트가 레벨마다 갖는 값어치. 채워 넣지 않으면 정의만 보고 정한다(손으로 채운
+        /// 가치 없이 측정 표나 레어도로). 배정 비용 행렬의 최내곽에서 쓰이므로 한 번만 정한다.
+        /// </summary>
+        public CharmWorth Worth
+        {
+            get => _worth ??= CharmWorth.Resolve(Definition);
+            set => _worth = value;
+        }
 
         /// <summary>
         /// 소비 아이템처럼 점수에 기여하지 않지만 칸은 차지하는 것. 무시하면 그 칸이 빈 칸으로

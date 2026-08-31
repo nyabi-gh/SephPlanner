@@ -96,6 +96,7 @@ public sealed class UserSettings
         PriorityCategories = new HashSet<string>(PriorityCategories),
         PinnedCharms = new HashSet<int>(PinnedCharms),
         Recommendations = Recommendations,
+        CharmValues = CharmValueStore.Book,
 
         // 프리셋이 알려 주는 것은 무엇을 집을지에 대한 조언이라, 추천을 끄면 함께 쉰다.
         PresetCharms = Recommendations && Preset() is { } preset

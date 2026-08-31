@@ -155,7 +155,6 @@ public class OfferAdvisorTests
         {
             InstanceId = 11,
             Definition = new CharmDefinition { MaxLevel = 5, Rarity = Rarity.Eternal, Names = { ["current"] = "핵심" } },
-            Weight = Worth.OfRarity(Rarity.Eternal),
         });
 
         var offered = new List<OfferCandidate>

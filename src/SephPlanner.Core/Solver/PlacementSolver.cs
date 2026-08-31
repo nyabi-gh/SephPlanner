@@ -20,9 +20,13 @@ namespace SephPlanner.Core.Solver
         private const double WastePenalty = 1e-4;
 
         /// <summary>
-        /// 효과가 켜져 있는 아티팩트 하나의 값어치. 레벨은 세기를 더할 뿐이고 레벨 0 도 살아 있다.
-        /// 이것이 없으면 꺼지는 자리(레벨 음수)와 레벨 0 자리가 똑같이 0점이라, 아티팩트를
-        /// 꺼진 채로 두고도 최적이라고 하게 된다.
+        /// 빔을 좁힐 때 쓰는, 켜져 있는 아티팩트 하나의 값어치. 레벨은 세기를 더할 뿐이고 레벨 0
+        /// 도 살아 있다. 이것이 없으면 꺼지는 자리(레벨 음수)와 레벨 0 자리가 똑같이 0점이라,
+        /// 아티팩트를 꺼진 채로 두고도 최적이라고 하게 된다.
+        ///
+        /// 실제 채점은 아티팩트마다 다른 <see cref="CharmWorth"/>를 쓴다. 여기서까지 그러지 않는
+        /// 것은 이 어림값이 "어느 아티팩트가 어디 갈지" 정하기 전에 배치만 줄 세우는 값이기
+        /// 때문이다. 어느 배치든 같은 잣대로 재기만 하면 되고, 뽑힌 배치는 뒤에서 다시 채점된다.
         /// </summary>
         private const double ActiveValue = 1;
 
@@ -274,7 +278,7 @@ namespace SephPlanner.Core.Solver
 
             // 상한을 넘긴 레벨은 아무 값어치가 없다. 점수가 같은 배치라면 덜 흘리는 쪽을 고르도록
             // 아주 작은 차이만 준다. 실제 점수 차이를 뒤집을 만한 크기가 아니다.
-            var value = charm.Weight * (ActiveValue + effective)
+            var value = charm.Weight * charm.Worth.At(effective)
                         - WastePenalty * Math.Max(0, level - effective);
 
             if (charm.Definition.Behavior == "Charm_WhitePaper")
