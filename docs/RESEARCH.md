@@ -727,8 +727,11 @@ selectionSeedOffset)`으로 내용을 정한다. **고르기 전에 무엇이 �
 
 추천 반영은 `OfferAdvisor`가 한다. 후보 아티팩트의 카테고리마다 "하나 더 모으면" 임계값에
 닿는지 보고, 닿으면 레벨 2에 해당하는 보너스, 다가가기만 하면 소액을 줄 세우기에 더한다.
-배치 점수(증가분)와는 섞지 않고 별도 열("잉걸불 7/8")로 보여준다. 가중치(2.0 / 0.25)는 실측
-근거가 없는 설계값이므로, 추천이 이상하게 기울면 여기부터 의심한다.
+배치 점수(증가분)와는 섞지 않고 별도 열("잉걸불 7/8")로 보여준다. 가중치는 위 "콤보 가중치"
+절에서 실측한 `Worth.ComboThreshold`(3.4)와 `ComboProgress`(0.43)다. 앞의 것은 잰 값이지만
+뒤의 것은 아니다 — 못 채운 콤보의 값어치는 그 판에서 결국 채우게 되느냐에 달려 있어 정적
+데이터로는 답이 안 나오므로, 비율(1/8)만 예전 그대로 두고 크기만 함께 옮겼다. 추천이 콤보 쪽으로
+이상하게 기울면 그 비율부터 의심한다.
 
 ## 무기 연동 아티팩트
 
@@ -795,6 +798,82 @@ PlayerAvatar -> GetComponent<WeaponControllerSimple>() -> currentWeapon.weaponTy
 그래서 두 가지를 둔다. 오버레이는 칸의 레벨이 아니라 **그 아티팩트가 실제로 받는 레벨**을 보여주고,
 남는 레벨이 있으면 색과 도움말로 알린다. 그리고 점수가 같은 배치 중에서는 덜 흘리는 쪽을 고르도록
 아주 작은 차이를 준다.
+
+## 인게임 UI (네이티브 패널)
+
+오버레이 창 대신 게임 안에 직접 그릴 수 있는지 조사한 결과다. **가능하고, 붙을 자리가 전부
+public 이다.**
+
+- 게임 UI 는 **uGUI + TextMeshPro** 다 (`UnityEngine.UI.dll`, `Unity.TextMeshPro.dll`).
+- `UIManager.Instance.GetRootFromType(EUIObjectPoolingParent.HUD)`가 `UIRoot`를 돌려주고,
+  `UIRoot.Canvas`/`CanvasGroup`이 public 이다. 그 밑에 GameObject 를 붙이면 그만이다.
+  풀링 부모는 `None/HUD/DynamicHUD/World/AltWorld/GroundWorld` 여섯이다.
+- **게임이 UI 를 감출 때 함께 감춰진다.** `UIManager.Hide()`가 하는 일이 `uiRoots` 각각의
+  CanvasGroup 알파를 0 으로 만드는 것이라, 밑에 달려 있으면 딸려간다. 흉내 낼 필요가 없다.
+- **입력을 뺏지 않는 것도 구조가 보장한다.** 컨트롤 스택에는 `UIBase`를 단 것만 `AddControl`로
+  들어가고(`UIManager.Awake`가 Awake 시점의 UIRoot 자식만 훑는다), ESC 처리도 그 스택을 탄다.
+  `UIBase`를 상속하지 않고 그리는 것마다 `raycastTarget`을 끄면 키보드도 마우스도 통과한다.
+- **글꼴은 게임에서 빌린다.** 씬의 `TMP_Text`에서 `font`와 `fontSharedMaterial`을 가져오면
+  외곽선·그림자까지 같아진다. 픽셀 글꼴이라 재질이 다르면 흐릿해져 한눈에 티가 난다.
+- **판때기 그림도 마찬가지다.** UIRoot 자식 중 `sprite.border != 0`(9-slice)인 `Image`를 찾아
+  스프라이트·타입·색을 복사한다. 테두리가 없는 그림을 늘리면 뭉개진다.
+
+### 게임이 Galmuri 를 쓴다
+
+`resources.assets`와 `sharedassets0.assets` 양쪽에서 문자열을 확인했다. 오버레이가 폰트를
+임베드해 게임과 맞추던 것(OFL 재배포 의무 포함)이 인게임에서는 필요 없다는 뜻이다. 색을
+`Theme.cs`에 손으로 채집해 둔 것도 스프라이트를 그대로 쓰면 대신할 수 있다.
+
+### 에셋 방침과의 관계
+
+씬에 이미 떠 있는 것을 런타임에 참조할 뿐 추출하지도 배포물에 넣지도 않으므로 `docs/LEGAL.md`
+의 "게임 저작물 미배포"를 그대로 지킨다. 오히려 아이콘 덤프(`IconDump`/`IconStore`,
+`%LOCALAPPDATA%\SephPlanner\icons\`)가 통째로 필요 없어진다.
+
+### 솔버는 백그라운드 스레드로
+
+`PlanBuilder.Build`는 빔 서치라 게임 루프에서 돌리면 프레임이 끊긴다. 넘겨도 되는 근거는
+`SephPlanner.Core`가 유니티 객체를 건드리지 않는 순수 계산이고 `GameReader.Read`가 호출마다
+새 스냅샷을 만든다는 것이다. `PlanRunner`가 한 번에 하나만 돌린다 - 폴링이 풀이보다 빠를 때
+요청이 쌓이면 게임이 스레드에 잠식된다.
+
+### 게임 단축키
+
+우리 단축키가 게임 조작을 함께 발동시키는 문제가 있었다. Ctrl+Alt+P 로 오버레이를 펼치면
+게임의 재능 창이 같이 열렸다. **게임은 수정키를 보지 않고 글자 키만 읽으므로 Ctrl·Alt 를 붙여도
+소용이 없고**, 전역 단축키(RegisterHotKey)가 조합을 가로채도 게임의 InputSystem 은 장치를 직접
+읽어서 눌린 글자를 그대로 받는다.
+
+`sharedassets0.assets` 의 InputActionAsset 바인딩을 뽑아 게임이 쓰는 키를 확정했다.
+
+```
+1 2 3 4 5 6 7 8   a b c d e f g p q r s v w x z
+backquote slash space tab enter numpadEnter escape
+leftArrow rightArrow upArrow downArrow   leftCtrl leftShift
+```
+
+**F 키는 하나도 쓰지 않는다.** 그래서 인게임 단축키는 F 키로 잡는다(F7 접고 펴기, F8 자동 배치,
+F9 덤프, F10 인벤토리 덤프). 오버레이의 전역 단축키는 조합이 필요해 글자를 쓰되 위 목록에 없는
+것으로 고른다 - Ctrl+Alt+I(접기/펼치기), Ctrl+Alt+O(숨기기). 단축키를 새로 정할 일이 생기면
+이 목록을 먼저 본다.
+
+### 누를 것이 없는 화면이다
+
+`raycastTarget`을 끄면 마우스가 통과하는 대신 버튼도 못 만든다. 그래서 조작은 전부 단축키로
+받는다 - 접고 펴기와 자동 배치가 BepInEx 설정의 `ExpandKey`/`AutoPlaceKey`다. 입력을 하나도
+가져가지 않는 것이 게임을 방해하지 않는다는 보장의 근거이므로, 버튼을 들이려면 그 보장을
+어떻게 지킬지부터 정해야 한다.
+
+그래서 아직 옮기지 못한 것도 여기서 갈린다. **누르거나 입력해야 하는 것 - 강화 우선 지정
+(우클릭), 콤보 칩 켜고 끄기, 프리셋 코드 붙여넣기, 추천 끄기, 아이콘/글자 모드 - 은 오버레이에
+남아 있다.** 이들은 결국 데스크톱 앱 쪽으로 가는 것이 맞아 보인다.
+
+### 아직 확인 못 한 것
+
+**게임을 켜서 봐야 답이 나오는 것들이다.** 화면이 HUD 와 겹치지 않는지(오프셋과 폭은 BepInEx
+설정으로 뺐다), 빌려 온 글꼴 크기가 게임 UI 배율에서 적절한지, 후보 추천까지 켠 솔버가 도는
+동안 프레임이 실제로 안 끊기는지. `NativeHud`가 무엇을 빌려 왔는지와 못 붙었다면 왜인지를
+BepInEx 로그에 남긴다.
 
 ## 프리셋 코드 (커스텀 로드아웃 공유)
 

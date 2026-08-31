@@ -323,7 +323,7 @@ public partial class MainWindow : Window
         DetailPanel.Visibility = _expanded ? Visibility.Visible : Visibility.Collapsed;
         Width = _expanded ? DetailWidth : CompactWidth;
         ExpandButton.Content = _expanded ? "▲" : "▼";
-        ExpandButton.ToolTip = (_expanded ? "접기" : "펼치기") + " (Ctrl+Alt+P)";
+        ExpandButton.ToolTip = (_expanded ? "접기" : "펼치기") + $" ({ExpandLabel})";
     }
 
     private void UpdateNextMoveVisibility() =>
@@ -362,7 +362,31 @@ public partial class MainWindow : Window
                 KeyOf(advice),
                 KeyOf(advice) == _previewKey ? Theme.RowPicked : Theme.Hit));
         }
+        RenderOfferNotice(plan);
         OfferPanel.Visibility = _offers.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private const string OfferNoticeDetail =
+        "아티팩트가 실제로 얼마나 센지는 게임 데이터만으로 다 잴 수 없습니다. 능력치를 주는 " +
+        "아티팩트는 레벨별 능력치 표에서 값어치를 재지만, 고유 효과에만 값어치가 있는 아티팩트는 " +
+        "레어도로 어림잡습니다. 어느 쪽인지는 후보에 마우스를 올리면 나옵니다." +
+        "\n\n자리 배치와 점수 증가분은 게임이 계산해 둔 레벨에서 나오므로 이 한계와 무관합니다.";
+
+    /// <summary>
+    /// 순위를 그대로 믿으면 안 된다는 것을 늘 보이게 적는다. 개별 후보의 사정은 마우스를 올리면
+    /// 나오지만, 그것만으로는 목록 자체가 확정된 답처럼 읽힌다. 어림잡은 것이 몇 개인지까지
+    /// 세어 적는 것은, 뭉뚱그린 면책 문구는 몇 번 보고 나면 읽히지 않기 때문이다.
+    /// </summary>
+    private void RenderOfferNotice(Plan plan)
+    {
+        var guessed = plan.Offers.Take(6).Count(advice =>
+            advice.Candidate.Charm is { } charm &&
+            CharmWorth.Resolve(charm, CharmValueStore.Book.Of(charm)).Source == CharmWorthSource.Rarity);
+
+        OfferNotice.Text = guessed > 0
+            ? $"순위는 참고용입니다 — 이 중 {guessed}개는 값어치를 레어도로 어림잡았습니다."
+            : "순위는 참고용입니다.";
+        OfferNotice.ToolTip = OfferNoticeDetail;
     }
 
     /// <summary>
@@ -815,6 +839,15 @@ public partial class MainWindow : Window
     }
 
     // 게임에 포커스가 가 있는 동안에도 조작할 수 있어야 해서 전역 단축키로 등록한다.
+    //
+    // 글자는 게임이 쓰지 않는 것으로 고른다. 전역 단축키는 조합을 가로채지만 게임은 InputSystem 이
+    // 장치를 직접 읽어서 눌린 글자를 그대로 받는다. 그래서 예전에 쓰던 Ctrl+Alt+P 는 펼칠 때마다
+    // 게임의 재능 창(P)이 함께 열렸다. 게임이 쓰는 글자 목록은 docs/RESEARCH.md 의 "게임 단축키" 절.
+    private const Key ExpandKey = Key.I;
+    private const Key VisibilityKey = Key.O;
+    private const string ExpandLabel = "Ctrl+Alt+I";
+    private const string VisibilityLabel = "Ctrl+Alt+O";
+
     private const int ExpandHotkeyId = 0xB1;
     private const int VisibilityHotkeyId = 0xB2;
     private const uint ModAlt = 0x0001, ModControl = 0x0002, ModNoRepeat = 0x4000;
@@ -838,18 +871,23 @@ public partial class MainWindow : Window
         _source = (HwndSource)PresentationSource.FromVisual(this)!;
         _source.AddHook(OnWindowMessage);
 
-        var keyP = (uint)KeyInterop.VirtualKeyFromKey(Key.P);
-        if (!RegisterHotKey(_source.Handle, ExpandHotkeyId, ModControl | ModAlt | ModNoRepeat, keyP))
+        var expand = (uint)KeyInterop.VirtualKeyFromKey(ExpandKey);
+        if (!RegisterHotKey(_source.Handle, ExpandHotkeyId, ModControl | ModAlt | ModNoRepeat, expand))
         {
             // 다른 프로그램이 이미 쓰고 있으면 등록에 실패한다. 버튼으로는 여전히 접고 펼 수 있다.
-            ExpandButton.ToolTip = "펼치기 (Ctrl+Alt+P 는 다른 프로그램이 쓰는 중)";
+            ExpandButton.ToolTip = $"펼치기 ({ExpandLabel} 은 다른 프로그램이 쓰는 중)";
         }
 
-        var keyO = (uint)KeyInterop.VirtualKeyFromKey(Key.O);
-        _canHide = RegisterHotKey(_source.Handle, VisibilityHotkeyId, ModControl | ModAlt | ModNoRepeat, keyO);
+        var visibility = (uint)KeyInterop.VirtualKeyFromKey(VisibilityKey);
+        _canHide = RegisterHotKey(
+            _source.Handle, VisibilityHotkeyId, ModControl | ModAlt | ModNoRepeat, visibility);
         if (!_canHide)
         {
-            TitleText.ToolTip = "Ctrl+Alt+P = 접기/펼치기 (Ctrl+Alt+O 는 다른 프로그램이 쓰는 중)";
+            TitleText.ToolTip = $"{ExpandLabel} = 접기/펼치기 ({VisibilityLabel} 은 다른 프로그램이 쓰는 중)";
+        }
+        else
+        {
+            TitleText.ToolTip = $"{ExpandLabel} = 접기/펼치기 · {VisibilityLabel} = 숨기기/보이기";
         }
     }
 

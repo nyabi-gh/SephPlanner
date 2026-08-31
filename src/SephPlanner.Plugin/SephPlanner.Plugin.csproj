@@ -44,6 +44,23 @@
       <HintPath>$(SephiriaManagedDir)\UnityEngine.ImageConversionModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <!-- 게임 HUD 캔버스 안에 직접 그리기 위한 것. 게임과 같은 uGUI + TextMeshPro 를 쓴다. -->
+    <Reference Include="UnityEngine.UIModule">
+      <HintPath>$(SephiriaManagedDir)\UnityEngine.UIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>$(SephiriaManagedDir)\UnityEngine.TextRenderingModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(SephiriaManagedDir)\UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>$(SephiriaManagedDir)\Unity.TextMeshPro.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
   <Target Name="WarnIfGameMissing" BeforeTargets="ResolveAssemblyReferences">

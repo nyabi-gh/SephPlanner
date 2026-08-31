@@ -99,7 +99,7 @@
                         <TextBlock x:Name="TitleText" Text="SephPlanner"
                                    Foreground="{x:Static local:Theme.TextBright}"
                                    FontSize="12" FontWeight="Bold"
-                                   ToolTip="Ctrl+Alt+P = 접기/펼치기 · Ctrl+Alt+O = 숨기기/보이기" />
+                                   />
                         <Button DockPanel.Dock="Right" Content="×" Click="OnClose"
                                 Style="{StaticResource GlyphButton}" Margin="6,0,0,0" FontSize="12"
                                 ToolTip="닫기 (Esc)" />
@@ -217,6 +217,9 @@
                         <StackPanel x:Name="OfferPanel" Margin="0,12,0,0" Visibility="Collapsed">
                             <TextBlock Text="지금 집을 수 있는 것" Style="{StaticResource SectionHeader}"
                                        Foreground="{x:Static local:Theme.Mint}" />
+                            <TextBlock x:Name="OfferNotice" Margin="0,0,0,5"
+                                       FontFamily="{x:Static local:Theme.Small}" FontSize="10" FontWeight="Normal"
+                                       Foreground="{x:Static local:Theme.TextDim}" TextWrapping="Wrap" />
                             <ItemsControl x:Name="OfferList">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
