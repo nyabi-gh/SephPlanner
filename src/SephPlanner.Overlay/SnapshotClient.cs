@@ -21,6 +21,9 @@ public sealed class SnapshotClient
     public event Action<GameSnapshot>? SnapshotReceived;
     public event Action<bool>? ConnectionChanged;
 
+    /// <summary>버전이 다른 스냅샷을 받았다. 인자는 플러그인이 보낸 버전이다.</summary>
+    public event Action<int>? ProtocolMismatch;
+
     public async Task RunAsync(CancellationToken token)
     {
         while (!token.IsCancellationRequested)
@@ -51,7 +54,17 @@ public sealed class SnapshotClient
                         continue; // 프로토콜이 어긋난 한 줄 때문에 연결을 끊지는 않는다.
                     }
 
-                    if (snapshot is not null) SnapshotReceived?.Invoke(snapshot);
+                    if (snapshot is null) continue;
+
+                    // 버전이 다른 스냅샷은 화면까지 보내지 않는다. 개명·삭제된 필드가 기본값으로
+                    // 읽히면 IsMultiplayer 같은 안전 잠금이 열린 쪽으로 무너지기 때문이다.
+                    if (snapshot.ProtocolVersion != IpcContract.ProtocolVersion)
+                    {
+                        ProtocolMismatch?.Invoke(snapshot.ProtocolVersion);
+                        continue;
+                    }
+
+                    SnapshotReceived?.Invoke(snapshot);
                 }
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)

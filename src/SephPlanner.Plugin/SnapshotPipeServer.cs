@@ -16,6 +16,7 @@ namespace SephPlanner.Plugin
         private readonly Action<string> _log;
         private volatile bool _running = true;
         private volatile string _latest;
+        private volatile NamedPipeServerStream _pipe;
 
         public SnapshotPipeServer(Action<string> log)
         {
@@ -35,6 +36,8 @@ namespace SephPlanner.Plugin
                         IpcContract.PipeName, PipeDirection.Out, 1,
                         PipeTransmissionMode.Byte, PipeOptions.Asynchronous))
                     {
+                        // Dispose 가 이 참조를 닫아 WaitForConnection 블로킹을 깨운다.
+                        _pipe = pipe;
                         pipe.WaitForConnection();
                         _log("오버레이 연결됨");
                         Serve(pipe);
@@ -48,9 +51,12 @@ namespace SephPlanner.Plugin
                 }
                 catch (IOException)
                 {
+                    // 잠들지 않으면 파이프 이름이 점유된 상태에서 로그도 없이 코어를 태운다.
+                    if (_running) Thread.Sleep(500);
                 }
                 catch (ObjectDisposedException)
                 {
+                    if (_running) Thread.Sleep(500);
                 }
                 catch (Exception ex)
                 {
@@ -77,6 +83,12 @@ namespace SephPlanner.Plugin
             }
         }
 
-        public void Dispose() => _running = false;
+        public void Dispose()
+        {
+            // 플래그만 세우면 WaitForConnection 에 블로킹된 스레드가 유일한 파이프 인스턴스를
+            // 쥔 채 살아남아, 다음 서버가 뜰 때 생성 실패 스핀으로 이어진다. 닫아서 깨운다.
+            _running = false;
+            try { _pipe?.Dispose(); } catch (Exception) { }
+        }
     }
 }

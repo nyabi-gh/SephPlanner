@@ -69,6 +69,10 @@ public partial class MainWindow : Window
         client.ConnectionChanged += connected => Dispatcher.Invoke(() =>
             StatusText.Text = connected ? "연결됨" : "게임 대기 중");
         client.SnapshotReceived += OnSnapshot;
+        client.ProtocolMismatch += version => Dispatcher.Invoke(() =>
+            ShowNotice(version < IpcContract.ProtocolVersion
+                ? "플러그인이 구버전입니다. BepInEx/plugins 의 SephPlanner DLL 두 개를 함께 업데이트해 주세요."
+                : "오버레이가 구버전입니다. SephPlanner.Overlay.exe 를 함께 업데이트해 주세요."));
 
         _ = client.RunAsync(_shutdown.Token);
     }
@@ -115,6 +119,19 @@ public partial class MainWindow : Window
 
                     var plan = PlanBuilder.Build(snapshot, _catalog, _preferences);
                     Dispatcher.Invoke(() => Render(snapshot, plan));
+                }
+            }
+            catch (Exception ex)
+            {
+                // 여기서 삼키지 않으면 태스크가 조용히 죽는데, 플러그인은 같은 상태를 다시
+                // 보내지 않으므로 그 상태는 영영 오지 않는다. 알리고 다음 스냅샷을 계속 받는다.
+                try
+                {
+                    Dispatcher.Invoke(() => ShowWarning("계산 중 오류가 났습니다: " + ex.Message));
+                }
+                catch (OperationCanceledException)
+                {
+                    // 창이 닫히는 중이다.
                 }
             }
             finally
@@ -196,8 +213,9 @@ public partial class MainWindow : Window
         MovePanel.Visibility = _moves.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
         // 멀티 세션에서는 쓰기 경로의 동기화가 검증되지 않아 자동 배치를 내놓지 않는다 (docs/LEGAL.md).
+        // Targets 가 비어 있으면(석판이 빠진 불완전 배치 등) 버튼을 보여줄 이유도 없다.
         _plan = plan;
-        AutoPlaceButton.Visibility = plan.Moves.Count > 0 && !snapshot.IsMultiplayer
+        AutoPlaceButton.Visibility = plan.Moves.Count > 0 && plan.Targets.Count > 0 && !snapshot.IsMultiplayer
             ? Visibility.Visible
             : Visibility.Collapsed;
 
@@ -211,6 +229,12 @@ public partial class MainWindow : Window
     /// </summary>
     private static string Warning(GameSnapshot snapshot, Plan plan)
     {
+        if (plan.Best.UnplacedTablets > 0)
+        {
+            return $"석판 {plan.Best.UnplacedTablets}개는 놓을 자리가 없어 계산에서 빠졌습니다. " +
+                   "점수가 실제와 다를 수 있습니다.";
+        }
+
         if (plan.LevelMismatches > 0)
         {
             // 무엇이 원인인지는 여기서 알 수 없다. 다만 어긋난다는 사실은 확실하므로 그것만 말한다.
@@ -476,12 +500,22 @@ public partial class MainWindow : Window
         var plan = _plan;
         if (plan is null || plan.Targets.Count == 0) return;
 
-        // 적용 결과는 새 스냅샷으로 돌아온다. 그때까지 같은 명령이 두 번 나가지 않게 잠근다.
+        // 응답이 올 때까지 같은 명령이 두 번 나가지 않게 잠근다. async void 라 예외가 새 나가면
+        // 프로세스가 죽으므로 버튼 복구까지 finally 로 지킨다.
         AutoPlaceButton.IsEnabled = false;
-        var sent = await Task.Run(() => CommandClient.TrySend(new ApplyPlanCommand { Targets = plan.Targets }));
-        AutoPlaceButton.IsEnabled = true;
-
-        if (!sent) ShowWarning("플러그인과 연결할 수 없어 자동 배치를 보내지 못했습니다.");
+        try
+        {
+            var response = await CommandClient.SendAsync(new ApplyPlanCommand { Targets = plan.Targets });
+            ShowWarning(response ?? "플러그인과 연결할 수 없어 자동 배치를 보내지 못했습니다.");
+        }
+        catch (Exception ex)
+        {
+            ShowWarning("자동 배치 요청 중 오류가 났습니다: " + ex.Message);
+        }
+        finally
+        {
+            AutoPlaceButton.IsEnabled = true;
+        }
     }
 
     /// <summary>

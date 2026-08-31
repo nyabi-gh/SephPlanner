@@ -5,12 +5,18 @@ namespace SephPlanner.Core.Ipc
 {
     /// <summary>
     /// 플러그인과 오버레이 사이의 통신 규약.
-    /// localhost HTTP 대신 명명 파이프를 쓴다. 방화벽 팝업이 없고 포트가 충돌하지 않으며
-    /// 같은 사용자 세션 밖에서는 열 수 없다.
+    /// localhost HTTP 대신 명명 파이프를 쓴다. 방화벽 팝업이 없고 포트가 충돌하지 않는다.
+    /// 다만 명명 파이프는 같은 데스크톱의 다른 프로세스도 열 수 있으므로 보안 격리 수단은 아니다.
     /// </summary>
     public static class IpcContract
     {
-        public const int ProtocolVersion = 1;
+        /// <summary>
+        /// 스냅샷·명령의 형태나 의미가 바뀌면 반드시 올린다. 필드가 개명·삭제된 채 기본값으로
+        /// 역직렬화되면 <c>IsMultiplayer</c> 같은 안전 잠금이 열린 쪽으로 무너지기 때문에,
+        /// 오버레이는 버전이 다른 스냅샷을 버리고 플러그인은 버전이 다른 명령을 거부한다.
+        /// v2: 명령 파이프가 응답을 돌려주는 양방향이 되고, 오버레이가 스냅샷 버전을 검사한다.
+        /// </summary>
+        public const int ProtocolVersion = 2;
 
         public const string PipeName = "SephPlanner.Snapshot.v1";
 

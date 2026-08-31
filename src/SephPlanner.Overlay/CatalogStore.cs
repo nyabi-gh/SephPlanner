@@ -49,9 +49,10 @@ public sealed class CatalogStore : ICatalog
             _loadedAt = stamp;
             return true;
         }
-        catch (JsonException)
+        catch (Exception ex) when (ex is JsonException or IOException)
         {
-            // 플러그인이 쓰는 도중에 읽었을 수 있다. 다음 기회에 다시 시도한다.
+            // 플러그인이 쓰는 도중에 읽었을 수 있다. 반쯤 쓰인 파일은 JsonException 으로,
+            // 쓰기 잠금에 부딪히면 IOException 으로 나타난다. 다음 기회에 다시 시도한다.
             return false;
         }
     }

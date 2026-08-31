@@ -69,16 +69,22 @@ namespace SephPlanner.Plugin
 
         private void DrainCommands()
         {
-            while (_commands.TryDequeue(out var command))
+            while (_commands.TryDequeue(out var pending))
             {
+                string result;
                 try
                 {
-                    Logger.LogInfo(PlanApplier.Apply(command));
+                    result = PlanApplier.Apply(pending.Command);
+                    Logger.LogInfo(result);
                 }
                 catch (Exception ex)
                 {
                     Logger.LogError("자동 배치 실패: " + ex);
+                    result = "자동 배치 중 오류가 났습니다. BepInEx 로그를 확인하세요.";
                 }
+
+                // 결과가 오버레이 화면까지 가야 한다. 로그에만 남기면 무음 실패가 된다.
+                pending.Complete(result);
 
                 // 적용 결과가 화면에 바로 보이도록 다음 폴링을 기다리지 않는다.
                 _nextPoll = 0;
