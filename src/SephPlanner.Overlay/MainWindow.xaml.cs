@@ -134,8 +134,8 @@ public partial class MainWindow : Window
                         continue;
                     }
 
-                    var plan = PlanBuilder.Build(snapshot, ActiveCatalog, _preferences);
-                    Dispatcher.Invoke(() => Render(snapshot, plan));
+                    var plan = PlanBuilder.Build(snapshot, ActiveCatalog, _preferences, out var blocker);
+                    Dispatcher.Invoke(() => Render(snapshot, plan, blocker));
                 }
             }
             catch (Exception ex)
@@ -188,7 +188,7 @@ public partial class MainWindow : Window
     /// <summary>마지막으로 아이콘 캐시를 비웠을 때의 카탈로그 버전.</summary>
     private int _iconCatalogVersion;
 
-    private void Render(GameSnapshot snapshot, Plan? plan)
+    private void Render(GameSnapshot snapshot, Plan? plan, PlanBlocker blocker)
     {
         // F9 재덤프로 아이콘이 바뀌었을 수 있다. 카탈로그가 다시 읽힌 시점에 함께 비운다.
         if (_catalog.Version != _iconCatalogVersion)
@@ -200,9 +200,13 @@ public partial class MainWindow : Window
         if (plan is null)
         {
             // "탐험"은 게임 자체가 쓰는 말이다 ("탐험 시작 시", "탐험 중" - ko-KR.json).
-            ShowNotice(snapshot.Inventory is null
-                ? "탐험 중이 아닙니다. 탐험을 시작하면 배치를 분석합니다."
-                : "인벤토리에 아티팩트가 없습니다.");
+            ShowNotice(blocker switch
+            {
+                PlanBlocker.NoCharms => "가방에 아티팩트가 없습니다. 하나 주우면 배치를 계산합니다.",
+                PlanBlocker.UnknownItems =>
+                    "가방의 물건 중 아는 아티팩트가 없습니다. 게임 안에서 F9 로 데이터를 다시 만들어 보세요.",
+                _ => "탐험 중이 아닙니다. 탐험을 시작하면 배치를 분석합니다.",
+            });
             return;
         }
 
@@ -655,7 +659,8 @@ public partial class MainWindow : Window
         UpdateIconModeButton();
 
         // 계산은 그대로 두고 화면만 다시 그린다.
-        if (_lastSnapshot is { } snapshot && _plan is { } plan) Render(snapshot, plan);
+        // 배치가 이미 있으니 막힌 것은 없다.
+        if (_lastSnapshot is { } snapshot && _plan is { } plan) Render(snapshot, plan, PlanBlocker.None);
     }
 
     private void UpdateIconModeButton() =>

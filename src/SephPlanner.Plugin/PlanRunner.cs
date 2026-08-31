@@ -22,6 +22,7 @@ namespace SephPlanner.Plugin
 
         private volatile Plan _latest;
         private volatile string _error;
+        private volatile PlanBlocker _blocker;
 
         public PlanRunner(ICatalog catalog)
         {
@@ -35,19 +36,27 @@ namespace SephPlanner.Plugin
         public string Error => _error;
 
         /// <summary>
+        /// 배치가 안 나왔으면 왜 안 나왔는지. 아직 한 번도 안 돌았을 때도
+        /// <see cref="PlanBlocker.None"/> 이므로, 화면은 <see cref="Latest"/>가 없는 것과 함께 본다.
+        /// </summary>
+        public PlanBlocker Blocker => _blocker;
+
+        /// <summary>
         /// 설정은 풀 때마다 새로 받는다. 설정 탭에서 바뀐 값이 다음 풀이부터 곧바로 걸리고,
         /// 백그라운드 스레드가 읽는 동안 메인 스레드가 같은 것을 고치는 일도 없다.
         /// </summary>
-        public void Submit(GameSnapshot snapshot, PlanPreferences preferences)
+        /// <summary>받아들였으면 참. 이미 풀고 있는 중이면 거짓이고, 그때는 부른 쪽이 다시 내야 한다.</summary>
+        public bool Submit(GameSnapshot snapshot, PlanPreferences preferences)
         {
-            if (snapshot == null) return;
-            if (Interlocked.CompareExchange(ref _busy, 1, 0) != 0) return;
+            if (snapshot == null) return false;
+            if (Interlocked.CompareExchange(ref _busy, 1, 0) != 0) return false;
 
             ThreadPool.QueueUserWorkItem(_ =>
             {
                 try
                 {
-                    _latest = PlanBuilder.Build(snapshot, _catalog, preferences);
+                    _latest = PlanBuilder.Build(snapshot, _catalog, preferences, out var blocker);
+                    _blocker = blocker;
                     _error = null;
                 }
                 catch (Exception ex)
@@ -60,6 +69,7 @@ namespace SephPlanner.Plugin
                     Interlocked.Exchange(ref _busy, 0);
                 }
             });
+            return true;
         }
     }
 }

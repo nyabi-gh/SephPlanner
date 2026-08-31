@@ -111,6 +111,7 @@ namespace SephPlanner.Plugin
                 text.AppendLine($"  ({pair.Key.x},{pair.Key.y}) = {pair.Value}");
 
             WriteOffers(text, inv, player, offerRadius);
+            UiDiagnostics.Write(text);
 
             Directory.CreateDirectory(IpcContract.DataDirectory);
             var path = Path.Combine(IpcContract.DataDirectory, FileName);

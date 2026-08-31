@@ -8,15 +8,47 @@ using SephPlanner.Core.Tablets;
 
 namespace SephPlanner.Core.Planning
 {
+    /// <summary>
+    /// 풀 배치가 없을 때 왜 없는지.
+    ///
+    /// 답이 없다는 것과 아직 못 구했다는 것은 다르다. 그냥 <c>null</c> 만 돌려주면 화면이 둘을
+    /// 가릴 수 없어 "계산 중"에 영영 멈춰 있는 것처럼 보인다 - 실제로 그렇게 보였다.
+    /// </summary>
+    public enum PlanBlocker
+    {
+        /// <summary>막힌 것이 없다. 배치가 나왔거나 아직 계산 전이다.</summary>
+        None,
+
+        /// <summary>탐험 중이 아니거나 가방을 읽지 못했다.</summary>
+        NoInventory,
+
+        /// <summary>격자가 비어 있다. 아직 아무것도 줍지 않았다.</summary>
+        NoCharms,
+
+        /// <summary>격자에 물건은 있는데 카탈로그가 아는 아티팩트가 하나도 없다.</summary>
+        UnknownItems,
+    }
+
     /// <summary>스냅샷과 카탈로그를 합쳐 현재 배치를 채점하고 더 나은 배치를 찾는다.</summary>
     public static class PlanBuilder
     {
-        public static Plan? Build(GameSnapshot snapshot, ICatalog catalog, PlanPreferences? preferences = null)
+        public static Plan? Build(
+            GameSnapshot snapshot, ICatalog catalog, PlanPreferences? preferences = null) =>
+            Build(snapshot, catalog, preferences, out _);
+
+        public static Plan? Build(
+            GameSnapshot snapshot, ICatalog catalog, PlanPreferences? preferences,
+            out PlanBlocker blocker)
         {
+            blocker = PlanBlocker.None;
             preferences ??= PlanPreferences.None;
             var values = preferences.CharmValues;
             var inventory = snapshot.Inventory;
-            if (inventory is null || inventory.Storage <= 0) return null;
+            if (inventory is null || inventory.Storage <= 0)
+            {
+                blocker = PlanBlocker.NoInventory;
+                return null;
+            }
 
             var grid = new GridSpec(inventory.Width, inventory.Height, inventory.Storage);
             var problem = new PlacementProblem { Grid = grid };
@@ -91,7 +123,13 @@ namespace SephPlanner.Core.Planning
                 problem.CurrentCharms[item.InstanceId] = item.Position;
             }
 
-            if (problem.Charms.All(charm => charm.IsFiller)) return null;
+            if (problem.Charms.All(charm => charm.IsFiller))
+            {
+                // 격자가 빈 것과, 물건은 있는데 우리가 하나도 못 알아본 것은 사람이 할 일이 다르다.
+                // 뒤엣것은 대개 카탈로그가 낡아서이므로 다시 덤프하라고 일러야 한다.
+                blocker = problem.Charms.Count > 0 ? PlanBlocker.UnknownItems : PlanBlocker.NoCharms;
+                return null;
+            }
 
             var current = PlacementSolver.Score(problem, layout, positions);
             var best = PlacementSolver.Solve(problem);

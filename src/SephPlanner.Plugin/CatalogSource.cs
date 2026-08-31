@@ -1,3 +1,4 @@
+using System;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Solver;
 
@@ -14,22 +15,45 @@ namespace SephPlanner.Plugin
     {
         private static ICatalog _catalog;
 
+        /// <summary>마지막으로 짓지 못한 이유. 지어졌으면 빈 문자열이다.</summary>
+        public static string LastError { get; private set; } = "";
+
+        /// <summary>
+        /// 아직 지을 수 없으면 <c>null</c> 을 돌려준다. 부르는 쪽은 다음 기회에 다시 물어보면 된다.
+        /// </summary>
         public static ICatalog Get()
         {
             if (_catalog != null) return _catalog;
 
-            var tablets = ItemCatalog.LoadTablets();
-            var charms = ItemCatalog.LoadCharms();
-            var combos = ItemCatalog.LoadCombos();
+            try
+            {
+                var tablets = ItemCatalog.LoadTablets();
+                var charms = ItemCatalog.LoadCharms();
+                var combos = ItemCatalog.LoadCombos();
 
-            // 아티팩트가 레벨마다 주는 값어치를 여기서도 실어 준다. 이것이 없으면 점수가 레어도
-            // 어림값으로 물러서서, 오버레이가 말하는 점수와 인게임 패널이 말하는 점수가 달라진다.
-            CharmStatWorth.Apply(charms, ItemCatalog.LoadStatMeasurement());
+                // 아티팩트가 레벨마다 주는 값어치를 여기서도 실어 준다. 이것이 없으면 점수가 레어도
+                // 어림값으로 물러서서, 오버레이가 말하는 점수와 인게임 패널이 말하는 점수가 달라진다.
+                CharmStatWorth.Apply(charms, ItemCatalog.LoadStatMeasurement());
 
-            return _catalog = new Catalog(tablets, charms, combos);
+                LastError = "";
+                return _catalog = new Catalog(tablets, charms, combos);
+            }
+            catch (Exception ex)
+            {
+                // 부팅 직후에는 게임의 LocalizationManager 가 아직 표를 안 들고 있어서 이름을
+                // 물어보면 터진다(BepInEx 로그에 NullReferenceException 으로 남았다). 반쯤 지은
+                // 것을 캐시하면 이름이 영영 빈 채로 굳으므로, 짓지 않고 물러서서 다음에 다시 짓는다.
+                // 조용히 넘기지는 않는다 - LastError 를 플러그인이 한 번 로그로 남긴다.
+                LastError = ex.Message;
+                return null;
+            }
         }
 
         /// <summary>F9 로 다시 덤프할 때처럼 정의가 바뀌었을 수 있으면 버린다.</summary>
-        public static void Invalidate() => _catalog = null;
+        public static void Invalidate()
+        {
+            _catalog = null;
+            LastError = "";
+        }
     }
 }

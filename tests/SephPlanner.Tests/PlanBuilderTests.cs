@@ -154,7 +154,8 @@ public class PlanBuilderTests
     [Fact]
     public void ThereIsNothingToPlanWithoutARun()
     {
-        Assert.Null(PlanBuilder.Build(new GameSnapshot(), Catalog()));
+        Assert.Null(PlanBuilder.Build(new GameSnapshot(), Catalog(), null, out var blocker));
+        Assert.Equal(PlanBlocker.NoInventory, blocker);
     }
 
     [Fact]
@@ -163,6 +164,23 @@ public class PlanBuilderTests
         var snapshot = Snapshot();
         snapshot.Inventory!.Items[0].DefinitionId = 9999;
 
-        Assert.Null(PlanBuilder.Build(snapshot, Catalog()));
+        Assert.Null(PlanBuilder.Build(snapshot, Catalog(), null, out var blocker));
+
+        // 물건은 격자에 있다. 비어 있는 것과 구별돼야 화면이 "데이터를 다시 만들라"고 말할 수 있다.
+        Assert.Equal(PlanBlocker.UnknownItems, blocker);
+    }
+
+    /// <summary>
+    /// 탐험을 막 시작하면 격자가 비어 있다. 이때 답이 없는 것을 "계산 중"으로 보여 주면 영영
+    /// 계산만 하는 것처럼 보이므로, 빈 격자임을 화면이 알 수 있어야 한다.
+    /// </summary>
+    [Fact]
+    public void AnEmptyGridSaysSoInsteadOfLookingLikeAStalledSolve()
+    {
+        var snapshot = Snapshot();
+        snapshot.Inventory!.Items.Clear();
+
+        Assert.Null(PlanBuilder.Build(snapshot, Catalog(), null, out var blocker));
+        Assert.Equal(PlanBlocker.NoCharms, blocker);
     }
 }

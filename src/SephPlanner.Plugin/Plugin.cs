@@ -38,6 +38,7 @@ namespace SephPlanner.Plugin
         private string _lastPanelOrigin;
         private string _lastPanelBlocker;
         private string _lastWindowOrigin;
+        private string _lastCatalogError = "";
         private string _lastWindowBlocker;
         private string _builtLayout;
         private float _appliedOpacity = -1f;
@@ -268,7 +269,22 @@ namespace SephPlanner.Plugin
                 // 카탈로그를 짓는 일은 리소스를 통째로 훑는 것이라 무겁다. 덤프가 끝나 정의가
                 // 갖춰진 뒤에 한 번만 짓는다.
                 if (_dumping || !CatalogDump.HasCatalog()) return;
-                _runner = new PlanRunner(CatalogSource.Get());
+
+                // 부팅 직후에는 게임의 로컬라이제이션이 아직 준비되지 않아 지을 수 없다.
+                // 그때는 물러서서 다음 폴링에 다시 짓는다.
+                var catalog = CatalogSource.Get();
+                if (catalog == null)
+                {
+                    if (CatalogSource.LastError != _lastCatalogError)
+                    {
+                        _lastCatalogError = CatalogSource.LastError;
+                        Logger.LogInfo("데이터를 아직 짓지 못했습니다. 다음에 다시 시도합니다 - " +
+                                       CatalogSource.LastError);
+                    }
+                    return;
+                }
+                _lastCatalogError = "";
+                _runner = new PlanRunner(catalog);
             }
 
             // 빌드 지정이 바뀌면 스냅샷이 그대로여도 답이 달라진다. 그대로 두면 창에서 콤보를
@@ -276,8 +292,9 @@ namespace SephPlanner.Plugin
             var stale = _solvedRevision != _prefs.Revision;
             if (!changed && !stale && _runner.Latest != null) return;
 
-            _solvedRevision = _prefs.Revision;
-            _runner.Submit(snapshot, Preferences());
+            // 이미 풀고 있는 중이면 이번 것은 받아들여지지 않는다. 그때 푼 것으로 쳐 두면 그
+            // 지정은 다음에 뭔가 또 바뀔 때까지 반영되지 않는다.
+            if (_runner.Submit(snapshot, Preferences())) _solvedRevision = _prefs.Revision;
         }
 
         /// <summary>빌드 창이 목록을 채울 재료. 창은 열려 있는 동안 시간이 멈추므로 그때 한 번 읽는다.</summary>
@@ -369,7 +386,7 @@ namespace SephPlanner.Plugin
             var plan = _runner?.Latest;
             if (plan == null)
             {
-                _hud.RenderNotice(_runner == null ? "데이터 준비 중" : "계산 중");
+                _hud.RenderNotice(Waiting());
                 return;
             }
 
@@ -389,6 +406,34 @@ namespace SephPlanner.Plugin
                 HintIsPreview = preview != null,
                 PreviewKey = _previewKey,
             });
+        }
+
+        /// <summary>
+        /// 배치가 없을 때 무엇을 기다리는 중인지.
+        ///
+        /// 예전에는 전부 "계산 중"이라고 했는데, 풀 것이 없어서 답이 안 나온 경우까지 그렇게
+        /// 말해서 영영 계산만 하는 것처럼 보였다. 탐험을 새로 시작해도 아티팩트를 하나 줍기
+        /// 전까지는 풀 것이 없으므로 늘 그 상태다.
+        /// </summary>
+        private string Waiting()
+        {
+            if (_runner == null) return "데이터 준비 중";
+
+            switch (_runner.Blocker)
+            {
+                case PlanBlocker.NoCharms:
+                    return "가방에 아티팩트가 없습니다. 하나 주우면 배치를 계산합니다.";
+
+                case PlanBlocker.UnknownItems:
+                    return "가방의 물건 중 아는 아티팩트가 없습니다. " +
+                           Describe(_settings.DumpKey) + " 로 데이터를 다시 만들어 보세요.";
+
+                case PlanBlocker.NoInventory:
+                    return "가방을 읽지 못했습니다.";
+
+                default:
+                    return "계산 중";
+            }
         }
 
         /// <summary>
