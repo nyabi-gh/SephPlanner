@@ -25,8 +25,8 @@ namespace SephPlanner.Plugin
         private ConfigEntry<float> _offerRadius;
         private ConfigEntry<KeyboardShortcut> _diagnosticsKey;
         private ConfigEntry<bool> _nativePanel;
-        private ConfigEntry<float> _nativePanelX;
-        private ConfigEntry<float> _nativePanelY;
+        private ConfigEntry<PanelCorner> _nativePanelCorner;
+        private ConfigEntry<float> _nativePanelMargin;
         private ConfigEntry<float> _nativePanelWidth;
         private ConfigEntry<KeyboardShortcut> _expandKey;
         private ConfigEntry<KeyboardShortcut> _autoPlaceKey;
@@ -64,15 +64,17 @@ namespace SephPlanner.Plugin
             _nativePanel = Config.Bind(
                 "NativePanel", "Enabled", true,
                 "게임 HUD 안에 점수 패널을 직접 그린다. 별도 오버레이 창과 함께 써도 된다.");
-            _nativePanelX = Config.Bind(
-                "NativePanel", "OffsetX", 20f,
-                "패널의 왼쪽 위 기준 가로 위치. 게임 HUD 와 겹치면 옮긴다.");
-            _nativePanelY = Config.Bind(
-                "NativePanel", "OffsetY", -20f,
-                "패널의 왼쪽 위 기준 세로 위치. 음수가 아래쪽이다.");
+            // 열쇠 이름이 예전과 다르다. 뜻이 바뀌었는데 이름을 그대로 두면 저장된 옛 값이
+            // 쓰여 화면이 엉뚱한 곳으로 간다.
+            _nativePanelCorner = Config.Bind(
+                "NativePanel", "Corner", PanelCorner.TopRight,
+                "화면을 붙일 모서리. 게임 HUD 와 겹치면 옮긴다.");
+            _nativePanelMargin = Config.Bind(
+                "NativePanel", "Margin", 1.5f,
+                "모서리에서 띄울 거리. 게임 HUD 글자 크기의 배수라 해상도가 달라도 같게 보인다.");
             _nativePanelWidth = Config.Bind(
-                "NativePanel", "Width", 300f,
-                "패널의 가로 폭(캔버스 단위). 글씨가 잘리면 넓힌다.");
+                "NativePanel", "WidthScale", 26f,
+                "화면의 가로 폭. 역시 게임 HUD 글자 크기의 배수다. 글씨가 잘리면 키운다.");
             // 게임이 쓰지 않는 키로 고른다. 게임은 수정키를 보지 않으므로 Ctrl+Alt 를 붙여도
             // 글자 키는 게임 조작을 함께 발동시킨다(docs/RESEARCH.md 의 "게임 단축키").
             // F 키는 게임이 하나도 쓰지 않으며 F9/F10 이 이미 같은 이유로 쓰이고 있다.
@@ -292,7 +294,8 @@ namespace SephPlanner.Plugin
                 return;
             }
 
-            if (!_hud.TryCreate(_nativePanelX.Value, _nativePanelY.Value, _nativePanelWidth.Value))
+            if (!_hud.TryCreate(
+                    _nativePanelCorner.Value, _nativePanelMargin.Value, _nativePanelWidth.Value))
             {
                 // 런이 도는데도 못 붙었으면 무엇이 없어서인지 한 번은 남긴다. 조용히 안 뜨면
                 // 게임 안에서는 확인할 길이 없다.

@@ -12,12 +12,23 @@ using UnityEngine.UI;
 
 namespace SephPlanner.Plugin.Ui
 {
+    internal enum PanelCorner
+    {
+        TopLeft,
+        TopRight,
+        BottomLeft,
+        BottomRight,
+    }
+
     /// <summary>
     /// 게임 HUD 캔버스 안에 직접 그리는 화면. 오버레이 창이 하던 표시를 게임 안으로 옮긴 것이다.
     ///
     /// 게임 UI 의 일부라서 전용 전체화면에서도 보이고, 게임 UI 배율을 따르며, 게임이 UI 를 감출 때
     /// 함께 감춰진다 - <c>UIManager.Hide</c>가 <c>UIRoot</c>의 CanvasGroup 알파를 0 으로 만드는데
     /// 우리가 그 밑에 달려 있기 때문이다.
+    ///
+    /// <b>크기는 전부 <see cref="NativeSkin.BaseSize"/>에 대한 비율이다.</b> HUD 캔버스가 픽셀
+    /// 아트라 크게 확대돼 있어서, 화면 픽셀을 생각하고 숫자를 넣으면 그 배율만큼 어긋난다.
     ///
     /// <b>입력은 가져가지 않는다.</b> <c>UIBase</c>를 상속하지 않아 컨트롤 스택에 들어가지 않으므로
     /// ESC 와 키보드를 뺏지 않고, <see cref="Widgets"/>가 그리는 것마다 <c>raycastTarget</c>을 꺼서
@@ -53,7 +64,7 @@ namespace SephPlanner.Plugin.Ui
         public string Blocker { get; private set; } = "";
         public bool IsAlive => _root != null;
 
-        public bool TryCreate(float offsetX, float offsetY, float width)
+        public bool TryCreate(PanelCorner corner, float margin, float widthScale)
         {
             if (IsAlive) return true;
             if (UIManager.Instance == null)
@@ -71,70 +82,84 @@ namespace SephPlanner.Plugin.Ui
             Blocker = "";
 
             _skin = NativeSkin.Borrow(root);
-            Build(root, offsetX, offsetY, width);
+            Build(root, corner, margin, widthScale);
             Origin = _skin.Origin;
             return true;
         }
 
-        private void Build(UIRoot root, float offsetX, float offsetY, float width)
+        private float S(float ratio) => _skin.BaseSize * ratio;
+
+        private void Build(UIRoot root, PanelCorner corner, float margin, float widthScale)
         {
-            var panel = Widgets.Panel("SephPlannerHud", root.transform, _skin, NativeSkin.PanelFill);
-            _root = panel.gameObject;
+            // 장미빛 테두리 한 겹과 그 안의 어두운 속. 오버레이 패널의 골격을 옮긴 것이다.
+            var frame = Widgets.Fill("SephPlannerHud", root.transform, NativeSkin.Frame);
+            _root = frame.gameObject;
 
-            var rect = panel.rectTransform;
-            rect.anchorMin = new Vector2(0f, 1f);
-            rect.anchorMax = new Vector2(0f, 1f);
-            rect.pivot = new Vector2(0f, 1f);
-            rect.anchoredPosition = new Vector2(offsetX, offsetY);
-            rect.sizeDelta = new Vector2(width, 0f);
+            var rect = frame.rectTransform;
+            Place(rect, corner, S(margin));
+            rect.sizeDelta = new Vector2(S(widthScale), 0f);
 
-            Widgets.Column(rect, 3f, new RectOffset(8, 8, 6, 8));
+            var edge = Mathf.Max(1, Mathf.RoundToInt(S(0.25f)));
+            Widgets.Column(rect, 0f, new RectOffset(edge, edge, edge, edge));
+
+            // 높이는 내용이 정한다. 층층이 붙이면 서로 다투므로 맨 바깥에만 둔다.
             Widgets.Fitter(rect);
 
-            BuildHeader(rect);
-            _notice = Line(rect, 10f, NativeSkin.Amber, 14f);
-            _nextMove = Line(rect, 11f, NativeSkin.Text, 16f);
+            var body = Widgets.Fill("Body", rect, NativeSkin.PanelFill);
+            var pad = Mathf.RoundToInt(S(0.6f));
+            var content = body.rectTransform;
+            Widgets.Column(content, S(0.2f), new RectOffset(pad, pad, pad, pad));
 
-            _detail = Widgets.Rect("Detail", rect);
-            Widgets.Column(_detail, 4f);
-            Widgets.Fitter(_detail);
+            BuildHeader(content);
+            _notice = Line(content, S(0.8f), NativeSkin.Amber);
+            _nextMove = Line(content, S(0.95f), NativeSkin.Text);
+
+            _detail = Widgets.Rect("Detail", content);
+            Widgets.Column(_detail, S(0.3f));
 
             BuildGrid(_detail);
             _moves = new Section(_detail, _skin, "옮길 것", NativeSkin.TextDim, MoveRows);
             BuildOffers(_detail);
             _mixes = new Section(_detail, _skin, "석판 합성기", NativeSkin.Mint, MixRows);
-            _chips = Line(_detail, 10f, NativeSkin.TextDim, 14f);
+            _chips = Line(_detail, S(0.8f), NativeSkin.TextDim);
+        }
+
+        private static void Place(RectTransform rect, PanelCorner corner, float margin)
+        {
+            var right = corner == PanelCorner.TopRight || corner == PanelCorner.BottomRight;
+            var top = corner == PanelCorner.TopLeft || corner == PanelCorner.TopRight;
+
+            var anchor = new Vector2(right ? 1f : 0f, top ? 1f : 0f);
+            rect.anchorMin = anchor;
+            rect.anchorMax = anchor;
+            rect.pivot = anchor;
+            rect.anchoredPosition = new Vector2(right ? -margin : margin, top ? -margin : margin);
         }
 
         private void BuildHeader(RectTransform parent)
         {
             var row = Widgets.Rect("Header", parent);
-            Widgets.Row(row, 6f);
-            Widgets.Fixed(row, 20f);
+            Widgets.Row(row, S(0.5f));
+            Widgets.Fixed(row, S(1.5f));
 
-            var title = Widgets.Label("Title", row, _skin, 13f, NativeSkin.TextBright);
-            title.text = "SephPlanner";
-            Widgets.Fixed(title.rectTransform, 20f, 92f);
+            _score = Widgets.Label("Score", row, _skin, S(1.2f), NativeSkin.TextBright);
+            Widgets.Fixed(_score.rectTransform, S(1.5f)).flexibleWidth = 1;
 
-            _score = Widgets.Label("Score", row, _skin, 15f, NativeSkin.TextBright);
-            Widgets.Fixed(_score.rectTransform, 20f);
+            _gain = Widgets.Label("Gain", row, _skin, S(0.9f), NativeSkin.Good, TextAlignmentOptions.MidlineRight);
+            Widgets.Fixed(_gain.rectTransform, S(1.5f), S(4f));
 
-            _gain = Widgets.Label("Gain", row, _skin, 11f, NativeSkin.Good, TextAlignmentOptions.MidlineRight);
-            Widgets.Fixed(_gain.rectTransform, 20f, 46f);
-
-            _hint = Widgets.Label("Hint", parent, _skin, 9f, NativeSkin.TextDim);
-            Widgets.Fixed(_hint.rectTransform, 12f);
+            _hint = Widgets.Label("Hint", parent, _skin, S(0.75f), NativeSkin.TextDim);
+            Widgets.Fixed(_hint.rectTransform, S(1f));
         }
 
         private void BuildGrid(RectTransform parent)
         {
             _grid = Widgets.Rect("Grid", parent);
             _gridLayout = _grid.gameObject.AddComponent<GridLayoutGroup>();
-            _gridLayout.cellSize = new Vector2(44f, 34f);
-            _gridLayout.spacing = new Vector2(2f, 2f);
+            _gridLayout.cellSize = new Vector2(S(3.4f), S(2.6f));
+            _gridLayout.spacing = new Vector2(S(0.15f), S(0.15f));
             _gridLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             _gridLayout.constraintCount = GridSpec.DefaultWidth;
-            Widgets.Fitter(_grid);
         }
 
         private void BuildOffers(RectTransform parent)
@@ -143,14 +168,14 @@ namespace SephPlanner.Plugin.Ui
 
             // 순위를 그대로 믿으면 안 된다는 것은 늘 보여야 한다. 머리글 바로 밑이라야 목록을
             // 읽기 전에 눈에 들어온다.
-            _offerNotice = Line(_offers.Body, 9f, NativeSkin.TextDim, 13f);
+            _offerNotice = Line(_offers.Body, S(0.75f), NativeSkin.TextDim);
             _offerNotice.transform.SetSiblingIndex(1);
         }
 
-        private TextMeshProUGUI Line(RectTransform parent, float size, Color color, float height)
+        private TextMeshProUGUI Line(RectTransform parent, float size, Color color)
         {
             var label = Widgets.Label("Line", parent, _skin, size, color);
-            Widgets.Fixed(label.rectTransform, height);
+            Widgets.Fixed(label.rectTransform, size * 1.4f);
             return label;
         }
 
@@ -163,7 +188,6 @@ namespace SephPlanner.Plugin.Ui
             _gain.text = "";
             _hint.text = "";
             _nextMove.text = message;
-            _notice.text = "";
             Widgets.SetActive(_nextMove, message.Length > 0);
             Widgets.SetActive(_notice, false);
             Widgets.SetActive(_detail, false);
@@ -194,7 +218,7 @@ namespace SephPlanner.Plugin.Ui
 
             RenderGrid(snapshot, plan);
             RenderMoves(plan);
-            RenderOffers(plan, snapshot.Run?.Gold ?? 0);
+            RenderOffers(plan);
             RenderMixes(plan, snapshot.Mixer);
             RenderChips(snapshot);
         }
@@ -291,7 +315,7 @@ namespace SephPlanner.Plugin.Ui
             _moves.End();
         }
 
-        private void RenderOffers(Plan plan, int gold)
+        private void RenderOffers(Plan plan)
         {
             _offers.Begin();
 
@@ -344,7 +368,8 @@ namespace SephPlanner.Plugin.Ui
 
             var gain = advice.Gain;
             var text = gain > 0.001 ? $"+{gain:0.#}" : gain < -0.001 ? $"{gain:0.#}" : "0";
-            parts.Append(Tint(text, gain > 0.001 ? NativeSkin.Good : gain < -0.001 ? NativeSkin.Bad : NativeSkin.TextDim));
+            parts.Append(Tint(
+                text, gain > 0.001 ? NativeSkin.Good : gain < -0.001 ? NativeSkin.Bad : NativeSkin.TextDim));
             return parts.ToString();
         }
 
@@ -372,7 +397,6 @@ namespace SephPlanner.Plugin.Ui
             }
             _mixes.End();
 
-            // 합성기가 이 층에 없거나 이미 썼으면 절 자체를 접는다.
             Widgets.SetActive(_mixes.Root, mixer != null && !mixer.Used && plan.Mixes.Count > 0);
         }
 
@@ -436,29 +460,28 @@ namespace SephPlanner.Plugin.Ui
 
             public Section(RectTransform parent, NativeSkin skin, string title, Color titleColor, int rows)
             {
+                var b = skin.BaseSize;
                 Root = Widgets.Rect(title, parent);
-                Widgets.Column(Root, 2f);
-                Widgets.Fitter(Root);
+                Widgets.Column(Root, b * 0.15f);
                 Body = Root;
 
-                var header = Widgets.Label("Header", Root, skin, 10f, titleColor);
+                var header = Widgets.Label("Header", Root, skin, b * 0.8f, titleColor);
                 header.text = title;
-                Widgets.Fixed(header.rectTransform, 13f);
+                Widgets.Fixed(header.rectTransform, b * 1.1f);
 
                 for (var i = 0; i < rows; i++)
                 {
                     var row = Widgets.Rect("Row", Root);
-                    Widgets.Row(row, 6f);
-                    Widgets.Fixed(row, 14f);
+                    Widgets.Row(row, b * 0.5f);
+                    Widgets.Fixed(row, b * 1.2f);
 
-                    var label = Widgets.Label("Label", row, skin, 11f, NativeSkin.Text);
-                    var element = Widgets.Fixed(label.rectTransform, 14f);
-                    element.flexibleWidth = 1;
+                    var label = Widgets.Label("Label", row, skin, b * 0.95f, NativeSkin.Text);
+                    Widgets.Fixed(label.rectTransform, b * 1.2f).flexibleWidth = 1;
 
                     var detail = Widgets.Label(
-                        "Detail", row, skin, 10f, NativeSkin.TextDim, TextAlignmentOptions.MidlineRight);
+                        "Detail", row, skin, b * 0.8f, NativeSkin.TextDim, TextAlignmentOptions.MidlineRight);
                     detail.richText = true;
-                    Widgets.Fixed(detail.rectTransform, 14f, 150f);
+                    Widgets.Fixed(detail.rectTransform, b * 1.2f, b * 12f);
 
                     _rows.Add((label, detail));
                 }
@@ -489,6 +512,7 @@ namespace SephPlanner.Plugin.Ui
         /// <summary>격자 한 칸. 테두리는 바깥 칠, 속은 안쪽 칠로 낸다.</summary>
         private sealed class Cell
         {
+            private readonly float _edge;
             private readonly Image _border;
             private readonly Image _fill;
             private readonly Image _icon;
@@ -497,26 +521,29 @@ namespace SephPlanner.Plugin.Ui
 
             public Cell(RectTransform parent, NativeSkin skin)
             {
-                _border = Widgets.Fill("Cell", parent, NativeSkin.SlotEdge);
+                var b = skin.BaseSize;
+                _edge = Mathf.Max(1f, b * 0.1f);
 
+                _border = Widgets.Fill("Cell", parent, NativeSkin.SlotEdge);
                 _fill = Widgets.Fill("Fill", _border.rectTransform, NativeSkin.EmptyFill);
-                Stretch(_fill.rectTransform, 1f);
+                Stretch(_fill.rectTransform, _edge);
 
                 _icon = Widgets.Fill("Icon", _fill.rectTransform, Color.white);
                 _icon.rectTransform.anchorMin = new Vector2(0.5f, 1f);
                 _icon.rectTransform.anchorMax = new Vector2(0.5f, 1f);
                 _icon.rectTransform.pivot = new Vector2(0.5f, 1f);
-                _icon.rectTransform.sizeDelta = new Vector2(16f, 16f);
-                _icon.rectTransform.anchoredPosition = new Vector2(0f, -1f);
+                _icon.rectTransform.sizeDelta = new Vector2(b * 1.3f, b * 1.3f);
+                _icon.rectTransform.anchoredPosition = new Vector2(0f, -_edge);
                 _icon.preserveAspect = true;
 
-                _name = Widgets.Label("Name", _fill.rectTransform, skin, 8f, NativeSkin.Text,
-                    TextAlignmentOptions.Top);
-                Stretch(_name.rectTransform, 1f);
+                _name = Widgets.Label(
+                    "Name", _fill.rectTransform, skin, b * 0.65f, NativeSkin.Text, TextAlignmentOptions.Top);
+                Stretch(_name.rectTransform, _edge);
 
-                _level = Widgets.Label("Level", _fill.rectTransform, skin, 10f, NativeSkin.TextBright,
+                _level = Widgets.Label(
+                    "Level", _fill.rectTransform, skin, b * 0.8f, NativeSkin.TextBright,
                     TextAlignmentOptions.Bottom);
-                Stretch(_level.rectTransform, 1f);
+                Stretch(_level.rectTransform, _edge);
             }
 
             private static void Stretch(RectTransform rect, float margin)
@@ -533,17 +560,13 @@ namespace SephPlanner.Plugin.Ui
             public void SetClosed()
             {
                 Paint(NativeSkin.SlotEdge, NativeSkin.ClosedFill, false);
-                _name.text = "";
-                _level.text = "";
-                Widgets.SetActive(_icon, false);
+                Clear();
             }
 
             public void SetEmpty()
             {
                 Paint(NativeSkin.SlotEdge, NativeSkin.EmptyFill, false);
-                _name.text = "";
-                _level.text = "";
-                Widgets.SetActive(_icon, false);
+                Clear();
             }
 
             public void SetTablet(string name, int rotation, bool moved, Sprite icon)
@@ -577,6 +600,13 @@ namespace SephPlanner.Plugin.Ui
                 _level.color = level > effective ? NativeSkin.Orange : NativeSkin.TextBright;
             }
 
+            private void Clear()
+            {
+                _name.text = "";
+                _level.text = "";
+                Widgets.SetActive(_icon, false);
+            }
+
             private void SetIcon(Sprite icon)
             {
                 _icon.sprite = icon;
@@ -587,7 +617,7 @@ namespace SephPlanner.Plugin.Ui
             {
                 _border.color = border;
                 _fill.color = fill;
-                Stretch(_fill.rectTransform, thick ? 2f : 1f);
+                Stretch(_fill.rectTransform, thick ? _edge * 2f : _edge);
             }
         }
     }

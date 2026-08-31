@@ -21,26 +21,6 @@ namespace SephPlanner.Plugin.Ui
             return rect;
         }
 
-        public static Image Panel(string name, Transform parent, NativeSkin skin, Color fill)
-        {
-            var rect = Rect(name, parent);
-            var image = rect.gameObject.AddComponent<Image>();
-            image.raycastTarget = false;
-
-            if (skin.Panel != null)
-            {
-                image.sprite = skin.Panel;
-                image.type = skin.PanelType;
-                image.color = skin.PanelTint;
-            }
-            else
-            {
-                image.color = fill;
-            }
-            return image;
-        }
-
-        /// <summary>격자 칸처럼 게임 판때기가 어울리지 않는 곳에 쓰는, 색만 칠한 사각형.</summary>
         public static Image Fill(string name, Transform parent, Color color)
         {
             var rect = Rect(name, parent);

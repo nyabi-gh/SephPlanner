@@ -1,29 +1,31 @@
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace SephPlanner.Plugin.Ui
 {
     /// <summary>
     /// 게임에서 빌려 온 글꼴·판때기와, 오버레이가 쓰던 것과 같은 색.
     ///
-    /// 오버레이의 <c>Theme</c>은 게임 화면을 보고 색을 손으로 채집하고 Galmuri 를 임베드해서
-    /// "게임처럼 보이게" 맞춘 것이었다. 여기서는 맞출 것이 없다 - 글꼴도 판때기도 게임이 지금
-    /// 쓰고 있는 그 물건을 그대로 가리킨다. 씬에 떠 있는 것을 참조할 뿐이라 추출도 배포도
-    /// 하지 않는다(docs/LEGAL.md).
+    /// 글꼴은 게임이 지금 쓰고 있는 것을 그대로 가리킨다. 씬에 떠 있는 것을 참조할 뿐이라
+    /// 추출도 배포도 하지 않는다(docs/LEGAL.md).
     ///
-    /// 색만은 여전히 우리 값이다. 게임 UI 에서 색만 뽑아낼 방법이 없고, 채집해 둔 값이 이미
-    /// 게임 패널에서 온 것이라 그대로 옮겼다.
+    /// <b>크기도 게임에서 온다.</b> HUD 캔버스는 픽셀 아트라 크게 확대돼 있어서 화면 픽셀을
+    /// 생각하고 숫자를 넣으면 글자가 네 배로 나온다. 그래서 기준 크기를 우리가 정하지 않고
+    /// HUD 글자 크기의 중앙값에서 가져오고, 나머지는 전부 그 비율로 잡는다.
+    ///
+    /// <b>판때기는 빌리지 않는다.</b> HUD 에서 9-slice 를 골라 쓰게 했더니 전체 화면짜리 선택
+    /// 테두리를 물어 왔고, 속이 비어 있어 글자가 게임 위에 그대로 떴다. 어느 스프라이트가
+    /// "창틀"인지 게임 데이터만으로는 가릴 수가 없다. 색은 오버레이가 게임 패널에서 채집해 둔
+    /// 값이 이미 있으므로 그것으로 직접 그린다.
     /// </summary>
     internal sealed class NativeSkin
     {
         public TMP_FontAsset Font { get; private set; }
         public Material FontMaterial { get; private set; }
 
-        /// <summary>게임 패널의 9-slice 판때기. 못 찾으면 null 이고 그때는 색으로만 그린다.</summary>
-        public Sprite Panel { get; private set; }
-        public Image.Type PanelType { get; private set; } = Image.Type.Sliced;
-        public Color PanelTint { get; private set; } = Color.white;
+        /// <summary>게임 HUD 글자 크기의 중앙값. 우리 크기는 전부 여기에 대한 비율이다.</summary>
+        public float BaseSize { get; private set; } = 12f;
 
         /// <summary>무엇을 어디서 빌려 왔는지. 스파이크의 판단 근거라 로그로 남긴다.</summary>
         public string Origin { get; private set; } = "";
@@ -52,36 +54,38 @@ namespace SephPlanner.Plugin.Ui
         public static NativeSkin Borrow(UIRoot root)
         {
             var skin = new NativeSkin();
-            var font = FindFont(root, out var material);
-            skin.Font = font;
-            skin.FontMaterial = material;
+            var sizes = new List<float>();
 
-            var template = FindPanelImage(root);
-            if (template != null)
+            foreach (var text in root.GetComponentsInChildren<TMP_Text>(true))
             {
-                skin.Panel = template.sprite;
-                skin.PanelType = template.type;
-                skin.PanelTint = template.color;
+                if (text == null || text.font == null || text.fontSize <= 0) continue;
+
+                sizes.Add(text.fontSize);
+                if (skin.Font != null) continue;
+
+                skin.Font = text.font;
+                skin.FontMaterial = text.fontSharedMaterial;
+            }
+
+            if (skin.Font == null)
+            {
+                skin.Font = Pick(
+                    Object.FindObjectsByType<TMP_Text>(FindObjectsInactive.Include, FindObjectsSortMode.None),
+                    out var material);
+                skin.FontMaterial = material;
+            }
+
+            if (sizes.Count > 0)
+            {
+                sizes.Sort();
+                skin.BaseSize = sizes[sizes.Count / 2];
             }
 
             skin.Origin =
-                "글꼴=" + (font != null ? font.name : "없음(기본)") +
-                " 판때기=" + (skin.Panel != null ? skin.Panel.name : "없음(색으로 대체)");
+                "글꼴=" + (skin.Font != null ? skin.Font.name : "없음(기본)") +
+                " 기준크기=" + skin.BaseSize.ToString("0.#") +
+                " (HUD 글자 " + sizes.Count + "개)";
             return skin;
-        }
-
-        /// <summary>
-        /// 같은 HUD 안의 글자를 먼저 찾는다. 씬 아무 데서나 집으면 월드 말풍선처럼 다른 크기·재질로
-        /// 꾸며 둔 글자를 물어 와서, 정작 HUD 옆에 놓았을 때 혼자 튄다.
-        /// </summary>
-        private static TMP_FontAsset FindFont(UIRoot root, out Material material)
-        {
-            var inHud = Pick(root.GetComponentsInChildren<TMP_Text>(true), out material);
-            if (inHud != null) return inHud;
-
-            return Pick(
-                Object.FindObjectsByType<TMP_Text>(FindObjectsInactive.Include, FindObjectsSortMode.None),
-                out material);
         }
 
         private static TMP_FontAsset Pick(TMP_Text[] texts, out Material material)
@@ -95,28 +99,6 @@ namespace SephPlanner.Plugin.Ui
                 return text.font;
             }
             return null;
-        }
-
-        /// <summary>
-        /// 테두리(9-slice)가 있는 것만 고른다. 테두리 없는 그림을 늘리면 뭉개져서 오히려 게임과
-        /// 달라 보인다. 큰 것일수록 창틀일 가능성이 높고 작은 것은 버튼이나 칸 테두리다.
-        /// </summary>
-        private static Image FindPanelImage(UIRoot root)
-        {
-            Image best = null;
-            foreach (var image in root.GetComponentsInChildren<Image>(true))
-            {
-                if (image == null || image.sprite == null) continue;
-                if (image.sprite.border == Vector4.zero) continue;
-                if (best == null || Area(image) > Area(best)) best = image;
-            }
-            return best;
-        }
-
-        private static float Area(Image image)
-        {
-            var size = image.rectTransform.rect.size;
-            return size.x * size.y;
         }
 
         private static Color Rgb(byte r, byte g, byte b) => new Color(r / 255f, g / 255f, b / 255f);
