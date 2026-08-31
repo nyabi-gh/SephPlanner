@@ -172,6 +172,19 @@ namespace SephPlanner.Plugin
             CatalogSource.Invalidate();
             _runner = null;
 
+            var readyDeadline = Time.realtimeSinceStartup + 30f;
+            while (CatalogSource.Get() == null)
+            {
+                if (Time.realtimeSinceStartup >= readyDeadline)
+                {
+                    Logger.LogError("데이터 덤프 보류 - 카탈로그 준비 실패: " + CatalogSource.LastError +
+                                    ". 게임 화면이 열린 뒤 F9로 다시 시도하세요.");
+                    _dumping = false;
+                    yield break;
+                }
+                yield return new WaitForSecondsRealtime(0.5f);
+            }
+
             // 이터레이터 안에서 던진 예외를 그대로 두면 코루틴이 죽으면서 _dumping 이 영영 참으로
             // 남는다. 한 걸음씩 감싸서 실패해도 플래그를 되돌린다.
             var steps = CatalogDump.WriteRoutine(Logger.LogInfo);
