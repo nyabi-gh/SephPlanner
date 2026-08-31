@@ -277,7 +277,9 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                            <TextBlock x:Name="MixNote" Style="{StaticResource Hint}" TextWrapping="Wrap" />
+                            <TextBlock x:Name="MixNote"
+                                       FontFamily="{x:Static local:Theme.Small}" FontSize="10" FontWeight="Normal"
+                                       Foreground="{x:Static local:Theme.TextDim}" TextWrapping="Wrap" />
                         </StackPanel>
 
                         <StackPanel x:Name="BuildPanel" Margin="0,12,0,0" Visibility="Collapsed">

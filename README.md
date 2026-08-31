@@ -124,6 +124,13 @@ dotnet run --project src/SephPlanner.Overlay -c Release
 dotnet run --project src/SephPlanner.Overlay -- --preview
 ```
 
+XAML 은 컴파일 때 검증되지 않아 빌드가 성공해도 창이 안 뜰 수 있다(없는 리소스를 참조하면
+로드에서 터진다). 프로세스만 보면 그 상태를 놓치므로, 보이는 창이 있는지까지 확인한다.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-overlay-window.ps1
+```
+
 화면은 게임 자체 UI의 문법을 따른다. 색은 게임 패널(가방·콤보 효과·스킬)에서 채집했고
 글꼴은 [Galmuri](https://github.com/quiple/galmuri) 픽셀 폰트다(OFL-1.1, 라이선스는
 `src/SephPlanner.Overlay/Fonts/LICENSE.txt`에 동봉). 값은 전부 `Theme.cs` 한곳에 있다.
