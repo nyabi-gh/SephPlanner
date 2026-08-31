@@ -252,6 +252,21 @@
 
                         <StackPanel x:Name="BuildPanel" Margin="0,12,0,0" Visibility="Collapsed">
                             <TextBlock Text="빌드 우선" Style="{StaticResource SectionHeader}" />
+
+                            <DockPanel x:Name="PresetRow" Margin="0,0,0,4">
+                                <Button x:Name="PresetClearButton" DockPanel.Dock="Right" Content="지우기"
+                                        Style="{StaticResource PixelButton}" Margin="4,0,0,0"
+                                        Click="OnClearPreset" Visibility="Collapsed"
+                                        ToolTip="가져온 빌드를 잊습니다. 위에 켜 둔 콤보는 그대로 두니 필요 없으면 눌러서 끄세요." />
+                                <Button x:Name="PresetPasteButton" DockPanel.Dock="Right" Content="빌드 코드 붙여넣기"
+                                        Style="{StaticResource PixelButton}" Margin="4,0,0,0"
+                                        Click="OnPastePreset"
+                                        ToolTip="공략에 첨부된 게임 프리셋 코드를 클립보드에서 읽어 옵니다. 그 빌드가 즐겨찾기로 찍은 아티팩트를 후보 목록에서 위로 올리고, 노리는 콤보를 빌드 우선으로 켭니다." />
+                                <TextBlock x:Name="PresetText" Foreground="{x:Static local:Theme.TextDim}"
+                                           FontSize="10" FontWeight="Normal" VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" />
+                            </DockPanel>
+
                             <ItemsControl x:Name="ChipList">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>

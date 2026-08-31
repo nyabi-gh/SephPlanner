@@ -22,6 +22,8 @@ public static class PreviewSnapshot
             new TabletDefinition { EntityId = 2044, Id = "PreviewB", Query = "LEFT -1\nRIGHT 3", Names = { ["current"] = "미리보기 석판 B" } },
             new TabletDefinition { EntityId = 12000, Id = "PreviewC", IsRotatable = true, Query = "HORIZONTAL 1", Rarity = Rarity.Legend, Names = { ["current"] = "미리보기 석판 C" } },
             new TabletDefinition { EntityId = 2001, Id = "PreviewD", Query = "DOWN 2", Names = { ["current"] = "미리보기 석판 D" } },
+            // 합성 석판. 정의는 껍데기라 질의도 이름도 인스턴스가 들고 있다.
+            new TabletDefinition { EntityId = 2101, Id = "...", Names = { ["current"] = "..." } },
         },
         new[]
         {
@@ -67,6 +69,11 @@ public static class PreviewSnapshot
             {
                 new PlacedTablet { DefinitionId = 2025, InstanceId = 11, Position = new GridPos(1, 1), Rotation = 1, IsApplied = true },
                 new PlacedTablet { DefinitionId = 2044, InstanceId = 12, Position = new GridPos(0, 1), IsApplied = true },
+                new PlacedTablet
+                {
+                    DefinitionId = 2101, InstanceId = 13, Position = new GridPos(4, 1), IsApplied = true,
+                    Query = "UP 2\nDOWN 1", IsRotatable = true, Name = "미리보기 합성 석판",
+                },
             },
             ComboCounts = { ["EMBER"] = 5, ["FLAMESWORD"] = 3 },
         },

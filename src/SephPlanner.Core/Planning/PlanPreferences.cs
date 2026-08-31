@@ -24,6 +24,13 @@ namespace SephPlanner.Core.Planning
         public const double PinnedWeight = 2.0;
 
         /// <summary>
+        /// 프리셋 코드가 알려 준, 그 빌드가 노리는 아티팩트(엔티티 번호). 손으로 지정하는
+        /// <see cref="PinnedCharms"/>와 섞지 않는다 — 이쪽은 "무엇을 집을지"에 대한 조언이라
+        /// 추천 끄기의 지배를 받고, 배치 가중치에는 관여하지 않는다.
+        /// </summary>
+        public HashSet<int> PresetCharms { get; set; } = new HashSet<int>();
+
+        /// <summary>
         /// 거짓이면 후보 평가를 아예 돌리지 않는다. 화면에서 가리기만 하는 것이 아니라 계산도
         /// 하지 않는 것이 정직하고, 후보마다 배치를 다시 푸는 비용도 아낀다. 배치(정렬)는 그대로다.
         /// </summary>

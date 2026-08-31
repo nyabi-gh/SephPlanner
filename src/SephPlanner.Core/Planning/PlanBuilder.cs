@@ -36,7 +36,8 @@ namespace SephPlanner.Core.Planning
                     InstanceId = tablet.InstanceId,
                     InstanceQuery = tablet.Query,
                     InstanceConditionQuery = tablet.ConditionQuery,
-                    Rotatable = tablet.IsRotatable,
+                    InstanceName = tablet.Name,
+                    Rotatable = tablet.IsRotatable ?? definition.IsRotatable,
                 };
                 problem.Tablets.Add(slot);
                 layout.Add(slot.At(tablet.Position, tablet.Rotation));
@@ -57,6 +58,7 @@ namespace SephPlanner.Core.Planning
                     Rotation = engraving.Rotation,
                     InstanceQuery = engraving.Query,
                     InstanceConditionQuery = engraving.ConditionQuery,
+                    InstanceName = engraving.Name,
                 });
             }
 
@@ -99,7 +101,8 @@ namespace SephPlanner.Core.Planning
                 var candidates = Candidates(snapshot, catalog, weapon, out skippedOffers);
                 offers = OfferAdvisor.Rank(
                     problem, candidates, snapshot.Run?.Gold ?? int.MaxValue,
-                    inventory.ComboCounts, catalog.Combo, preferences.PriorityCategories);
+                    inventory.ComboCounts, catalog.Combo, preferences.PriorityCategories,
+                    preferences.PresetCharms);
             }
 
             return new Plan
@@ -239,7 +242,6 @@ namespace SephPlanner.Core.Planning
             {
                 var from = current.Tablets[i];
                 var to = best.Tablets[i];
-                var definition = problem.Tablets[i].Definition;
 
                 if (from.Position == to.Position && from.Rotation == to.Rotation)
                 {
@@ -249,7 +251,7 @@ namespace SephPlanner.Core.Planning
 
                 pending.Add(new Relocation
                 {
-                    Name = Naming.Of(definition.Names, definition.Id, "석판"),
+                    Name = Naming.OfTablet(to),
                     From = from.Position,
                     To = to.Position,
                     FromRotation = from.Rotation,

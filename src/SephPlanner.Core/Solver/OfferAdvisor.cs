@@ -46,6 +46,9 @@ namespace SephPlanner.Core.Solver
         /// <summary>사용자가 밀고 있는 빌드 카테고리에 속하는 아티팩트인가.</summary>
         public bool MatchesPriority { get; set; }
 
+        /// <summary>가져온 프리셋의 빌드가 즐겨찾기로 찍어 둔 아티팩트인가.</summary>
+        public bool MatchesPreset { get; set; }
+
         /// <summary>가방이 차 있어 이 후보를 집으면 자리를 내줘야 하는 것의 이름. 없으면 빈 문자열.</summary>
         public string Displaced { get; set; } = "";
     }
@@ -67,11 +70,18 @@ namespace SephPlanner.Core.Solver
         /// <summary>콤보 진행과 무관하게, 밀고 있는 카테고리라는 것만으로 얹는 가치.</summary>
         private const double PriorityWorth = 0.5;
 
+        /// <summary>
+        /// 프리셋 빌드가 즐겨찾기로 찍은 아티팩트에 얹는 가치. 카테고리보다 구체적인 지목이라
+        /// 조금 더 크게 잡았다. 다른 값들과 마찬가지로 실측 근거가 없는 설계값이다.
+        /// </summary>
+        private const double PresetCharmWorth = 1.0;
+
         public static List<OfferAdvice> Rank(
             PlacementProblem problem, IReadOnlyList<OfferCandidate> candidates, int gold,
             IReadOnlyDictionary<string, int>? comboCounts = null,
             Func<string, ComboDefinition?>? combos = null,
-            IReadOnlyCollection<string>? priorityCategories = null)
+            IReadOnlyCollection<string>? priorityCategories = null,
+            IReadOnlyCollection<int>? presetCharms = null)
         {
             // 기준과 후보를 같은 탐색 강도로 풀어야 증가분이 순수하게 후보의 몫이 된다. 기준만
             // 촘촘한 탐색으로 풀면, 명백히 좋은 후보에도 탐색 강도 차이만큼 음수가 나온다.
@@ -101,6 +111,7 @@ namespace SephPlanner.Core.Solver
                     {
                         Definition = candidate.Tablet,
                         InstanceId = candidateId,
+                        Rotatable = candidate.Tablet.IsRotatable,
                     });
                 }
                 else
@@ -117,7 +128,7 @@ namespace SephPlanner.Core.Solver
                     Effect = EffectOf(candidate, trial, solved),
                     Displaced = DisplacedBy(trial, solved, candidateId),
                 };
-                EvaluateCombo(entry, comboCounts, combos, priorityCategories);
+                EvaluateCombo(entry, comboCounts, combos, priorityCategories, presetCharms);
                 advice.Add(entry);
             }
 
@@ -140,10 +151,17 @@ namespace SephPlanner.Core.Solver
             OfferAdvice advice,
             IReadOnlyDictionary<string, int>? comboCounts,
             Func<string, ComboDefinition?>? combos,
-            IReadOnlyCollection<string>? priorityCategories)
+            IReadOnlyCollection<string>? priorityCategories,
+            IReadOnlyCollection<int>? presetCharms)
         {
             var charm = advice.Candidate.Charm;
             if (charm is null) return;
+
+            if (presetCharms is not null && presetCharms.Contains(charm.EntityId))
+            {
+                advice.MatchesPreset = true;
+                advice.ComboBonus += PresetCharmWorth;
+            }
 
             foreach (var category in charm.Categories)
             {

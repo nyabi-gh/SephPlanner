@@ -204,6 +204,7 @@ namespace SephPlanner.Plugin
             IsRotatable = DungeonManager.IsTabletRotatable(tablet.instanceID, tablet.isRotatable),
             Query = tablet.isCustomTablet ? tablet.GetQuery(tablet.instanceID) : null,
             ConditionQuery = tablet.isCustomTablet ? tablet.GetConditionQuery(tablet.instanceID) : null,
+            Name = DungeonManager.GetItemName(tablet.instanceID, null),
         };
 
         private static int LookupMatrix(SyncDictionary<ItemPosition, int> matrix, sbyte x, sbyte y)

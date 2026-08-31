@@ -328,7 +328,8 @@ public partial class MainWindow : Window
                 price > 0 ? $"{price}골드" : "",
                 gain > 0.001 ? $"+{gain:0.#}" : gain < -0.001 ? $"{gain:0.#}" : "0",
                 gain > 0.001 ? Theme.Good : gain < -0.001 ? Theme.Bad : Theme.TextDim,
-                !advice.Affordable ? Theme.TextDim : advice.MatchesPriority ? Theme.Mint : Theme.Text,
+                !advice.Affordable ? Theme.TextDim
+                    : advice.MatchesPriority || advice.MatchesPreset ? Theme.Mint : Theme.Text,
                 advice.Affordable ? Theme.TextDim : Theme.Bad,
                 advice.ComboCompletes ? Theme.Good : Theme.Mint,
                 _settings.IconMode ? IconStore.Get(advice.Candidate.DefinitionId) : null,
@@ -355,6 +356,7 @@ public partial class MainWindow : Window
         var lines = new List<string>();
         if (!advice.Affordable) lines.Add($"소지금 {gold}골드로는 살 수 없습니다.");
 
+        if (advice.MatchesPreset) lines.Add("가져온 빌드가 즐겨찾기로 찍어 둔 아티팩트입니다.");
         if (advice.MatchesPriority) lines.Add("밀고 있는 빌드의 아티팩트입니다.");
         if (advice.Displaced.Length > 0) lines.Add($"가방이 차 있어, 집으면 빠지는 것: {advice.Displaced}");
 
@@ -397,7 +399,7 @@ public partial class MainWindow : Window
             if (index >= inventory.Storage) cell.SetClosed();
             else if (tabletCells.TryGetValue(position, out var tablet))
             {
-                var name = Naming.Of(tablet.Definition.Names, tablet.Definition.Id, "석판");
+                var name = Naming.OfTablet(tablet);
                 cell.SetTablet(name, tablet.Rotation, moved.Contains(position),
                     _settings.IconMode ? IconStore.Get(tablet.Definition.EntityId) : null);
             }
@@ -439,7 +441,80 @@ public partial class MainWindow : Window
         foreach (var category in _preferences.PriorityCategories)
             AddChip(category, 0, shown);
 
-        BuildPanel.Visibility = _chips.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        RenderPreset();
+
+        // 칩이 하나도 없어도 접지 않는다. 빌드 코드를 가져올 자리가 여기뿐이다.
+        BuildPanel.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>가져온 빌드가 무엇을 알려 주는지 한 줄로 보여준다. 없으면 무엇을 하는 자리인지 알린다.</summary>
+    private void RenderPreset()
+    {
+        var preset = _settings.Preset();
+        PresetClearButton.Visibility = preset is null ? Visibility.Collapsed : Visibility.Visible;
+        PresetPasteButton.Content = preset is null ? "빌드 코드 붙여넣기" : "다른 빌드";
+
+        if (preset is null)
+        {
+            PresetText.Text = _presetMessage.Length > 0 ? _presetMessage : "가져온 빌드 없음";
+            PresetText.Foreground = _presetMessage.Length > 0 ? Theme.Amber : Theme.TextDim;
+            return;
+        }
+
+        var parts = new List<string> { $"아티팩트 {preset.FavoriteCharms.Count}개" };
+
+        var avoided = preset.CategoryBias.Count(pair => pair.Value < 0);
+        if (avoided > 0) parts.Add($"피하는 콤보 {avoided}개");
+
+        PresetText.Text = "가져온 빌드 · " + string.Join(" · ", parts);
+        PresetText.Foreground = Theme.TextDim;
+    }
+
+    /// <summary>가져오기에 실패한 이유. 다음 가져오기까지 남겨 둔다.</summary>
+    private string _presetMessage = "";
+
+    private void OnPastePreset(object sender, RoutedEventArgs e)
+    {
+        string code;
+        try
+        {
+            code = Clipboard.GetText();
+        }
+        catch (Exception)
+        {
+            // 다른 앱이 클립보드를 쥐고 있으면 읽기가 실패한다. 오버레이가 죽을 일은 아니다.
+            _presetMessage = "클립보드를 읽지 못했습니다. 잠시 뒤 다시 눌러 보세요.";
+            RenderPreset();
+            return;
+        }
+
+        if (!Core.Planning.PresetCode.TryParse(code, out var preset, out var error))
+        {
+            _presetMessage = error;
+            RenderPreset();
+            return;
+        }
+
+        _presetMessage = "";
+        _settings.PresetCode = code.Trim();
+
+        // 프리셋이 노리는 콤보는 칩을 대신 눌러 주는 것으로 잇는다. 그래야 그 뒤로는 손으로 켠
+        // 것과 똑같이 끄고 켤 수 있다. 음수(피하는 카테고리)는 켜지 않는다.
+        foreach (var pair in preset.CategoryBias)
+        {
+            if (pair.Value <= 0) continue;
+            if (!_settings.PriorityCategories.Contains(pair.Key))
+                _settings.PriorityCategories.Add(pair.Key);
+        }
+
+        Resolve();
+    }
+
+    private void OnClearPreset(object sender, RoutedEventArgs e)
+    {
+        _settings.PresetCode = null;
+        _presetMessage = "";
+        Resolve();
     }
 
     private void AddChip(string categoryId, int count, HashSet<string> shown)

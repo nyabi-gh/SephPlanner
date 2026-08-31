@@ -69,6 +69,43 @@ public readonly SyncDictionary<ItemPosition, StoneTablet>        stoneTablets;
 
 그 밖의 필드: `isRotatable`, `rotation`, `xIdx`, `yIdx`, `entityID`, `instanceID`, `IsApplied`.
 
+### 석판 합성 (`TabletMix`)
+
+상점 층에 놓이는 석판 합성기다. 게임 안 이름은 "석판 합성기"이고 한 번 쓰면 그 층에서는 다시
+못 쓴다. `GridInventory.ServerMixTablet`이 실제 처리를 한다.
+
+```
+결과 = entityID 2101 짜리 새 아이템 (새 instanceID)
+  질의      = GetRotatedQuery(A, 회전A) + "
+" + GetRotatedQuery(B, 회전B)
+  조건질의  = 둘이 같아야 한다 (다르면 TABLET_MIX_FAILED / DIFFERENT_CONDITION_QUERY)
+  회전가능  = A와 B가 둘 다 회전 가능할 때만
+  이름      = 플레이어가 직접 입력
+```
+
+값은 셋 다 인스턴스 단위로 `DungeonManager`에 저장된다 — `customTabletQuery`,
+`overrideTabletRotatable`, `overrideItemName`. 엔티티 2101 자체의 정의는 껍데기다:
+질의는 비어 있고, `isRotatable`은 거짓이며, **이름은 문자열 `"..."` 하나다**(자리표시자).
+
+여기서 따라오는 것들:
+
+- 질의가 **여러 줄**이다. 게임 `ParseQuery`는 `
+`으로 잘라 줄마다 처리하고 우리
+  `TabletQuery.Parse`도 같으므로 그대로 통한다.
+- 합성 시점의 회전이 **토큰 이름으로 미리 구워진다**(`GetRotatedKeyword`). 나오는 토큰은 전부
+  기존 28+19종 안이라 새 토큰이 생기지 않는다.
+- `DungeonManager.IsTabletRotatable(instanceID, 기본값)`은 오버라이드가 있으면 그것을 그대로
+  돌려준다. 즉 **인스턴스 값이 정의 기본값을 이미 흡수한 최종 답이다.** 정의값을 다시 AND 하면
+  합성 석판(정의상 거짓)은 영원히 회전 후보에서 빠진다 — 실제로 그 버그가 있었고
+  `PlacementSolver`에서 정의값을 떼어 고쳤다. 아직 집지 않은 후보 석판은 인스턴스가 없으므로
+  그쪽만 정의값을 쓴다(`OfferAdvisor`).
+- 이름이 없으면 화면에서 합성 석판끼리 구분되지 않는다. 아이콘도 2101 하나를 공유한다.
+  그래서 스냅샷에 `PlacedTablet.Name`을 실어 `DungeonManager.GetItemName`의 값을 그대로 쓴다.
+  게임 화면에 이미 보이는 이름이라 숨은 정보에 해당하지 않는다.
+
+`QueryVerifier`는 카탈로그 정의 68종을 도는데 2101의 질의가 비어 있어, **합성으로 생긴 인스턴스
+질의는 게임 원본과 대조된 적이 없다.** 분할 코드가 같아 위험은 낮지만 검증 공백으로 남아 있다.
+
 ### `NewItemOwnInstance` / `ItemEntity`
 
 ```
@@ -568,6 +605,11 @@ XOR 키는 `"ActionAnimalFarmPresetShareKey"`의 UTF-8 바이트를 순환 적�
 | `D:` | 차원 주머니 내용물 `{instanceID},{entityID},{수량}` 목록 |
 | `B:` | 과일 꼬치의 적응형 드롭 보너스 (기본 1이면 생략) |
 | `R:` | **과일 꼬치 카테고리 성향** `{카테고리},{값}` 목록 |
+
+`R:`의 카테고리 문자열은 게임 `ItemCategoryEntity.id`다(`UI_FruitSkewerPanel`이
+`ItemDatabase.FindItemCategory`로 되찾는다). 즉 **콤보 식별자·아티팩트의 `Categories`와 같은
+체계라 그대로 이어 쓸 수 있다.** 값은 부호가 있고, 같은 카테고리 과일을 여러 개 꽂으면 게임도
+합쳐서 보여 준다 — 양수는 그 카테고리를 모으겠다는 뜻, 음수는 피하겠다는 뜻이다.
 
 `F:`(이 빌드가 노리는 아티팩트)와 `R:`(카테고리 드롭 성향)이 빌드 정의의 핵심이다. 가져오기
 쪽 검증은 `TryApplyCompactPresetData`가 하며, 소유하지 않은 코스튬 등은 기본값으로 보정한다.

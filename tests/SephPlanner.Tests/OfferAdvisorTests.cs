@@ -217,4 +217,46 @@ public class OfferAdvisorTests
         Assert.Equal("", advice[0].ComboText);
         Assert.Equal(0, advice[0].ComboBonus);
     }
+
+    private const int WantedCharm = 4242;
+
+    [Fact]
+    public void AnArtifactTheImportedBuildWantsRisesAboveAnIdenticalOne()
+    {
+        // 배치 증가분이 똑같은 둘 사이에서는 빌드가 지목한 쪽이 위로 와야 가져온 의미가 있다.
+        var candidates = new List<OfferCandidate>
+        {
+            new() { Kind = "charm", Name = "plain", Charm = new CharmDefinition { MaxLevel = 5 } },
+            new()
+            {
+                Kind = "charm", Name = "wanted",
+                Charm = new CharmDefinition { EntityId = WantedCharm, MaxLevel = 5 },
+            },
+        };
+
+        var advice = OfferAdvisor.Rank(
+            BaseProblem(), candidates, gold: 0, presetCharms: new[] { WantedCharm });
+
+        Assert.Equal("wanted", advice[0].Candidate.Name);
+        Assert.True(advice[0].MatchesPreset);
+        Assert.False(advice[1].MatchesPreset);
+    }
+
+    [Fact]
+    public void WithNoImportedBuildNothingIsMarked()
+    {
+        var candidates = new List<OfferCandidate>
+        {
+            new()
+            {
+                Kind = "charm", Name = "wanted",
+                Charm = new CharmDefinition { EntityId = WantedCharm, MaxLevel = 5 },
+            },
+        };
+
+        var advice = OfferAdvisor.Rank(BaseProblem(), candidates, gold: 0);
+
+        Assert.False(advice[0].MatchesPreset);
+        Assert.Equal(0, advice[0].ComboBonus);
+    }
 }

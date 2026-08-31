@@ -44,10 +44,14 @@ namespace SephPlanner.Core.Solver
         public int InstanceId { get; set; }
         public string? InstanceQuery { get; set; }
         public string? InstanceConditionQuery { get; set; }
+        public string? InstanceName { get; set; }
 
         /// <summary>
-        /// 이 인스턴스를 돌려도 되는지. 정의가 회전 가능해도 저주 등으로 인스턴스가 잠길 수 있다.
-        /// 잠긴 석판에 회전을 제안하면 사람도 자동 배치도 따라 할 수 없다.
+        /// 이 슬롯을 돌려도 되는지에 대한 최종 답. 정의의 기본값을 여기에 다시 AND 하면 안 된다.
+        /// 게임의 <c>DungeonManager.IsTabletRotatable</c>이 기본값을 이미 흡수한 뒤 인스턴스
+        /// 오버라이드를 돌려주기 때문이다. 저주는 돌릴 수 있던 석판을 잠그고, 석판 합성은
+        /// 반대로 정의상 돌릴 수 없는 합성 석판을 돌릴 수 있게 푼다. 채우는 쪽이 책임진다 —
+        /// 가진 석판은 스냅샷 값, 아직 집지 않은 후보는 정의 값.
         /// </summary>
         public bool Rotatable { get; set; } = true;
 
@@ -58,6 +62,7 @@ namespace SephPlanner.Core.Solver
             Rotation = rotation,
             InstanceQuery = InstanceQuery,
             InstanceConditionQuery = InstanceConditionQuery,
+            InstanceName = InstanceName,
         };
     }
 

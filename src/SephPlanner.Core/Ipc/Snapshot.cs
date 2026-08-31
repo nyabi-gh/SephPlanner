@@ -85,14 +85,22 @@ namespace SephPlanner.Core.Ipc
         public bool IsApplied { get; set; }
 
         /// <summary>
-        /// 이 인스턴스를 지금 돌릴 수 있는지. 저주 등으로 인스턴스 단위로 잠길 수 있어
-        /// 정의의 회전 가능 여부와 별개다(<c>DungeonManager.IsTabletRotatable</c>).
+        /// 이 인스턴스를 지금 돌릴 수 있는지. 저주는 돌릴 수 있던 석판을 잠그고, 석판 합성은
+        /// 반대로 정의상 돌릴 수 없는 합성 석판을 돌릴 수 있게 풀기 때문에 정의값과 별개다
+        /// (<c>DungeonManager.IsTabletRotatable</c>). 비어 있으면 정의값을 쓴다 — 참을 기본값으로
+        /// 두면 값을 싣지 않은 쪽이 돌릴 수 없는 석판을 돌릴 수 있다고 말하는 셈이 된다.
         /// </summary>
-        public bool IsRotatable { get; set; } = true;
+        public bool? IsRotatable { get; set; }
 
         /// <summary>커스텀 석판만 채워진다. 질의가 인스턴스마다 다르기 때문이다.</summary>
         public string? Query { get; set; }
         public string? ConditionQuery { get; set; }
+
+        /// <summary>
+        /// 플레이어가 석판 합성기에서 직접 붙인 이름. 합성 석판은 정의상 이름이 "..." 자리표시자라
+        /// 이것이 없으면 화면에서 서로 구분되지 않는다. 붙인 이름이 없으면 비어 있다.
+        /// </summary>
+        public string? Name { get; set; }
     }
 
     public sealed class OfferedItem

@@ -13,6 +13,9 @@ namespace SephPlanner.Core.Tablets
         public string? InstanceQuery { get; set; }
         public string? InstanceConditionQuery { get; set; }
 
+        /// <summary>플레이어가 합성하며 직접 붙인 이름. 없으면 정의의 이름을 쓴다.</summary>
+        public string? InstanceName { get; set; }
+
         public string Query => InstanceQuery ?? Definition.Query;
         public string ConditionQuery => InstanceConditionQuery ?? Definition.ConditionQuery;
     }

@@ -30,6 +30,29 @@ public sealed class UserSettings
     /// </summary>
     public bool Recommendations { get; set; } = true;
 
+    /// <summary>
+    /// 가져온 빌드 프리셋 코드 원문. 해석 결과가 아니라 원문을 저장한다 - 카탈로그나 게임이
+    /// 바뀌어도 다시 읽으면 되고, 사용자가 어떤 코드를 넣었는지 그대로 남는다.
+    /// </summary>
+    public string? PresetCode { get; set; }
+
+    private string? _decodedFrom;
+    private BuildPreset? _decoded;
+
+    /// <summary>해석에 실패했거나 코드가 없으면 null. 같은 코드를 두 번 풀지 않는다.</summary>
+    public BuildPreset? Preset()
+    {
+        if (string.IsNullOrWhiteSpace(PresetCode)) return null;
+        if (_decodedFrom != PresetCode)
+        {
+            _decodedFrom = PresetCode;
+            _decoded = SephPlanner.Core.Planning.PresetCode.TryParse(PresetCode, out var preset, out _)
+                ? preset
+                : null;
+        }
+        return _decoded;
+    }
+
     private static string FilePath =>
         Path.Combine(IpcContract.DataDirectory, "overlay-settings.json");
 
@@ -73,5 +96,10 @@ public sealed class UserSettings
         PriorityCategories = new HashSet<string>(PriorityCategories),
         PinnedCharms = new HashSet<int>(PinnedCharms),
         Recommendations = Recommendations,
+
+        // 프리셋이 알려 주는 것은 무엇을 집을지에 대한 조언이라, 추천을 끄면 함께 쉰다.
+        PresetCharms = Recommendations && Preset() is { } preset
+            ? new HashSet<int>(preset.FavoriteCharms)
+            : new HashSet<int>(),
     };
 }

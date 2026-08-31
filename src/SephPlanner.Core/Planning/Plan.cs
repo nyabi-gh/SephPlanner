@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using SephPlanner.Core.Ipc;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Solver;
+using SephPlanner.Core.Tablets;
 
 namespace SephPlanner.Core.Planning
 {
@@ -31,6 +32,13 @@ namespace SephPlanner.Core.Planning
         {
             if (names.TryGetValue(CurrentLanguage, out var text) && text.Length > 0) return text;
             return id.Length > 0 ? id : fallback;
+        }
+
+        /// <summary>석판은 플레이어가 붙인 이름이 있으면 그쪽이 먼저다. 합성 석판이 여기 해당한다.</summary>
+        public static string OfTablet(TabletPlacement placement)
+        {
+            if (!string.IsNullOrEmpty(placement.InstanceName)) return placement.InstanceName!;
+            return Of(placement.Definition.Names, placement.Definition.Id, "석판");
         }
     }
 

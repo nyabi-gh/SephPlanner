@@ -121,7 +121,7 @@ namespace SephPlanner.Core.Solver
             {
                 // 돌릴 수 없는 석판은 지금 돌아가 있는 각도 그대로만 쓴다. 0으로 고정하면
                 // 이미 돌아간 채로 잠긴 석판(저주 등)에 불가능한 회전을 제안하게 된다.
-                var rotatable = slot.Definition.IsRotatable && slot.Rotatable;
+                var rotatable = slot.Rotatable;
                 var fixedRotation = problem.CurrentTablets.TryGetValue(slot.InstanceId, out var spot)
                     ? spot.Rotation
                     : 0;
