@@ -26,10 +26,15 @@ namespace SephPlanner.Plugin
         private ConfigEntry<KeyboardShortcut> _diagnosticsKey;
         private ConfigEntry<bool> _nativePanel;
         private ConfigEntry<PanelCorner> _nativePanelCorner;
-        private ConfigEntry<float> _nativePanelMargin;
+        private ConfigEntry<float> _nativePanelMarginX;
+        private ConfigEntry<float> _nativePanelMarginY;
         private ConfigEntry<float> _nativePanelWidth;
+        private ConfigEntry<float> _nativePanelScale;
+        private ConfigEntry<float> _nativePanelOpacity;
         private ConfigEntry<KeyboardShortcut> _expandKey;
         private ConfigEntry<KeyboardShortcut> _autoPlaceKey;
+        private ConfigEntry<KeyboardShortcut> _opacityKey;
+        private ConfigEntry<KeyboardShortcut> _moveKey;
         private float _nextPoll;
         private string _lastJson;
         private bool _catalogChecked;
@@ -44,6 +49,7 @@ namespace SephPlanner.Plugin
         private string _lastPanelBlocker;
         private bool _expanded;
         private bool _hadOffers;
+        private bool _moving;
         private string _autoPlaceResult = "";
         private float _autoPlaceShownUntil;
 
@@ -69,12 +75,21 @@ namespace SephPlanner.Plugin
             _nativePanelCorner = Config.Bind(
                 "NativePanel", "Corner", PanelCorner.TopRight,
                 "화면을 붙일 모서리. 게임 HUD 와 겹치면 옮긴다.");
-            _nativePanelMargin = Config.Bind(
-                "NativePanel", "Margin", 1.5f,
-                "모서리에서 띄울 거리. 게임 HUD 글자 크기의 배수라 해상도가 달라도 같게 보인다.");
+            _nativePanelMarginX = Config.Bind(
+                "NativePanel", "MarginX", 1.5f,
+                "모서리에서 가로로 띄울 거리. 게임 HUD 글자 크기의 배수라 해상도가 달라도 같게 보인다.");
+            _nativePanelMarginY = Config.Bind(
+                "NativePanel", "MarginY", 1.5f,
+                "모서리에서 세로로 띄울 거리. 이동 모드로 옮기면 여기에 저장된다.");
             _nativePanelWidth = Config.Bind(
                 "NativePanel", "WidthScale", 26f,
                 "화면의 가로 폭. 역시 게임 HUD 글자 크기의 배수다. 글씨가 잘리면 키운다.");
+            _nativePanelScale = Config.Bind(
+                "NativePanel", "Scale", 1.0f,
+                "화면 전체의 크기 배율. 1 이 게임 HUD 글자와 같은 크기다.");
+            _nativePanelOpacity = Config.Bind(
+                "NativePanel", "Opacity", 1.0f,
+                "화면의 불투명도(0~1).");
             // 게임이 쓰지 않는 키로 고른다. 게임은 수정키를 보지 않으므로 Ctrl+Alt 를 붙여도
             // 글자 키는 게임 조작을 함께 발동시킨다(docs/RESEARCH.md 의 "게임 단축키").
             // F 키는 게임이 하나도 쓰지 않으며 F9/F10 이 이미 같은 이유로 쓰이고 있다.
@@ -84,10 +99,61 @@ namespace SephPlanner.Plugin
             _autoPlaceKey = Config.Bind(
                 "NativePanel", "AutoPlaceKey", new KeyboardShortcut(KeyCode.F8),
                 "제안된 배치를 게임에 적용하는 단축키. 싱글플레이에서만 동작한다.");
+            _opacityKey = Config.Bind(
+                "NativePanel", "OpacityKey", new KeyboardShortcut(KeyCode.F5),
+                "불투명도를 차례로 바꾸는 단축키.");
+            _moveKey = Config.Bind(
+                "NativePanel", "MoveKey", new KeyboardShortcut(KeyCode.F6),
+                "이동 모드. 한 번 누르면 화면이 커서를 따라오고, 다시 누르면 그 자리에 고정된다.");
+
+            Retire(_expandKey, new KeyboardShortcut(KeyCode.P, KeyCode.LeftControl, KeyCode.LeftAlt));
+            Retire(_autoPlaceKey, new KeyboardShortcut(KeyCode.Return, KeyCode.LeftControl, KeyCode.LeftAlt));
+            WarnIfGameKey(_expandKey, "ExpandKey");
+            WarnIfGameKey(_autoPlaceKey, "AutoPlaceKey");
 
             _server = new SnapshotPipeServer(Logger.LogInfo);
             _commands = new CommandPipeServer(Logger.LogInfo);
             Logger.LogInfo("SephPlanner 브리지 시작");
+        }
+
+        /// <summary>
+        /// 게임이 실제로 읽는 키. `sharedassets0.assets` 의 InputActionAsset 바인딩에서 뽑았다
+        /// (docs/RESEARCH.md 의 "게임 단축키"). 게임은 수정키를 보지 않으므로 Ctrl·Alt 를 붙여도
+        /// 여기 걸린 키는 게임 조작을 함께 발동시킨다. F 키는 하나도 쓰지 않는다.
+        /// </summary>
+        private static readonly System.Collections.Generic.HashSet<KeyCode> GameKeys =
+            new System.Collections.Generic.HashSet<KeyCode>
+            {
+                KeyCode.Alpha1, KeyCode.Alpha2, KeyCode.Alpha3, KeyCode.Alpha4,
+                KeyCode.Alpha5, KeyCode.Alpha6, KeyCode.Alpha7, KeyCode.Alpha8,
+                KeyCode.A, KeyCode.B, KeyCode.C, KeyCode.D, KeyCode.E, KeyCode.F, KeyCode.G,
+                KeyCode.P, KeyCode.Q, KeyCode.R, KeyCode.S, KeyCode.V, KeyCode.W, KeyCode.X, KeyCode.Z,
+                KeyCode.BackQuote, KeyCode.Slash, KeyCode.Space, KeyCode.Tab,
+                KeyCode.Return, KeyCode.KeypadEnter, KeyCode.Escape,
+                KeyCode.LeftArrow, KeyCode.RightArrow, KeyCode.UpArrow, KeyCode.DownArrow,
+                KeyCode.LeftControl, KeyCode.LeftShift,
+            };
+
+        /// <summary>
+        /// 기본값을 옮겨도 설정 파일에 남은 옛 값이 그대로 쓰인다. 그 값이 게임 키와 겹쳐서 옮긴
+        /// 것이므로 남아 있으면 옮긴 뜻이 없다. 정확히 그 값일 때만 새 기본값으로 되돌린다 -
+        /// 사용자가 손으로 정한 것은 건드리지 않는다.
+        /// </summary>
+        private void Retire(ConfigEntry<KeyboardShortcut> entry, KeyboardShortcut retired)
+        {
+            if (entry.Value.ToString() != retired.ToString()) return;
+
+            entry.Value = (KeyboardShortcut)entry.DefaultValue;
+            Logger.LogInfo($"{entry.Definition.Key} 가 게임 키와 겹쳐 {entry.Value} 로 옮겼습니다.");
+        }
+
+        private void WarnIfGameKey(ConfigEntry<KeyboardShortcut> entry, string name)
+        {
+            if (!GameKeys.Contains(entry.Value.MainKey)) return;
+
+            Logger.LogWarning(
+                $"{name} 의 {entry.Value.MainKey} 키는 게임도 쓰는 키라 게임 조작이 함께 발동합니다. " +
+                "F 키는 게임이 쓰지 않습니다.");
         }
 
         private void Update()
@@ -98,6 +164,9 @@ namespace SephPlanner.Plugin
             {
                 if (_expandKey.Value.IsDown()) _expanded = !_expanded;
                 if (_autoPlaceKey.Value.IsDown()) AutoPlace();
+                if (_opacityKey.Value.IsDown()) CycleOpacity();
+                if (_moveKey.Value.IsDown()) ToggleMove();
+                if (_moving) _hud.DragTo(Input.mousePosition);
             }
 
             // 리소스는 부팅 직후 준비되므로 첫 프레임에 확인한다.
@@ -295,7 +364,9 @@ namespace SephPlanner.Plugin
             }
 
             if (!_hud.TryCreate(
-                    _nativePanelCorner.Value, _nativePanelMargin.Value, _nativePanelWidth.Value))
+                    _nativePanelCorner.Value,
+                    new Vector2(_nativePanelMarginX.Value, _nativePanelMarginY.Value),
+                    _nativePanelWidth.Value, _nativePanelScale.Value))
             {
                 // 런이 도는데도 못 붙었으면 무엇이 없어서인지 한 번은 남긴다. 조용히 안 뜨면
                 // 게임 안에서는 확인할 길이 없다.
@@ -310,6 +381,7 @@ namespace SephPlanner.Plugin
             {
                 _lastPanelOrigin = _hud.Origin;
                 Logger.LogInfo("인게임 화면 생성 - " + _hud.Origin);
+                _hud.SetOpacity(_nativePanelOpacity.Value);
             }
             _hud.SetVisible(true);
 
@@ -361,9 +433,10 @@ namespace SephPlanner.Plugin
             if (Time.unscaledTime < _autoPlaceShownUntil) return _autoPlaceResult;
 
             var expand = Describe(_expandKey.Value) + (_expanded ? " 접기" : " 펼치기");
-            if (_lastSnapshot != null && _lastSnapshot.IsMultiplayer) return expand;
+            var look = Describe(_opacityKey.Value) + " 불투명도   " + Describe(_moveKey.Value) + " 이동";
+            if (_lastSnapshot != null && _lastSnapshot.IsMultiplayer) return expand + "   " + look;
 
-            return expand + "   " + Describe(_autoPlaceKey.Value) + " 자동 배치";
+            return expand + "   " + Describe(_autoPlaceKey.Value) + " 자동 배치   " + look;
         }
 
         private static string Describe(KeyboardShortcut shortcut)
@@ -415,6 +488,46 @@ namespace SephPlanner.Plugin
 
             // 적용 결과가 화면에 바로 보이도록 다음 폴링을 기다리지 않는다.
             _nextPoll = 0;
+        }
+
+        private static readonly float[] OpacitySteps = { 1.0f, 0.85f, 0.7f, 0.55f };
+
+        private void CycleOpacity()
+        {
+            var next = 0;
+            for (var i = 0; i < OpacitySteps.Length; i++)
+            {
+                if (Mathf.Abs(OpacitySteps[i] - _nativePanelOpacity.Value) > 0.01f) continue;
+
+                next = (i + 1) % OpacitySteps.Length;
+                break;
+            }
+
+            _nativePanelOpacity.Value = OpacitySteps[next];
+            _hud.SetOpacity(_nativePanelOpacity.Value);
+            Report($"불투명도 {_nativePanelOpacity.Value * 100:0}%");
+        }
+
+        /// <summary>
+        /// 화면을 커서로 옮긴다. 끌어서 옮기려면 마우스를 받아야 하는데 그러면 게임 조작을
+        /// 가로채게 되므로, 잡고 놓는 것만 단축키로 하고 그 사이에는 커서 위치를 읽기만 한다.
+        /// </summary>
+        private void ToggleMove()
+        {
+            if (!_hud.IsAlive) return;
+
+            _moving = !_moving;
+            if (_moving)
+            {
+                _hud.BeginDrag(Input.mousePosition);
+                Report("이동 중 - 마우스로 옮기고 " + Describe(_moveKey.Value) + " 로 고정");
+                return;
+            }
+
+            var margin = _hud.Margin;
+            _nativePanelMarginX.Value = margin.x;
+            _nativePanelMarginY.Value = margin.y;
+            Report("자리를 기억했습니다.");
         }
 
         private void Report(string message)

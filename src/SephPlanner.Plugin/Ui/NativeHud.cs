@@ -42,6 +42,14 @@ namespace SephPlanner.Plugin.Ui
 
         private NativeSkin _skin;
         private GameObject _root;
+        private RectTransform _rect;
+        private RectTransform _canvasRect;
+        private Canvas _canvas;
+        private CanvasGroup _group;
+        private Vector2 _grab;
+
+        /// <summary>기준 크기에 사용자 배율을 곱한 값. 화면의 모든 치수가 여기서 나온다.</summary>
+        private float _base;
 
         private TextMeshProUGUI _hint;
         private TextMeshProUGUI _score;
@@ -64,7 +72,7 @@ namespace SephPlanner.Plugin.Ui
         public string Blocker { get; private set; } = "";
         public bool IsAlive => _root != null;
 
-        public bool TryCreate(PanelCorner corner, float margin, float widthScale)
+        public bool TryCreate(PanelCorner corner, Vector2 margin, float widthScale, float scale)
         {
             if (IsAlive) return true;
             if (UIManager.Instance == null)
@@ -82,21 +90,30 @@ namespace SephPlanner.Plugin.Ui
             Blocker = "";
 
             _skin = NativeSkin.Borrow(root);
+            _base = _skin.BaseSize * Mathf.Max(0.2f, scale);
             Build(root, corner, margin, widthScale);
             Origin = _skin.Origin;
             return true;
         }
 
-        private float S(float ratio) => _skin.BaseSize * ratio;
+        private float S(float ratio) => _base * ratio;
 
-        private void Build(UIRoot root, PanelCorner corner, float margin, float widthScale)
+        private void Build(UIRoot root, PanelCorner corner, Vector2 margin, float widthScale)
         {
             // 장미빛 테두리 한 겹과 그 안의 어두운 속. 오버레이 패널의 골격을 옮긴 것이다.
             var frame = Widgets.Fill("SephPlannerHud", root.transform, NativeSkin.Frame);
             _root = frame.gameObject;
+            _canvas = root.Canvas;
+            _canvasRect = (RectTransform)root.transform;
+
+            // 불투명도 전용. UIRoot 자신의 CanvasGroup 은 게임이 UI 를 감출 때 쓰므로 건드리지 않는다.
+            _group = _root.AddComponent<CanvasGroup>();
+            _group.interactable = false;
+            _group.blocksRaycasts = false;
 
             var rect = frame.rectTransform;
-            Place(rect, corner, S(margin));
+            _rect = rect;
+            Place(rect, corner, new Vector2(S(margin.x), S(margin.y)));
             rect.sizeDelta = new Vector2(S(widthScale), 0f);
 
             var edge = Mathf.Max(1, Mathf.RoundToInt(S(0.25f)));
@@ -118,13 +135,13 @@ namespace SephPlanner.Plugin.Ui
             Widgets.Column(_detail, S(0.3f));
 
             BuildGrid(_detail);
-            _moves = new Section(_detail, _skin, "옮길 것", NativeSkin.TextDim, MoveRows);
+            _moves = new Section(_detail, _skin, _base, "옮길 것", NativeSkin.TextDim, MoveRows);
             BuildOffers(_detail);
-            _mixes = new Section(_detail, _skin, "석판 합성기", NativeSkin.Mint, MixRows);
+            _mixes = new Section(_detail, _skin, _base, "석판 합성기", NativeSkin.Mint, MixRows);
             _chips = Line(_detail, S(0.8f), NativeSkin.TextDim);
         }
 
-        private static void Place(RectTransform rect, PanelCorner corner, float margin)
+        private static void Place(RectTransform rect, PanelCorner corner, Vector2 margin)
         {
             var right = corner == PanelCorner.TopRight || corner == PanelCorner.BottomRight;
             var top = corner == PanelCorner.TopLeft || corner == PanelCorner.TopRight;
@@ -133,7 +150,44 @@ namespace SephPlanner.Plugin.Ui
             rect.anchorMin = anchor;
             rect.anchorMax = anchor;
             rect.pivot = anchor;
-            rect.anchoredPosition = new Vector2(right ? -margin : margin, top ? -margin : margin);
+            rect.anchoredPosition = new Vector2(right ? -margin.x : margin.x, top ? -margin.y : margin.y);
+        }
+
+        public void SetOpacity(float alpha)
+        {
+            if (_group != null) _group.alpha = Mathf.Clamp01(alpha);
+        }
+
+        /// <summary>
+        /// 옮기기 시작한 자리를 기억한다. 이것이 없으면 잡는 순간 화면 모서리가 커서로 튄다.
+        /// </summary>
+        public void BeginDrag(Vector2 screenPoint)
+        {
+            if (IsAlive) _grab = Anchored(screenPoint) - _rect.anchoredPosition;
+        }
+
+        public void DragTo(Vector2 screenPoint)
+        {
+            if (IsAlive) _rect.anchoredPosition = Anchored(screenPoint) - _grab;
+        }
+
+        /// <summary>지금 자리를 설정에 적어 둘 값으로. 모서리에서 안쪽으로 얼마인지를 기준 크기 단위로 센다.</summary>
+        public Vector2 Margin => IsAlive
+            ? new Vector2(
+                (_rect.anchorMin.x > 0.5f ? -_rect.anchoredPosition.x : _rect.anchoredPosition.x) / _base,
+                (_rect.anchorMin.y > 0.5f ? -_rect.anchoredPosition.y : _rect.anchoredPosition.y) / _base)
+            : Vector2.zero;
+
+        private Vector2 Anchored(Vector2 screenPoint)
+        {
+            var camera = _canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : _canvas.worldCamera;
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                _canvasRect, screenPoint, camera, out var local);
+
+            var anchor = new Vector2(
+                _rect.anchorMin.x > 0.5f ? _canvasRect.rect.xMax : _canvasRect.rect.xMin,
+                _rect.anchorMin.y > 0.5f ? _canvasRect.rect.yMax : _canvasRect.rect.yMin);
+            return local - anchor;
         }
 
         private void BuildHeader(RectTransform parent)
@@ -164,7 +218,7 @@ namespace SephPlanner.Plugin.Ui
 
         private void BuildOffers(RectTransform parent)
         {
-            _offers = new Section(parent, _skin, "지금 집을 수 있는 것", NativeSkin.Mint, OfferRows);
+            _offers = new Section(parent, _skin, _base, "지금 집을 수 있는 것", NativeSkin.Mint, OfferRows);
 
             // 순위를 그대로 믿으면 안 된다는 것은 늘 보여야 한다. 머리글 바로 밑이라야 목록을
             // 읽기 전에 눈에 들어온다.
@@ -247,7 +301,7 @@ namespace SephPlanner.Plugin.Ui
             var total = inventory.Width * inventory.Height;
             _gridLayout.constraintCount = inventory.Width;
 
-            while (_cells.Count < total) _cells.Add(new Cell(_grid, _skin));
+            while (_cells.Count < total) _cells.Add(new Cell(_grid, _skin, _base));
             for (var i = total; i < _cells.Count; i++) _cells[i].Hide();
 
             var tabletCells = new Dictionary<GridPos, TabletPlacement>();
@@ -458,9 +512,9 @@ namespace SephPlanner.Plugin.Ui
             public RectTransform Root { get; }
             public RectTransform Body { get; }
 
-            public Section(RectTransform parent, NativeSkin skin, string title, Color titleColor, int rows)
+            public Section(
+                RectTransform parent, NativeSkin skin, float b, string title, Color titleColor, int rows)
             {
-                var b = skin.BaseSize;
                 Root = Widgets.Rect(title, parent);
                 Widgets.Column(Root, b * 0.15f);
                 Body = Root;
@@ -519,9 +573,8 @@ namespace SephPlanner.Plugin.Ui
             private readonly TextMeshProUGUI _name;
             private readonly TextMeshProUGUI _level;
 
-            public Cell(RectTransform parent, NativeSkin skin)
+            public Cell(RectTransform parent, NativeSkin skin, float b)
             {
-                var b = skin.BaseSize;
                 _edge = Mathf.Max(1f, b * 0.1f);
 
                 _border = Widgets.Fill("Cell", parent, NativeSkin.SlotEdge);

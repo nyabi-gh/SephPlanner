@@ -61,6 +61,11 @@
       <HintPath>$(SephiriaManagedDir)\Unity.TextMeshPro.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <!-- 이동 모드에서 커서 위치를 읽는다. BepInEx 단축키도 같은 구식 입력을 쓴다. -->
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>$(SephiriaManagedDir)\UnityEngine.InputLegacyModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
   <Target Name="WarnIfGameMissing" BeforeTargets="ResolveAssemblyReferences">
