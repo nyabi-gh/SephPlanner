@@ -10,6 +10,9 @@
   없고, 그 자리를 채우는 것이 이 함수다. `showAllLevel`을 켜서 레벨별 값이 범위로 나오게 했다.
   덤프는 종류마다 한 번뿐이라 특정 레벨의 값을 담으면 다른 레벨에서 거짓말이 된다.
   TextMeshPro 서식은 `RichText.Strip`으로 걷어낸다.
+- **콤보 가중치 실측.** `Worth.ComboThreshold`를 2.0(설계값)에서 3.4(실측)로, 조화의 수정
+  환산값 `Worth.DamageBonus`를 0.05(짐작)에서 0.4(실측)로 옮겼다. 재는 길
+  (`--measure`)과 결과는 RESEARCH.md 의 "콤보 가중치" 절에 있다.
 - **프리셋 코드 가져오기.** 오버레이 "빌드 우선"에 붙여넣기 자리를 두었다. 디코더는
   `SephPlanner.Core`의 `PresetCode`이고, 즐겨찾기 아티팩트는 후보 목록 가중치로, 과일 꼬치의
   양수 카테고리는 빌드 우선 칩을 대신 눌러 주는 것으로 이었다. 칩을 대신 눌러 주는 방식이라
@@ -54,11 +57,10 @@
   `Charm_RightSpellCooldownHelper`, `Charm_NearMagicBullet`, `Charm_PlanetModule`,
   `Charm_WoodenBox`, `Charm_MagicCoolDownBonusByTag`, `Charm_BoltMagicMultiShot`,
   `Charm_CompanionChaos`. 각자 로직이 달라 하나씩 봐야 한다. RESEARCH.md 참고.
-- **콤보 가중치 상수 갱신 (측정 대기).** 재는 길은 만들었다 —
-  `dotnet run --project src/SephPlanner.DataTool -- --measure`. 다만 **게임을 한 번 켜서 카탈로그를
-  다시 덤프해야** 원자료(`stat-measure.json`)가 생긴다. 그 결과의 중앙값으로
-  `Worth.ComboThreshold`를, 같은 방식으로 `Worth.DamageBonus`(조화의 수정 환산값)를 정한다.
-  그때까지 두 값은 여전히 설계값이다.
+- **콤보 진행 가치의 모양.** `Worth.ComboProgress`는 임계값까지 한 걸음이 남았든 넷이 남았든
+  같은 값을 준다. 남은 걸음 수에 따라 달라지는 편이 맞아 보이지만, 못 채운 콤보의 값어치는
+  결국 채우게 되느냐에 달려 있어 정적 데이터로는 잴 수 없다. 모양을 바꾸려면 그 판단 근거를
+  따로 마련해야 한다.
 - **프리셋의 "피하는 콤보" 반영.** 가져오기는 과일 꼬치의 양수 카테고리만 빌드 우선으로 켠다.
   음수(그 카테고리를 피하겠다는 뜻)는 화면에 개수만 보여 주고 점수에는 쓰지 않는다. 콤보 가치를
   깎는 방향이 맞는지 실제 빌드로 확인한 뒤에 붙인다.
