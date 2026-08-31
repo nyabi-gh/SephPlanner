@@ -190,6 +190,33 @@ Cmd 경유가 필요한데, 커뮤니티의 다른 자동배치 모드가 클라
 오염을 겪은 전례가 있다. 동기화가 안전하다고 확인될 때까지 플러그인은 멀티 세션에서 적용을
 거부한다(`docs/LEGAL.md`).
 
+## 아티팩트 효과 설명
+
+로컬라이제이션의 `Charm_{Id}_Effect` / `_Effect2`는 **완성된 문장이 아니다.** 자리표시자와 키워드
+태그가 남아 있다 — 예: `블록 성공 시 {BASIC_ATTACK_DAMAGE} 물리 피해 {TIME}초`,
+`<tag=CATEGORY:STURDY>`.
+
+자리를 채우는 것은 `Charm_Basic.BuildEffectString(avatar, bullet, endl, level, virtualLevelOffset,
+showAllLevel, ignoreAvatarStatus)`이다. 파생 클래스가 `BuildKeywords`로 값을 만들어 넣고,
+마지막에 `KeywordDatabase.Convert`가 `<tag=…>`를 푼다.
+
+우리 덤프가 이 함수를 그대로 부르는 이유와 인자 선택:
+
+- 문장 조립을 우리가 흉내 내면 게임과 어긋난다. 값이 프리팹의 레벨별 배열에서 나오기 때문이다.
+- `showAllLevel: true` — 덤프는 아티팩트 종류마다 한 번뿐인데 값은 레벨마다 다르다. 이 인자를
+  켜면 `+3~+9` 꼴의 범위로 나와 어느 레벨에서도 거짓말이 아니다.
+- `avatar: null`, `ignoreAvatarStatus: true` — 덤프 시점에는 플레이어 상태가 없다.
+- 프리팹 컴포넌트라 `RequestCharmDamageBonusOnRoot`는 `netIdentity`가 없어 0을 돌려준다. 안전하다.
+- 그래도 런타임 상태가 있어야 문장을 만드는 아티팩트가 있을 수 있어 종류마다 try/catch 로 감싸고,
+  실패하면 설명 없이 둔다.
+
+결과에는 `<color=…>`, `<sprite=…>`, `<indent=…>` 같은 TextMeshPro 서식이 남으므로
+`SephPlanner.Core`의 `RichText.Strip`으로 걷어낸 뒤 저장한다. 색을 가져오지 않는 것은 의도다 —
+오버레이 색은 `Theme`에서만 온다.
+
+덤프에 항목이 늘어나는 변경이라 `IpcContract.CatalogVersion`을 두었다. 덤프는 첫 실행에 한 번만
+만들어지므로, 번호가 없으면 예전 덤프를 가진 사람은 새 항목이 영영 빈 채로 남는다.
+
 ## 텍스트 데이터
 
 `Sephiria_Data/StreamingAssets/Localization/*.json`이 **평문 JSON**이고 15개 언어가 모두 들어 있다.

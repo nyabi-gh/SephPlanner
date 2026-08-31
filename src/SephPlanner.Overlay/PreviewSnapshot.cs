@@ -27,7 +27,12 @@ public static class PreviewSnapshot
         },
         new[]
         {
-            new CharmDefinition { EntityId = 1237, Id = "PreviewCharmA", MaxLevel = 3, Rarity = Rarity.Rare, Categories = { "EMBER" }, Names = { ["current"] = "미리보기 아티팩트 A" } },
+            new CharmDefinition
+            {
+                EntityId = 1237, Id = "PreviewCharmA", MaxLevel = 3, Rarity = Rarity.Rare,
+                Categories = { "EMBER" }, Names = { ["current"] = "미리보기 아티팩트 A" },
+                EffectLines = { "적을 맞힐 때마다 미리보기 피해를 1~3 줍니다.", "미리보기 효과가 2초간 남습니다." },
+            },
             new CharmDefinition { EntityId = 3002, Id = "PreviewCharmB", MaxLevel = 4, Categories = { "FLAMESWORD" }, Names = { ["current"] = "미리보기 아티팩트 B" } },
             new CharmDefinition { EntityId = 3012, Id = "PreviewCharmC", MaxLevel = 3, Categories = { "EMBER" }, Names = { ["current"] = "미리보기 아티팩트 C" } },
         },

@@ -30,6 +30,12 @@ namespace SephPlanner.Core.Model
         /// </summary>
         public string Behavior { get; set; } = "";
 
+        /// <summary>
+        /// 게임이 만들어 준 효과 설명. 게임 툴팁과 같은 문장이며 레벨별 값은 범위로 적혀 있다.
+        /// 서식 태그는 덤프할 때 이미 걷어냈다. 만들지 못한 아티팩트는 비어 있다.
+        /// </summary>
+        public List<string> EffectLines { get; set; } = new List<string>();
+
         public List<string> Categories { get; set; } = new List<string>();
         public Dictionary<string, string> Names { get; set; } = new Dictionary<string, string>();
     }

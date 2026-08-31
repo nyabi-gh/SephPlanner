@@ -27,6 +27,14 @@ namespace SephPlanner.Core.Ipc
         public const string CharmDbFile = "charms.json";
         public const string ComboDbFile = "combos.json";
         public const string VerificationReportFile = "query-verification.txt";
+        public const string CatalogVersionFile = "catalog-version.txt";
+
+        /// <summary>
+        /// 덤프에 담기는 내용이 늘어날 때 올린다. 덤프는 첫 실행에 한 번만 만들어지므로, 이 번호가
+        /// 없으면 예전 덤프를 가진 사람은 새 항목이 영영 빈 채로 남는다.
+        /// v2: 아티팩트 효과 설명을 함께 담는다.
+        /// </summary>
+        public const int CatalogVersion = 2;
 
         /// <summary>플러그인이 덤프한 데이터와 오버레이가 읽는 데이터의 공용 위치.</summary>
         public static string DataDirectory =>

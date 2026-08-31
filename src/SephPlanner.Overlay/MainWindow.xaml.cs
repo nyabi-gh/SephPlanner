@@ -354,6 +354,8 @@ public partial class MainWindow : Window
     private static string Explain(OfferAdvice advice, int gold)
     {
         var lines = new List<string>();
+        lines.AddRange(advice.Candidate.Charm?.EffectLines ?? new List<string>());
+
         if (!advice.Affordable) lines.Add($"소지금 {gold}골드로는 살 수 없습니다.");
 
         if (advice.MatchesPreset) lines.Add("가져온 빌드가 즐겨찾기로 찍어 둔 아티팩트입니다.");
@@ -412,7 +414,8 @@ public partial class MainWindow : Window
                 cell.SetCharm(
                     name ?? "", level, effective, reason, moved.Contains(position),
                     charmId, _preferences.PinnedCharms.Contains(charmId),
-                    _settings.IconMode ? IconStore.Get(charmId) : null);
+                    _settings.IconMode ? IconStore.Get(charmId) : null,
+                    ActiveCatalog.Charm(charmId)?.EffectLines);
             }
             else cell.SetEmpty();
         }
@@ -843,32 +846,42 @@ public sealed class CellView : INotifyPropertyChanged
     /// </summary>
     public void SetCharm(
         string name, int level, int effective, CharmInactiveReason reason, bool moved,
-        int charmId = 0, bool pinned = false, ImageSource? icon = null)
+        int charmId = 0, bool pinned = false, ImageSource? icon = null,
+        IReadOnlyList<string>? effectLines = null)
     {
         CharmId = charmId;
         Icon = icon;
         var title = pinned ? "★ " + name : name;
-        var pinNote = pinned ? "\n강화 우선: 가치를 2배로 칩니다. 우클릭으로 해제합니다." : "";
 
         // 아이콘 모드에서는 이름 줄이 숨으므로 강화 표시가 레벨 줄로 내려온다.
         var star = pinned && icon is not null ? "★" : "";
 
+        // 이름 다음에 무슨 아티팩트인지가 오고, 이 자리에서만 해당하는 이야기는 그 뒤에 온다.
+        var lines = new List<string> { name };
+        if (effectLines is not null) lines.AddRange(effectLines);
+
         if (reason != CharmInactiveReason.None)
         {
-            Fill(title, star + "꺼짐", name + "\n" + Explain(reason) + pinNote, Theme.Bad, Theme.SlotFill);
+            lines.Add(Explain(reason));
+            if (pinned) lines.Add(PinNote);
+
+            Fill(title, star + "꺼짐", string.Join(Environment.NewLine, lines), Theme.Bad, Theme.SlotFill);
             SetEdge(moved);
             return;
         }
 
         var wasted = level > effective;
         var label = effective > 0 ? $"+{effective}" : level < 0 ? level.ToString() : "0";
-        var tooltip = wasted ? $"{name}\n칸 레벨 {level}, 이 아티팩트는 {effective}까지만 반영됩니다" : name;
+        if (wasted) lines.Add($"칸 레벨 {level}, 이 아티팩트는 {effective}까지만 반영됩니다");
+        if (pinned) lines.Add(PinNote);
 
-        Fill(title, star + label, tooltip + pinNote,
+        Fill(title, star + label, string.Join(Environment.NewLine, lines),
             level < 0 ? Theme.Bad : wasted ? Theme.Orange : effective > 0 ? Theme.Good : Theme.TextDim,
             Theme.SlotFill);
         SetEdge(moved);
     }
+
+    private const string PinNote = "강화 우선: 가치를 2배로 칩니다. 우클릭으로 해제합니다.";
 
     private void Fill(string title, string label, string tooltip, Brush foreground, Brush background)
     {

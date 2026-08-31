@@ -63,6 +63,7 @@ namespace SephPlanner.Plugin
                         ? charm.relatedWeapon.ToString()
                         : "",
                     Behavior = charm != null ? charm.GetType().Name : "",
+                    EffectLines = EffectLines(charm),
                     Categories = entity.categories ?? new List<string>(),
                     Names = DisplayName(entity),
                 });
@@ -109,6 +110,39 @@ namespace SephPlanner.Plugin
                 });
             }
             return result;
+        }
+
+        /// <summary>
+        /// 아티팩트 효과 설명. 게임 툴팁이 쓰는 <c>BuildEffectString</c>을 프리팹 컴포넌트에 그대로
+        /// 부른다 — 문장을 우리가 흉내 내면 게임과 어긋나고, 값 자리표시자({VALUE} 같은 것)를
+        /// 채우는 것이 이 함수이기 때문이다.
+        ///
+        /// <c>showAllLevel</c>을 켜서 레벨별 값이 범위로 나오게 한다. 덤프는 아티팩트 종류마다
+        /// 한 번뿐이라 특정 레벨의 값을 담으면 다른 레벨에서 거짓말이 된다. 아바타를 넘기지 않고
+        /// <c>ignoreAvatarStatus</c>를 켜는 것도 같은 이유다.
+        /// </summary>
+        private static List<string> EffectLines(Charm_Basic charm)
+        {
+            var lines = new List<string>();
+            if (charm == null) return lines;
+
+            try
+            {
+                var text = charm.BuildEffectString(
+                    null, "", "", 1, 0, showAllLevel: true, ignoreAvatarStatus: true);
+
+                foreach (var line in text.Split('\n'))
+                {
+                    var clean = RichText.Strip(line).Trim();
+                    if (clean.Length > 0) lines.Add(clean);
+                }
+            }
+            catch (System.Exception)
+            {
+                // 런타임 상태가 있어야 문장을 만드는 아티팩트가 있다. 그런 것은 설명 없이 둔다.
+                lines.Clear();
+            }
+            return lines;
         }
 
         /// <summary>

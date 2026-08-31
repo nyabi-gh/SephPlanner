@@ -29,6 +29,7 @@ namespace SephPlanner.Plugin
             WriteJson(IpcContract.TabletDbFile, tablets);
             WriteJson(IpcContract.CharmDbFile, charms);
             WriteJson(IpcContract.ComboDbFile, combos);
+            WriteText(IpcContract.CatalogVersionFile, IpcContract.CatalogVersion.ToString());
             yield return null;
 
             var icons = 0;
@@ -47,8 +48,20 @@ namespace SephPlanner.Plugin
                    $"아이콘 {icons}개 저장. 질의 검증 {verification.Comparisons}건 중 불일치 {verification.Mismatches}건.");
         }
 
-        public static bool HasCatalog() =>
-            File.Exists(Path.Combine(IpcContract.DataDirectory, IpcContract.TabletDbFile));
+        /// <summary>
+        /// 다시 덤프할 필요가 없는지. 파일이 있는지만 보면 덤프에 항목이 늘어났을 때 예전 덤프를
+        /// 가진 사람은 새 항목이 영영 빈 채로 남는다.
+        /// </summary>
+        public static bool HasCatalog()
+        {
+            if (!File.Exists(Path.Combine(IpcContract.DataDirectory, IpcContract.TabletDbFile))) return false;
+
+            var stamp = Path.Combine(IpcContract.DataDirectory, IpcContract.CatalogVersionFile);
+            if (!File.Exists(stamp)) return false;
+
+            return int.TryParse(File.ReadAllText(stamp).Trim(), out var version)
+                   && version >= IpcContract.CatalogVersion;
+        }
 
         private static void WriteJson(string fileName, object value) =>
             WriteText(fileName, JsonConvert.SerializeObject(value, Formatting.Indented));
