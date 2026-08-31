@@ -885,6 +885,17 @@ F9 덤프, F10 인벤토리 덤프). 오버레이의 전역 단축키는 조합�
 게임이 쓰는 키면 그 사실을 로그에 남긴다(`WarnIfGameKey`) - 손으로 겹치는 키를 넣었을 때
 왜 이상한지 알 수 있어야 한다.
 
+### 마우스는 새 InputSystem 으로만 읽힌다
+
+키보드는 구식 `Input` 으로 읽힌다 - BepInEx 단축키가 그 길이고 F9/F10 이 잘 먹는다. **그런데
+마우스는 죽어 있다.** 게임이 `<Mouse>/position`·`leftButton`·`scroll` 을 새 InputSystem 으로
+바인딩하고 있어서, `Input.mousePosition` 은 커서가 한자리에 멈춰 있는 것처럼 돌려준다.
+이동 모드가 "자리를 저장했다"고만 하고 화면이 따라오지 않던 원인이 이것이었다.
+
+`UnityEngine.InputSystem.Mouse.current.position.ReadValue()` 를 쓰고 구식은 폴백으로 남긴다.
+이동 중에는 커서 좌표를 화면에 그대로 띄워, 같은 증상이 다시 나면 커서를 못 읽는 것인지
+자리가 안 먹는 것인지 로그 없이 갈린다.
+
 ### 설정 패널에 탭을 붙일 수 있다
 
 게임 설정 창에 우리 탭을 넣는 길이 열려 있다. `UI_OptionsPanel`(UIBase)이 `UI_Tab` 하나를 들고
