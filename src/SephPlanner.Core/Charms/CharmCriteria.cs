@@ -39,7 +39,9 @@ namespace SephPlanner.Core.Charms
             if (string.IsNullOrEmpty(typeName)) return CharmCriteriaKind.None;
 
             const string prefix = "CharmActivateCriteria_";
-            var name = typeName.StartsWith(prefix) ? typeName.Substring(prefix.Length) : typeName;
+            var name = typeName.StartsWith(prefix, System.StringComparison.Ordinal)
+                ? typeName.Substring(prefix.Length)
+                : typeName;
 
             foreach (CharmCriteriaKind kind in System.Enum.GetValues(typeof(CharmCriteriaKind)))
                 if (kind.ToString() == name) return kind;
@@ -78,14 +80,14 @@ namespace SephPlanner.Core.Charms
                     return occupancy.HasCharm(pos.Offset(-1, 0)) && occupancy.HasCharm(pos.Offset(1, 0));
 
                 case CharmCriteriaKind.BothSidesAreEmpty:
-                {
-                    if (pos.X <= 0 || pos.X >= grid.Width - 1) return false;
-                    var remainder = grid.Storage % grid.Width;
-                    var withinStorage = remainder == 0 || pos.Y < grid.Height - 1 || pos.X < remainder - 1;
-                    return withinStorage
-                           && !occupancy.HasItem(pos.Offset(-1, 0))
-                           && !occupancy.HasItem(pos.Offset(1, 0));
-                }
+                    {
+                        if (pos.X <= 0 || pos.X >= grid.Width - 1) return false;
+                        var remainder = grid.Storage % grid.Width;
+                        var withinStorage = remainder == 0 || pos.Y < grid.Height - 1 || pos.X < remainder - 1;
+                        return withinStorage
+                               && !occupancy.HasItem(pos.Offset(-1, 0))
+                               && !occupancy.HasItem(pos.Offset(1, 0));
+                    }
 
                 case CharmCriteriaKind.NeighborsAreFull:
                     foreach (var (dx, dy) in Neighbors)

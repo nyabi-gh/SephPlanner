@@ -125,12 +125,14 @@ public class MoveOrderTests
     }
 
     [Fact]
-    public void NothingIsLostWhenThereIsNowhereToPark()
+    public void ImpossibleManualInstructionsAreNotShownWhenThereIsNowhereToPark()
     {
-        // 격자가 꽉 차 대피할 칸이 없어도 옮길 것을 조용히 빠뜨리지는 않는다.
         var plan = PlanBuilder.Build(Swap(storage: 3), Catalog());
 
         Assert.NotNull(plan);
-        Assert.Equal(2, plan!.Moves.Count);
+        Assert.False(plan!.ManualMoveInstructionsAvailable);
+        Assert.True(plan.HasPlacementChanges);
+        Assert.Empty(plan.Moves);
+        Assert.NotEmpty(plan.Targets);
     }
 }

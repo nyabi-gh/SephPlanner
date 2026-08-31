@@ -24,8 +24,10 @@ namespace SephPlanner.Core.Planning
     /// </summary>
     internal static class MoveOrder
     {
-        public static List<Move> Sequence(GridSpec grid, List<Relocation> pending, IEnumerable<GridPos> stationary)
+        public static List<Move> Sequence(
+            GridSpec grid, List<Relocation> pending, IEnumerable<GridPos> stationary, out bool complete)
         {
+            complete = true;
             var moves = new List<Move>();
             if (pending.Count == 0) return moves;
 
@@ -62,7 +64,12 @@ namespace SephPlanner.Core.Planning
 
                 // 남은 것들이 서로의 자리를 물고 있다. 하나를 빈 칸으로 빼서 고리를 끊는다.
                 var shelter = Shelter(grid, occupied);
-                if (shelter is null) break;
+                if (shelter is null)
+                {
+                    complete = false;
+                    moves.Clear();
+                    return moves;
+                }
 
                 var victim = remaining[0];
                 moves.Add(Describe(victim, shelter.Value, parked: true));
@@ -70,9 +77,6 @@ namespace SephPlanner.Core.Planning
                 occupied.Add(shelter.Value);
                 victim.From = shelter.Value;
             }
-
-            // 대피할 칸조차 없으면 남은 것은 그대로 알린다. 조용히 빠뜨리는 것보다 낫다.
-            foreach (var item in remaining) moves.Add(Describe(item, item.To, parked: false));
 
             return moves;
         }

@@ -177,19 +177,31 @@ namespace SephPlanner.Core.Planning
                 FillPreviews(offers, best);
             }
 
+            var levelMismatches = CountLevelMismatches(inventory, current);
+            var moves = Moves(problem, current, best, out var manualMovesAvailable);
+            var targets = Targets(problem, best);
+            var hasPlacementChanges = targets.Any(target =>
+                target.From != target.To || target.IsTablet && target.FromRotation != target.Rotation);
+
+            if (best.UnplacedTablets > 0 || levelMismatches > 0) targets.Clear();
+
             return new Plan
             {
-                LevelMismatches = CountLevelMismatches(inventory, current),
+                LevelMismatches = levelMismatches,
                 Current = current,
                 Best = best,
-                Moves = Moves(problem, current, best),
+                Moves = moves,
+                ManualMoveInstructionsAvailable = manualMovesAvailable,
+                HasPlacementChanges = hasPlacementChanges,
+                InventoryWidth = inventory.Width,
+                InventoryHeight = inventory.Height,
+                InventoryStorage = inventory.Storage,
                 Offers = offers,
                 Mixes = mixes,
                 SkippedOffers = skippedOffers,
                 Names = NamesByCell(problem, best),
                 Charms = CharmsByCell(problem, best),
-                // 석판이 빠진 배치를 게임에 적용하면 빠진 석판이 있던 자리가 임의로 뒤섞인다.
-                Targets = best.UnplacedTablets > 0 ? new List<PlanTarget>() : Targets(problem, best),
+                Targets = targets,
             };
         }
 
@@ -241,8 +253,10 @@ namespace SephPlanner.Core.Planning
                 targets.Add(new PlanTarget
                 {
                     InstanceId = problem.Tablets[i].InstanceId,
+                    From = problem.CurrentTablets[problem.Tablets[i].InstanceId].Position,
                     To = best.Tablets[i].Position,
                     IsTablet = true,
+                    FromRotation = problem.CurrentTablets[problem.Tablets[i].InstanceId].Rotation,
                     Rotation = best.Tablets[i].Rotation,
                 });
             }
@@ -250,7 +264,12 @@ namespace SephPlanner.Core.Planning
             foreach (var charm in problem.Charms)
             {
                 if (!best.CharmPositions.TryGetValue(charm.InstanceId, out var position)) continue;
-                targets.Add(new PlanTarget { InstanceId = charm.InstanceId, To = position });
+                targets.Add(new PlanTarget
+                {
+                    InstanceId = charm.InstanceId,
+                    From = problem.CurrentCharms[charm.InstanceId],
+                    To = position,
+                });
             }
             return targets;
         }
@@ -352,7 +371,8 @@ namespace SephPlanner.Core.Planning
         /// 무엇을 어디로 옮길지, 그리고 그것을 실제로 따라 할 수 있는 순서로 세운다.
         /// 순서를 정하는 일은 <see cref="MoveOrder"/>가 맡는다.
         /// </summary>
-        private static List<Move> Moves(PlacementProblem problem, Arrangement current, Arrangement best)
+        private static List<Move> Moves(
+            PlacementProblem problem, Arrangement current, Arrangement best, out bool complete)
         {
             var pending = new List<Relocation>();
             var stationary = new List<GridPos>();
@@ -398,7 +418,7 @@ namespace SephPlanner.Core.Planning
                 });
             }
 
-            return MoveOrder.Sequence(problem.Grid, pending, stationary);
+            return MoveOrder.Sequence(problem.Grid, pending, stationary, out complete);
         }
     }
 }

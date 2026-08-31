@@ -33,6 +33,7 @@ namespace SephPlanner.Plugin.Ui
         public bool Expanded;
         public bool Recommendations = true;
         public bool MultiplayerAutoPlace;
+        public bool QueryVerified;
         public string Hint = "";
 
         /// <summary>안내 줄이 지금 미리보기를 설명하고 있는가. 그때는 색이 달라야 눈에 든다.</summary>
@@ -137,8 +138,10 @@ namespace SephPlanner.Plugin.Ui
             Blocker = "";
 
             _skin = NativeSkin.Borrow(root);
-            _base = _skin.BaseSize * Mathf.Max(0.2f, scale);
-            Build(root, corner, margin, widthScale);
+            _base = _skin.BaseSize * Mathf.Clamp(scale, 0.8f, 1.5f);
+            Build(
+                root, corner, new Vector2(Mathf.Max(0f, margin.x), Mathf.Max(0f, margin.y)),
+                Mathf.Clamp(widthScale, 18f, 36f));
             Origin = _skin.Origin;
             return true;
         }
@@ -237,7 +240,7 @@ namespace SephPlanner.Plugin.Ui
 
         public void DragTo(Vector2 screenPoint)
         {
-            if (IsAlive) _rect.anchoredPosition = Anchored(screenPoint) - _grab;
+            if (IsAlive) _rect.anchoredPosition = ClampToCanvas(Anchored(screenPoint) - _grab);
         }
 
         /// <summary>지금 자리를 설정에 적어 둘 값으로. 모서리에서 안쪽으로 얼마인지를 기준 크기 단위로 센다.</summary>
@@ -257,6 +260,22 @@ namespace SephPlanner.Plugin.Ui
                 _rect.anchorMin.x > 0.5f ? _canvasRect.rect.xMax : _canvasRect.rect.xMin,
                 _rect.anchorMin.y > 0.5f ? _canvasRect.rect.yMax : _canvasRect.rect.yMin);
             return local - anchor;
+        }
+
+        private Vector2 ClampToCanvas(Vector2 position)
+        {
+            var inset = S(0.25f);
+            var canvas = _canvasRect.rect.size;
+            var panel = _rect.rect.size;
+
+            var minX = _rect.anchorMin.x > 0.5f ? -canvas.x + panel.x + inset : inset;
+            var maxX = _rect.anchorMin.x > 0.5f ? -inset : canvas.x - panel.x - inset;
+            var minY = _rect.anchorMin.y > 0.5f ? -canvas.y + panel.y + inset : inset;
+            var maxY = _rect.anchorMin.y > 0.5f ? -inset : canvas.y - panel.y - inset;
+
+            position.x = minX <= maxX ? Mathf.Clamp(position.x, minX, maxX) : 0f;
+            position.y = minY <= maxY ? Mathf.Clamp(position.y, minY, maxY) : 0f;
+            return position;
         }
 
         private void BuildHeader(RectTransform parent)
@@ -357,17 +376,19 @@ namespace SephPlanner.Plugin.Ui
 
             var improved = plan.Gain > 0.001;
             _score.text = $"{plan.Current.Score:0.#} / {plan.Best.Score:0.#}";
-            _gain.text = improved ? $"+{plan.Gain:0.#}" : "최적";
+            _gain.text = improved ? $"+{plan.Gain:0.#}" : "변경 없음";
             _gain.color = improved ? NativeSkin.Good : NativeSkin.TextDim;
 
-            var warning = Warning(snapshot, plan, frame.MultiplayerAutoPlace);
+            var warning = Warning(snapshot, plan, frame.MultiplayerAutoPlace, frame.QueryVerified);
             _notice.text = warning;
             Widgets.SetActive(_notice, warning.Length > 0);
 
             // 접었을 때는 지금 옮길 것 하나만. 펼치면 아래 목록이 그 일을 하므로 겹치지 않게 접는다.
             var next = plan.Moves.Count > 0 ? plan.Moves[0] : null;
-            _nextMove.text = next == null ? "" : $"{next.Label}  {next.Detail}";
-            Widgets.SetActive(_nextMove, !expanded && next != null);
+            _nextMove.text = !plan.ManualMoveInstructionsAvailable
+                ? "빈 칸이 없어 수동 이동 순서를 만들 수 없습니다."
+                : next == null ? "" : $"{next.Label}  {next.Detail}";
+            Widgets.SetActive(_nextMove, !expanded && (next != null || !plan.ManualMoveInstructionsAvailable));
 
             Widgets.SetActive(_detail, expanded);
             SetCompact(!expanded);
@@ -444,21 +465,32 @@ namespace SephPlanner.Plugin.Ui
         /// 지금 화면에서 알려야 할 것. 오버레이와 같은 순서다 - 점수를 믿을 수 없는 상황이
         /// 멀티 안내보다 먼저다.
         /// </summary>
-        private static string Warning(GameSnapshot snapshot, Plan plan, bool multiplayerAutoPlace)
+        private static string Warning(
+            GameSnapshot snapshot, Plan plan, bool multiplayerAutoPlace, bool queryVerified)
         {
+            var warnings = new List<string>();
+            if (!queryVerified)
+                warnings.Add("석판 질의 검증이 끝나지 않았거나 실패해 자동 배치를 껐습니다. F9로 다시 만드세요.");
+
             if (plan.Best.UnplacedTablets > 0)
-                return $"석판 {plan.Best.UnplacedTablets}개는 놓을 자리가 없어 계산에서 빠졌습니다.";
+                warnings.Add($"석판 {plan.Best.UnplacedTablets}개는 놓을 자리가 없어 계산에서 빠졌습니다.");
 
             if (plan.LevelMismatches > 0)
-                return $"칸 {plan.LevelMismatches}개의 레벨이 게임과 다릅니다. 점수가 실제와 다를 수 있습니다.";
+                warnings.Add($"칸 {plan.LevelMismatches}개의 레벨이 게임과 달라 자동 배치를 껐습니다.");
+
+            if (!plan.ManualMoveInstructionsAvailable)
+                warnings.Add("빈 칸이 없어 수동 이동 순서를 만들 수 없습니다. 자동 배치를 이용하세요.");
 
             if (plan.SkippedOffers > 0)
-                return $"선택지가 많아 {plan.SkippedOffers}개는 평가하지 못했습니다.";
+                warnings.Add($"선택지가 많아 {plan.SkippedOffers}개는 평가하지 못했습니다.");
 
-            if (!snapshot.IsMultiplayer) return "";
-            return multiplayerAutoPlace
-                ? "멀티플레이 세션 - 자동 배치 허용됨 (실험, 호스트만)."
-                : "멀티플레이 세션 - 제안만 표시합니다.";
+            if (snapshot.IsMultiplayer)
+            {
+                warnings.Add(multiplayerAutoPlace
+                    ? "멀티플레이 세션 - 자동 배치 허용됨 (실험, 호스트만)."
+                    : "멀티플레이 세션 - 제안만 표시합니다.");
+            }
+            return string.Join("\n", warnings);
         }
 
         /// <summary>
@@ -557,6 +589,12 @@ namespace SephPlanner.Plugin.Ui
         private void RenderMoves(Plan plan)
         {
             _moves.Begin();
+            if (!plan.ManualMoveInstructionsAvailable)
+            {
+                _moves.Add("수동 이동 불가", "빈 칸이 없어 순서를 만들 수 없습니다.", NativeSkin.Amber);
+                _moves.End();
+                return;
+            }
             for (var i = 0; i < plan.Moves.Count && i < MoveRows; i++)
             {
                 var move = plan.Moves[i];
@@ -722,26 +760,22 @@ namespace SephPlanner.Plugin.Ui
         }
 
         /// <summary>
-        /// 접었을 때는 폭도 내용에 맞춰 줄인다. 접는 이유가 게임 화면을 가리지 않는 것인데,
-        /// 펼쳤을 때의 폭을 그대로 쥐고 있으면 한 줄짜리 내용이 넓은 띠로 남는다.
+        /// 접었을 때는 폭을 제한한다. 긴 안내나 경고가 있어도 펼친 폭으로 커지지 않아야 한다.
         /// </summary>
         private void SetCompact(bool compact)
         {
             if (_fitter == null || _compact == compact) return;
 
             _compact = compact;
-            _fitter.horizontalFit = compact
-                ? ContentSizeFitter.FitMode.PreferredSize
-                : ContentSizeFitter.FitMode.Unconstrained;
-
-            // Unconstrained 로 돌아오면 폭을 정해 주는 쪽이 없다. 지을 때 쓴 값을 다시 건다.
-            if (!compact) _rect.sizeDelta = new Vector2(_width, _rect.sizeDelta.y);
+            _fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            _rect.sizeDelta = new Vector2(compact ? Mathf.Min(_width, S(18f)) : _width, _rect.sizeDelta.y);
         }
 
         public void SetVisible(bool visible)
         {
             if (!IsAlive) return;
             if (_root.activeSelf != visible) _root.SetActive(visible);
+            if (visible) _rect.anchoredPosition = ClampToCanvas(_rect.anchoredPosition);
 
             // 쪽지는 HUD 밖(캔버스 바로 밑)에 달려 있어서 함께 꺼지지 않는다. 숨긴 화면 옆에
             // 쪽지만 남으면 어디서 나온 것인지 알 수 없다.

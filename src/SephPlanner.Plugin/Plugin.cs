@@ -14,7 +14,7 @@ namespace SephPlanner.Plugin
     /// 세피리아 상태를 읽어 SephPlanner 오버레이로 내보내고, 싱글플레이에서는 오버레이가 요청한
     /// 자동 배치를 게임 자체의 이동 경로로 적용하는 브리지. 멀티 세션에서는 읽기만 한다.
     /// </summary>
-    [BepInPlugin(PluginGuid, "SephPlanner Bridge", "0.1.0")]
+    [BepInPlugin(PluginGuid, "SephPlanner Bridge", "0.2.0")]
     public sealed class SephPlannerPlugin : BaseUnityPlugin
     {
         public const string PluginGuid = "dev.nyabi.sephplanner.bridge";
@@ -58,6 +58,8 @@ namespace SephPlanner.Plugin
         private bool _resubmit;
         private string _autoPlaceResult = "";
         private float _autoPlaceShownUntil;
+        private string _autoPlaceConfirmation = "";
+        private float _autoPlaceConfirmUntil;
 
         private void Awake()
         {
@@ -434,6 +436,7 @@ namespace SephPlanner.Plugin
                 Expanded = _expanded,
                 Recommendations = _settings.Recommendations.Value,
                 MultiplayerAutoPlace = _settings.MultiplayerAutoPlace.Value,
+                QueryVerified = CatalogDump.QueryVerificationPassed(),
                 Hint = Hint(plan, preview),
                 HintIsPreview = preview != null,
                 PreviewKey = _previewKey,
@@ -602,8 +605,12 @@ namespace SephPlanner.Plugin
             var plan = _runner != null ? _runner.Latest : null;
             var text = Describe(_settings.ExpandKey) + (_expanded ? " 접기" : " 펼치기");
 
-            if (_lastSnapshot == null || !_lastSnapshot.IsMultiplayer || _settings.MultiplayerAutoPlace.Value)
-                text += "   " + Describe(_settings.AutoPlaceKey) + " 자동 배치";
+            var canAutoPlace = plan != null && plan.HasPlacementChanges && plan.Targets.Count > 0 &&
+                               CatalogDump.QueryVerificationPassed() &&
+                               (_lastSnapshot == null || !_lastSnapshot.IsMultiplayer ||
+                                _settings.MultiplayerAutoPlace.Value);
+            if (canAutoPlace)
+                text += "   " + Describe(_settings.AutoPlaceKey) + " 자동 배치(두 번)";
 
             if (plan != null && plan.Offers.Count > 0)
                 text += "   " + Describe(_settings.PreviewKey) + " 후보 미리보기";
@@ -643,16 +650,38 @@ namespace SephPlanner.Plugin
         private void AutoPlace()
         {
             var plan = _runner?.Latest;
-            if (plan == null || plan.Targets.Count == 0 || plan.Moves.Count == 0)
+            if (!CatalogDump.QueryVerificationPassed())
+            {
+                Report("석판 질의 검증이 끝나지 않아 자동 배치를 사용할 수 없습니다. F9로 데이터를 다시 만드세요.");
+                return;
+            }
+            if (plan?.LevelMismatches > 0)
+            {
+                Report("게임과 계산 레벨이 달라 자동 배치를 사용할 수 없습니다.");
+                return;
+            }
+            if (plan == null || plan.Targets.Count == 0 || !plan.HasPlacementChanges)
             {
                 Report("옮길 것이 없습니다.");
                 return;
             }
 
+            var signature = string.Join("|", plan.Targets.ConvertAll(target =>
+                $"{target.InstanceId}:{target.From}>{target.To}:{target.FromRotation}>{target.Rotation}"));
+            if (Time.unscaledTime > _autoPlaceConfirmUntil || _autoPlaceConfirmation != signature)
+            {
+                _autoPlaceConfirmation = signature;
+                _autoPlaceConfirmUntil = Time.unscaledTime + 3f;
+                Report($"배치를 적용하려면 3초 안에 {Describe(_settings.AutoPlaceKey)} 을(를) 한 번 더 누르세요.");
+                return;
+            }
+            _autoPlaceConfirmation = "";
+            _autoPlaceConfirmUntil = 0f;
+
             try
             {
                 var result = PlanApplier.Apply(
-                    new ApplyPlanCommand { Targets = plan.Targets }, _settings.MultiplayerAutoPlace.Value);
+                    plan.CreateApplyCommand(), _settings.MultiplayerAutoPlace.Value);
                 Logger.LogInfo(result);
                 Report(result);
             }

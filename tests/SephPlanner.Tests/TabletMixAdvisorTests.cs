@@ -170,11 +170,19 @@ public class TabletMixAdvisorTests
 
         inventory.Tablets.Add(new PlacedTablet
         {
-            DefinitionId = 300, InstanceId = 1, Position = new GridPos(0, 0), IsApplied = true, IsRotatable = true,
+            DefinitionId = 300,
+            InstanceId = 1,
+            Position = new GridPos(0, 0),
+            IsApplied = true,
+            IsRotatable = true,
         });
         inventory.Tablets.Add(new PlacedTablet
         {
-            DefinitionId = 301, InstanceId = 2, Position = new GridPos(3, 0), IsApplied = true, IsRotatable = true,
+            DefinitionId = 301,
+            InstanceId = 2,
+            Position = new GridPos(3, 0),
+            IsApplied = true,
+            IsRotatable = true,
         });
 
         inventory.Items.Add(new PlacedItem { DefinitionId = 200, InstanceId = 10, Position = new GridPos(1, 0) });

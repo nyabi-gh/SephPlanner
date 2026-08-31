@@ -11,6 +11,9 @@ namespace SephPlanner.Core.Ipc
     public sealed class ApplyPlanCommand
     {
         public int ProtocolVersion { get; set; } = IpcContract.ProtocolVersion;
+        public int ExpectedWidth { get; set; }
+        public int ExpectedHeight { get; set; }
+        public int ExpectedStorage { get; set; }
         public List<PlanTarget> Targets { get; set; } = new List<PlanTarget>();
     }
 
@@ -18,8 +21,12 @@ namespace SephPlanner.Core.Ipc
     public sealed class PlanTarget
     {
         public int InstanceId { get; set; }
+        public GridPos From { get; set; }
         public GridPos To { get; set; }
         public bool IsTablet { get; set; }
+
+        /// <summary>석판만 의미가 있다.</summary>
+        public int FromRotation { get; set; }
 
         /// <summary>석판만 의미가 있다.</summary>
         public int Rotation { get; set; }

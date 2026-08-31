@@ -75,6 +75,12 @@ public class PlanBuilderTests
         Assert.Equal(3, plan!.Current.Score, 3);
         Assert.Equal(0, plan.LevelMismatches);
         Assert.Equal("C", plan.Names[plan.Best.CharmPositions[10]]);
+        Assert.All(plan.Targets, target => Assert.Equal(target.From, target.To));
+
+        var command = plan.CreateApplyCommand();
+        Assert.Equal(6, command.ExpectedWidth);
+        Assert.Equal(7, command.ExpectedHeight);
+        Assert.Equal(6, command.ExpectedStorage);
     }
 
     [Fact]
@@ -94,6 +100,7 @@ public class PlanBuilderTests
         var plan = PlanBuilder.Build(Snapshot(enchant: 0, reportedLevel: 4), Catalog());
 
         Assert.Equal(1, plan!.LevelMismatches);
+        Assert.Empty(plan.Targets);
     }
 
     [Fact]

@@ -16,6 +16,7 @@ namespace SephPlanner.Plugin
     /// </summary>
     internal sealed class PluginSettings
     {
+        private const float DefaultPanelMargin = 1.5f;
         public ConfigEntry<float> PollInterval { get; }
         public ConfigEntry<KeyboardShortcut> DumpKey { get; }
         public ConfigEntry<KeyboardShortcut> InventoryDumpKey { get; }
@@ -75,10 +76,10 @@ namespace SephPlanner.Plugin
                 "NativePanel", "Corner", PanelCorner.TopRight,
                 "화면을 붙일 모서리. 게임 HUD 와 겹치면 옮긴다.");
             MarginX = config.Bind(
-                "NativePanel", "MarginX", 1.5f,
+                "NativePanel", "MarginX", DefaultPanelMargin,
                 "모서리에서 가로로 띄울 거리. 게임 HUD 글자 크기의 배수라 해상도가 달라도 같게 보인다.");
             MarginY = config.Bind(
-                "NativePanel", "MarginY", 1.5f,
+                "NativePanel", "MarginY", DefaultPanelMargin,
                 "모서리에서 세로로 띄울 거리. 이동 모드로 옮기면 여기에 저장된다.");
             Width = config.Bind(
                 "NativePanel", "WidthScale", 26f,
@@ -179,7 +180,7 @@ namespace SephPlanner.Plugin
                     Label = "모서리",
                     Choices = new[] { "왼쪽 위", "오른쪽 위", "왼쪽 아래", "오른쪽 아래" },
                     Read = () => (int)Corner.Value,
-                    Write = i => Corner.Value = (PanelCorner)i,
+                    Write = i => ChangeCorner((PanelCorner)i),
                 },
                 Steps("크기", Scale, ScaleSteps, new[] { "80%", "90%", "100%", "115%", "130%", "150%" }),
                 Steps("폭", Width, WidthSteps,
@@ -198,6 +199,15 @@ namespace SephPlanner.Plugin
             };
         }
 
+        private void ChangeCorner(PanelCorner corner)
+        {
+            if (Corner.Value == corner) return;
+
+            Corner.Value = corner;
+            MarginX.Value = DefaultPanelMargin;
+            MarginY.Value = DefaultPanelMargin;
+        }
+
         private static OptionRow Switch(string label, ConfigEntry<bool> entry) => new OptionRow
         {
             Label = label,
@@ -208,12 +218,12 @@ namespace SephPlanner.Plugin
 
         private static OptionRow Steps(
             string label, ConfigEntry<float> entry, float[] steps, string[] names) => new OptionRow
-        {
-            Label = label,
-            Choices = names,
-            Read = () => Nearest(steps, entry.Value),
-            Write = i => entry.Value = steps[i],
-        };
+            {
+                Label = label,
+                Choices = names,
+                Read = () => Nearest(steps, entry.Value),
+                Write = i => entry.Value = steps[i],
+            };
 
         private OptionRow Key(
             string label, ConfigEntry<KeyboardShortcut> entry, List<KeyCode> keys, string[] names,

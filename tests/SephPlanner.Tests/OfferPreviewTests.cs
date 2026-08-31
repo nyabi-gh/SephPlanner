@@ -85,7 +85,11 @@ public class OfferPreviewTests
 
         inventory.Tablets.Add(new PlacedTablet
         {
-            DefinitionId = Tablet, InstanceId = 1, Position = new GridPos(2, 0), IsApplied = true, IsRotatable = true,
+            DefinitionId = Tablet,
+            InstanceId = 1,
+            Position = new GridPos(2, 0),
+            IsApplied = true,
+            IsRotatable = true,
         });
         // Storage 12 는 6칸짜리 두 줄만 열려 있다는 뜻이다. 그 밖의 칸에 두면 아예 읽히지 않는다.
         inventory.Items.Add(new PlacedItem { DefinitionId = Held, InstanceId = 10, Position = new GridPos(0, 1) });

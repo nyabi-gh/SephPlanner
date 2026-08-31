@@ -62,6 +62,11 @@ namespace SephPlanner.Core.Planning
         public Arrangement Current { get; set; } = new Arrangement();
         public Arrangement Best { get; set; } = new Arrangement();
         public List<Move> Moves { get; set; } = new List<Move>();
+        public bool ManualMoveInstructionsAvailable { get; set; } = true;
+        public bool HasPlacementChanges { get; set; }
+        public int InventoryWidth { get; set; }
+        public int InventoryHeight { get; set; }
+        public int InventoryStorage { get; set; }
         public List<OfferAdvice> Offers { get; set; } = new List<OfferAdvice>();
 
         /// <summary>
@@ -91,5 +96,13 @@ namespace SephPlanner.Core.Planning
         public List<PlanTarget> Targets { get; set; } = new List<PlanTarget>();
 
         public double Gain => Best.Score - Current.Score;
+
+        public ApplyPlanCommand CreateApplyCommand() => new ApplyPlanCommand
+        {
+            ExpectedWidth = InventoryWidth,
+            ExpectedHeight = InventoryHeight,
+            ExpectedStorage = InventoryStorage,
+            Targets = new List<PlanTarget>(Targets),
+        };
     }
 }

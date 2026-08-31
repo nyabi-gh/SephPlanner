@@ -4,6 +4,7 @@ using System.IO;
 using Newtonsoft.Json;
 using SephPlanner.Core.Ipc;
 using SephPlanner.Core.Solver;
+using UnityEngine;
 
 namespace SephPlanner.Plugin
 {
@@ -16,8 +17,18 @@ namespace SephPlanner.Plugin
     /// </summary>
     internal static class CatalogDump
     {
+        private sealed class VerificationStatus
+        {
+            public string GameVersion = "";
+            public int Comparisons;
+            public int Mismatches;
+        }
+
+        private static bool? _queryVerified;
+
         public static IEnumerator WriteRoutine(Action<string> report)
         {
+            _queryVerified = null;
             Directory.CreateDirectory(IpcContract.DataDirectory);
 
             var tablets = ItemCatalog.LoadTablets();
@@ -38,7 +49,6 @@ namespace SephPlanner.Plugin
             WriteJson(IpcContract.CharmDbFile, charms);
             WriteJson(IpcContract.ComboDbFile, combos);
             WriteJson(IpcContract.StatMeasurementFile, measurement);
-            WriteText(IpcContract.CatalogVersionFile, IpcContract.CatalogVersion.ToString());
             yield return null;
 
             var icons = 0;
@@ -52,6 +62,14 @@ namespace SephPlanner.Plugin
             foreach (var _ in QueryVerifier.RunBatched(tablets, verification))
                 yield return null;
             WriteText(IpcContract.VerificationReportFile, QueryVerifier.Format(verification));
+            WriteJson(IpcContract.VerificationStatusFile, new VerificationStatus
+            {
+                GameVersion = Application.version,
+                Comparisons = verification.Comparisons,
+                Mismatches = verification.Mismatches,
+            });
+            WriteText(IpcContract.CatalogVersionFile, IpcContract.CatalogVersion.ToString());
+            _queryVerified = verification.Passed;
 
             report($"석판 {tablets.Count}종, 아티팩트 {charms.Count}종, 콤보 {combos.Count}종, " +
                    $"아이콘 {icons}개 저장. 아티팩트 가치 {worth.ByEntity.Count}종 측정. " +
@@ -64,13 +82,55 @@ namespace SephPlanner.Plugin
         /// </summary>
         public static bool HasCatalog()
         {
-            if (!File.Exists(Path.Combine(IpcContract.DataDirectory, IpcContract.TabletDbFile))) return false;
+            var required = new[]
+            {
+                IpcContract.TabletDbFile,
+                IpcContract.CharmDbFile,
+                IpcContract.ComboDbFile,
+                IpcContract.StatMeasurementFile,
+                IpcContract.VerificationReportFile,
+                IpcContract.VerificationStatusFile,
+            };
+            foreach (var file in required)
+            {
+                var path = Path.Combine(IpcContract.DataDirectory, file);
+                if (!File.Exists(path) || new FileInfo(path).Length == 0) return false;
+            }
+
+            var verification = ReadVerificationStatus();
+            if (verification == null || verification.GameVersion != Application.version ||
+                verification.Comparisons <= 0)
+                return false;
 
             var stamp = Path.Combine(IpcContract.DataDirectory, IpcContract.CatalogVersionFile);
             if (!File.Exists(stamp)) return false;
 
             return int.TryParse(File.ReadAllText(stamp).Trim(), out var version)
-                   && version >= IpcContract.CatalogVersion;
+                   && version == IpcContract.CatalogVersion;
+        }
+
+        public static bool QueryVerificationPassed()
+        {
+            if (_queryVerified.HasValue) return _queryVerified.Value;
+
+            var status = ReadVerificationStatus();
+            _queryVerified = status != null && status.GameVersion == Application.version &&
+                             status.Comparisons > 0 && status.Mismatches == 0;
+            return _queryVerified.Value;
+        }
+
+        private static VerificationStatus ReadVerificationStatus()
+        {
+            var path = Path.Combine(IpcContract.DataDirectory, IpcContract.VerificationStatusFile);
+            if (!File.Exists(path)) return null;
+            try
+            {
+                return JsonConvert.DeserializeObject<VerificationStatus>(File.ReadAllText(path));
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private static void WriteJson(string fileName, object value) =>

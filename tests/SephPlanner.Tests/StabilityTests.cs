@@ -74,23 +74,38 @@ public class StabilityTests
         var inventory = new InventoryState { Width = 6, Height = 7, Storage = 12 };
         inventory.Tablets.Add(new PlacedTablet
         {
-            DefinitionId = 100, InstanceId = 1, Position = new GridPos(0, 0), IsApplied = true,
+            DefinitionId = 100,
+            InstanceId = 1,
+            Position = new GridPos(0, 0),
+            IsApplied = true,
         });
         inventory.Tablets.Add(new PlacedTablet
         {
-            DefinitionId = 101, InstanceId = 2, Position = new GridPos(3, 0), IsApplied = true,
+            DefinitionId = 101,
+            InstanceId = 2,
+            Position = new GridPos(3, 0),
+            IsApplied = true,
         });
         inventory.Items.Add(new PlacedItem
         {
-            DefinitionId = 200, InstanceId = 10, Position = new GridPos(1, 0), IsActive = true,
+            DefinitionId = 200,
+            InstanceId = 10,
+            Position = new GridPos(1, 0),
+            IsActive = true,
         });
         inventory.Items.Add(new PlacedItem
         {
-            DefinitionId = 201, InstanceId = 11, Position = new GridPos(2, 0), IsActive = true,
+            DefinitionId = 201,
+            InstanceId = 11,
+            Position = new GridPos(2, 0),
+            IsActive = true,
         });
         inventory.Items.Add(new PlacedItem
         {
-            DefinitionId = 202, InstanceId = 12, Position = new GridPos(4, 0), IsActive = true,
+            DefinitionId = 202,
+            InstanceId = 12,
+            Position = new GridPos(4, 0),
+            IsActive = true,
         });
 
         var snapshot = new GameSnapshot
@@ -177,19 +192,31 @@ public class StabilityTests
         var inventory = new InventoryState { Width = 6, Height = 7, Storage = 6 };
         inventory.Tablets.Add(new PlacedTablet
         {
-            DefinitionId = 100, InstanceId = 1, Position = new GridPos(5, 0), IsApplied = true,
+            DefinitionId = 100,
+            InstanceId = 1,
+            Position = new GridPos(5, 0),
+            IsApplied = true,
         });
         inventory.Items.Add(new PlacedItem
         {
-            DefinitionId = 200, InstanceId = 10, Position = new GridPos(1, 0), IsActive = true,
+            DefinitionId = 200,
+            InstanceId = 10,
+            Position = new GridPos(1, 0),
+            IsActive = true,
         });
         inventory.Items.Add(new PlacedItem
         {
-            DefinitionId = 201, InstanceId = 11, Position = new GridPos(3, 0), IsActive = true,
+            DefinitionId = 201,
+            InstanceId = 11,
+            Position = new GridPos(3, 0),
+            IsActive = true,
         });
         inventory.Items.Add(new PlacedItem
         {
-            DefinitionId = 202, InstanceId = 12, Position = new GridPos(0, 0), IsActive = true,
+            DefinitionId = 202,
+            InstanceId = 12,
+            Position = new GridPos(0, 0),
+            IsActive = true,
         });
 
         var plan = PlanBuilder.Build(
@@ -239,18 +266,26 @@ public class StabilityTests
         var inventory = new InventoryState { Width = 6, Height = 7, Storage = 12 };
         inventory.Tablets.Add(new PlacedTablet
         {
-            DefinitionId = 100, InstanceId = 1, Position = new GridPos(5, 1), IsApplied = true,
+            DefinitionId = 100,
+            InstanceId = 1,
+            Position = new GridPos(5, 1),
+            IsApplied = true,
         });
         inventory.Tablets.Add(new PlacedTablet
         {
-            DefinitionId = 101, InstanceId = 2, Position = new GridPos(0, 0), IsApplied = true,
+            DefinitionId = 101,
+            InstanceId = 2,
+            Position = new GridPos(0, 0),
+            IsApplied = true,
         });
         for (var i = 0; i < 4; i++)
         {
             inventory.Items.Add(new PlacedItem
             {
-                DefinitionId = 200, InstanceId = 10 + i,
-                Position = new GridPos(i, 1), IsActive = true,
+                DefinitionId = 200,
+                InstanceId = 10 + i,
+                Position = new GridPos(i, 1),
+                IsActive = true,
             });
         }
 
@@ -296,15 +331,24 @@ public class StabilityTests
         var inventory = new InventoryState { Width = 6, Height = 7, Storage = 6 };
         inventory.Tablets.Add(new PlacedTablet
         {
-            DefinitionId = 100, InstanceId = 1, Position = new GridPos(1, 0), IsApplied = true,
+            DefinitionId = 100,
+            InstanceId = 1,
+            Position = new GridPos(1, 0),
+            IsApplied = true,
         });
         inventory.Items.Add(new PlacedItem
         {
-            DefinitionId = 200, InstanceId = 10, Position = new GridPos(4, 0), IsActive = true,
+            DefinitionId = 200,
+            InstanceId = 10,
+            Position = new GridPos(4, 0),
+            IsActive = true,
         });
         inventory.Items.Add(new PlacedItem
         {
-            DefinitionId = 200, InstanceId = 11, Position = new GridPos(5, 0), IsActive = true,
+            DefinitionId = 200,
+            InstanceId = 11,
+            Position = new GridPos(5, 0),
+            IsActive = true,
         });
         var snapshot = new GameSnapshot { Inventory = inventory, Run = new RunState() };
 

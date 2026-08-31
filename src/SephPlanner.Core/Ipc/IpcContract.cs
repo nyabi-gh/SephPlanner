@@ -15,8 +15,9 @@ namespace SephPlanner.Core.Ipc
         /// 역직렬화되면 <c>IsMultiplayer</c> 같은 안전 잠금이 열린 쪽으로 무너지기 때문에,
         /// 오버레이는 버전이 다른 스냅샷을 버리고 플러그인은 버전이 다른 명령을 거부한다.
         /// v2: 명령 파이프가 응답을 돌려주는 양방향이 되고, 오버레이가 스냅샷 버전을 검사한다.
+        /// v3: 자동 배치 명령에 계산 당시의 격자, 출발 위치와 회전을 포함한다.
         /// </summary>
-        public const int ProtocolVersion = 2;
+        public const int ProtocolVersion = 3;
 
         public const string PipeName = "SephPlanner.Snapshot.v1";
 
@@ -27,6 +28,7 @@ namespace SephPlanner.Core.Ipc
         public const string CharmDbFile = "charms.json";
         public const string ComboDbFile = "combos.json";
         public const string VerificationReportFile = "query-verification.txt";
+        public const string VerificationStatusFile = "query-verification.json";
         public const string CatalogVersionFile = "catalog-version.txt";
         public const string StatMeasurementFile = "stat-measure.json";
 
@@ -39,8 +41,9 @@ namespace SephPlanner.Core.Ipc
         ///     물러서므로, 예전 덤프를 가진 사람에게는 이 항목이 반드시 새로 만들어져야 한다.
         /// v5: 게임이 매겨 둔 원가와 사파이어 해금가를 담는다. 능력치로 잴 수 없는 아티팩트의
         ///     값어치를 가늠할 후보라, 쓸 만한지 재려면 먼저 덤프에 있어야 한다.
+        /// v6: 자동 배치가 질의 검증 결과를 확인할 수 있는 상태 파일을 담는다.
         /// </summary>
-        public const int CatalogVersion = 5;
+        public const int CatalogVersion = 6;
 
         /// <summary>플러그인이 덤프한 데이터와 오버레이가 읽는 데이터의 공용 위치.</summary>
         public static string DataDirectory =>

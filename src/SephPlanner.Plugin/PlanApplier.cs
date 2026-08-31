@@ -24,6 +24,9 @@ namespace SephPlanner.Plugin
         /// </summary>
         public static string Apply(ApplyPlanCommand command, bool allowMultiplayer = false)
         {
+            if (!CatalogDump.QueryVerificationPassed())
+                return "석판 질의 검증이 완료되지 않았거나 실패해 자동 배치를 실행하지 않습니다. F9로 데이터를 다시 만드세요.";
+
             if (GameReader.IsMultiplayerSession() && !allowMultiplayer)
                 return "멀티플레이 세션에서는 자동 배치를 실행하지 않습니다. 설정에서 열 수 있습니다(실험).";
 
@@ -45,16 +48,14 @@ namespace SephPlanner.Plugin
             var swaps = ApplySwaps(command, inventory, positions, occupants, journal, allowMultiplayer, out var failure);
             if (failure != null) return failure;
 
-            var rotations = ApplyRotations(command, inventory, out var lockedTablets, out failure);
+            var rotations = ApplyRotations(command, inventory, out failure);
             if (failure != null)
             {
                 // 옮겨졌지만 안 돌아간 배치는 솔버가 평가한 적 없는 상태다. 이동도 함께 되돌린다.
                 return failure + " " + Rollback(inventory, journal);
             }
 
-            var report = $"자동 배치 완료 - 이동 {swaps}건, 회전 {rotations}건";
-            if (lockedTablets > 0) report += $", 회전 잠긴 석판 {lockedTablets}개는 건너뜀";
-            return report;
+            return $"자동 배치 완료 - 이동 {swaps}건, 회전 {rotations}건";
         }
 
         private static string Validate(
@@ -90,15 +91,36 @@ namespace SephPlanner.Plugin
                     return $"여러 칸을 차지하는 아이템(인스턴스 {count.Key})이 있어 자동 배치를 중단합니다.";
             }
 
-            var destinations = new HashSet<GridPos>();
+            var tablets = new Dictionary<int, StoneTablet>();
+            foreach (var pair in inventory.stoneTablets)
+            {
+                var tablet = pair.Value;
+                if (tablet != null) tablets[tablet.instanceID] = tablet;
+            }
+
+            var liveItems = new List<LivePlanItem>();
+            foreach (var pair in positions)
+            {
+                tablets.TryGetValue(pair.Key, out var tablet);
+                liveItems.Add(new LivePlanItem
+                {
+                    InstanceId = pair.Key,
+                    Position = pair.Value,
+                    IsTablet = tablet != null,
+                    Rotation = tablet != null ? tablet.rotation : 0,
+                    CanRotate = tablet != null &&
+                                DungeonManager.IsTabletRotatable(tablet.instanceID, tablet.isRotatable),
+                });
+            }
+
+            var stateError = ApplyPlanValidator.Validate(
+                command, liveItems, inventory.Width, inventory.Height, inventory.CurrentInventoryStorage);
+            if (stateError != null) return stateError;
+
             foreach (var target in command.Targets)
             {
-                if (!positions.ContainsKey(target.InstanceId))
-                    return "배치 계산 이후 인벤토리가 바뀌어 자동 배치를 중단합니다. 잠시 뒤 다시 시도하세요.";
                 if (!IsOnGrid(target.To.X, target.To.Y, inventory))
                     return $"목표 칸 {target.To}이 격자 밖이라 자동 배치를 중단합니다.";
-                if (!destinations.Add(target.To))
-                    return $"목표 칸 {target.To}이 겹쳐 자동 배치를 중단합니다.";
             }
             return null;
         }
@@ -176,9 +198,8 @@ namespace SephPlanner.Plugin
         }
 
         private static int ApplyRotations(
-            ApplyPlanCommand command, GridInventory inventory, out int lockedTablets, out string failure)
+            ApplyPlanCommand command, GridInventory inventory, out string failure)
         {
-            lockedTablets = 0;
             failure = null;
 
             var pending = new List<KeyValuePair<StoneTablet, int>>();
@@ -189,14 +210,19 @@ namespace SephPlanner.Plugin
                     if (!target.IsTablet) continue;
 
                     var tablet = FindTablet(inventory, target.InstanceId);
-                    if (tablet == null || tablet.rotation == target.Rotation) continue;
+                    if (tablet == null)
+                    {
+                        failure = "적용 도중 석판이 사라져 자동 배치를 중단합니다.";
+                        return 0;
+                    }
+                    if (tablet.rotation == target.Rotation) continue;
 
                     // 솔버도 스냅샷의 인스턴스별 회전 가능 여부를 보지만, 계산 이후 저주 등으로
                     // 잠겼을 수 있어 적용 직전에 한 번 더 확인한다.
                     if (!DungeonManager.IsTabletRotatable(tablet.instanceID, tablet.isRotatable))
                     {
-                        lockedTablets++;
-                        continue;
+                        failure = $"적용 도중 석판(인스턴스 {target.InstanceId})의 회전이 잠겨 중단합니다.";
+                        return 0;
                     }
                     pending.Add(new KeyValuePair<StoneTablet, int>(tablet, target.Rotation));
                 }

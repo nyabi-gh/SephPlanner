@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Globalization;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Solver;
 using UnityEngine;
@@ -258,11 +260,11 @@ namespace SephPlanner.Plugin
         // 이름 키가 없는 아이템도 있어 그때는 엔티티 번호를 식별자로 쓴다.
         private static string IdFromKey(string key, string prefix, int entityId)
         {
-            if (string.IsNullOrEmpty(key)) return entityId.ToString();
-            var start = key.StartsWith(prefix) ? prefix.Length : 0;
+            if (string.IsNullOrEmpty(key)) return entityId.ToString(CultureInfo.InvariantCulture);
+            var start = key.StartsWith(prefix, StringComparison.Ordinal) ? prefix.Length : 0;
             var end = key.LastIndexOf('_');
             var id = end > start ? key.Substring(start, end - start) : key.Substring(start);
-            return id.Length > 0 ? id : entityId.ToString();
+            return id.Length > 0 ? id : entityId.ToString(CultureInfo.InvariantCulture);
         }
     }
 }

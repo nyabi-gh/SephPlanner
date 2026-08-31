@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
@@ -134,7 +135,7 @@ public partial class MainWindow : Window
                         continue;
                     }
 
-                    var plan = PlanBuilder.Build(snapshot, ActiveCatalog, _preferences, out var blocker);
+                    var plan = PlanBuilder.Build(snapshot, ActiveCatalog, _preferences, out var blocker, _plan);
                     Dispatcher.Invoke(() => Render(snapshot, plan, blocker));
                 }
             }
@@ -217,7 +218,7 @@ public partial class MainWindow : Window
         BestScoreText.Text = $"{plan.Best.Score:0.#}";
 
         var improved = plan.Gain > 0.001;
-        GainText.Text = improved ? $"+{plan.Gain:0.#}" : "최적";
+        GainText.Text = improved ? $"+{plan.Gain:0.#}" : "탐색 기준 최선";
         GainText.Foreground = improved ? Theme.Good : Theme.TextDim;
 
         // 최적에 도달했으면 지금 점수를 어둡게 둘 이유가 없다.
@@ -244,15 +245,23 @@ public partial class MainWindow : Window
         LegendRow.Visibility = Visibility.Visible;
 
         // 제안이 그대로면 목록을 다시 만들지 않는다. 스냅샷마다 깜빡이는 것을 막는다.
-        var signature = string.Join("|", plan.Moves.Select(m => $"{m.Label}{m.Detail}"));
+        var signature = plan.ManualMoveInstructionsAvailable + "|" +
+                        string.Join("|", plan.Moves.Select(m => $"{m.Label}{m.Detail}"));
         if (signature != _lastPlanned)
         {
             _lastPlanned = signature;
             _moves.Clear();
-            foreach (var move in plan.Moves.Take(6))
-                _moves.Add(new MoveView(move.Label, move.Detail));
-            if (plan.Moves.Count > 6)
-                _moves.Add(new MoveView($"… 외 {plan.Moves.Count - 6}개", ""));
+            if (!plan.ManualMoveInstructionsAvailable)
+            {
+                _moves.Add(new MoveView("수동 이동 불가", "빈 칸이 없어 순서를 만들 수 없습니다."));
+            }
+            else
+            {
+                foreach (var move in plan.Moves.Take(6))
+                    _moves.Add(new MoveView(move.Label, move.Detail));
+                if (plan.Moves.Count > 6)
+                    _moves.Add(new MoveView($"… 외 {plan.Moves.Count - 6}개", ""));
+            }
         }
 
         MovePanel.Visibility = _moves.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -260,7 +269,7 @@ public partial class MainWindow : Window
         // 멀티 세션에서는 쓰기 경로의 동기화가 검증되지 않아 자동 배치를 내놓지 않는다 (docs/LEGAL.md).
         // Targets 가 비어 있으면(석판이 빠진 불완전 배치 등) 버튼을 보여줄 이유도 없다.
         _plan = plan;
-        AutoPlaceButton.Visibility = plan.Moves.Count > 0 && plan.Targets.Count > 0 && !snapshot.IsMultiplayer
+        AutoPlaceButton.Visibility = plan.HasPlacementChanges && plan.Targets.Count > 0 && !snapshot.IsMultiplayer
             ? Visibility.Visible
             : Visibility.Collapsed;
 
@@ -274,23 +283,21 @@ public partial class MainWindow : Window
     /// </summary>
     private static string Warning(GameSnapshot snapshot, Plan plan)
     {
+        var warnings = new List<string>();
         if (plan.Best.UnplacedTablets > 0)
-        {
-            return $"석판 {plan.Best.UnplacedTablets}개는 놓을 자리가 없어 계산에서 빠졌습니다. " +
-                   "점수가 실제와 다를 수 있습니다.";
-        }
+            warnings.Add($"석판 {plan.Best.UnplacedTablets}개는 놓을 자리가 없어 계산에서 빠졌습니다.");
 
         if (plan.LevelMismatches > 0)
-        {
-            // 무엇이 원인인지는 여기서 알 수 없다. 다만 어긋난다는 사실은 확실하므로 그것만 말한다.
-            return $"칸 {plan.LevelMismatches}개의 레벨이 게임과 다릅니다. 아직 읽지 못하는 효과가 " +
-                   "걸려 있어 점수가 실제와 다를 수 있습니다.";
-        }
+            warnings.Add($"칸 {plan.LevelMismatches}개의 레벨이 게임과 달라 자동 배치를 껐습니다.");
+
+        if (!plan.ManualMoveInstructionsAvailable)
+            warnings.Add("빈 칸이 없어 수동 이동 순서를 만들 수 없습니다. 자동 배치를 이용하세요.");
 
         if (plan.SkippedOffers > 0)
-            return $"선택지가 많아 {plan.SkippedOffers}개는 평가하지 못했습니다.";
+            warnings.Add($"선택지가 많아 {plan.SkippedOffers}개는 평가하지 못했습니다.");
 
-        return snapshot.IsMultiplayer ? "멀티플레이 세션 - 제안만 표시합니다." : "";
+        if (snapshot.IsMultiplayer) warnings.Add("멀티플레이 세션 - 제안만 표시합니다.");
+        return string.Join("\n", warnings);
     }
 
     private void ShowWarning(string message)
@@ -670,13 +677,17 @@ public partial class MainWindow : Window
     {
         var plan = _plan;
         if (plan is null || plan.Targets.Count == 0) return;
+        if (MessageBox.Show(
+                this, "현재 배치를 제안된 배치로 변경할까요?", "자동 배치 확인",
+                MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            return;
 
         // 응답이 올 때까지 같은 명령이 두 번 나가지 않게 잠근다. async void 라 예외가 새 나가면
         // 프로세스가 죽으므로 버튼 복구까지 finally 로 지킨다.
         AutoPlaceButton.IsEnabled = false;
         try
         {
-            var response = await CommandClient.SendAsync(new ApplyPlanCommand { Targets = plan.Targets });
+            var response = await CommandClient.SendAsync(plan.CreateApplyCommand());
             ShowWarning(response ?? "플러그인과 연결할 수 없어 자동 배치를 보내지 못했습니다.");
         }
         catch (Exception ex)
@@ -827,6 +838,7 @@ public partial class MainWindow : Window
         }
 
         _shutdown.Cancel();
+        _shutdown.Dispose();
         base.OnClosed(e);
     }
 }
