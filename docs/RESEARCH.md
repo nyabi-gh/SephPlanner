@@ -845,6 +845,11 @@ PlayerAvatar -> GetComponent<WeaponControllerSimple>() -> currentWeapon.weaponTy
    InstanceID 로 정렬한다. 열거 순서만 흔들려도 스냅샷 JSON 비교가 "변경"으로 오인해
    재계산이 돌고 후보 순번이 바뀐다.
 
+이 흔들림을 잡은 도구가 DataTool 에 남아 있다. 게임이 켜져 있을 때
+`dotnet run --project src/SephPlanner.DataTool -- --record <폴더>` 가 파이프 스냅샷을 전부
+저장하며 계획이 바뀌는 순간을 표시하고, `--replay <폴더>` 가 그 녹화를 새 코드로 다시 풀어
+흔들림과 풀이 시간을 잰다. 솔버를 손대면 녹화 재생으로 먼저 검증한다.
+
 멀티 실측(2026-08-31, 파이프 스냅샷 108장 녹화)에서 더 큰 결이 드러나 둘을 더했다.
 **제안을 한 수씩 따라가는 동안 걸음마다 남은 목표들이 저희끼리 뒤바뀌고, 아이템 하나를
 주울 때마다 같은 점수의 전혀 다른 배치로 계획이 통째로 다시 쓰였다**(15~16수 개편이 연발).
