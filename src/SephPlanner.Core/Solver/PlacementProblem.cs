@@ -109,6 +109,14 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         public Dictionary<int, TabletSpot> CurrentTablets { get; } = new Dictionary<int, TabletSpot>();
         public Dictionary<int, GridPos> CurrentCharms { get; } = new Dictionary<int, GridPos>();
+
+        /// <summary>
+        /// 직전 제안이 앉힌 자리. 동점 배치가 여럿일 때 저번에 제안한 쪽을 고르는 데 쓴다.
+        /// 이것이 없으면 제안을 한 수씩 따라가는 동안 남은 목표들이 저희끼리 자리를 맞바꾼다 -
+        /// 실제 멀티 세션 기록에서 걸음마다 두 목표가 서로 뒤집히는 것이 관측됐다.
+        /// </summary>
+        public Dictionary<int, TabletSpot> PlannedTablets { get; } = new Dictionary<int, TabletSpot>();
+        public Dictionary<int, GridPos> PlannedCharms { get; } = new Dictionary<int, GridPos>();
     }
 
     public readonly struct TabletSpot

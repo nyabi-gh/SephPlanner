@@ -33,12 +33,17 @@ namespace SephPlanner.Core.Planning
     public static class PlanBuilder
     {
         public static Plan? Build(
-            GameSnapshot snapshot, ICatalog catalog, PlanPreferences? preferences = null) =>
-            Build(snapshot, catalog, preferences, out _);
+            GameSnapshot snapshot, ICatalog catalog, PlanPreferences? preferences = null,
+            Plan? previous = null) =>
+            Build(snapshot, catalog, preferences, out _, previous);
 
+        /// <param name="previous">
+        /// 직전에 내놓은 계획. 동점 배치 사이에서 저번에 말한 쪽을 고르는 앵커로만 쓰이고,
+        /// 점수가 실제로 나은 배치를 이기지는 못한다.
+        /// </param>
         public static Plan? Build(
             GameSnapshot snapshot, ICatalog catalog, PlanPreferences? preferences,
-            out PlanBlocker blocker)
+            out PlanBlocker blocker, Plan? previous = null)
         {
             blocker = PlanBlocker.None;
             preferences ??= PlanPreferences.None;
@@ -129,6 +134,17 @@ namespace SephPlanner.Core.Planning
                 // 뒤엣것은 대개 카탈로그가 낡아서이므로 다시 덤프하라고 일러야 한다.
                 blocker = problem.Charms.Count > 0 ? PlanBlocker.UnknownItems : PlanBlocker.NoCharms;
                 return null;
+            }
+
+            if (previous is not null)
+            {
+                foreach (var target in previous.Targets)
+                {
+                    if (target.IsTablet)
+                        problem.PlannedTablets[target.InstanceId] = new TabletSpot(target.To, target.Rotation);
+                    else
+                        problem.PlannedCharms[target.InstanceId] = target.To;
+                }
             }
 
             var current = PlacementSolver.Score(problem, layout, positions);

@@ -191,6 +191,12 @@ namespace SephPlanner.Core.Solver
                 clone.CurrentTablets[pair.Key] = pair.Value;
             }
             foreach (var pair in problem.CurrentCharms) clone.CurrentCharms[pair.Key] = pair.Value;
+            foreach (var pair in problem.PlannedTablets)
+            {
+                if (pair.Key == first || pair.Key == second) continue;
+                clone.PlannedTablets[pair.Key] = pair.Value;
+            }
+            foreach (var pair in problem.PlannedCharms) clone.PlannedCharms[pair.Key] = pair.Value;
             return clone;
         }
     }

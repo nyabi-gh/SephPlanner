@@ -55,7 +55,8 @@ namespace SephPlanner.Plugin
             {
                 try
                 {
-                    _latest = PlanBuilder.Build(snapshot, _catalog, preferences, out var blocker);
+                    // 직전 계획을 앵커로 넘긴다. 없으면 동점 배치 사이에서 목표가 걸음마다 뒤바뀐다.
+                    _latest = PlanBuilder.Build(snapshot, _catalog, preferences, out var blocker, _latest);
                     _blocker = blocker;
                     _error = null;
                 }

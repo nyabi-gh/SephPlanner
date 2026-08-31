@@ -129,7 +129,7 @@ namespace SephPlanner.Plugin
                 string result;
                 try
                 {
-                    result = PlanApplier.Apply(pending.Command);
+                    result = PlanApplier.Apply(pending.Command, _settings.MultiplayerAutoPlace.Value);
                     Logger.LogInfo(result);
                 }
                 catch (Exception ex)
@@ -433,6 +433,7 @@ namespace SephPlanner.Plugin
                 Values = CharmValueSource.Book,
                 Expanded = _expanded,
                 Recommendations = _settings.Recommendations.Value,
+                MultiplayerAutoPlace = _settings.MultiplayerAutoPlace.Value,
                 Hint = Hint(plan, preview),
                 HintIsPreview = preview != null,
                 PreviewKey = _previewKey,
@@ -601,7 +602,7 @@ namespace SephPlanner.Plugin
             var plan = _runner != null ? _runner.Latest : null;
             var text = Describe(_settings.ExpandKey) + (_expanded ? " 접기" : " 펼치기");
 
-            if (_lastSnapshot == null || !_lastSnapshot.IsMultiplayer)
+            if (_lastSnapshot == null || !_lastSnapshot.IsMultiplayer || _settings.MultiplayerAutoPlace.Value)
                 text += "   " + Describe(_settings.AutoPlaceKey) + " 자동 배치";
 
             if (plan != null && plan.Offers.Count > 0)
@@ -650,7 +651,8 @@ namespace SephPlanner.Plugin
 
             try
             {
-                var result = PlanApplier.Apply(new ApplyPlanCommand { Targets = plan.Targets });
+                var result = PlanApplier.Apply(
+                    new ApplyPlanCommand { Targets = plan.Targets }, _settings.MultiplayerAutoPlace.Value);
                 Logger.LogInfo(result);
                 Report(result);
             }

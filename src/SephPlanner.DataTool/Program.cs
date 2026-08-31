@@ -20,6 +20,30 @@ if (args.Contains("--measure"))
 if (args.Contains("--values"))
     return CharmValueDraft.Run(FindRepoRoot());
 
+// 녹화해 둔 스냅샷들을 순서대로 다시 풀어 흔들림과 풀이 시간을 잰다.
+var replayIndex = Array.IndexOf(args, "--replay");
+if (replayIndex >= 0)
+{
+    if (replayIndex + 1 >= args.Length)
+    {
+        Console.Error.WriteLine("사용법: --replay <녹화 폴더>");
+        return 1;
+    }
+    return SnapshotRecorder.Replay(args[replayIndex + 1]);
+}
+
+// 게임이 흘려보내는 스냅샷을 전부 녹화하며 계획이 흔들리는 순간을 표시한다.
+var recordIndex = Array.IndexOf(args, "--record");
+if (recordIndex >= 0)
+{
+    if (recordIndex + 1 >= args.Length)
+    {
+        Console.Error.WriteLine("사용법: --record <저장 폴더>");
+        return 1;
+    }
+    return SnapshotRecorder.Run(args[recordIndex + 1]);
+}
+
 // 저장해 둔 스냅샷으로 우리 레벨 계산을 게임 값과 견준다. 게임을 다시 켜지 않고 확인할 수 있다.
 var checkIndex = Array.IndexOf(args, "--check");
 if (checkIndex >= 0)

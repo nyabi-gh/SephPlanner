@@ -32,6 +32,7 @@ namespace SephPlanner.Plugin.Ui
         public CharmValueBook Values = CharmValueBook.Empty;
         public bool Expanded;
         public bool Recommendations = true;
+        public bool MultiplayerAutoPlace;
         public string Hint = "";
 
         /// <summary>안내 줄이 지금 미리보기를 설명하고 있는가. 그때는 색이 달라야 눈에 든다.</summary>
@@ -359,7 +360,7 @@ namespace SephPlanner.Plugin.Ui
             _gain.text = improved ? $"+{plan.Gain:0.#}" : "최적";
             _gain.color = improved ? NativeSkin.Good : NativeSkin.TextDim;
 
-            var warning = Warning(snapshot, plan);
+            var warning = Warning(snapshot, plan, frame.MultiplayerAutoPlace);
             _notice.text = warning;
             Widgets.SetActive(_notice, warning.Length > 0);
 
@@ -443,7 +444,7 @@ namespace SephPlanner.Plugin.Ui
         /// 지금 화면에서 알려야 할 것. 오버레이와 같은 순서다 - 점수를 믿을 수 없는 상황이
         /// 멀티 안내보다 먼저다.
         /// </summary>
-        private static string Warning(GameSnapshot snapshot, Plan plan)
+        private static string Warning(GameSnapshot snapshot, Plan plan, bool multiplayerAutoPlace)
         {
             if (plan.Best.UnplacedTablets > 0)
                 return $"석판 {plan.Best.UnplacedTablets}개는 놓을 자리가 없어 계산에서 빠졌습니다.";
@@ -454,7 +455,10 @@ namespace SephPlanner.Plugin.Ui
             if (plan.SkippedOffers > 0)
                 return $"선택지가 많아 {plan.SkippedOffers}개는 평가하지 못했습니다.";
 
-            return snapshot.IsMultiplayer ? "멀티플레이 세션 - 제안만 표시합니다." : "";
+            if (!snapshot.IsMultiplayer) return "";
+            return multiplayerAutoPlace
+                ? "멀티플레이 세션 - 자동 배치 허용됨 (실험, 호스트만)."
+                : "멀티플레이 세션 - 제안만 표시합니다.";
         }
 
         /// <summary>

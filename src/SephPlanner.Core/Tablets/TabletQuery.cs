@@ -113,13 +113,31 @@ namespace SephPlanner.Core.Tablets
             return RotatedNames.TryGetValue(token, out var names) ? names[rotation] : token;
         }
 
+        /// <summary>
+        /// 파싱 결과 캐시. 빔 확장이 같은 질의를 같은 자리·회전으로 수백만 번 다시 읽는 구조라
+        /// (BeamWidth x 열린 칸 x 회전) 여기가 풀이 시간의 대부분이었다. 키 공간이 유한하므로
+        /// (질의 종류 x 칸 x 회전 4) 상한만 두고 넘치면 비운다.
+        /// 반환 리스트는 공유되므로 받은 쪽이 고치면 안 된다(QueryCell 은 구조체라 원소는 복사된다).
+        /// </summary>
+        private static readonly object CacheLock = new object();
+        private static readonly Dictionary<(string, int, int, int, int, int, int), List<QueryCell>> Cache =
+            new Dictionary<(string, int, int, int, int, int, int), List<QueryCell>>();
+        private const int CacheLimit = 100000;
+        private static readonly List<QueryCell> NoCells = new List<QueryCell>();
+
         public static List<QueryCell> Parse(string query, GridSpec grid, GridPos origin, int rotation)
         {
-            var cells = new List<QueryCell>();
-            if (string.IsNullOrEmpty(query)) return cells;
+            if (string.IsNullOrEmpty(query)) return NoCells;
 
             rotation = ((rotation % 4) + 4) % 4;
 
+            var key = (query, grid.Width, grid.Height, grid.Storage, origin.X, origin.Y, rotation);
+            lock (CacheLock)
+            {
+                if (Cache.TryGetValue(key, out var cached)) return cached;
+            }
+
+            var cells = new List<QueryCell>();
             foreach (var line in query.Split(LineSeparators, StringSplitOptions.RemoveEmptyEntries))
             {
                 // 게임 ParseQuery 와 같은 분할이다. 빈 토큰을 거르지 않는 것까지 동일해서,
@@ -127,6 +145,12 @@ namespace SephPlanner.Core.Tablets
                 var parts = line.Split(' ');
                 if (parts.Length < 2) continue;
                 Emit(cells, parts, grid, origin, rotation);
+            }
+
+            lock (CacheLock)
+            {
+                if (Cache.Count >= CacheLimit) Cache.Clear();
+                Cache[key] = cells;
             }
             return cells;
         }

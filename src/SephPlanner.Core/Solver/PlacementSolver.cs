@@ -33,6 +33,13 @@ namespace SephPlanner.Core.Solver
         /// <summary>낭비 판단보다도 작게 두어, 정말 우열이 없을 때만 현 상태를 유지하도록 한다.</summary>
         private const double StabilityBonus = 1e-6;
 
+        /// <summary>
+        /// 직전 제안과 같은 자리에 주는 몫. 지금 자리보다 약해야 한다 - 옮길 필요가 없어진 것은
+        /// 그대로 두는 쪽이 먼저고, 어차피 옮길 것이라면 저번에 말한 자리가 먼저다.
+        /// 격자 42칸이 다 맞아도 합이 StabilityBonus 하나를 넘지 않도록 잡았다(42 x 2e-8 &lt; 1e-6).
+        /// </summary>
+        private const double PlanBonus = 2e-8;
+
         public static Arrangement Solve(PlacementProblem problem, SolverOptions? options = null)
         {
             options ??= new SolverOptions();
@@ -52,8 +59,13 @@ namespace SephPlanner.Core.Solver
                 .ToList();
 
             // 탐색이 현재 배치를 후보에서 떨어뜨리면, 이미 최적인 배치를 두고도 옮기라고 하게 된다.
-            var asIs = CurrentLayout(problem);
+            var asIs = Layout(problem, problem.CurrentTablets);
             if (asIs != null) candidates.Insert(0, asIs);
+
+            // 직전 제안의 배치도 마찬가지다. 빔이 떨어뜨리면 같은 점수의 다른 배치로 갈아타
+            // 따라가던 계획이 통째로 다시 쓰인다.
+            var asPlanned = Layout(problem, problem.PlannedTablets);
+            if (asPlanned != null) candidates.Insert(0, asPlanned);
 
             // 완전한 배치가 아예 없으면(석판이 열린 칸보다 많은 극단) 놓을 수 있는 만큼이라도
             // 평가하되, Describe 가 빠진 수를 UnplacedTablets 로 남겨 호출자가 알 수 있게 한다.
@@ -100,20 +112,56 @@ namespace SephPlanner.Core.Solver
             return all;
         }
 
-        private static List<TabletPlacement>? CurrentLayout(PlacementProblem problem)
+        private static List<TabletPlacement>? Layout(
+            PlacementProblem problem, Dictionary<int, TabletSpot> spots)
         {
-            if (problem.Tablets.Count == 0 || problem.CurrentTablets.Count < problem.Tablets.Count) return null;
+            if (problem.Tablets.Count == 0 || spots.Count < problem.Tablets.Count) return null;
 
             var layout = new List<TabletPlacement>(problem.Tablets.Count);
             var taken = new HashSet<GridPos>();
 
             foreach (var slot in problem.Tablets)
             {
-                if (!problem.CurrentTablets.TryGetValue(slot.InstanceId, out var spot)) return null;
+                if (!spots.TryGetValue(slot.InstanceId, out var spot)) return null;
                 if (!taken.Add(spot.Position)) return null;
                 layout.Add(slot.At(spot.Position, spot.Rotation));
             }
             return layout;
+        }
+
+        /// <summary>
+        /// Estimate 의 낙관적 점유. "빈 칸에는 다 아이템이 있다"는 가정을 집합에 칸마다 넣는 대신
+        /// 좌표 계산으로 답한다 - 최심부 루프에서 호출마다 해시셋 백여 건을 채우고 있었다.
+        /// </summary>
+        private sealed class EstimateOccupancy : GridOccupancy
+        {
+            private readonly GridSpec _grid;
+            private readonly bool _anyMagic;
+            private readonly bool[] _taken;
+
+            public EstimateOccupancy(GridSpec grid, bool anyMagic)
+            {
+                _grid = grid;
+                _anyMagic = anyMagic;
+                _taken = new bool[grid.Width * grid.Height];
+            }
+
+            public void Take(GridPos position)
+            {
+                if (Open(position)) _taken[_grid.ToIndex(position.X, position.Y)] = true;
+            }
+
+            private bool Open(GridPos position) =>
+                position.X >= 0 && position.X < _grid.Width &&
+                position.Y >= 0 && position.Y < _grid.Height &&
+                _grid.ToIndex(position.X, position.Y) < _grid.Storage;
+
+            // OptimisticOccupancy 와 같은 답이다: 열린 칸에는 전부 아이템이 있고,
+            // 석판이 차지한 칸만 아티팩트가 아니다.
+            public override bool HasItem(GridPos position) => Open(position);
+            public override bool HasCharm(GridPos position) =>
+                Open(position) && !_taken[_grid.ToIndex(position.X, position.Y)];
+            public override bool HasMagicCharm(GridPos position) => _anyMagic && HasCharm(position);
         }
 
         private static List<List<TabletPlacement>> SearchTabletLayouts(
@@ -121,14 +169,25 @@ namespace SephPlanner.Core.Solver
         {
             var beam = new List<List<TabletPlacement>> { new List<TabletPlacement>() };
 
+            var scoring = 0;
+            var levelCap = 0;
+            foreach (var charm in problem.Charms)
+            {
+                if (charm.IsFiller || charm.IsDormant) continue;
+                scoring++;
+                levelCap = Math.Max(levelCap, charm.Definition.MaxLevel);
+            }
+            if (scoring == 0) levelCap = 5;
+            var anyMagic = problem.Charms.Any(c => c.Definition.IsMagic);
+
             foreach (var slot in problem.Tablets)
             {
                 // 돌릴 수 없는 석판은 지금 돌아가 있는 각도 그대로만 쓴다. 0으로 고정하면
                 // 이미 돌아간 채로 잠긴 석판(저주 등)에 불가능한 회전을 제안하게 된다.
-                var rotatable = slot.Rotatable;
-                var fixedRotation = problem.CurrentTablets.TryGetValue(slot.InstanceId, out var spot)
+                var currentRotation = problem.CurrentTablets.TryGetValue(slot.InstanceId, out var spot)
                     ? spot.Rotation
                     : 0;
+                var rotations = DistinctRotations(slot, currentRotation);
 
                 var expanded = new List<(List<TabletPlacement> Layout, double Score)>();
 
@@ -140,13 +199,13 @@ namespace SephPlanner.Core.Solver
                     {
                         if (taken.Contains(cell)) continue;
 
-                        for (var rotation = 0; rotation < (rotatable ? 4 : 1); rotation++)
+                        foreach (var rotation in rotations)
                         {
                             var next = new List<TabletPlacement>(layout)
                             {
-                                slot.At(cell, rotatable ? rotation : fixedRotation),
+                                slot.At(cell, rotation),
                             };
-                            expanded.Add((next, Estimate(problem, cells, next)));
+                            expanded.Add((next, Estimate(problem, cells, next, scoring, levelCap, anyMagic)));
                         }
                     }
                 }
@@ -162,33 +221,76 @@ namespace SephPlanner.Core.Solver
         }
 
         /// <summary>
+        /// 실제 효과가 다른 회전만, 지금 각도부터 세어 남긴다. 대칭 질의 석판(쌍성의 위아래 등)의
+        /// 회전은 효과가 같아, 걸러내지 않으면 "회전 3 → 1" 같은 아무 일도 하지 않는 회전 지시가
+        /// 나온다 - 실제 세션에서 관측됐다.
+        /// </summary>
+        private static List<int> DistinctRotations(TabletSlot slot, int currentRotation)
+        {
+            if (!slot.Rotatable) return new List<int> { currentRotation };
+
+            var rotations = new List<int>(4);
+            var seen = new HashSet<string>();
+            for (var step = 0; step < 4; step++)
+            {
+                var rotation = (currentRotation + step) % 4;
+                if (seen.Add(RotationSignature(slot, rotation))) rotations.Add(rotation);
+            }
+            return rotations;
+        }
+
+        private static string RotationSignature(TabletSlot slot, int rotation)
+        {
+            var query = slot.InstanceQuery ?? slot.Definition.Query;
+            var condition = slot.InstanceConditionQuery ?? slot.Definition.ConditionQuery;
+            return Canonical(TabletQuery.Rotated(query, rotation)) + "|" +
+                   Canonical(TabletQuery.Rotated(condition, rotation));
+        }
+
+        /// <summary>줄 순서만 다른 질의는 같은 효과다(누적이 전부 교환법칙을 탄다).</summary>
+        private static string Canonical(string query)
+        {
+            if (string.IsNullOrEmpty(query)) return "";
+
+            var lines = query
+                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .OrderBy(line => line, StringComparer.Ordinal);
+            return string.Join("\n", lines);
+        }
+
+        /// <summary>
         /// 아티팩트를 실제로 배정하지 않고 매기는 값. 빔을 좁히는 용도이므로 정확할 필요는 없고
-        /// 유망한 배치를 위로 올리기만 하면 된다.
+        /// 유망한 배치를 위로 올리기만 하면 된다. 탐색의 최심부라 정렬·집합 할당을 두지 않는다 -
+        /// 레벨 분포를 세어 위에서부터 아티팩트 수만큼 거둔다.
         /// </summary>
         private static double Estimate(
-            PlacementProblem problem, List<GridPos> cells, List<TabletPlacement> layout)
+            PlacementProblem problem, List<GridPos> cells, List<TabletPlacement> layout,
+            int scoring, int levelCap, bool anyMagic)
         {
-            var occupancy = OptimisticOccupancy(cells, layout, problem);
+            var occupancy = new EstimateOccupancy(problem.Grid, anyMagic);
+            foreach (var placement in layout) occupancy.Take(placement.Position);
             var result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid, problem.FixedEffects);
 
-            var taken = new HashSet<GridPos>(layout.Select(p => p.Position));
-            var scoring = problem.Charms.Where(c => !c.IsFiller && !c.IsDormant).ToList();
-            var levelCap = scoring.Count > 0 ? scoring.Max(c => c.Definition.MaxLevel) : 5;
-
-            var levels = new List<int>();
+            var counts = new int[levelCap + 1];
             foreach (var cell in cells)
             {
-                if (taken.Contains(cell)) continue;
+                if (!occupancy.HasCharm(cell)) continue;
                 if (result.IsDisabled(cell)) continue;
 
                 var level = result.EffectiveLevel(cell, 0);
                 if (level < 0) continue;
-                levels.Add(Math.Min(level, levelCap));
+                counts[Math.Min(level, levelCap)]++;
             }
 
-            levels.Sort();
-            levels.Reverse();
-            return levels.Take(scoring.Count).Sum(level => ActiveValue + level);
+            var total = 0.0;
+            var remaining = scoring;
+            for (var level = levelCap; level >= 0 && remaining > 0; level--)
+            {
+                var take = Math.Min(counts[level], remaining);
+                total += take * (ActiveValue + level);
+                remaining -= take;
+            }
+            return total;
         }
 
         private static Arrangement Evaluate(
@@ -270,14 +372,9 @@ namespace SephPlanner.Core.Solver
             PlacementProblem problem, CharmSlot charm, GridPos cell,
             SimulationResult result, GridOccupancy occupancy, Dictionary<GridPos, CharmSlot>? neighbors)
         {
-            // 필러도 자리 유지 몫은 받아야 한다. 없으면 전 칸이 0점 동률이라 배정 순서에 따라
-            // 필러끼리 자리를 맞바꾸는 제안이 나온다.
-            if (charm.IsFiller)
-            {
-                return problem.CurrentCharms.TryGetValue(charm.InstanceId, out var kept) && kept == cell
-                    ? StabilityBonus
-                    : 0;
-            }
+            // 필러도 자리 유지·계획 유지 몫은 받아야 한다. 없으면 전 칸이 0점 동률이라 배정
+            // 순서에 따라 필러끼리 자리를 맞바꾸는 제안이 나온다.
+            if (charm.IsFiller) return Anchors(problem, charm, cell);
             if (Reason(charm, cell, result, problem.Grid, occupancy) != CharmInactiveReason.None) return 0;
 
             var level = result.EffectiveLevel(cell, charm.Enchant);
@@ -294,11 +391,20 @@ namespace SephPlanner.Core.Solver
             if (charm.Definition.Behavior == "Charm_NearLevelDamage")
                 value += NearLevelDamageWorth(charm, cell, effective, result, neighbors);
 
-            // 점수가 같은 배치가 여럿일 때 지금 자리를 지킨다. 채점할 때만 더하면 배정기가 이미
-            // 자리를 바꿔 놓은 뒤라, 이득이 없는데도 맞바꾸라는 제안이 나온다.
+            return value + Anchors(problem, charm, cell);
+        }
+
+        /// <summary>
+        /// 점수가 같은 배치가 여럿일 때 지금 자리, 그다음 직전 제안의 자리를 지킨다. 채점할 때만
+        /// 더하면 배정기가 이미 자리를 바꿔 놓은 뒤라, 이득이 없는데도 맞바꾸라는 제안이 나온다.
+        /// </summary>
+        private static double Anchors(PlacementProblem problem, CharmSlot charm, GridPos cell)
+        {
+            var value = 0.0;
             if (problem.CurrentCharms.TryGetValue(charm.InstanceId, out var current) && current == cell)
                 value += StabilityBonus;
-
+            if (problem.PlannedCharms.TryGetValue(charm.InstanceId, out var planned) && planned == cell)
+                value += PlanBonus;
             return value;
         }
 
@@ -385,7 +491,7 @@ namespace SephPlanner.Core.Solver
             if (result.IsDisabled(cell)) return CharmInactiveReason.Disabled;
             if (result.EffectiveLevel(cell, charm.Enchant) < 0) return CharmInactiveReason.NegativeLevel;
 
-            if (result.IgnoreCriteria.TryGetValue(cell, out var ignore) && ignore > 0)
+            if (result.IgnoreCriteriaAt(cell) > 0)
                 return CharmInactiveReason.None;
 
             return CharmCriteria.IsSatisfied(charm.Criteria, cell, grid, occupancy)
@@ -422,20 +528,29 @@ namespace SephPlanner.Core.Solver
         }
 
         /// <summary>
-        /// 지금과 같은 자리에 있는 석판마다 아주 작은 값을 더한다. 아티팩트 몫은 배정 단계에서
-        /// 반영해야 뜻이 있어 <see cref="Value"/>가 따로 챙긴다.
+        /// 지금과 같은 자리에 있는 석판, 그다음 직전 제안과 같은 자리에 있는 석판마다 아주 작은
+        /// 값을 더한다. 아티팩트 몫은 배정 단계에서 반영해야 뜻이 있어 <see cref="Anchors"/>가
+        /// 따로 챙긴다.
         /// </summary>
         private static double Familiarity(PlacementProblem problem, List<TabletPlacement> layout)
         {
-            var kept = 0;
+            var value = 0.0;
 
             for (var i = 0; i < layout.Count && i < problem.Tablets.Count; i++)
             {
-                if (!problem.CurrentTablets.TryGetValue(problem.Tablets[i].InstanceId, out var spot)) continue;
-                if (spot.Position == layout[i].Position && spot.Rotation == layout[i].Rotation) kept++;
+                var id = problem.Tablets[i].InstanceId;
+                if (problem.CurrentTablets.TryGetValue(id, out var spot) &&
+                    spot.Position == layout[i].Position && spot.Rotation == layout[i].Rotation)
+                {
+                    value += StabilityBonus;
+                }
+                if (problem.PlannedTablets.TryGetValue(id, out var planned) &&
+                    planned.Position == layout[i].Position && planned.Rotation == layout[i].Rotation)
+                {
+                    value += PlanBonus;
+                }
             }
-
-            return StabilityBonus * kept;
+            return value;
         }
 
         private static bool SamePositions(Dictionary<int, GridPos> left, Dictionary<int, GridPos> right)

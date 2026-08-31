@@ -281,10 +281,12 @@ namespace SephPlanner.Core.Solver
                 Combos = problem.Combos,
             };
 
-            // 현재 위치를 빼먹으면 후보 쪽 풀이만 현 배치 후보와 안정 보너스를 잃어,
-            // 기준과 후보가 서로 다른 조건으로 풀리게 된다.
+            // 현재 위치와 직전 제안을 빼먹으면 후보 쪽 풀이만 앵커를 잃어, 기준과 후보가
+            // 서로 다른 조건으로 풀리게 된다.
             foreach (var pair in problem.CurrentTablets) clone.CurrentTablets[pair.Key] = pair.Value;
             foreach (var pair in problem.CurrentCharms) clone.CurrentCharms[pair.Key] = pair.Value;
+            foreach (var pair in problem.PlannedTablets) clone.PlannedTablets[pair.Key] = pair.Value;
+            foreach (var pair in problem.PlannedCharms) clone.PlannedCharms[pair.Key] = pair.Value;
             return clone;
         }
     }

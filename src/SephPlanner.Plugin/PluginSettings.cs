@@ -29,6 +29,7 @@ namespace SephPlanner.Plugin
         public ConfigEntry<float> Scale { get; }
         public ConfigEntry<float> Opacity { get; }
         public ConfigEntry<bool> Recommendations { get; }
+        public ConfigEntry<bool> MultiplayerAutoPlace { get; }
 
         public ConfigEntry<KeyboardShortcut> ExpandKey { get; }
         public ConfigEntry<KeyboardShortcut> AutoPlaceKey { get; }
@@ -92,6 +93,10 @@ namespace SephPlanner.Plugin
                 "NativePanel", "Recommendations", true,
                 "무엇을 집을지에 대한 후보 추천을 계산할지. 끄면 가리는 것이 아니라 계산 자체를 " +
                 "건너뛴다. 점수와 배치 제안은 그대로 남는다.");
+            MultiplayerAutoPlace = config.Bind(
+                "NativePanel", "MultiplayerAutoPlace", false,
+                "멀티플레이 세션에서도 자동 배치를 허용한다(실험). 호스트에서만 실제로 동작하며, " +
+                "동기화 문제가 검증되지 않았으므로 같이 하는 사람의 동의를 얻고 켠다.");
 
             // 게임이 쓰지 않는 키로 고른다. 게임은 수정키를 보지 않으므로 Ctrl+Alt 를 붙여도
             // 글자 키는 게임 조작을 함께 발동시킨다(docs/RESEARCH.md 의 "게임 단축키").
@@ -181,6 +186,7 @@ namespace SephPlanner.Plugin
                     new[] { "아주 좁게", "좁게", "보통", "넓게", "아주 넓게" }),
                 Steps("불투명도", Opacity, OpacitySteps, new[] { "55%", "70%", "85%", "100%" }),
                 Switch("후보 추천", Recommendations),
+                Switch("멀티 자동 배치(실험)", MultiplayerAutoPlace),
                 Key("접기/펼치기", ExpandKey, keys, keyNames, divider: true),
                 Key("자동 배치", AutoPlaceKey, keys, keyNames),
                 Key("후보 미리보기", PreviewKey, keys, keyNames),
