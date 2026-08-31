@@ -1,4 +1,5 @@
 using SephPlanner.Core.Model;
+using SephPlanner.Core.Planning;
 using SephPlanner.Core.Solver;
 
 namespace SephPlanner.DataTool;
@@ -47,7 +48,7 @@ public static class PriceProxy
         {
             var costs = group.Select(s => s.Cost).OrderBy(c => c).ToList();
             var distinct = costs.Distinct().Count();
-            Console.WriteLine($"  {group.Key,-9} n={costs.Count,3}  {costs[0],5} ~ {costs[^1],-5}  서로 다른 값 {distinct,3}가지"
+            Console.WriteLine($"  {Naming.OfRarity(group.Key),-4} n={costs.Count,3}  {costs[0],5} ~ {costs[^1],-5}  서로 다른 값 {distinct,3}가지"
                               + (distinct <= 1 ? "  <- 한 값뿐" : ""));
         }
         Console.WriteLine();

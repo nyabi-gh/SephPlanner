@@ -34,6 +34,20 @@ namespace SephPlanner.Core.Planning
             return id.Length > 0 ? id : fallback;
         }
 
+        /// <summary>
+        /// 레어도를 게임이 부르는 대로. 게임 로컬라이제이션의 <c>ItemRarity_*</c> 값 그대로이며,
+        /// "커먼/레어" 같은 커뮤니티 은어를 화면이나 도구 출력에 쓰지 않기 위한 것이다.
+        /// 다국어를 하게 되면 이 표는 카탈로그 덤프로 옮긴다.
+        /// </summary>
+        public static string OfRarity(Rarity rarity) => rarity switch
+        {
+            Rarity.Uncommon => "고급",
+            Rarity.Rare => "희귀",
+            Rarity.Legend => "전설",
+            Rarity.Eternal => "영원",
+            _ => "일반",
+        };
+
         /// <summary>석판은 플레이어가 붙인 이름이 있으면 그쪽이 먼저다. 합성 석판이 여기 해당한다.</summary>
         public static string OfTablet(TabletPlacement placement)
         {
