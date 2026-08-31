@@ -537,3 +537,37 @@ PlayerAvatar -> GetComponent<WeaponControllerSimple>() -> currentWeapon.weaponTy
 그래서 두 가지를 둔다. 오버레이는 칸의 레벨이 아니라 **그 아티팩트가 실제로 받는 레벨**을 보여주고,
 남는 레벨이 있으면 색과 도움말로 알린다. 그리고 점수가 같은 배치 중에서는 덜 흘리는 쪽을 고르도록
 아주 작은 차이를 준다.
+
+## 프리셋 코드 (커스텀 로드아웃 공유)
+
+커뮤니티(디시 세피리아 갤러리, sephiria.wiki/builds)가 빌드 공략에 첨부하는
+`AAF_PRESET_OBFZ|v1…` 코드의 정체다. 게임의 `UI_PresetPanel`이 클립보드로 내보내고 들여온다
+(`CopyPresetToClipboard` / `PastePresetFromClipboard`). **빌드 인식 추천의 데이터 소스로 쓴다** —
+작성자가 공유 목적으로 만든 게임 네이티브 포맷이라, 공략 사이트를 긁는 방식의 라이선스·파싱
+문제가 전부 없다(docs/ROADMAP.md).
+
+### 인코딩
+
+```
+"AAF_PRESET_OBFZ|v1" + Base64( XOR( GZip( 평문 ) ) )
+```
+
+XOR 키는 `"ActionAnimalFarmPresetShareKey"`의 UTF-8 바이트를 순환 적용한다. 디코딩은 게임
+어셈블리 없이 재현 가능하다(`DeobfuscatePresetData` 디컴파일 확인).
+
+### 평문 구조 (`BuildCompactPresetData`)
+
+줄 단위 `접두사:값` 형식이고 첫 줄은 매직 `AAP1`이다.
+
+| 줄 | 내용 |
+|---|---|
+| `W:` | 시작 무기 엔티티 ID |
+| `C:` / `S:` | 코스튬 / 스킨 (URI 이스케이프) |
+| `F:` | **즐겨찾기 아티팩트 엔티티 ID 목록** (쉼표 구분). `Item_Favorite_{id}` 저장 키에서 오며 Eternal 레어도와 Hidden 은 제외 |
+| `P:` | 특성 포인트 `{id},{점수}` 목록 (세미콜론 구분, `PassiveDatabase`) |
+| `D:` | 차원 주머니 내용물 `{instanceID},{entityID},{수량}` 목록 |
+| `B:` | 과일 꼬치의 적응형 드롭 보너스 (기본 1이면 생략) |
+| `R:` | **과일 꼬치 카테고리 성향** `{카테고리},{값}` 목록 |
+
+`F:`(이 빌드가 노리는 아티팩트)와 `R:`(카테고리 드롭 성향)이 빌드 정의의 핵심이다. 가져오기
+쪽 검증은 `TryApplyCompactPresetData`가 하며, 소유하지 않은 코스튬 등은 기본값으로 보정한다.
