@@ -6,3 +6,4 @@ artifacts/
 data/generated/
 docs/research/decompiled/
 data/values/charms.draft.json
+.DS_Store
