@@ -102,7 +102,9 @@ public static class SnapshotReplay
 
     private static T? Load<T>(string fileName)
     {
-        var path = Path.Combine(PlannerData.DataDirectory, fileName);
-        return File.Exists(path) ? JsonSerializer.Deserialize<T>(File.ReadAllText(path), Options) : default;
+        var path = PlannerData.ActiveDataFile(fileName);
+        return path is not null && File.Exists(path)
+            ? JsonSerializer.Deserialize<T>(File.ReadAllText(path), Options)
+            : default;
     }
 }

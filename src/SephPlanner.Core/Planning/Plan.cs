@@ -80,11 +80,10 @@ namespace SephPlanner.Core.Planning
         /// </summary>
         public int SkippedOffers { get; set; }
 
-        /// <summary>
-        /// 게임이 계산해 둔 레벨과 우리 계산이 어긋난 칸 수. 0이 아니면 우리가 읽지 않는 효과가
-        /// 걸려 있다는 뜻이라, 점수를 그대로 믿으면 안 된다.
-        /// </summary>
-        public int LevelMismatches { get; set; }
+        public PlanVerification Verification { get; set; } = new PlanVerification();
+
+        /// <summary>기존 진단 도구와 표시 코드가 쓰는 레벨 차이 수.</summary>
+        public int LevelMismatches => Verification.LevelMismatches;
 
         /// <summary>제안된 배치에서 각 칸에 놓이는 아이템의 이름. 격자에 그대로 보여준다.</summary>
         public Dictionary<GridPos, string> Names { get; set; } = new Dictionary<GridPos, string>();
@@ -95,6 +94,13 @@ namespace SephPlanner.Core.Planning
         /// <summary>자동 배치 명령에 실어 보낼 최종 배치. 인스턴스마다 있어야 할 자리다.</summary>
         public List<PlanTarget> Targets { get; set; } = new List<PlanTarget>();
 
+        public long RequestGeneration { get; set; }
+        public string RequestFingerprint { get; set; } = "";
+        public string PlacementFingerprint { get; set; } = "";
+        public string PlanningContextFingerprint { get; set; } = "";
+        public string CatalogGeneration { get; set; } = "";
+        public string ExpectedWeaponId { get; set; } = "";
+
         public double Gain => Best.Score - Current.Score;
 
         public ApplyPlanCommand CreateApplyCommand() => new ApplyPlanCommand
@@ -102,6 +108,10 @@ namespace SephPlanner.Core.Planning
             ExpectedWidth = InventoryWidth,
             ExpectedHeight = InventoryHeight,
             ExpectedStorage = InventoryStorage,
+            ExpectedPlacementFingerprint = PlacementFingerprint,
+            ExpectedPlanningContextFingerprint = PlanningContextFingerprint,
+            ExpectedWeaponId = ExpectedWeaponId,
+            ExpectedCatalogGeneration = CatalogGeneration,
             Targets = new List<PlanTarget>(Targets),
         };
     }

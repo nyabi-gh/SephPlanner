@@ -1,11 +1,68 @@
-# P1 개선 작업 인수인계
+# P1 개선 작업 및 검증 인수인계
 
 작성일: 2026-09-01
 
 기준 커밋: `ee7e4f786f210465ce16b56fedeabfcfc9ff5ed5`
 
 이 문서는 macOS 코드 감사에서 확인한 P1 문제를 Windows 게임 설치 환경에서 수정하기 위한
-실행 계획이다. 이 문서를 작성한 시점에는 구현 코드를 바꾸지 않았다.
+실행 계획으로 시작했다. 초기 문서 작성 시점에는 구현 코드를 바꾸지 않았고,
+아래에 2026-09-01 구현 결과와 남은 Windows 검증을 추가했다.
+
+## 구현 상태 (2026-09-01)
+
+구현 작업 기준 HEAD는 `246cb6deafe13a12b111d2ba0d2a95231bf5ea5d`이다. 네 개 P1의 코드와
+회귀 테스트는 구현했다. 현재 인수 상태는 다음과 같다.
+
+- P1-1 코드 완료: 계획 검증을 `Unavailable/Passed/Failed`로 명시하고, 열린 모든 칸의
+  레벨·아이템 유효 레벨·disable·석판 `IsApplied`를 사전 검증한다.
+- P1-2 코드 완료: `PlanRunner`를 Core로 옮기고 generation, latest-pending, 오래된 완료 폐기,
+  실패 재시도, 배치/전체 지문을 구현했다.
+- P1-3 코드 완료: 가방이 차면 후보를 반드시 포함한 상태에서 charm/tablet/filler
+  교체를 열거하고, 실제 제거 인스턴스와 콤보 증감·상실을 사후 인벤토리 기준으로
+  계산한다.
+- P1-4 코드 완료: 세대별 디렉터리, 파일 크기/SHA-256 manifest, 원자적 active pointer,
+  지속적 `Refreshing/Failed/Ready` 상태, 게임 버전과 `Assembly-CSharp` MVID 검증을 추가했다.
+- 로컬 검증 완료: Core/DataTool Release 빌드 경고 0개·오류 0개, 테스트 176개 통과,
+  `git diff --check` 통과.
+- 남은 인수 조건: 이 변경 후 Plugin Release 빌드와 게임 내 수동 확인. macOS에는
+  `Assembly-CSharp.dll`, Mirror, Unity, TextMeshPro 등 게임 DLL이 없어 Plugin 전체 빌드를
+  완료할 수 없다.
+
+### 구현한 안전 불변식
+
+- 검증할 수 없거나 하나라도 다른 상태는 자동 배치에서 성공으로 간주하지 않는다.
+- 화면과 F8은 `RequestedGeneration == PublishedGeneration == Plan.RequestGeneration`인 계획만
+  현재 계획으로 취급한다.
+- 계획을 만든 배치 지문·무기·카탈로그 generation이 현재 상태와 다르면 쓰기 직전에
+  전체 명령을 취소한다. 지문이 비어 있는 예전 명령도 실행하지 않는다.
+- 실패하거나 중단된 카탈로그 generation은 이전 성공 상태를 재사용하지 못한다.
+- 가득 찬 가방 후보 평가에서 후보 자신을 탈락시킨 가짜 0점 계획은 유효하지 않다.
+- 콤보 진행도는 `현재 + 후보 - 실제 교체 대상`의 순변화로 계산하며, 임계값
+  상실은 음수 가치로 반영한다.
+
+### 회귀 테스트
+
+새 테스트는 주로 다음 파일에 있다.
+
+- `PlanBuilderTests`: sparse level matrix, 아이템 유효 레벨, disable, 석판 적용 불일치
+- `AutoPlacePolicyTests`: 최신 generation, 카탈로그 generation, Core/실시간 검증 사유
+- `PlanRunnerTests`: latest-pending, 오래된 완료 폐기, 실패 후 재시도, 추천 설정 재계산
+- `PlanFingerprintTests`: 목록 순서 독립성, 무기/추천 설정/수동 가치표 변경
+- `ApplyPlanValidatorTests`: 무기·배치 지문 변경과 빈 지문의 fail-closed 처리
+- `CatalogBundleStoreTests`: 완전 게시, 중단/실패, 변조, 게임 버전/MVID, 검증 실패
+  generation의 이전 성공 미재사용
+- `OfferAdvisorTests`, `OfferPreviewTests`: 후보 강제 포함, 음수 gain, 구조화 교체 대상,
+  charm/tablet/filler 교체, 동점 결정, 콤보 완성/상실, preview 일치
+
+### Windows 최종 검증 시 기록할 것
+
+아래 `Windows 검증 명령`과 `게임 내 수동 확인표`를 변경 후 코드로 다시 실행한다.
+인수 기록에는 다음을 남긴다.
+
+- 실제 게임 버전과 `Assembly-CSharp.dll` MVID
+- Plugin Release 빌드의 경고/오류 수
+- F9 정상 완료 후 생성된 active generation과 질의 검증 비교/불일치 수
+- 아래 수동 시나리오의 통과/실패와 `BepInEx/LogOutput.log`의 관련 한 줄
 
 ## 범위
 
@@ -20,7 +77,7 @@
 배치 가능 여부를 중앙화할 때 멀티플레이 조건도 같은 결정 객체를 사용하게 만들어, 후속 P0 작업이
 한 곳에서 끝나도록 한다.
 
-## 현재 기준선
+## 초기 기준선
 
 macOS에서 게임 DLL 비의존 범위는 다음과 같이 검증됐다.
 

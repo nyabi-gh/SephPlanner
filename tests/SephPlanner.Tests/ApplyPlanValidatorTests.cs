@@ -64,6 +64,41 @@ public class ApplyPlanValidatorTests
             ApplyPlanValidator.Validate(Command(), LiveItems(), width: 6, height: 7, storage: 12));
     }
 
+    [Fact]
+    public void AChangedWeaponStopsTheWholePlan()
+    {
+        var command = Command();
+        command.ExpectedWeaponId = "Sword";
+
+        Assert.Contains(
+            "인벤토리가 바뀌어",
+            ApplyPlanValidator.Validate(
+                command, LiveItems(), width: 6, height: 7, storage: 6, weaponId: "Dagger"));
+    }
+
+    [Fact]
+    public void AChangedPlacementFingerprintStopsTheWholePlan()
+    {
+        var command = Command();
+        command.ExpectedPlacementFingerprint = "old";
+
+        Assert.Contains(
+            "인벤토리가 바뀌어",
+            ApplyPlanValidator.Validate(
+                command, LiveItems(), width: 6, height: 7, storage: 6,
+                livePlacementFingerprint: "new"));
+    }
+
+    [Fact]
+    public void AMissingPlacementFingerprintFailsClosedWhenLiveStateIsProvided()
+    {
+        Assert.Contains(
+            "인벤토리가 바뀌어",
+            ApplyPlanValidator.Validate(
+                Command(), LiveItems(), width: 6, height: 7, storage: 6,
+                livePlacementFingerprint: "current"));
+    }
+
     private static ApplyPlanCommand Command() => new()
     {
         ExpectedWidth = 6,

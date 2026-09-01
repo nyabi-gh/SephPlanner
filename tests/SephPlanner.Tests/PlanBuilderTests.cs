@@ -74,6 +74,7 @@ public class PlanBuilderTests
         Assert.NotNull(plan);
         Assert.Equal(3, plan!.Current.Score, 3);
         Assert.Equal(0, plan.LevelMismatches);
+        Assert.Equal(PlanVerificationStatus.Passed, plan.Verification.Status);
         Assert.Equal("C", plan.Names[plan.Best.CharmPositions[10]]);
         Assert.All(plan.Targets, target => Assert.Equal(target.From, target.To));
 
@@ -100,6 +101,60 @@ public class PlanBuilderTests
         var plan = PlanBuilder.Build(Snapshot(enchant: 0, reportedLevel: 4), Catalog());
 
         Assert.Equal(1, plan!.LevelMismatches);
+        Assert.Empty(plan.Targets);
+    }
+
+    [Fact]
+    public void ALevelMissingFromTheSparseMatrixIsComparedAsZero()
+    {
+        var snapshot = Snapshot();
+        snapshot.Inventory!.LevelMatrix.Clear();
+
+        var plan = PlanBuilder.Build(snapshot, Catalog());
+
+        Assert.Equal(PlanVerificationStatus.Failed, plan!.Verification.Status);
+        Assert.Equal(1, plan.LevelMismatches);
+        Assert.Empty(plan.Targets);
+    }
+
+    [Fact]
+    public void AnItemEffectiveLevelMismatchIsNotHiddenByTheCellMatrix()
+    {
+        var snapshot = Snapshot();
+        snapshot.Inventory!.Items[0].EffectiveLevel = 4;
+
+        var plan = PlanBuilder.Build(snapshot, Catalog());
+
+        Assert.Equal(0, plan!.LevelMismatches);
+        Assert.Equal(1, plan.Verification.EffectiveLevelMismatches);
+        Assert.Equal(PlanVerificationStatus.Failed, plan.Verification.Status);
+        Assert.Empty(plan.Targets);
+    }
+
+    [Fact]
+    public void ADisabledCellMismatchLocksAutomaticPlacement()
+    {
+        var snapshot = Snapshot();
+        snapshot.Inventory!.DisabledCells.Add("1,0");
+        snapshot.Inventory.Items[0].IsActive = false;
+
+        var plan = PlanBuilder.Build(snapshot, Catalog());
+
+        Assert.Equal(PlanVerificationStatus.Failed, plan!.Verification.Status);
+        Assert.True(plan.Verification.DisabledMismatches > 0);
+        Assert.Empty(plan.Targets);
+    }
+
+    [Fact]
+    public void ATabletApplicationMismatchLocksAutomaticPlacement()
+    {
+        var snapshot = Snapshot();
+        snapshot.Inventory!.Tablets[0].IsApplied = false;
+
+        var plan = PlanBuilder.Build(snapshot, Catalog());
+
+        Assert.Equal(PlanVerificationStatus.Failed, plan!.Verification.Status);
+        Assert.Equal(1, plan.Verification.TabletMismatches);
         Assert.Empty(plan.Targets);
     }
 

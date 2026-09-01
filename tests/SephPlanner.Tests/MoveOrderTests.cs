@@ -42,8 +42,24 @@ public class MoveOrderTests
         });
 
         // 상한이 작은 쪽이 좋은 칸(왼쪽)을 차지하고 있다. 서로 바꿔야 이득이다.
-        inventory.Items.Add(new PlacedItem { DefinitionId = SmallCharm, InstanceId = 10, Position = new GridPos(0, 0) });
-        inventory.Items.Add(new PlacedItem { DefinitionId = BigCharm, InstanceId = 11, Position = new GridPos(2, 0) });
+        inventory.Items.Add(new PlacedItem
+        {
+            DefinitionId = SmallCharm,
+            InstanceId = 10,
+            Position = new GridPos(0, 0),
+            EffectiveLevel = 2,
+            IsActive = true,
+        });
+        inventory.Items.Add(new PlacedItem
+        {
+            DefinitionId = BigCharm,
+            InstanceId = 11,
+            Position = new GridPos(2, 0),
+            EffectiveLevel = 1,
+            IsActive = true,
+        });
+        inventory.LevelMatrix["0,0"] = 2;
+        inventory.LevelMatrix["2,0"] = 1;
 
         return new GameSnapshot { Inventory = inventory };
     }

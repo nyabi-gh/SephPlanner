@@ -638,6 +638,13 @@ namespace SephPlanner.Core.Solver
             arrangement.UnplacedTablets = problem.Tablets.Count - layout.Count;
             arrangement.Score += Familiarity(problem, layout);
 
+            for (var i = 0; i < problem.Tablets.Count && i < layout.Count && i < result.Applied.Length; i++)
+            {
+                arrangement.AppliedTablets[problem.Tablets[i].InstanceId] = result.Applied[i];
+                arrangement.TabletPositions[problem.Tablets[i].InstanceId] =
+                    new TabletSpot(layout[i].Position, layout[i].Rotation);
+            }
+
             // 하얀 종이 같은 이웃 의존 가치를 최종 배치 기준으로 다시 매긴다.
             var neighbors = CharmsByCell(problem, positions);
 
@@ -677,6 +684,7 @@ namespace SephPlanner.Core.Solver
                 arrangement.CellLevels[cell] = arrangement.Levels.TryGetValue(cell, out var withEnchant)
                     ? withEnchant
                     : result.EffectiveLevel(cell, 0);
+                if (result.IsDisabled(cell)) arrangement.DisabledCells.Add(cell);
             }
             return arrangement;
         }

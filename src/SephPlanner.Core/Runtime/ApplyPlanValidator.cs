@@ -16,12 +16,19 @@ namespace SephPlanner.Core.Runtime
     {
         public static string? Validate(
             ApplyPlanCommand command, IReadOnlyCollection<LivePlanItem> liveItems,
-            int width, int height, int storage)
+            int width, int height, int storage,
+            string? livePlacementFingerprint = null, string? weaponId = null)
         {
             if (command.Targets is null || command.Targets.Count == 0)
                 return "적용할 배치가 없습니다.";
             if (command.ExpectedWidth != width || command.ExpectedHeight != height ||
                 command.ExpectedStorage != storage)
+                return Changed();
+            if (livePlacementFingerprint is not null &&
+                (command.ExpectedPlacementFingerprint.Length == 0 ||
+                 command.ExpectedPlacementFingerprint != livePlacementFingerprint))
+                return Changed();
+            if (weaponId is not null && command.ExpectedWeaponId != weaponId)
                 return Changed();
 
             var liveById = new Dictionary<int, LivePlanItem>();

@@ -26,6 +26,12 @@ namespace SephPlanner.Plugin
         {
             if (!CatalogDump.QueryVerificationPassed())
                 return "석판 질의 검증이 완료되지 않았거나 실패해 자동 배치를 실행하지 않습니다. F9로 데이터를 다시 만드세요.";
+            if (command.ExpectedCatalogGeneration.Length == 0 ||
+                command.ExpectedCatalogGeneration != CatalogDump.ActiveGeneration)
+                return "계획을 만든 카탈로그가 더 이상 최신이 아니어서 자동 배치를 실행하지 않습니다.";
+            if (command.ExpectedPlacementFingerprint.Length == 0 ||
+                command.ExpectedPlanningContextFingerprint.Length == 0)
+                return "계획의 상태 지문이 없어 자동 배치를 실행하지 않습니다.";
 
             if (GameReader.IsMultiplayerSession() && !allowMultiplayer)
                 return "멀티플레이 세션에서는 자동 배치를 실행하지 않습니다. 설정에서 열 수 있습니다(실험).";
@@ -40,8 +46,15 @@ namespace SephPlanner.Plugin
             if (inventory == null || avatar.IsDead)
                 return "적용할 인벤토리가 없습니다.";
 
+            var liveSnapshot = GameReader.Read(0, includeRecommendations: false);
+            var livePlacementFingerprint = PlanFingerprint.Placement(
+                liveSnapshot, command.ExpectedPlanningContextFingerprint);
+            var liveWeaponId = liveSnapshot.Run?.WeaponId ?? "";
+
             // 명령이 만들어진 뒤 상태가 바뀌었을 수 있다. 하나라도 어긋나면 통째로 물러선다.
-            var error = Validate(command, inventory, out var positions, out var occupants);
+            var error = Validate(
+                command, inventory, livePlacementFingerprint, liveWeaponId,
+                out var positions, out var occupants);
             if (error != null) return error;
 
             var journal = new List<KeyValuePair<GridPos, GridPos>>();
@@ -60,6 +73,7 @@ namespace SephPlanner.Plugin
 
         private static string Validate(
             ApplyPlanCommand command, GridInventory inventory,
+            string livePlacementFingerprint, string liveWeaponId,
             out Dictionary<int, GridPos> positions, out Dictionary<GridPos, int> occupants)
         {
             positions = new Dictionary<int, GridPos>();
@@ -114,7 +128,8 @@ namespace SephPlanner.Plugin
             }
 
             var stateError = ApplyPlanValidator.Validate(
-                command, liveItems, inventory.Width, inventory.Height, inventory.CurrentInventoryStorage);
+                command, liveItems, inventory.Width, inventory.Height, inventory.CurrentInventoryStorage,
+                livePlacementFingerprint, liveWeaponId);
             if (stateError != null) return stateError;
 
             foreach (var target in command.Targets)

@@ -144,6 +144,9 @@ namespace SephPlanner.Core.Solver
 
         public int Count => _byEntity.Count + _byId.Count;
 
+        internal IEnumerable<KeyValuePair<int, CharmValueEntry>> EntityValues => _byEntity;
+        internal IEnumerable<KeyValuePair<string, CharmValueEntry>> IdValues => _byId;
+
         /// <summary>
         /// 엔티티 번호를 먼저 본다. 게임 패치로 번호가 밀리면 식별자가 받아 주는데, 그때
         /// 번호로 잘못 찾는 일이 없도록 번호가 가리킨 항목의 식별자가 다르면 식별자를 믿는다.

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using BepInEx;
 using BepInEx.Configuration;
-using Newtonsoft.Json;
+using Mirror;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
 using SephPlanner.Plugin.Ui;
@@ -21,9 +21,9 @@ namespace SephPlanner.Plugin
 
         private PluginSettings _settings;
         private float _nextPoll;
-        private string _lastStateJson;
         private bool _catalogChecked;
-        private string _lastSimulationIssue;
+        private PlanVerificationStatus _simulationVerification;
+        private string _simulationReason = "실시간 시뮬레이션 검증이 아직 완료되지 않았습니다.";
         private string _lastSephiriteReport;
         private int _verifiedTablets;
 
@@ -45,15 +45,14 @@ namespace SephPlanner.Plugin
         private bool _hidden;
         private bool _hadOffers;
         private bool _moving;
+        private bool _panelEnabledLastFrame;
+        private bool _panelAwaitingRefresh;
 
         /// <summary>지금 미리보고 있는 후보. 빈 문자열이면 미리보기가 꺼져 있다.</summary>
         private string _previewKey = "";
 
-        /// <summary>마지막으로 풀 때 쓴 빌드 지정. 달라졌으면 스냅샷이 그대로여도 다시 푼다.</summary>
-        private int _solvedRevision = -1;
-
-        /// <summary>솔버가 바빠 받아주지 못한 변경이 남아 있다. 받아줄 때까지 다시 낸다.</summary>
-        private bool _resubmit;
+        private string _currentPlacementFingerprint = "";
+        private string _currentCatalogGeneration = "";
         private string _autoPlaceResult = "";
         private float _autoPlaceShownUntil;
 
@@ -68,6 +67,10 @@ namespace SephPlanner.Plugin
 
         private void Update()
         {
+            var panelEnabled = _settings.Panel.Value;
+            if (panelEnabled && !_panelEnabledLastFrame) _panelAwaitingRefresh = true;
+            _panelEnabledLastFrame = panelEnabled;
+
             if (_settings.DumpKey.Value.IsDown()) StartDump();
             if (_settings.InventoryDumpKey.Value.IsDown()) DumpInventory();
             // 화면 스위치 밖이어야 한다. 화면을 끈 뒤 이 키까지 죽으면 되켤 길이 없다.
@@ -127,6 +130,17 @@ namespace SephPlanner.Plugin
         private System.Collections.IEnumerator DumpRoutine()
         {
             _dumping = true;
+            string generation;
+            try
+            {
+                generation = CatalogDump.BeginRefresh();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("데이터 덤프를 시작하지 못했습니다: " + ex);
+                _dumping = false;
+                yield break;
+            }
 
             // 정의가 바뀌었을 수 있으므로 인게임 풀이가 쓰던 카탈로그를 버리고 다시 짓게 한다.
             CatalogSource.Invalidate();
@@ -139,6 +153,7 @@ namespace SephPlanner.Plugin
                 {
                     Logger.LogError("데이터 덤프 보류 - 카탈로그 준비 실패: " + CatalogSource.LastError +
                                     ". 게임 화면이 열린 뒤 F9로 다시 시도하세요.");
+                    FailDump(generation, "카탈로그 준비 실패: " + CatalogSource.LastError);
                     _dumping = false;
                     yield break;
                 }
@@ -147,21 +162,40 @@ namespace SephPlanner.Plugin
 
             // 이터레이터 안에서 던진 예외를 그대로 두면 코루틴이 죽으면서 _dumping 이 영영 참으로
             // 남는다. 한 걸음씩 감싸서 실패해도 플래그를 되돌린다.
-            var steps = CatalogDump.WriteRoutine(Logger.LogInfo);
+            var steps = CatalogDump.WriteRoutine(Logger.LogInfo, generation);
+            var completed = false;
             while (true)
             {
                 try
                 {
-                    if (!steps.MoveNext()) break;
+                    if (!steps.MoveNext())
+                    {
+                        completed = true;
+                        break;
+                    }
                 }
                 catch (Exception ex)
                 {
                     Logger.LogError("데이터 덤프 실패: " + ex);
+                    FailDump(generation, ex.Message);
                     break;
                 }
                 yield return steps.Current;
             }
+            if (completed) CatalogSource.Invalidate();
             _dumping = false;
+        }
+
+        private void FailDump(string generation, string reason)
+        {
+            try
+            {
+                CatalogDump.FailRefresh(generation, reason);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("카탈로그 실패 상태도 기록하지 못했습니다: " + ex);
+            }
         }
 
         private void DumpInventory()
@@ -182,14 +216,9 @@ namespace SephPlanner.Plugin
             try
             {
                 var snapshot = GameReader.Read(_settings.OfferRadius.Value);
-                VerifySimulation();
+                VerifySimulation(GameReader.CheckSimulation());
                 ReportSephirites(snapshot);
-
-                var json = JsonConvert.SerializeObject(snapshot);
-                var changed = json != _lastStateJson;
-                _lastStateJson = json;
-
-                FeedNativePanel(snapshot, changed);
+                FeedNativePanel(snapshot);
             }
             catch (Exception ex)
             {
@@ -211,18 +240,20 @@ namespace SephPlanner.Plugin
             Logger.LogInfo($"세피라이트 {(report.Length == 0 ? "없음" : report)} -> 후보 {snapshot.Offers.Count}개");
         }
 
-        private void VerifySimulation()
+        private void VerifySimulation(RuntimeSimulationCheck verification)
         {
-            var issue = GameReader.CheckSimulation();
-            if (issue != _lastSimulationIssue)
+            var changed = verification.Status != _simulationVerification ||
+                          verification.Reason != _simulationReason;
+            _simulationVerification = verification.Status;
+            _simulationReason = verification.Reason;
+            if (changed && verification.Status == PlanVerificationStatus.Failed)
             {
-                _lastSimulationIssue = issue;
-                if (issue != null) Logger.LogWarning("시뮬레이터 불일치: " + issue);
+                Logger.LogWarning(verification.Reason);
             }
 
             // 일치할 때 아무것도 남기지 않으면 검증이 돌았는지조차 알 수 없다.
             var checkedTablets = SimulationVerifier.LastCheckedTablets;
-            if (issue == null && checkedTablets > _verifiedTablets)
+            if (verification.Status == PlanVerificationStatus.Passed && checkedTablets > _verifiedTablets)
             {
                 _verifiedTablets = checkedTablets;
                 Logger.LogInfo($"시뮬레이터 검증 통과 - 석판 {checkedTablets}개와 칸별 레벨까지 일치");
@@ -233,7 +264,7 @@ namespace SephPlanner.Plugin
         /// 인게임 화면이 쓸 배치를 푼다. 스냅샷이 그대로면
         /// 다시 풀지 않는다 - 같은 답을 얻자고 매번 빔 서치를 돌릴 이유가 없다.
         /// </summary>
-        private void FeedNativePanel(GameSnapshot snapshot, bool changed)
+        private void FeedNativePanel(GameSnapshot snapshot)
         {
             _lastSnapshot = snapshot;
             if (!_settings.Panel.Value) return;
@@ -261,22 +292,12 @@ namespace SephPlanner.Plugin
                 _runner = new PlanRunner(catalog);
             }
 
-            // 빌드 지정이 바뀌면 스냅샷이 그대로여도 답이 달라진다. 그대로 두면 창에서 콤보를
-            // 켠 것이 다음에 물건을 옮길 때까지 아무 일도 하지 않는 것처럼 보인다.
-            var stale = _solvedRevision != _prefs.Revision;
-            if (!changed && !stale && !_resubmit && _runner.Latest != null) return;
-
-            // 거절된 변경은 _lastStateJson 이 이미 갱신돼 다음 폴링에 "그대로"로 보인다.
-            // 받아들여질 때까지 최신 스냅샷으로 다시 낸다.
-            if (_runner.Submit(snapshot, Preferences()))
-            {
-                _solvedRevision = _prefs.Revision;
-                _resubmit = false;
-            }
-            else
-            {
-                _resubmit = true;
-            }
+            var preferences = Preferences();
+            _currentCatalogGeneration = CatalogDump.ActiveGeneration;
+            _currentPlacementFingerprint = PlanFingerprint.Placement(
+                snapshot, preferences, _currentCatalogGeneration);
+            _runner.Submit(snapshot, preferences, _currentCatalogGeneration);
+            _panelAwaitingRefresh = false;
         }
 
         /// <summary>빌드 창이 목록을 채울 재료. 창은 열려 있는 동안 시간이 멈추므로 그때 한 번 읽는다.</summary>
@@ -284,7 +305,7 @@ namespace SephPlanner.Plugin
         {
             Catalog = _runner != null ? CatalogSource.Get() : null,
             Snapshot = _lastSnapshot,
-            Plan = _runner != null ? _runner.Latest : null,
+            Plan = CurrentPlan(),
             Recommendations = _settings.Recommendations.Value,
         };
 
@@ -358,17 +379,30 @@ namespace SephPlanner.Plugin
                 return;
             }
 
-            var error = _runner?.Error;
+            if (_panelAwaitingRefresh)
+            {
+                _hud.RenderNotice("최신 게임 상태를 읽는 중입니다.");
+                return;
+            }
+
+            var state = _runner?.State;
+            var error = state?.Error;
             if (error != null)
             {
                 _hud.RenderNotice("계산 실패 - " + error);
                 return;
             }
 
-            var plan = _runner?.Latest;
+            if (state == null || !state.IsCurrent)
+            {
+                _hud.RenderNotice(Waiting(state));
+                return;
+            }
+
+            var plan = state.Latest;
             if (plan == null)
             {
-                _hud.RenderNotice(Waiting());
+                _hud.RenderNotice(Waiting(state));
                 return;
             }
 
@@ -404,6 +438,8 @@ namespace SephPlanner.Plugin
                 Recommendations = _settings.Recommendations.Value,
                 MultiplayerAutoPlace = _settings.MultiplayerAutoPlace.Value,
                 QueryVerified = CatalogDump.QueryVerificationPassed(),
+                RuntimeVerification = _simulationVerification,
+                RuntimeVerificationReason = _simulationReason,
                 Hint = Hint(plan, preview),
                 HintIsPreview = preview != null,
                 PreviewKey = _previewKey,
@@ -417,11 +453,11 @@ namespace SephPlanner.Plugin
         /// 말해서 영영 계산만 하는 것처럼 보였다. 탐험을 새로 시작해도 아티팩트를 하나 줍기
         /// 전까지는 풀 것이 없으므로 늘 그 상태다.
         /// </summary>
-        private string Waiting()
+        private string Waiting(PlanRunState state)
         {
-            if (_runner == null) return "데이터 준비 중";
+            if (state == null) return "데이터 준비 중";
 
-            switch (_runner.Blocker)
+            switch (state.Blocker)
             {
                 case PlanBlocker.NoCharms:
                     return "가방에 아티팩트가 없습니다. 하나 주우면 배치를 계산합니다.";
@@ -462,7 +498,7 @@ namespace SephPlanner.Plugin
         /// </summary>
         private void CyclePreview()
         {
-            var plan = _runner != null ? _runner.Latest : null;
+            var plan = CurrentPlan();
             var keys = new List<string>();
             if (plan != null)
             {
@@ -569,14 +605,13 @@ namespace SephPlanner.Plugin
         /// </summary>
         private string Guide()
         {
-            var plan = _runner != null ? _runner.Latest : null;
+            var state = _runner?.State;
+            var plan = state != null && state.IsCurrent ? state.Latest : null;
             var text = Describe(_settings.ExpandKey) + (_expanded ? " 접기" : " 펼치기");
 
-            var canAutoPlace = plan != null && plan.HasPlacementChanges && plan.Targets.Count > 0 &&
-                               CatalogDump.QueryVerificationPassed() &&
-                               (_lastSnapshot == null || !_lastSnapshot.IsMultiplayer ||
-                                _settings.MultiplayerAutoPlace.Value);
-            if (canAutoPlace)
+            var decision = AutoPlaceAvailability(
+                _lastSnapshot, state, _currentPlacementFingerprint, _currentCatalogGeneration);
+            if (decision.Allowed)
                 text += "   " + Describe(_settings.AutoPlaceKey) + " 자동 배치";
 
             if (plan != null && plan.Offers.Count > 0)
@@ -616,25 +651,23 @@ namespace SephPlanner.Plugin
         /// </summary>
         private void AutoPlace()
         {
-            var plan = _runner?.Latest;
-            if (!CatalogDump.QueryVerificationPassed())
-            {
-                Report("석판 질의 검증이 끝나지 않아 자동 배치를 사용할 수 없습니다. F9로 데이터를 다시 만드세요.");
-                return;
-            }
-            if (plan?.LevelMismatches > 0)
-            {
-                Report("게임과 계산 레벨이 달라 자동 배치를 사용할 수 없습니다.");
-                return;
-            }
-            if (plan == null || plan.Targets.Count == 0 || !plan.HasPlacementChanges)
-            {
-                Report("옮길 것이 없습니다.");
-                return;
-            }
-
             try
             {
+                var snapshot = GameReader.Read(_settings.OfferRadius.Value);
+                VerifySimulation(GameReader.CheckSimulation());
+                FeedNativePanel(snapshot);
+
+                var state = _runner?.State;
+                var generation = CatalogDump.ActiveGeneration;
+                var fingerprint = PlanFingerprint.Placement(snapshot, Preferences(), generation);
+                var decision = AutoPlaceAvailability(snapshot, state, fingerprint, generation);
+                if (!decision.Allowed)
+                {
+                    Report(decision.Reason);
+                    return;
+                }
+
+                var plan = state.Latest;
                 var result = PlanApplier.Apply(
                     plan.CreateApplyCommand(), _settings.MultiplayerAutoPlace.Value);
                 Logger.LogInfo(result);
@@ -649,6 +682,28 @@ namespace SephPlanner.Plugin
             // 적용 결과가 화면에 바로 보이도록 다음 폴링을 기다리지 않는다.
             _nextPoll = 0;
         }
+
+        private Plan CurrentPlan()
+        {
+            var state = _runner?.State;
+            return state != null && state.IsCurrent ? state.Latest : null;
+        }
+
+        private AutoPlaceDecision AutoPlaceAvailability(
+            GameSnapshot snapshot, PlanRunState state,
+            string placementFingerprint, string catalogGeneration) =>
+            AutoPlacePolicy.Evaluate(new AutoPlaceContext
+            {
+                Runner = state,
+                CatalogVerified = CatalogDump.QueryVerificationPassed(),
+                CatalogGeneration = catalogGeneration,
+                RuntimeVerification = _simulationVerification,
+                RuntimeVerificationReason = _simulationReason,
+                CurrentPlacementFingerprint = placementFingerprint,
+                IsMultiplayer = snapshot != null && snapshot.IsMultiplayer,
+                AllowMultiplayer = _settings.MultiplayerAutoPlace.Value,
+                ServerActive = NetworkServer.active,
+            });
 
         /// <summary>
         /// 커서 위치. 게임이 새 InputSystem 을 쓰므로 그쪽을 먼저 본다. 구식 <c>Input</c> 은

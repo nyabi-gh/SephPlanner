@@ -189,6 +189,174 @@ public class OfferAdvisorTests
 
         // 레어도가 낮은 쪽이 밀려나야 하고, 그 이름이 그대로 나와야 한다.
         Assert.Equal("낡은 반지", advice[0].Displaced);
+        Assert.True(advice[0].CandidatePlaced);
+        var displacement = Assert.IsType<OfferDisplacement>(advice[0].Displacement);
+        Assert.Equal(10, displacement.InstanceId);
+        Assert.Equal("charm", displacement.Kind);
+    }
+
+    [Fact]
+    public void AWeakCandidateInAFullBagCannotDropItself()
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(6, 7, 1) };
+        problem.Charms.Add(new CharmSlot
+        {
+            InstanceId = 10,
+            Definition = new CharmDefinition { MaxLevel = 5, Rarity = Rarity.Eternal },
+        });
+        var candidate = new OfferCandidate
+        {
+            Kind = "charm",
+            Name = "dormant",
+            Charm = new CharmDefinition { MaxLevel = 5 },
+            CharmIsDormant = true,
+        };
+
+        var advice = Assert.Single(OfferAdvisor.Rank(problem, new[] { candidate }, gold: 0));
+
+        Assert.True(advice.Available);
+        Assert.True(advice.CandidatePlaced);
+        Assert.Equal(10, advice.Displacement!.InstanceId);
+        Assert.True(advice.Gain < 0, $"교체 손실이 음수여야 하는데 {advice.Gain}");
+    }
+
+    [Fact]
+    public void ReplacingTheSameCategoryDoesNotInventComboProgress()
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(6, 7, 1) };
+        problem.Charms.Add(new CharmSlot
+        {
+            InstanceId = 10,
+            Definition = new CharmDefinition
+            {
+                MaxLevel = 5,
+                Categories = { "EMBER" },
+            },
+        });
+        var counts = new Dictionary<string, int> { ["EMBER"] = 1 };
+
+        var advice = Assert.Single(OfferAdvisor.Rank(
+            problem, new[] { Charm("new-ember", "EMBER") }, 0, counts, FindCombo));
+
+        Assert.Equal(10, advice.Displacement!.InstanceId);
+        Assert.False(advice.ComboCompletes);
+        Assert.False(advice.ComboLoses);
+        Assert.Equal("", advice.ComboText);
+        Assert.Equal(0, advice.ComboBonus);
+    }
+
+    [Fact]
+    public void ReplacingAnotherCategoryAccountsForComboLoss()
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(6, 7, 1) };
+        problem.Charms.Add(new CharmSlot
+        {
+            InstanceId = 10,
+            Definition = new CharmDefinition
+            {
+                MaxLevel = 5,
+                Categories = { "EMBER" },
+            },
+        });
+        var combos = new Dictionary<string, ComboDefinition>(Combos)
+        {
+            ["FROST"] = new ComboDefinition { Id = "FROST", Thresholds = { 2 } },
+        };
+        var counts = new Dictionary<string, int> { ["EMBER"] = 2, ["FROST"] = 0 };
+
+        var advice = Assert.Single(OfferAdvisor.Rank(
+            problem, new[] { Charm("frost", "FROST") }, 0, counts,
+            id => combos.TryGetValue(id, out var combo) ? combo : null));
+
+        Assert.True(advice.ComboLoses);
+        Assert.Contains("잉걸불 1/2", advice.ComboText);
+        Assert.True(advice.ComboBonus < 0);
+    }
+
+    [Fact]
+    public void ATabletCandidateIsMandatoryInAFullBag()
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(6, 7, 1) };
+        problem.Charms.Add(new CharmSlot
+        {
+            InstanceId = 10,
+            Definition = new CharmDefinition { MaxLevel = 5 },
+        });
+        var tablet = Tablet("offered-tablet", "RIGHT 1", price: 0);
+
+        var advice = Assert.Single(OfferAdvisor.Rank(problem, new[] { tablet }, gold: 0));
+
+        Assert.True(advice.CandidatePlaced);
+        Assert.Equal(10, advice.Displacement!.InstanceId);
+    }
+
+    [Fact]
+    public void AFullBagCanDisplaceAFiller()
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(6, 7, 1) };
+        problem.Charms.Add(new CharmSlot
+        {
+            InstanceId = 10,
+            IsFiller = true,
+            Definition = new CharmDefinition(),
+        });
+
+        var advice = Assert.Single(OfferAdvisor.Rank(
+            problem, new[] { Charm("candidate") }, gold: 0));
+
+        Assert.Equal("filler", advice.Displacement!.Kind);
+        Assert.True(advice.CandidatePlaced);
+    }
+
+    [Fact]
+    public void AFullBagCanDisplaceATablet()
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(6, 7, 1) };
+        problem.Tablets.Add(new TabletSlot
+        {
+            InstanceId = 10,
+            Definition = new TabletDefinition { Id = "held" },
+        });
+
+        var advice = Assert.Single(OfferAdvisor.Rank(
+            problem, new[] { Charm("candidate") }, gold: 0));
+
+        Assert.Equal("tablet", advice.Displacement!.Kind);
+        Assert.True(advice.CandidatePlaced);
+    }
+
+    [Fact]
+    public void EqualDisplacementsUseTheLowestInstanceId()
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(6, 7, 2) };
+        problem.Charms.Add(new CharmSlot
+        {
+            InstanceId = 20,
+            Definition = new CharmDefinition { MaxLevel = 5 },
+        });
+        problem.Charms.Add(new CharmSlot
+        {
+            InstanceId = 10,
+            Definition = new CharmDefinition { MaxLevel = 5 },
+        });
+
+        var advice = Assert.Single(OfferAdvisor.Rank(
+            problem, new[] { Charm("candidate") }, gold: 0));
+
+        Assert.Equal(10, advice.Displacement!.InstanceId);
+    }
+
+    [Fact]
+    public void NoRemovableSlotReturnsUnavailableInsteadOfAZeroPointRecommendation()
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(6, 7, 0) };
+
+        var advice = Assert.Single(OfferAdvisor.Rank(
+            problem, new[] { Charm("unavailable") }, gold: 0));
+
+        Assert.False(advice.Available);
+        Assert.False(advice.CandidatePlaced);
+        Assert.Null(advice.Preview);
     }
 
     [Fact]

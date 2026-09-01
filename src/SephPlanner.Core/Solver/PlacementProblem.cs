@@ -147,6 +147,12 @@ namespace SephPlanner.Core.Solver
     {
         public List<TabletPlacement> Tablets { get; } = new List<TabletPlacement>();
 
+        /// <summary>석판 인스턴스 번호별 시뮬레이션 적용 여부.</summary>
+        public Dictionary<int, bool> AppliedTablets { get; } = new Dictionary<int, bool>();
+
+        /// <summary>석판 인스턴스 번호별 최종 자리와 회전.</summary>
+        public Dictionary<int, TabletSpot> TabletPositions { get; } = new Dictionary<int, TabletSpot>();
+
         /// <summary>아티팩트 인스턴스 번호 → 배치된 칸.</summary>
         public Dictionary<int, GridPos> CharmPositions { get; } = new Dictionary<int, GridPos>();
 
@@ -166,6 +172,9 @@ namespace SephPlanner.Core.Solver
         /// 빈 칸에 걸린 효과(각인 등)의 어긋남을 놓쳐 "점수를 믿어도 되는가"의 신호가 절반이 된다.
         /// </summary>
         public Dictionary<GridPos, int> CellLevels { get; } = new Dictionary<GridPos, int>();
+
+        /// <summary>시뮬레이션 결과 disable 행렬이 양수인 열린 칸.</summary>
+        public HashSet<GridPos> DisabledCells { get; } = new HashSet<GridPos>();
 
         /// <summary>
         /// 그 칸의 아티팩트가 실제로 받는 레벨. 아티팩트마다 상한이 달라 칸의 레벨보다 낮을 수 있다.

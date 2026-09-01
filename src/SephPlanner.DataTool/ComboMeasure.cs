@@ -12,8 +12,8 @@ public static class ComboMeasure
 {
     public static int Run()
     {
-        var path = Path.Combine(PlannerData.DataDirectory, PlannerData.StatMeasurementFile);
-        if (!File.Exists(path))
+        var path = PlannerData.ActiveDataFile(PlannerData.StatMeasurementFile);
+        if (path is null || !File.Exists(path))
         {
             Console.Error.WriteLine($"측정 자료가 없습니다: {path}");
             Console.Error.WriteLine("게임을 한 번 켜서 카탈로그를 다시 덤프하세요(F9).");

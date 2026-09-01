@@ -29,6 +29,11 @@ namespace SephPlanner.Core.Solver
         /// <summary>지금 소지금으로 살 수 있는지. 그냥 집으면 되는 것은 항상 참이다.</summary>
         public bool Affordable { get; set; }
 
+        /// <summary>게임의 한 칸 인벤토리 규칙으로 후보를 반드시 포함할 수 있는가.</summary>
+        public bool Available { get; set; } = true;
+
+        public bool CandidatePlaced { get; set; }
+
         /// <summary>
         /// 석판 후보가 놓일 자리에서 실제로 미치는 효과. 증가분이 같아 보일 때 무엇이 다른지
         /// 알려주는 근거다. 아티팩트 후보는 비어 있다.
@@ -41,6 +46,9 @@ namespace SephPlanner.Core.Solver
         /// <summary>이 후보로 콤보 임계값에 닿아 새 효과가 발동하는가.</summary>
         public bool ComboCompletes { get; set; }
 
+        /// <summary>교체 때문에 이미 발동한 콤보 임계값 아래로 내려가는가.</summary>
+        public bool ComboLoses { get; set; }
+
         /// <summary>줄 세우기에 더해지는 콤보 가치. 점수 증가분과 같은 단위로 환산한 것이다.</summary>
         public double ComboBonus { get; set; }
 
@@ -52,6 +60,7 @@ namespace SephPlanner.Core.Solver
 
         /// <summary>가방이 차 있어 이 후보를 집으면 자리를 내줘야 하는 것의 이름. 없으면 빈 문자열.</summary>
         public string Displaced { get; set; } = "";
+        public OfferDisplacement? Displacement { get; set; }
 
         /// <summary>
         /// 이 후보를 집었을 때의 격자. 증가분이라는 숫자 하나로는 무엇이 어떻게 달라지는지
@@ -69,6 +78,14 @@ namespace SephPlanner.Core.Solver
         /// 후보는 하나로 묶여 오지만 합성 석판처럼 엔티티가 같고 이름이 다른 것이 있어 이름까지 넣는다.
         /// </summary>
         public string Key => $"{Candidate.Kind}:{Candidate.DefinitionId}:{Candidate.Name}";
+    }
+
+    public sealed class OfferDisplacement
+    {
+        public int InstanceId { get; set; }
+        public int DefinitionId { get; set; }
+        public string Kind { get; set; } = "";
+        public string Name { get; set; } = "";
     }
 
     /// <summary>후보를 집었다고 쳤을 때의 배치. 화면이 그리는 데 필요한 것만 담는다.</summary>
@@ -96,6 +113,14 @@ namespace SephPlanner.Core.Solver
     /// </summary>
     public static class OfferAdvisor
     {
+        private sealed class TrialOutcome
+        {
+            public PlacementProblem Trial = new PlacementProblem();
+            public Arrangement Solved = new Arrangement();
+            public OfferDisplacement? Displacement;
+            public CharmSlot? DisplacedCharm;
+        }
+
         /// <summary>후보마다 한 번씩 푸는 만큼, 기본 탐색보다 가볍게 잡는다.</summary>
         private static readonly SolverOptions Faster = new() { BeamWidth = 150, ExactCandidates = 40 };
 
@@ -128,45 +153,27 @@ namespace SephPlanner.Core.Solver
 
             foreach (var candidate in candidates)
             {
-                var trial = Clone(problem);
                 var candidateId = nextInstanceId--;
-
-                if (candidate.Charm is not null)
-                {
-                    trial.Charms.Add(new CharmSlot
-                    {
-                        Definition = candidate.Charm,
-                        InstanceId = candidateId,
-                        IsDormant = candidate.CharmIsDormant,
-                        Worth = CharmWorth.Resolve(candidate.Charm, values?.Of(candidate.Charm)),
-                    });
-                }
-                else if (candidate.Tablet is not null)
-                {
-                    trial.Tablets.Add(new TabletSlot
-                    {
-                        Definition = candidate.Tablet,
-                        InstanceId = candidateId,
-                        Rotatable = candidate.Tablet.IsRotatable,
-                    });
-                }
-                else
-                {
-                    continue;
-                }
-
-                var solved = PlacementSolver.Solve(trial, Faster);
+                var outcome = BestTrial(problem, candidate, candidateId, values);
                 var entry = new OfferAdvice
                 {
                     Candidate = candidate,
-                    Gain = solved.Score - baseScore,
                     Affordable = candidate.Price <= gold,
-                    Effect = EffectOf(candidate, trial, solved),
-                    Displaced = DisplacedBy(trial, solved, candidateId),
-                    Trial = trial,
-                    Solved = solved,
+                    Available = outcome is not null,
+                    CandidatePlaced = outcome is not null,
                 };
-                EvaluateCombo(entry, comboCounts, combos, priorityCategories, presetCharms);
+                if (outcome is not null)
+                {
+                    entry.Gain = outcome.Solved.Score - baseScore;
+                    entry.Effect = EffectOf(candidate, outcome.Trial, outcome.Solved, candidateId);
+                    entry.Displacement = outcome.Displacement;
+                    entry.Displaced = outcome.Displacement?.Name ?? "";
+                    entry.Trial = outcome.Trial;
+                    entry.Solved = outcome.Solved;
+                }
+                EvaluateCombo(
+                    entry, comboCounts, combos, priorityCategories, presetCharms,
+                    outcome?.DisplacedCharm);
                 advice.Add(entry);
             }
 
@@ -175,7 +182,8 @@ namespace SephPlanner.Core.Solver
             // 여력이 큰 쪽을 위로 올린다. 아티팩트가 적을 때는 여러 석판이 똑같이 최대치를
             // 뽑아내 증가분만으로는 우열이 드러나지 않는다. 그래도 같으면 정의 번호로 가른다 -
             // 입력 순서는 게임의 오브젝트 열거 순서라 폴링마다 흔들릴 수 있다.
-            return advice.OrderByDescending(entry => entry.Affordable)
+            return advice.OrderByDescending(entry => entry.Available)
+                         .ThenByDescending(entry => entry.Affordable)
                          .ThenByDescending(entry => entry.Gain + entry.ComboBonus)
                          .ThenByDescending(entry => entry.Effect.Reach)
                          .ThenBy(entry => entry.Candidate.DefinitionId)
@@ -192,7 +200,8 @@ namespace SephPlanner.Core.Solver
             IReadOnlyDictionary<string, int>? comboCounts,
             Func<string, ComboDefinition?>? combos,
             IReadOnlyCollection<string>? priorityCategories,
-            IReadOnlyCollection<int>? presetCharms)
+            IReadOnlyCollection<int>? presetCharms,
+            CharmSlot? displacedCharm)
         {
             var charm = advice.Candidate.Charm;
             if (charm is null) return;
@@ -211,11 +220,25 @@ namespace SephPlanner.Core.Solver
                 advice.ComboBonus += PriorityWorth;
                 break;
             }
-            if (comboCounts is null || combos is null) return;
+            if (!advice.Available || comboCounts is null || combos is null) return;
 
             var parts = new List<string>();
-            foreach (var category in charm.Categories)
+            var deltas = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var category in charm.Categories.Distinct(StringComparer.Ordinal))
+                deltas[category] = 1;
+            if (displacedCharm is not null && !displacedCharm.IsFiller)
             {
+                foreach (var category in displacedCharm.Definition.Categories.Distinct(StringComparer.Ordinal))
+                {
+                    deltas.TryGetValue(category, out var delta);
+                    deltas[category] = delta - 1;
+                }
+            }
+
+            foreach (var pair in deltas.OrderBy(value => value.Key, StringComparer.Ordinal))
+            {
+                var category = pair.Key;
+                if (pair.Value == 0) continue;
                 var combo = combos(category);
                 if (combo is null || combo.Thresholds.Count == 0) continue;
 
@@ -223,16 +246,49 @@ namespace SephPlanner.Core.Solver
                 var worth = priority ? PriorityMultiplier : 1;
 
                 comboCounts.TryGetValue(category, out var current);
-                var step = Worth.OfComboStep(combo, current, out var completes, out var goal);
-                if (step <= 0) continue; // 임계값을 다 넘겼다 - 더 모아도 변하는 것이 없다.
+                var next = Math.Max(0, current + pair.Value);
+                var change = ComboValue(combo, next) - ComboValue(combo, current);
+                if (Math.Abs(change) < 0.000001) continue;
 
-                if (completes) advice.ComboCompletes = true;
-                advice.ComboBonus += step * worth;
+                if (CrossesUp(combo, current, next)) advice.ComboCompletes = true;
+                if (CrossesDown(combo, current, next)) advice.ComboLoses = true;
+                advice.ComboBonus += change * worth;
 
                 var name = Naming.Of(combo.Names, combo.Id, "?");
-                parts.Add($"{name} {current + 1}/{goal}");
+                parts.Add($"{name} {next}/{Goal(combo, next, pair.Value)}");
             }
             advice.ComboText = string.Join(" ", parts);
+        }
+
+        private static double ComboValue(ComboDefinition combo, int count)
+        {
+            var total = 0.0;
+            var cap = combo.Thresholds.Count == 0 ? 0 : combo.Thresholds.Max();
+            for (var current = 0; current < Math.Min(count, cap); current++)
+                total += Worth.OfComboStep(combo, current, out _, out _);
+            return total;
+        }
+
+        private static bool CrossesUp(ComboDefinition combo, int current, int next) =>
+            combo.Thresholds.Any(threshold => current < threshold && next >= threshold);
+
+        private static bool CrossesDown(ComboDefinition combo, int current, int next) =>
+            combo.Thresholds.Any(threshold => current >= threshold && next < threshold);
+
+        private static int Goal(ComboDefinition combo, int count, int delta)
+        {
+            var ordered = combo.Thresholds.OrderBy(value => value).ToList();
+            if (delta > 0)
+            {
+                foreach (var threshold in ordered)
+                    if (threshold >= count) return threshold;
+            }
+            else
+            {
+                foreach (var threshold in ordered)
+                    if (threshold > count) return threshold;
+            }
+            return ordered[ordered.Count - 1];
         }
 
         /// <summary>
@@ -240,32 +296,119 @@ namespace SephPlanner.Core.Solver
         /// 따라 격자 밖으로 나가는 칸이 달라진다. 후보는 마지막에 넣었으므로 배치도 마지막이다.
         /// </summary>
         private static TabletEffectSummary EffectOf(
-            OfferCandidate candidate, PlacementProblem trial, Arrangement solved)
+            OfferCandidate candidate, PlacementProblem trial, Arrangement solved, int candidateId)
         {
             if (candidate.Tablet is null) return new TabletEffectSummary();
+            if (!solved.TabletPositions.TryGetValue(candidateId, out var spot))
+                return new TabletEffectSummary();
 
-            var index = trial.Tablets.Count - 1;
-            if (index < 0 || index >= solved.Tablets.Count) return new TabletEffectSummary();
-
-            var placement = solved.Tablets[index];
+            var placement = trial.Tablets.First(slot => slot.InstanceId == candidateId)
+                .At(spot.Position, spot.Rotation);
             return TabletEffectSummary.Of(placement.Query, trial.Grid, placement.Position, placement.Rotation);
         }
 
-        /// <summary>
-        /// 가방이 차 있으면 후보를 집는 값에 "무엇을 빼는가"가 이미 들어 있다(솔버가 배정에서
-        /// 떨어뜨린다). 그 사실을 이름으로 드러낸다.
-        /// </summary>
-        private static string DisplacedBy(PlacementProblem trial, Arrangement solved, int candidateId)
+        private static TrialOutcome? BestTrial(
+            PlacementProblem problem, OfferCandidate candidate, int candidateId, CharmValueBook? values)
         {
-            foreach (var charm in trial.Charms)
+            TrialOutcome? best = null;
+            foreach (var outcome in Trials(problem, candidate, candidateId, values))
             {
-                if (charm.InstanceId == candidateId) continue;
-                if (solved.CharmPositions.ContainsKey(charm.InstanceId)) continue;
-
-                return Naming.Of(
-                    charm.Definition.Names, charm.Definition.Id, charm.IsFiller ? "아이템" : "아티팩트");
+                outcome.Solved = PlacementSolver.Solve(outcome.Trial, Faster);
+                var placed = candidate.Charm is not null
+                    ? outcome.Solved.CharmPositions.ContainsKey(candidateId)
+                    : outcome.Solved.TabletPositions.ContainsKey(candidateId);
+                if (!placed) continue;
+                if (best is null || outcome.Solved.Score > best.Solved.Score) best = outcome;
             }
-            return "";
+            return best;
+        }
+
+        private static IEnumerable<TrialOutcome> Trials(
+            PlacementProblem problem, OfferCandidate candidate, int candidateId, CharmValueBook? values)
+        {
+            var occupied = problem.Charms.Count + problem.Tablets.Count;
+            if (occupied < problem.Grid.Storage)
+            {
+                var trial = Clone(problem);
+                if (AddCandidate(trial, candidate, candidateId, values))
+                    yield return new TrialOutcome { Trial = trial };
+                yield break;
+            }
+
+            foreach (var charm in problem.Charms.OrderBy(value => value.InstanceId))
+            {
+                var trial = Clone(problem);
+                trial.Charms.RemoveAll(value => value.InstanceId == charm.InstanceId);
+                trial.CurrentCharms.Remove(charm.InstanceId);
+                trial.PlannedCharms.Remove(charm.InstanceId);
+                if (trial.Charms.Count + trial.Tablets.Count >= problem.Grid.Storage ||
+                    !AddCandidate(trial, candidate, candidateId, values))
+                    continue;
+
+                var kind = charm.IsFiller ? "filler" : "charm";
+                yield return new TrialOutcome
+                {
+                    Trial = trial,
+                    DisplacedCharm = charm,
+                    Displacement = new OfferDisplacement
+                    {
+                        InstanceId = charm.InstanceId,
+                        DefinitionId = charm.Definition.EntityId,
+                        Kind = kind,
+                        Name = Naming.Of(
+                            charm.Definition.Names, charm.Definition.Id,
+                            charm.IsFiller ? "아이템" : "아티팩트"),
+                    },
+                };
+            }
+
+            foreach (var tablet in problem.Tablets.OrderBy(value => value.InstanceId))
+            {
+                var trial = Clone(problem);
+                trial.Tablets.RemoveAll(value => value.InstanceId == tablet.InstanceId);
+                trial.CurrentTablets.Remove(tablet.InstanceId);
+                trial.PlannedTablets.Remove(tablet.InstanceId);
+                if (trial.Charms.Count + trial.Tablets.Count >= problem.Grid.Storage ||
+                    !AddCandidate(trial, candidate, candidateId, values))
+                    continue;
+
+                yield return new TrialOutcome
+                {
+                    Trial = trial,
+                    Displacement = new OfferDisplacement
+                    {
+                        InstanceId = tablet.InstanceId,
+                        DefinitionId = tablet.Definition.EntityId,
+                        Kind = "tablet",
+                        Name = Naming.Of(tablet.Definition.Names, tablet.Definition.Id, "석판"),
+                    },
+                };
+            }
+        }
+
+        private static bool AddCandidate(
+            PlacementProblem trial, OfferCandidate candidate, int candidateId, CharmValueBook? values)
+        {
+            if (candidate.Charm is not null)
+            {
+                trial.Charms.Add(new CharmSlot
+                {
+                    Definition = candidate.Charm,
+                    InstanceId = candidateId,
+                    IsDormant = candidate.CharmIsDormant,
+                    Worth = CharmWorth.Resolve(candidate.Charm, values?.Of(candidate.Charm)),
+                });
+                return true;
+            }
+            if (candidate.Tablet is null) return false;
+
+            trial.Tablets.Add(new TabletSlot
+            {
+                Definition = candidate.Tablet,
+                InstanceId = candidateId,
+                Rotatable = candidate.Tablet.IsRotatable,
+            });
+            return true;
         }
 
         private static PlacementProblem Clone(PlacementProblem problem)

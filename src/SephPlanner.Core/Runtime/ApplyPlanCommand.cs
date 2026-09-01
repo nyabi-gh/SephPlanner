@@ -11,6 +11,10 @@ namespace SephPlanner.Core.Runtime
         public int ExpectedWidth { get; set; }
         public int ExpectedHeight { get; set; }
         public int ExpectedStorage { get; set; }
+        public string ExpectedPlacementFingerprint { get; set; } = "";
+        public string ExpectedPlanningContextFingerprint { get; set; } = "";
+        public string ExpectedWeaponId { get; set; } = "";
+        public string ExpectedCatalogGeneration { get; set; } = "";
         public List<PlanTarget> Targets { get; set; } = new List<PlanTarget>();
     }
 

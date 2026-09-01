@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using SephPlanner.Core.Charms;
@@ -177,17 +178,17 @@ namespace SephPlanner.Core.Planning
                 FillPreviews(offers, best);
             }
 
-            var levelMismatches = CountLevelMismatches(inventory, current);
+            var verification = Verify(inventory, current, grid);
             var moves = Moves(problem, current, best, out var manualMovesAvailable);
             var targets = Targets(problem, best);
             var hasPlacementChanges = targets.Any(target =>
                 target.From != target.To || target.IsTablet && target.FromRotation != target.Rotation);
 
-            if (best.UnplacedTablets > 0 || levelMismatches > 0) targets.Clear();
+            if (best.UnplacedTablets > 0 || !verification.Passed) targets.Clear();
 
             return new Plan
             {
-                LevelMismatches = levelMismatches,
+                Verification = verification,
                 Current = current,
                 Best = best,
                 Moves = moves,
@@ -196,6 +197,7 @@ namespace SephPlanner.Core.Planning
                 InventoryWidth = inventory.Width,
                 InventoryHeight = inventory.Height,
                 InventoryStorage = inventory.Storage,
+                ExpectedWeaponId = weapon,
                 Offers = offers,
                 Mixes = mixes,
                 SkippedOffers = skippedOffers,
@@ -309,7 +311,11 @@ namespace SephPlanner.Core.Planning
             var seen = new HashSet<int>();
             skipped = 0;
 
-            foreach (var offer in snapshot.Offers)
+            foreach (var offer in snapshot.Offers
+                         .OrderBy(value => value.DefinitionId)
+                         .ThenBy(value => value.Kind)
+                         .ThenBy(value => value.Price)
+                         .ThenBy(value => value.SlotIndex))
             {
                 if (!seen.Add(offer.DefinitionId)) continue;
 
@@ -340,22 +346,97 @@ namespace SephPlanner.Core.Planning
             return candidates;
         }
 
-        /// <summary>
-        /// 지금 배치를 우리가 계산한 레벨과 게임이 계산해 둔 레벨을 칸마다 견준다.
-        ///
-        /// 각인과 세트 효과, 배치 보너스는 아직 모델에 없어서 그런 것이 걸려 있으면 점수가 어긋난다.
-        /// 무엇이 걸려 있을지 미리 추측해 경고하는 대신, 실제로 어긋날 때만 세어 알린다.
-        /// </summary>
-        private static int CountLevelMismatches(InventoryState inventory, Arrangement current)
+        private static PlanVerification Verify(InventoryState inventory, Arrangement current, GridSpec grid)
         {
-            var mismatches = 0;
+            if (inventory.LevelMatrix is null || inventory.DisabledCells is null)
+            {
+                return new PlanVerification
+                {
+                    Status = PlanVerificationStatus.Unavailable,
+                    Reason = "게임의 레벨 또는 비활성 행렬을 읽지 못해 계획을 검증할 수 없습니다.",
+                };
+            }
+
+            var levelMismatches = 0;
             foreach (var pair in current.CellLevels)
             {
                 var key = pair.Key.X + "," + pair.Key.Y;
-                if (!inventory.LevelMatrix.TryGetValue(key, out var reported)) continue;
-                if (reported != pair.Value) mismatches++;
+                inventory.LevelMatrix.TryGetValue(key, out var reported);
+                if (reported != pair.Value) levelMismatches++;
             }
-            return mismatches;
+
+            var reportedDisabled = new HashSet<GridPos>();
+            foreach (var key in inventory.DisabledCells)
+            {
+                if (!TryParseCell(key, out var cell))
+                {
+                    return new PlanVerification
+                    {
+                        Status = PlanVerificationStatus.Failed,
+                        LevelMismatches = levelMismatches,
+                        DisabledMismatches = 1,
+                        Reason = "게임의 비활성 칸 좌표를 해석할 수 없어 자동 배치를 잠갔습니다.",
+                    };
+                }
+                if (IsOnGrid(cell, grid)) reportedDisabled.Add(cell);
+            }
+
+            var disabledMismatches = 0;
+            for (var index = 0; index < grid.Storage; index++)
+            {
+                var cell = grid.ToPosition(index);
+                if (reportedDisabled.Contains(cell) != current.DisabledCells.Contains(cell))
+                    disabledMismatches++;
+            }
+
+            var effectiveLevelMismatches = 0;
+            var itemDisabledMismatches = 0;
+            foreach (var item in inventory.Items)
+            {
+                if (!IsOnGrid(item.Position, grid)) continue;
+                if (!current.Levels.TryGetValue(item.Position, out var level) || level != item.EffectiveLevel)
+                    effectiveLevelMismatches++;
+
+                var expectedActive = !current.DisabledCells.Contains(item.Position);
+                if (item.IsActive != expectedActive) itemDisabledMismatches++;
+            }
+            disabledMismatches += itemDisabledMismatches;
+
+            var tabletMismatches = 0;
+            foreach (var tablet in inventory.Tablets)
+            {
+                if (!current.AppliedTablets.TryGetValue(tablet.InstanceId, out var applied) ||
+                    applied != tablet.IsApplied)
+                    tabletMismatches++;
+            }
+
+            var total = levelMismatches + effectiveLevelMismatches + disabledMismatches + tabletMismatches;
+            return new PlanVerification
+            {
+                Status = total == 0 ? PlanVerificationStatus.Passed : PlanVerificationStatus.Failed,
+                LevelMismatches = levelMismatches,
+                EffectiveLevelMismatches = effectiveLevelMismatches,
+                DisabledMismatches = disabledMismatches,
+                TabletMismatches = tabletMismatches,
+                Reason = total == 0
+                    ? "게임 상태와 계획 시뮬레이션이 일치합니다."
+                    : $"게임 상태와 계산 결과가 {total}곳에서 달라 자동 배치를 잠갔습니다.",
+            };
+        }
+
+        private static bool TryParseCell(string key, out GridPos cell)
+        {
+            cell = default;
+            if (key is null) return false;
+
+            var comma = key.IndexOf(',');
+            if (comma <= 0 || comma >= key.Length - 1 ||
+                !int.TryParse(key.AsSpan(0, comma), out var x) ||
+                !int.TryParse(key.AsSpan(comma + 1), out var y))
+                return false;
+
+            cell = new GridPos(x, y);
+            return true;
         }
 
         /// <summary>

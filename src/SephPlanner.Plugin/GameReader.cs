@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Mirror;
 using SephPlanner.Core.Model;
+using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
 using UnityEngine;
 
@@ -13,7 +14,7 @@ namespace SephPlanner.Plugin
         /// 항상 스냅샷을 돌려준다. 런이 끝났거나 플레이어가 죽었으면 인벤토리가 비어 있는 스냅샷이다.
         /// 이 상태를 넘겨야 HUD에서 직전 런의 배치를 지울 수 있다.
         /// </summary>
-        public static GameSnapshot Read(float offerRadius)
+        public static GameSnapshot Read(float offerRadius, bool includeRecommendations = true)
         {
             var snapshot = new GameSnapshot
             {
@@ -29,8 +30,11 @@ namespace SephPlanner.Plugin
 
             snapshot.Run = ReadRun(avatar);
             snapshot.Inventory = ReadInventory(avatar.Inventory);
-            snapshot.Mixer = ReadMixer();
-            OfferReader.Fill(snapshot, avatar, offerRadius);
+            if (includeRecommendations)
+            {
+                snapshot.Mixer = ReadMixer();
+                OfferReader.Fill(snapshot, avatar, offerRadius);
+            }
             return snapshot;
         }
 
@@ -42,11 +46,26 @@ namespace SephPlanner.Plugin
                 : InventoryDiagnostics.Write(avatar.Inventory, avatar, offerRadius);
         }
 
-        public static string CheckSimulation()
+        public static RuntimeSimulationCheck CheckSimulation()
         {
             var avatar = FindLocalPlayer();
-            if (avatar == null || avatar.Inventory == null || avatar.IsDead) return null;
-            return SimulationVerifier.Check(avatar.Inventory);
+            if (avatar == null || avatar.Inventory == null || avatar.IsDead)
+            {
+                return new RuntimeSimulationCheck
+                {
+                    Status = PlanVerificationStatus.Unavailable,
+                    Reason = "실시간 시뮬레이션을 검증할 인벤토리가 없습니다.",
+                };
+            }
+
+            var issue = SimulationVerifier.Check(avatar.Inventory);
+            return new RuntimeSimulationCheck
+            {
+                Status = issue == null
+                    ? PlanVerificationStatus.Passed
+                    : PlanVerificationStatus.Failed,
+                Reason = issue == null ? "" : "시뮬레이터 불일치: " + issue,
+            };
         }
 
         internal static PlayerAvatar FindLocalPlayer()

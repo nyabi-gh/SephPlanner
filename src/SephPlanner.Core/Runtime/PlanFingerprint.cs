@@ -1,0 +1,183 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using SephPlanner.Core.Model;
+using SephPlanner.Core.Planning;
+
+namespace SephPlanner.Core.Runtime
+{
+    public static class PlanFingerprint
+    {
+        public static string Full(
+            GameSnapshot snapshot, PlanPreferences preferences, string catalogGeneration)
+        {
+            var builder = new StringBuilder();
+            Add(builder, "placement", Placement(snapshot, preferences, catalogGeneration));
+            Add(builder, "recommendations", preferences.Recommendations);
+            Add(builder, "gold", snapshot.Run?.Gold ?? 0);
+            Add(builder, "mixer", snapshot.Mixer is not null);
+            Add(builder, "mixerCost", snapshot.Mixer?.Cost ?? 0);
+            Add(builder, "mixerUsed", snapshot.Mixer?.Used ?? false);
+
+            foreach (var category in preferences.PriorityCategories.OrderBy(value => value, StringComparer.Ordinal))
+                Add(builder, "priority", category);
+            foreach (var charm in preferences.PresetCharms.OrderBy(value => value))
+                Add(builder, "preset", charm);
+            foreach (var offer in snapshot.Offers
+                         .OrderBy(value => value.Kind, StringComparer.Ordinal)
+                         .ThenBy(value => value.DefinitionId)
+                         .ThenBy(value => value.SlotIndex)
+                         .ThenBy(value => value.Price))
+            {
+                Add(builder, "offerKind", offer.Kind);
+                Add(builder, "offerDefinition", offer.DefinitionId);
+                Add(builder, "offerSlot", offer.SlotIndex);
+                Add(builder, "offerPrice", offer.Price);
+            }
+            return Hash(builder);
+        }
+
+        public static string Placement(
+            GameSnapshot snapshot, PlanPreferences preferences, string catalogGeneration) =>
+            Placement(snapshot, PlanningContext(preferences, catalogGeneration));
+
+        public static string Placement(GameSnapshot snapshot, string planningContextFingerprint)
+        {
+            var builder = new StringBuilder();
+            Add(builder, "context", planningContextFingerprint);
+            Add(builder, "gameVersion", snapshot.GameVersion);
+            Add(builder, "weapon", snapshot.Run?.WeaponId ?? "");
+
+            var inventory = snapshot.Inventory;
+            Add(builder, "inventory", inventory is not null);
+            if (inventory is null) return Hash(builder);
+
+            Add(builder, "width", inventory.Width);
+            Add(builder, "height", inventory.Height);
+            Add(builder, "storage", inventory.Storage);
+
+            foreach (var item in inventory.Items
+                         .OrderBy(value => value.InstanceId).ThenBy(value => value.DefinitionId)
+                         .ThenBy(value => value.Position.Y).ThenBy(value => value.Position.X)
+                         .ThenBy(value => value.EffectiveLevel).ThenBy(value => value.IsActive)
+                         .ThenBy(value => value.Enchant))
+            {
+                Add(builder, "itemDefinition", item.DefinitionId);
+                Add(builder, "itemInstance", item.InstanceId);
+                Add(builder, "itemX", item.Position.X);
+                Add(builder, "itemY", item.Position.Y);
+                Add(builder, "itemLevel", item.EffectiveLevel);
+                Add(builder, "itemActive", item.IsActive);
+                Add(builder, "itemEnchant", item.Enchant);
+            }
+
+            foreach (var tablet in inventory.Tablets
+                         .OrderBy(value => value.InstanceId).ThenBy(value => value.DefinitionId)
+                         .ThenBy(value => value.Position.Y).ThenBy(value => value.Position.X)
+                         .ThenBy(value => value.Rotation).ThenBy(value => value.IsApplied)
+                         .ThenBy(value => value.IsRotatable)
+                         .ThenBy(value => value.Query, StringComparer.Ordinal)
+                         .ThenBy(value => value.ConditionQuery, StringComparer.Ordinal)
+                         .ThenBy(value => value.Name, StringComparer.Ordinal))
+                AddTablet(builder, "tablet", tablet);
+            foreach (var engraving in inventory.Engravings
+                         .OrderBy(value => value.InstanceId).ThenBy(value => value.DefinitionId)
+                         .ThenBy(value => value.Position.Y).ThenBy(value => value.Position.X)
+                         .ThenBy(value => value.Rotation).ThenBy(value => value.IsApplied)
+                         .ThenBy(value => value.IsRotatable)
+                         .ThenBy(value => value.Query, StringComparer.Ordinal)
+                         .ThenBy(value => value.ConditionQuery, StringComparer.Ordinal)
+                         .ThenBy(value => value.Name, StringComparer.Ordinal))
+                AddTablet(builder, "engraving", engraving);
+
+            foreach (var effect in inventory.FixedEffects
+                         .OrderBy(value => value.Position.Y).ThenBy(value => value.Position.X)
+                         .ThenBy(value => value.Level).ThenBy(value => value.Disable)
+                         .ThenBy(value => value.IgnoreCriteria).ThenBy(value => value.Multiply))
+            {
+                Add(builder, "fixedX", effect.Position.X);
+                Add(builder, "fixedY", effect.Position.Y);
+                Add(builder, "fixedLevel", effect.Level);
+                Add(builder, "fixedDisable", effect.Disable);
+                Add(builder, "fixedIgnore", effect.IgnoreCriteria);
+                Add(builder, "fixedMultiply", effect.Multiply);
+            }
+
+            foreach (var pair in inventory.LevelMatrix.OrderBy(value => value.Key, StringComparer.Ordinal))
+            {
+                Add(builder, "levelCell", pair.Key);
+                Add(builder, "levelValue", pair.Value);
+            }
+            foreach (var cell in inventory.DisabledCells.OrderBy(value => value, StringComparer.Ordinal))
+                Add(builder, "disabled", cell);
+            foreach (var pair in inventory.ComboCounts.OrderBy(value => value.Key, StringComparer.Ordinal))
+            {
+                Add(builder, "combo", pair.Key);
+                Add(builder, "comboCount", pair.Value);
+            }
+            return Hash(builder);
+        }
+
+        public static string PlanningContext(PlanPreferences preferences, string catalogGeneration)
+        {
+            var builder = new StringBuilder();
+            Add(builder, "catalog", catalogGeneration);
+            foreach (var charm in preferences.PinnedCharms.OrderBy(value => value))
+                Add(builder, "pinned", charm);
+            foreach (var pair in preferences.CharmValues.EntityValues.OrderBy(value => value.Key))
+                AddCharmValue(builder, "valueEntity", pair.Key.ToString(CultureInfo.InvariantCulture), pair.Value);
+            foreach (var pair in preferences.CharmValues.IdValues.OrderBy(value => value.Key, StringComparer.Ordinal))
+                AddCharmValue(builder, "valueId", pair.Key, pair.Value);
+            return Hash(builder);
+        }
+
+        private static void AddCharmValue(
+            StringBuilder builder, string prefix, string key, CharmValueEntry entry)
+        {
+            Add(builder, prefix + "Key", key);
+            Add(builder, prefix + "Entity", entry.EntityId);
+            Add(builder, prefix + "Id", entry.Id);
+            Add(builder, prefix + "Tier", entry.Tier);
+            Add(builder, prefix + "Base", entry.Base?.ToString("R", CultureInfo.InvariantCulture) ?? "unset");
+            Add(builder, prefix + "PerLevel", entry.PerLevel?.ToString("R", CultureInfo.InvariantCulture) ?? "unset");
+        }
+
+        private static void AddTablet(StringBuilder builder, string prefix, PlacedTablet tablet)
+        {
+            Add(builder, prefix + "Definition", tablet.DefinitionId);
+            Add(builder, prefix + "Instance", tablet.InstanceId);
+            Add(builder, prefix + "X", tablet.Position.X);
+            Add(builder, prefix + "Y", tablet.Position.Y);
+            Add(builder, prefix + "Rotation", tablet.Rotation);
+            Add(builder, prefix + "Applied", tablet.IsApplied);
+            Add(builder, prefix + "Rotatable", tablet.IsRotatable?.ToString() ?? "unknown");
+            Add(builder, prefix + "Query", tablet.Query ?? "");
+            Add(builder, prefix + "Condition", tablet.ConditionQuery ?? "");
+            Add(builder, prefix + "Name", tablet.Name ?? "");
+        }
+
+        private static void Add(StringBuilder builder, string key, bool value) =>
+            Add(builder, key, value ? "1" : "0");
+
+        private static void Add(StringBuilder builder, string key, int value) =>
+            Add(builder, key, value.ToString(CultureInfo.InvariantCulture));
+
+        private static void Add(StringBuilder builder, string key, string value)
+        {
+            builder.Append(key.Length).Append(':').Append(key)
+                .Append(value.Length).Append(':').Append(value).Append(';');
+        }
+
+        private static string Hash(StringBuilder builder)
+        {
+            using var algorithm = SHA256.Create();
+            var bytes = algorithm.ComputeHash(Encoding.UTF8.GetBytes(builder.ToString()));
+            var result = new StringBuilder(bytes.Length * 2);
+            foreach (var value in bytes) result.Append(value.ToString("x2", CultureInfo.InvariantCulture));
+            return result.ToString();
+        }
+    }
+}

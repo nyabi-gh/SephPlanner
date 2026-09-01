@@ -17,17 +17,45 @@ namespace SephPlanner.Plugin
     {
         private sealed class VerificationStatus
         {
+            public string Generation = "";
             public string GameVersion = "";
+            public string GameAssemblyId = "";
             public int Comparisons;
             public int Mismatches;
         }
 
+        private static bool _loaded;
         private static bool? _queryVerified;
+        private static CatalogRefreshStatus _status;
+        private static string _activeGeneration = "";
+        private static CatalogBundleWriter _writer;
 
-        public static IEnumerator WriteRoutine(Action<string> report)
+        public static string BeginRefresh()
         {
+            var generation = CatalogBundleStore.NewGeneration();
+            _writer = CatalogBundleStore.Begin(
+                PlannerData.DataDirectory, generation, Application.version, GameAssemblyId());
+            _loaded = true;
             _queryVerified = null;
-            Directory.CreateDirectory(PlannerData.DataDirectory);
+            _status = CatalogRefreshStatus.Refreshing;
+            _activeGeneration = "";
+            return generation;
+        }
+
+        public static void FailRefresh(string generation, string reason)
+        {
+            CatalogBundleStore.MarkFailed(PlannerData.DataDirectory, generation, reason);
+            _loaded = true;
+            _queryVerified = false;
+            _status = CatalogRefreshStatus.Failed;
+            _activeGeneration = "";
+            _writer = null;
+        }
+
+        public static IEnumerator WriteRoutine(Action<string> report, string generation)
+        {
+            if (_writer == null || _writer.Generation != generation)
+                throw new InvalidDataException("현재 카탈로그 갱신 generation이 아닙니다.");
 
             var tablets = ItemCatalog.LoadTablets();
             yield return null;
@@ -54,12 +82,20 @@ namespace SephPlanner.Plugin
             WriteText(PlannerData.VerificationReportFile, QueryVerifier.Format(verification));
             WriteJson(PlannerData.VerificationStatusFile, new VerificationStatus
             {
+                Generation = generation,
                 GameVersion = Application.version,
+                GameAssemblyId = GameAssemblyId(),
                 Comparisons = verification.Comparisons,
                 Mismatches = verification.Mismatches,
             });
             WriteText(PlannerData.CatalogVersionFile, PlannerData.CatalogVersion.ToString());
+            _writer.Publish(verification.Comparisons, verification.Mismatches);
+
+            _loaded = true;
             _queryVerified = verification.Passed;
+            _status = CatalogRefreshStatus.Ready;
+            _activeGeneration = generation;
+            _writer = null;
 
             report($"석판 {tablets.Count}종, 아티팩트 {charms.Count}종, 콤보 {combos.Count}종, " +
                    $"아티팩트 가치 {worth.ByEntity.Count}종 측정. 질의 검증 " +
@@ -72,71 +108,52 @@ namespace SephPlanner.Plugin
         /// </summary>
         public static bool HasCatalog()
         {
-            var required = new[]
-            {
-                PlannerData.TabletDbFile,
-                PlannerData.CharmDbFile,
-                PlannerData.ComboDbFile,
-                PlannerData.StatMeasurementFile,
-                PlannerData.VerificationReportFile,
-                PlannerData.VerificationStatusFile,
-            };
-            foreach (var file in required)
-            {
-                var path = Path.Combine(PlannerData.DataDirectory, file);
-                if (!File.Exists(path) || new FileInfo(path).Length == 0) return false;
-            }
-
-            var verification = ReadVerificationStatus();
-            if (verification == null || verification.GameVersion != Application.version ||
-                verification.Comparisons <= 0)
-                return false;
-
-            var stamp = Path.Combine(PlannerData.DataDirectory, PlannerData.CatalogVersionFile);
-            if (!File.Exists(stamp)) return false;
-
-            return int.TryParse(File.ReadAllText(stamp).Trim(), out var version)
-                   && version == PlannerData.CatalogVersion;
+            LoadActive();
+            return _status == CatalogRefreshStatus.Ready;
         }
 
         public static bool QueryVerificationPassed()
         {
-            if (_queryVerified.HasValue) return _queryVerified.Value;
-
-            var status = ReadVerificationStatus();
-            _queryVerified = status != null && status.GameVersion == Application.version &&
-                             status.Comparisons > 0 && status.Mismatches == 0;
-            return _queryVerified.Value;
+            LoadActive();
+            return _status == CatalogRefreshStatus.Ready && _queryVerified == true;
         }
 
-        private static VerificationStatus ReadVerificationStatus()
+        public static string ActiveGeneration
         {
-            var path = Path.Combine(PlannerData.DataDirectory, PlannerData.VerificationStatusFile);
-            if (!File.Exists(path)) return null;
-            try
+            get
             {
-                return JsonConvert.DeserializeObject<VerificationStatus>(File.ReadAllText(path));
-            }
-            catch
-            {
-                return null;
+                LoadActive();
+                return _status == CatalogRefreshStatus.Ready ? _activeGeneration : "";
             }
         }
+
+        private static void LoadActive()
+        {
+            if (_loaded) return;
+            _loaded = true;
+
+            if (!CatalogBundleStore.TryGetActive(
+                    PlannerData.DataDirectory, Application.version, GameAssemblyId(),
+                    out var info, out _))
+            {
+                _status = CatalogRefreshStatus.Unavailable;
+                _queryVerified = false;
+                _activeGeneration = "";
+                return;
+            }
+
+            _status = CatalogRefreshStatus.Ready;
+            _queryVerified = info.VerificationPassed;
+            _activeGeneration = info.Generation;
+        }
+
+        private static string GameAssemblyId() =>
+            typeof(GridInventory).Assembly.ManifestModule.ModuleVersionId.ToString("N");
 
         private static void WriteJson(string fileName, object value) =>
             WriteText(fileName, JsonConvert.SerializeObject(value, Formatting.Indented));
 
-        /// <summary>
-        /// 임시 파일에 쓰고 바꿔치기해 중단되더라도 잘린 파일을 남기지 않는다.
-        /// </summary>
-        private static void WriteText(string fileName, string content)
-        {
-            var path = Path.Combine(PlannerData.DataDirectory, fileName);
-            var temp = path + ".tmp";
-            File.WriteAllText(temp, content);
-
-            if (File.Exists(path)) File.Replace(temp, path, null);
-            else File.Move(temp, path);
-        }
+        private static void WriteText(string fileName, string content) =>
+            _writer.WriteText(fileName, content);
     }
 }

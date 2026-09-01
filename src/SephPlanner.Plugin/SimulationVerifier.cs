@@ -1,9 +1,16 @@
 using System.Collections.Generic;
 using SephPlanner.Core.Model;
+using SephPlanner.Core.Planning;
 using SephPlanner.Core.Tablets;
 
 namespace SephPlanner.Plugin
 {
+    internal sealed class RuntimeSimulationCheck
+    {
+        public PlanVerificationStatus Status { get; set; }
+        public string Reason { get; set; } = "";
+    }
+
     /// <summary>
     /// Core 의 석판 시뮬레이터를 게임의 실제 적용 결과와 대조한다.
     /// 게임이 이미 계산해 둔 <c>IsApplied</c>와 <c>EffectRange</c>, 그리고 <c>levelMatrix</c>가 정답지다.
@@ -24,19 +31,13 @@ namespace SephPlanner.Plugin
 
             var placements = new List<TabletPlacement>();
             var tablets = new List<StoneTablet>();
+            var seenTablets = new HashSet<int>();
             foreach (var tablet in inv.stoneTablets.Values)
             {
-                if (tablet == null) continue;
-                tablets.Add(tablet);
-                placements.Add(new TabletPlacement
-                {
-                    Definition = new TabletDefinition(),
-                    Position = new GridPos(tablet.xIdx, tablet.yIdx),
-                    Rotation = tablet.rotation,
-                    InstanceQuery = tablet.GetQuery(tablet.instanceID) ?? "",
-                    InstanceConditionQuery = tablet.GetConditionQuery(tablet.instanceID) ?? "",
-                });
+                AddTablet(tablet, seenTablets, tablets, placements);
             }
+            foreach (var tablet in inv.engravings)
+                AddTablet(tablet, seenTablets, tablets, placements);
             LastCheckedTablets = placements.Count;
 
             // 고정 각인 몫까지 넣어야 게임 levelMatrix 와 같은 기준으로 견주게 된다.
@@ -53,28 +54,48 @@ namespace SephPlanner.Plugin
                 if (difference != null) return $"석판 {tablets[i].entityID} {difference}";
             }
 
-            return CompareLevels(inv, result);
+            return CompareMatrices(inv, grid, result);
         }
 
-        /// <summary>
-        /// 아티팩트가 놓인 칸마다 우리가 계산한 레벨과 게임이 계산해 둔 값을 견준다.
-        /// 어긋난다면 우리가 읽지 않는 효과(각인, 세트 효과, 배치 보너스)가 걸려 있다는 뜻이다.
-        /// </summary>
-        private static string CompareLevels(GridInventory inv, SimulationResult result)
+        private static void AddTablet(
+            StoneTablet tablet, HashSet<int> seen,
+            List<StoneTablet> tablets, List<TabletPlacement> placements)
         {
-            foreach (var pair in inv.charms)
+            if (tablet == null || !seen.Add(tablet.instanceID)) return;
+            tablets.Add(tablet);
+            placements.Add(new TabletPlacement
             {
-                var charm = pair.Value;
-                if (charm == null) continue;
+                Definition = new TabletDefinition(),
+                Position = new GridPos(tablet.xIdx, tablet.yIdx),
+                Rotation = tablet.rotation,
+                InstanceQuery = tablet.GetQuery(tablet.instanceID) ?? "",
+                InstanceConditionQuery = tablet.GetConditionQuery(tablet.instanceID) ?? "",
+            });
+        }
 
-                var position = new GridPos(charm.xIdx, charm.yIdx);
-                var item = charm.Item;
-                var enchant = item == null ? 0 : GameReader.EnchantOf(item.InstanceID);
+        private static string CompareMatrices(GridInventory inv, GridSpec grid, SimulationResult result)
+        {
+            var enchants = new Dictionary<GridPos, int>();
+            foreach (var pair in inv.inventoryMatrix)
+            {
+                var item = pair.Value;
+                if (item == null || item.StoneTablet != null) continue;
+                var position = new GridPos(pair.Key.x, pair.Key.y);
+                enchants[position] = GameReader.EnchantOf(item.InstanceID);
+            }
 
+            for (var index = 0; index < grid.Storage; index++)
+            {
+                var position = grid.ToPosition(index);
+                enchants.TryGetValue(position, out var enchant);
                 var ours = result.EffectiveLevel(position, enchant);
-                var theirs = LookupLevel(inv, charm.xIdx, charm.yIdx);
+                var theirs = LookupLevel(inv, (sbyte)position.X, (sbyte)position.Y);
                 if (ours != theirs)
-                    return $"칸 ({charm.xIdx},{charm.yIdx}) 레벨 {ours} != 게임 {theirs} (인챈트 {enchant})";
+                    return $"칸 {position} 레벨 {ours} != 게임 {theirs} (인챈트 {enchant})";
+
+                var disabled = LookupDisabled(inv, (sbyte)position.X, (sbyte)position.Y);
+                if (result.IsDisabled(position) != disabled)
+                    return $"칸 {position} 비활성 {result.IsDisabled(position)} != 게임 {disabled}";
             }
             return null;
         }
@@ -84,6 +105,13 @@ namespace SephPlanner.Plugin
             foreach (var pair in inv.levelMatrix)
                 if (pair.Key.x == x && pair.Key.y == y) return pair.Value;
             return 0;
+        }
+
+        private static bool LookupDisabled(GridInventory inv, sbyte x, sbyte y)
+        {
+            foreach (var pair in inv.disableMatrix)
+                if (pair.Key.x == x && pair.Key.y == y) return pair.Value > 0;
+            return false;
         }
 
         private static GridOccupancy BuildOccupancy(GridInventory inv)

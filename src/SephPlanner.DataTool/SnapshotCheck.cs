@@ -60,33 +60,40 @@ public static class SnapshotCheck
         Console.WriteLine($"현재 점수 {plan.Current.Score:0.#} → 제안 {plan.Best.Score:0.#}");
         Console.WriteLine();
 
-        if (plan.LevelMismatches == 0)
+        if (plan.Verification.Passed)
         {
-            Console.WriteLine("칸별 레벨이 모두 일치합니다.");
+            Console.WriteLine("레벨·유효 레벨·비활성·석판 적용 상태가 모두 일치합니다.");
             return 0;
         }
 
         var explainedByEnchant = 0;
-        foreach (var item in inventory.Items.OrderBy(i => i.Position.Y).ThenBy(i => i.Position.X))
+        foreach (var pair in plan.Current.CellLevels.OrderBy(p => p.Key.Y).ThenBy(p => p.Key.X))
         {
-            if (!plan.Current.Levels.TryGetValue(item.Position, out var ours)) continue;
-            if (!inventory.LevelMatrix.TryGetValue($"{item.Position.X},{item.Position.Y}", out var reported)) continue;
-            if (ours == reported) continue;
+            var cell = pair.Key;
+            var reported = 0;
+            inventory.LevelMatrix?.TryGetValue($"{cell.X},{cell.Y}", out reported);
+            if (pair.Value == reported) continue;
 
-            // 인챈트를 싣기 전 플러그인이 만든 스냅샷은 그 값이 0으로 온다. 차이가 그 방향이면
-            // 우리 모델이 아니라 스냅샷이 오래된 것일 수 있다.
-            var looksLikeEnchant = item.Enchant == 0 && reported > ours;
+            var item = inventory.Items.FirstOrDefault(candidate => candidate.Position == cell);
+            var looksLikeEnchant = item is not null && item.Enchant == 0 && reported > pair.Value;
             if (looksLikeEnchant) explainedByEnchant++;
 
-            var name = catalog.Charm(item.DefinitionId)?.Id ?? $"#{item.DefinitionId}";
+            var name = item is null
+                ? "(빈 칸)"
+                : catalog.Charm(item.DefinitionId)?.Id ?? $"#{item.DefinitionId}";
             Console.WriteLine(
-                $"  {item.Position} {name,-28} 우리 {ours,3} / 게임 {reported,3}" +
+                $"  {cell} {name,-28} 우리 {pair.Value,3} / 게임 {reported,3}" +
                 (looksLikeEnchant ? "  (인챈트 미포함 스냅샷일 수 있음)" : ""));
         }
 
         Console.WriteLine();
-        Console.WriteLine($"어긋난 칸 {plan.LevelMismatches}개 (그중 인챈트로 설명되는 것 {explainedByEnchant}개).");
-        Console.WriteLine("나머지는 각인·세트 효과·배치 보너스처럼 아직 읽지 않는 효과일 수 있습니다.");
+        Console.WriteLine(plan.Verification.Reason);
+        Console.WriteLine(
+            $"칸 레벨 {plan.Verification.LevelMismatches}개, " +
+            $"아이템 유효 레벨 {plan.Verification.EffectiveLevelMismatches}개, " +
+            $"비활성 상태 {plan.Verification.DisabledMismatches}개, " +
+            $"석판 적용 상태 {plan.Verification.TabletMismatches}개");
+        Console.WriteLine($"칸 레벨 차이 중 인챈트로 설명되는 것: {explainedByEnchant}개");
         return 0;
     }
 
@@ -94,7 +101,9 @@ public static class SnapshotCheck
 
     private static T? Load<T>(string fileName)
     {
-        var path = Path.Combine(PlannerData.DataDirectory, fileName);
-        return File.Exists(path) ? JsonSerializer.Deserialize<T>(File.ReadAllText(path), Options) : default;
+        var path = PlannerData.ActiveDataFile(fileName);
+        return path is not null && File.Exists(path)
+            ? JsonSerializer.Deserialize<T>(File.ReadAllText(path), Options)
+            : default;
     }
 }

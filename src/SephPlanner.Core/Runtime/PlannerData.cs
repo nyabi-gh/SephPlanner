@@ -15,6 +15,21 @@ namespace SephPlanner.Core.Runtime
         public const string VerificationStatusFile = "query-verification.json";
         public const string CatalogVersionFile = "catalog-version.txt";
         public const string StatMeasurementFile = "stat-measure.json";
+        public const string CatalogGenerationsDirectory = "catalog-generations";
+        public const string CatalogManifestFile = "manifest.txt";
+        public const string ActiveCatalogFile = "active-catalog.txt";
+        public const string CatalogRefreshStateFile = "catalog-refresh-state.txt";
+
+        public static readonly string[] RequiredCatalogFiles =
+        {
+            TabletDbFile,
+            CharmDbFile,
+            ComboDbFile,
+            StatMeasurementFile,
+            VerificationReportFile,
+            VerificationStatusFile,
+            CatalogVersionFile,
+        };
 
         /// <summary>
         /// 덤프에 담기는 내용이 늘어날 때 올린다. 덤프는 첫 실행에 한 번만 만들어지므로, 이 번호가
@@ -26,11 +41,29 @@ namespace SephPlanner.Core.Runtime
         /// v5: 게임이 매겨 둔 원가와 사파이어 해금가를 담는다. 능력치로 잴 수 없는 아티팩트의
         ///     값어치를 가늠할 후보라, 쓸 만한지 재려면 먼저 덤프에 있어야 한다.
         /// v6: 자동 배치가 질의 검증 결과를 확인할 수 있는 상태 파일을 담는다.
+        /// v7: 데이터와 검증 결과를 generation 묶음으로 원자적으로 게시한다.
         /// </summary>
-        public const int CatalogVersion = 6;
+        public const int CatalogVersion = 7;
 
         /// <summary>플러그인이 생성하고 진단 도구가 읽는 데이터 위치.</summary>
         public static string DataDirectory =>
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SephPlanner");
+
+        public static string? ActiveDataFile(string fileName)
+        {
+            if (!IsCatalogFile(fileName) ||
+                !CatalogBundleStore.TryGetActive(DataDirectory, null, null, out var info, out _))
+                return null;
+            return Path.Combine(info.Directory, fileName);
+        }
+
+        public static bool IsCatalogFile(string fileName)
+        {
+            foreach (var required in RequiredCatalogFiles)
+            {
+                if (string.Equals(required, fileName, StringComparison.Ordinal)) return true;
+            }
+            return false;
+        }
     }
 }

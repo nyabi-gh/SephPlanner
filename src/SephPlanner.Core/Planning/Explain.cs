@@ -75,6 +75,7 @@ namespace SephPlanner.Core.Planning
         {
             var lines = Charm(advice.Candidate.Charm, values);
 
+            if (!advice.Available) lines.Add("가방에서 교체할 수 있는 항목이 없어 이 후보를 집을 수 없습니다.");
             if (!advice.Affordable) lines.Add($"소지금 {gold}골드로는 살 수 없습니다.");
 
             if (advice.MatchesPreset) lines.Add("가져온 빌드가 즐겨찾기로 찍어 둔 아티팩트입니다.");
@@ -83,9 +84,13 @@ namespace SephPlanner.Core.Planning
 
             if (advice.ComboText.Length > 0)
             {
-                lines.Add(advice.ComboCompletes
-                    ? $"콤보가 발동합니다: {advice.ComboText}"
-                    : $"콤보 진행: {advice.ComboText}");
+                lines.Add(advice.ComboCompletes && advice.ComboLoses
+                    ? $"콤보 구성이 바뀝니다: {advice.ComboText}"
+                    : advice.ComboCompletes
+                        ? $"콤보가 발동합니다: {advice.ComboText}"
+                        : advice.ComboLoses
+                            ? $"콤보 효과를 잃습니다: {advice.ComboText}"
+                            : $"콤보 진행: {advice.ComboText}");
             }
 
             var effect = advice.Effect;

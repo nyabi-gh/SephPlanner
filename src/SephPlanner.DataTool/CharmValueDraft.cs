@@ -30,9 +30,9 @@ public static class CharmValueDraft
 
     public static int Run(string repoRoot)
     {
-        var charmPath = Path.Combine(PlannerData.DataDirectory, PlannerData.CharmDbFile);
-        var statPath = Path.Combine(PlannerData.DataDirectory, PlannerData.StatMeasurementFile);
-        if (!File.Exists(charmPath) || !File.Exists(statPath))
+        var charmPath = PlannerData.ActiveDataFile(PlannerData.CharmDbFile);
+        var statPath = PlannerData.ActiveDataFile(PlannerData.StatMeasurementFile);
+        if (charmPath is null || statPath is null || !File.Exists(charmPath) || !File.Exists(statPath))
         {
             Console.Error.WriteLine($"카탈로그 덤프가 없습니다: {PlannerData.DataDirectory}");
             Console.Error.WriteLine("게임을 한 번 켜서 카탈로그를 다시 덤프하세요(F9).");

@@ -64,6 +64,34 @@ public class OfferPreviewTests
         Assert.Empty(plan!.Offers);
     }
 
+    [Fact]
+    public void AFullBagPreviewContainsTheCandidateAndOmitsTheDisplacedItem()
+    {
+        var inventory = new InventoryState { Width = 6, Height = 4, Storage = 1 };
+        inventory.Items.Add(new PlacedItem
+        {
+            DefinitionId = Held,
+            InstanceId = 10,
+            Position = new GridPos(0, 0),
+            IsActive = true,
+        });
+        var snapshot = new GameSnapshot
+        {
+            Inventory = inventory,
+            Run = new RunState { Gold = 1000 },
+            Offers =
+            {
+                new OfferedItem { DefinitionId = Offered, Kind = "charm", SlotIndex = 0 },
+            },
+        };
+
+        var advice = Assert.Single(PlanBuilder.Build(snapshot, Catalog())!.Offers);
+
+        Assert.Equal(10, advice.Displacement!.InstanceId);
+        Assert.Contains("후보", advice.Preview!.Names.Values);
+        Assert.DoesNotContain("가진 것", advice.Preview.Names.Values);
+    }
+
     private static Catalog Catalog() => new(
         new[]
         {

@@ -34,6 +34,8 @@ namespace SephPlanner.Plugin.Ui
         public bool Recommendations = true;
         public bool MultiplayerAutoPlace;
         public bool QueryVerified;
+        public PlanVerificationStatus RuntimeVerification;
+        public string RuntimeVerificationReason = "";
         public string Hint = "";
 
         /// <summary>안내 줄이 지금 미리보기를 설명하고 있는가. 그때는 색이 달라야 눈에 든다.</summary>
@@ -379,7 +381,9 @@ namespace SephPlanner.Plugin.Ui
             _gain.text = improved ? $"+{plan.Gain:0.#}" : "변경 없음";
             _gain.color = improved ? NativeSkin.Good : NativeSkin.TextDim;
 
-            var warning = Warning(snapshot, plan, frame.MultiplayerAutoPlace, frame.QueryVerified);
+            var warning = Warning(
+                snapshot, plan, frame.MultiplayerAutoPlace, frame.QueryVerified,
+                frame.RuntimeVerification, frame.RuntimeVerificationReason);
             _notice.text = warning;
             Widgets.SetActive(_notice, warning.Length > 0);
 
@@ -466,7 +470,8 @@ namespace SephPlanner.Plugin.Ui
         /// 멀티 안내보다 먼저다.
         /// </summary>
         private static string Warning(
-            GameSnapshot snapshot, Plan plan, bool multiplayerAutoPlace, bool queryVerified)
+            GameSnapshot snapshot, Plan plan, bool multiplayerAutoPlace, bool queryVerified,
+            PlanVerificationStatus runtimeVerification, string runtimeVerificationReason)
         {
             var warnings = new List<string>();
             if (!queryVerified)
@@ -475,8 +480,13 @@ namespace SephPlanner.Plugin.Ui
             if (plan.Best.UnplacedTablets > 0)
                 warnings.Add($"석판 {plan.Best.UnplacedTablets}개는 놓을 자리가 없어 계산에서 빠졌습니다.");
 
-            if (plan.LevelMismatches > 0)
-                warnings.Add($"칸 {plan.LevelMismatches}개의 레벨이 게임과 달라 자동 배치를 껐습니다.");
+            if (!plan.Verification.Passed)
+                warnings.Add(plan.Verification.Reason);
+
+            if (runtimeVerification != PlanVerificationStatus.Passed &&
+                runtimeVerificationReason.Length > 0 &&
+                runtimeVerificationReason != plan.Verification.Reason)
+                warnings.Add(runtimeVerificationReason);
 
             if (!plan.ManualMoveInstructionsAvailable)
                 warnings.Add("빈 칸이 없어 수동 이동 순서를 만들 수 없습니다. 자동 배치를 이용하세요.");
@@ -637,7 +647,7 @@ namespace SephPlanner.Plugin.Ui
         }
 
         private static Color NameTone(OfferAdvice advice) =>
-            !advice.Affordable ? NativeSkin.TextDim
+            !advice.Available || !advice.Affordable ? NativeSkin.TextDim
             : advice.MatchesPriority || advice.MatchesPreset ? NativeSkin.Mint
             : NativeSkin.Text;
 
@@ -649,9 +659,13 @@ namespace SephPlanner.Plugin.Ui
         {
             var parts = new StringBuilder();
 
+            if (!advice.Available) return Tint("선택 불가", NativeSkin.Bad);
+
             if (advice.ComboText.Length > 0)
             {
-                parts.Append(Tint(advice.ComboText, advice.ComboCompletes ? NativeSkin.Good : NativeSkin.Mint))
+                parts.Append(Tint(
+                        advice.ComboText,
+                        advice.ComboCompletes ? NativeSkin.Good : advice.ComboLoses ? NativeSkin.Bad : NativeSkin.Mint))
                      .Append("  ");
             }
 
