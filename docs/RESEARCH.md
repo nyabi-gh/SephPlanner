@@ -227,12 +227,14 @@ public void Swap(sbyte xLeft, sbyte yLeft, sbyte xRight, sbyte yRight)
 데이터베이스 로드·세션 시작·`GridInventoryStartPermission`/`EndPermission` 등의 이벤트를 제공한다.
 아직 초기 단계라 쓰지는 않지만, 게임이 모드를 공식적으로 상정하고 있다는 근거다.
 
-### 멀티플레이는 검증 전 잠금
+### 멀티플레이는 기본 잠금, 호스트만 실험 가능
 
 싱글은 호스트 모드라 위 경로가 전부 서버 로컬에서 끝난다. 멀티 클라이언트에서는 `CmdSwap` 등
 Cmd 경유가 필요한데, 커뮤니티의 다른 자동배치 모드가 클라이언트 회전 미동작·호스트 인벤토리
-오염을 겪은 전례가 있다. 동기화가 안전하다고 확인될 때까지 플러그인은 멀티 세션에서 적용을
-거부한다(`docs/LEGAL.md`).
+오염을 겪은 전례가 있다. 그래서 멀티 세션은 기본적으로 적용을 거부한다. 사용자가
+`MultiplayerAutoPlace` 실험 토글을 명시적으로 켠 경우에도 `NetworkServer.active`인 호스트만
+적용하며 클라이언트는 거부한다. 동기화 실기 검증이 끝나지 않았으므로 참가자 전원이 동의한
+사설 방의 실험 경로로만 취급한다(`docs/LEGAL.md`).
 
 ## 아티팩트 효과 설명
 
@@ -324,7 +326,9 @@ ilspycmd -t GridInventory "<게임경로>/Sephiria_Data/Managed/Assembly-CSharp.
 
 `SephPlanner.Plugin`의 `QueryVerifier`가 게임 안에서 원본 `StoneTablet.ParseQuery`와 전수 대조한다.
 석판 68종 × 질의 2종 × 회전 4 × storage 7단계 × 모든 원점 조합을 돌려 위치·값·플래그를 비교하고,
-결과를 `%LOCALAPPDATA%\SephPlanner\query-verification.txt`에 남긴다.
+결과를 `%LOCALAPPDATA%\SephPlanner\catalog-generations\<generation>\query-verification.txt`에
+남긴다. 데이터 루트의 `active-catalog.txt`가 현재 활성 generation을 가리키며, 같은 generation의
+`manifest.txt`가 파일 크기·SHA-256·게임 버전·게임 어셈블리 MVID를 묶어 검증한다.
 
 ## 아티팩트 레벨과 활성 조건
 

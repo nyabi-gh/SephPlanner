@@ -4,14 +4,16 @@
 
 기준 커밋: `ee7e4f786f210465ce16b56fedeabfcfc9ff5ed5`
 
+구현 커밋: `5233acd8b4ffe5b7ab942839909c52b138ad2fce`
+
 이 문서는 macOS 코드 감사에서 확인한 P1 문제를 Windows 게임 설치 환경에서 수정하기 위한
 실행 계획으로 시작했다. 초기 문서 작성 시점에는 구현 코드를 바꾸지 않았고,
-아래에 2026-09-01 구현 결과와 남은 Windows 검증을 추가했다.
+아래에 2026-09-01 구현 결과와 남은 게임 내 검증을 추가했다.
 
 ## 구현 상태 (2026-09-01)
 
-구현 작업 기준 HEAD는 `246cb6deafe13a12b111d2ba0d2a95231bf5ea5d`이다. 네 개 P1의 코드와
-회귀 테스트는 구현했다. 현재 인수 상태는 다음과 같다.
+구현은 `5233acd8b4ffe5b7ab942839909c52b138ad2fce`에 반영됐다. 네 개 P1의 코드와 회귀 테스트는
+완료했다. 현재 인수 상태는 다음과 같다.
 
 - P1-1 코드 완료: 계획 검증을 `Unavailable/Passed/Failed`로 명시하고, 열린 모든 칸의
   레벨·아이템 유효 레벨·disable·석판 `IsApplied`를 사전 검증한다.
@@ -22,11 +24,13 @@
   계산한다.
 - P1-4 코드 완료: 세대별 디렉터리, 파일 크기/SHA-256 manifest, 원자적 active pointer,
   지속적 `Refreshing/Failed/Ready` 상태, 게임 버전과 `Assembly-CSharp` MVID 검증을 추가했다.
-- 로컬 검증 완료: Core/DataTool Release 빌드 경고 0개·오류 0개, 테스트 176개 통과,
+- macOS 검증 완료: Core/DataTool Release 빌드 경고 0개·오류 0개, 테스트 176개 통과,
   `git diff --check` 통과.
-- 남은 인수 조건: 이 변경 후 Plugin Release 빌드와 게임 내 수동 확인. macOS에는
-  `Assembly-CSharp.dll`, Mirror, Unity, TextMeshPro 등 게임 DLL이 없어 Plugin 전체 빌드를
-  완료할 수 없다.
+- Windows 검증 완료: 실제 게임 DLL 참조를 포함한 솔루션 전체 Release 빌드 성공, 오류 0개.
+  테스트 176개가 모두 통과했고 건너뜀은 없다. 경고 6개는 제한된 네트워크에서 NuGet 취약점
+  피드를 읽지 못한 `NU1900`이며 컴파일러·분석기 경고는 없다.
+- 남은 인수 조건: 아래 게임 내 수동 확인표 실행과 실제 게임 버전·`Assembly-CSharp` MVID,
+  F9 질의 검증 결과 기록.
 
 ### 구현한 안전 불변식
 
@@ -54,13 +58,13 @@
 - `OfferAdvisorTests`, `OfferPreviewTests`: 후보 강제 포함, 음수 gain, 구조화 교체 대상,
   charm/tablet/filler 교체, 동점 결정, 콤보 완성/상실, preview 일치
 
-### Windows 최종 검증 시 기록할 것
+### 남은 게임 내 인수에서 기록할 것
 
-아래 `Windows 검증 명령`과 `게임 내 수동 확인표`를 변경 후 코드로 다시 실행한다.
+Windows 빌드와 단위 테스트는 완료했다. 아래 `게임 내 수동 확인표`를 변경 후 코드로 실행하고
 인수 기록에는 다음을 남긴다.
 
 - 실제 게임 버전과 `Assembly-CSharp.dll` MVID
-- Plugin Release 빌드의 경고/오류 수
+- Plugin Release 빌드 결과: 오류 0개, NuGet 피드 접근 `NU1900` 6개
 - F9 정상 완료 후 생성된 active generation과 질의 검증 비교/불일치 수
 - 아래 수동 시나리오의 통과/실패와 `BepInEx/LogOutput.log`의 관련 한 줄
 
@@ -73,9 +77,9 @@
 3. 가방이 찬 상태의 후보 및 콤보 추천
 4. 실패한 카탈로그 갱신이 이전 검증 성공을 재사용하는 문제
 
-멀티플레이 자동 배치 정책 불일치는 P0이므로 이 문서의 구현 범위에는 넣지 않는다. 다만 자동
-배치 가능 여부를 중앙화할 때 멀티플레이 조건도 같은 결정 객체를 사용하게 만들어, 후속 P0 작업이
-한 곳에서 끝나도록 한다.
+멀티플레이 자동 배치 실험 옵션의 동기화 검증과 정식 지원 여부 결정은 P0이므로 이 문서의 구현
+범위에는 넣지 않는다. 다만 자동 배치 가능 여부를 중앙화하면서 멀티플레이 조건도 같은 결정 객체에
+넣어 후속 P0 작업이 한 곳에서 끝나도록 했다.
 
 ## 초기 기준선
 
@@ -89,8 +93,9 @@ macOS에서 게임 DLL 비의존 범위는 다음과 같이 검증됐다.
 - 전체 NuGet 패키지에서 알려진 취약점 없음
 - xUnit 2.9.3 계열은 NuGet에서 Legacy로 분류됨
 
-Plugin 전체 빌드와 의미 기반 포맷 검사는 로컬에 `Assembly-CSharp.dll`, Mirror, Unity,
-TextMeshPro 등 게임 어셈블리가 없어 완료하지 못했다. Windows 세션에서는 이 검증부터 다시 한다.
+이 초기 기준선에서는 `Assembly-CSharp.dll`, Mirror, Unity, TextMeshPro 등 게임 어셈블리가 없어
+Plugin 전체 빌드와 의미 기반 포맷 검사를 완료하지 못했다. 이후 Windows 게임 설치 환경에서
+Plugin을 포함한 전체 Release 빌드를 완료했으며 결과는 위 구현 상태에 기록했다.
 
 ## 공통 완료 조건
 
@@ -398,8 +403,10 @@ SephPlanner/
       stat-measure.json
       query-verification.txt
       query-verification.json
-      manifest.json
-  active-catalog.json
+      catalog-version.txt
+      manifest.txt
+  active-catalog.txt
+  catalog-refresh-state.txt
 ```
 
 게시 순서는 다음과 같다.
@@ -408,8 +415,9 @@ SephPlanner/
 2. 질의 검증을 완료한다.
 3. 파일 크기와 필요하면 SHA-256을 포함한 manifest를 쓴다.
 4. 모든 파일을 다시 열어 manifest와 검증 결과를 확인한다.
-5. 마지막에 작은 `active-catalog.json` 포인터만 `File.Replace` 또는 temp+move로 교체한다.
-6. reader는 active pointer가 가리키는 한 generation만 읽는다.
+5. 마지막에 작은 `active-catalog.txt` 포인터만 `File.Replace` 또는 temp+move로 교체한다.
+6. `catalog-refresh-state.txt`를 `Ready`로 바꾸고 reader는 두 파일이 함께 가리키는 한
+   generation만 읽는다.
 
 더 작은 변경을 원하면 flat 파일을 유지할 수 있지만, 마지막 commit manifest에 모든 파일의 hash와
 generation을 담고 `HasCatalog`가 항상 이를 검증해야 한다. 이 방식은 실패 시 이전 묶음을 그대로
@@ -438,7 +446,8 @@ Plugin과 DataTool이 각자 다른 경로 규칙을 구현하지 않게 한다.
 - 일부 데이터 파일 기록 뒤 실패해도 혼합 bundle이 active가 되지 않는다.
 - 검증 상태 기록 직전 또는 active pointer 교체 직전 실패해도 이전/새 bundle이 섞이지 않는다.
 - 완전 성공한 generation만 재시작 후 `HasCatalog`와 `QueryVerificationPassed`를 통과한다.
-- active manifest의 hash 또는 generation이 다르면 통과하지 않는다.
+- generation manifest의 hash가 다르거나 active pointer와 refresh state의 generation이 다르면
+  통과하지 않는다.
 - 게임 버전 또는 게임 어셈블리 식별자가 바뀌면 이전 검증을 재사용하지 않는다.
 
 ### 주요 수정 후보
