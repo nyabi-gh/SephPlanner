@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Newtonsoft.Json;
-using SephPlanner.Core.Ipc;
 using SephPlanner.Core.Planning;
+using SephPlanner.Core.Runtime;
 
 namespace SephPlanner.Plugin
 {
@@ -13,11 +13,6 @@ namespace SephPlanner.Plugin
     /// <b>BepInEx 설정 파일이 아니라 제 파일을 쓴다.</b> 담는 것이 목록(콤보 카테고리, 아티팩트
     /// 번호)과 긴 문자열(프리셋 코드)이라 한 줄짜리 설정 항목으로는 담기지 않는다. 표시 설정은
     /// 그대로 BepInEx 쪽에 있다.
-    ///
-    /// <b>오버레이의 <c>overlay-settings.json</c>과 같은 파일을 쓰지 않는다.</b> 두 프로세스가
-    /// 한 파일을 함께 쓰면 나중에 쓴 쪽이 상대의 변경을 덮는다. 대신 둘을 나란히 켜 두면 빌드
-    /// 지정이 갈릴 수 있는데, 오버레이를 걷어내는 것이 예정된 방향이라 그 편이 단순하다
-    /// (docs/ROADMAP.md).
     /// </summary>
     internal sealed class PluginPreferences
     {
@@ -129,7 +124,7 @@ namespace SephPlanner.Plugin
                 : new HashSet<int>(),
         };
 
-        private static string Path_ => Path.Combine(IpcContract.DataDirectory, FileName);
+        private static string Path_ => Path.Combine(PlannerData.DataDirectory, FileName);
 
         public static PluginPreferences Load(Action<string> log)
         {
@@ -165,7 +160,7 @@ namespace SephPlanner.Plugin
         {
             try
             {
-                Directory.CreateDirectory(IpcContract.DataDirectory);
+                Directory.CreateDirectory(PlannerData.DataDirectory);
 
                 // 바로 덮어쓰면 쓰는 도중 게임이 죽었을 때 잘린 JSON 이 남아 지정이 통째로 날아간다.
                 var temp = Path_ + ".tmp";

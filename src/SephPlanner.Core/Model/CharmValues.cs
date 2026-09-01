@@ -33,7 +33,7 @@ namespace SephPlanner.Core.Model
         /// </summary>
         public List<string> Tags { get; set; } = new List<string>();
 
-        /// <summary>왜 이 값인지. 오버레이 툴팁에 그대로 보인다.</summary>
+        /// <summary>왜 이 값인지. HUD 툴팁에 그대로 보인다.</summary>
         public string Note { get; set; } = "";
 
         /// <summary>판단의 근거로 삼은 글. 참고 문헌으로만 적고 본문을 옮기지 않는다.</summary>

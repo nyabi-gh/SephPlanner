@@ -1,8 +1,7 @@
-using System;
 using System.Collections.Generic;
 using Mirror;
-using SephPlanner.Core.Ipc;
 using SephPlanner.Core.Model;
+using SephPlanner.Core.Runtime;
 using UnityEngine;
 
 namespace SephPlanner.Plugin
@@ -12,18 +11,17 @@ namespace SephPlanner.Plugin
     {
         /// <summary>
         /// 항상 스냅샷을 돌려준다. 런이 끝났거나 플레이어가 죽었으면 인벤토리가 비어 있는 스냅샷이다.
-        /// 이때 아무것도 보내지 않으면 오버레이에 직전 런의 배치가 그대로 남는다.
+        /// 이 상태를 넘겨야 HUD에서 직전 런의 배치를 지울 수 있다.
         /// </summary>
         public static GameSnapshot Read(float offerRadius)
         {
             var snapshot = new GameSnapshot
             {
-                TimestampMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                 GameVersion = Application.version,
             };
 
             // 아바타가 없거나 죽어서 일찍 돌아가는 스냅샷도 멀티 여부는 정확해야 한다.
-            // 여기서 기본값 false 로 나가면 오버레이의 멀티 잠금이 열린 쪽으로 무너진다.
+            // 여기서 기본값 false 로 두면 자동 배치 잠금이 열린 쪽으로 무너진다.
             snapshot.IsMultiplayer = IsMultiplayerSession();
 
             var avatar = FindLocalPlayer();
@@ -74,11 +72,6 @@ namespace SephPlanner.Plugin
             return NetworkServer.active && NetworkServer.connections.Count > 1;
         }
 
-        /// <summary>
-        /// 배치와 무관하지만 추천에 영향을 주는 런 상태. 무기 연동 아티팩트는 해당 무기를 들고
-        /// 있어야 효과가 켜지므로(<c>Charm_Basic.RefreshCharm</c>) 장착 무기를 싣고, 살 수 없는
-        /// 후보를 가려내려고 소지금도 함께 보낸다.
-        /// </summary>
         /// <summary>
         /// 이 층의 석판 합성기. 거리를 보지 않는 것은 의도다 - 미니맵에 뜨는 고정물이라 층에
         /// 있다는 사실 자체가 이미 보이는 정보이고, 무엇을 합칠지는 합성기 앞에 서기 전에 정해

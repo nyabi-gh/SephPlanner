@@ -1,6 +1,6 @@
 using System.Text.Json;
-using SephPlanner.Core.Ipc;
 using SephPlanner.Core.Model;
+using SephPlanner.Core.Runtime;
 using SephPlanner.Core.Solver;
 using SephPlanner.Core.Tablets;
 
@@ -16,12 +16,12 @@ public static class SolverSmokeTest
 
     public static int Run(int tabletCount, int charmCount)
     {
-        var tablets = Load<List<TabletDefinition>>(IpcContract.TabletDbFile);
-        var charms = Load<List<CharmDefinition>>(IpcContract.CharmDbFile);
+        var tablets = Load<List<TabletDefinition>>(PlannerData.TabletDbFile);
+        var charms = Load<List<CharmDefinition>>(PlannerData.CharmDbFile);
         if (tablets is null || charms is null)
         {
             Console.Error.WriteLine(
-                $"덤프 데이터가 없습니다. 게임을 한 번 실행해 {IpcContract.DataDirectory} 를 채우세요.");
+                $"덤프 데이터가 없습니다. 게임을 한 번 실행해 {PlannerData.DataDirectory} 를 채우세요.");
             return 1;
         }
 
@@ -98,7 +98,7 @@ public static class SolverSmokeTest
 
     private static T? Load<T>(string fileName)
     {
-        var path = Path.Combine(IpcContract.DataDirectory, fileName);
+        var path = Path.Combine(PlannerData.DataDirectory, fileName);
         return File.Exists(path) ? JsonSerializer.Deserialize<T>(File.ReadAllText(path), Options) : default;
     }
 }

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
-using SephPlanner.Core.Ipc;
+using SephPlanner.Core.Runtime;
 using UnityEngine;
 
 namespace SephPlanner.Plugin
@@ -93,17 +93,15 @@ namespace SephPlanner.Plugin
         private static PropertyInfo _viewerInventory;
 
         /// <summary>
-        /// 세피라이트 안에 든 후보들. 제단에서 무엇이 나올지는 고르기 전까지 서버만 알지만,
-        /// 일단 세피라이트가 생기고 나면 <c>rewards</c>가 동기화되어 무엇이 들었는지 알 수 있다.
-        /// 석판은 대개 이 경로로 나오므로 여기를 빼면 석판 추천이 아예 되지 않는다.
-        /// </summary>
-        /// <summary>
         /// 마지막으로 훑은 세피라이트들의 상태. 왜 어떤 선택지가 추천에 안 들어왔는지는 거리와
         /// 생성 여부로 갈리는데, 단축키로 덤프를 받는 방식은 키 입력이 게임에 닿아야만 해서
         /// 정작 필요할 때 못 쓴다. 그래서 플러그인이 스스로 로그에 남긴다.
         /// </summary>
         public static string LastSephiriteReport { get; private set; } = "";
 
+        /// <summary>
+        /// 현재 열린 보상 창과 연결된 세피라이트의 동기화된 후보를 수집한다.
+        /// </summary>
         private static void CollectSephirites(List<OfferedItem> offers, Vector3 origin, float radius)
         {
             var report = new StringBuilder();

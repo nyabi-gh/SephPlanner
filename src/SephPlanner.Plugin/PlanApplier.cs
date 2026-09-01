@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
 using Mirror;
-using SephPlanner.Core.Ipc;
 using SephPlanner.Core.Model;
+using SephPlanner.Core.Runtime;
 
 namespace SephPlanner.Plugin
 {
     /// <summary>
-    /// 오버레이가 보낸 최종 배치를 게임에 적용한다. 게임이 스스로 쓰는 경로만 탄다.
+    /// 솔버가 만든 최종 배치를 게임에 적용한다. 게임이 스스로 쓰는 경로만 탄다.
     /// 자리는 수동 드래그와 같은 <c>GridInventory.Swap</c>, 회전은 게임 내장 자동 정리
     /// (<c>AutoArrangeInventoryForBestCharmLevels</c>)와 같은 <c>Permission</c> 스코프 안의
     /// <c>Networkrotation</c> 설정이다.

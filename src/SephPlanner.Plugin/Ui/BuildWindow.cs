@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using SephPlanner.Core.Ipc;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
+using SephPlanner.Core.Runtime;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -19,8 +19,7 @@ namespace SephPlanner.Plugin.Ui
     }
 
     /// <summary>
-    /// 빌드 방향을 고르는 창. 오버레이에만 남아 있던 세 가지 - 프리셋 코드 가져오기, 빌드 우선
-    /// 콤보 지정, 강화 우선 아티팩트 지정 - 를 여기로 옮겼다.
+    /// 프리셋 코드, 빌드 우선 콤보와 강화 우선 아티팩트를 고르는 창.
     ///
     /// 셋을 한 창에 둔 것은 셋 다 "무엇을 노릴지"를 정하는 일이고, 한 판에 몇 번 하지 않는
     /// 일이라 창을 따로 열 만큼 자주 쓰지 않기 때문이다. 창을 나누면 단축키도 그만큼 는다.
@@ -319,7 +318,7 @@ namespace SephPlanner.Plugin.Ui
         }
 
         /// <summary>
-        /// 격자에 놓인 아티팩트. 오버레이에서는 칸을 우클릭해 지정했는데, HUD 격자를 누르게
+        /// 격자에 놓인 아티팩트. HUD 격자를 누르게
         /// 만들면 무입력 보장이 깨지므로 목록으로 옮겼다. 같은 종류가 여럿이면 한 줄로 묶는다 -
         /// 지정은 종류(엔티티 번호) 단위라 인스턴스를 갈라 봐야 할 것이 없다.
         /// </summary>

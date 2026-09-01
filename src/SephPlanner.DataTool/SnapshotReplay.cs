@@ -1,20 +1,14 @@
-using System.IO.Pipes;
-using System.Text;
 using System.Text.Json;
-using SephPlanner.Core.Ipc;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
+using SephPlanner.Core.Runtime;
 
 namespace SephPlanner.DataTool;
 
 /// <summary>
-/// 게임이 흘려보내는 스냅샷을 전부 받아 저장하면서, 스냅샷마다 계획을 다시 풀어 목표 배치가
-/// 바뀌는 순간을 표시한다. "제안을 따라가는데 제안이 바뀐다"처럼 간헐적으로만 나오는 문제는
-/// 게임 안에서 재현을 기다리는 대신 이 기록을 재생해서 잡는다.
-///
-/// 오버레이와 같은 파이프를 쓰므로 함께 켤 수 없다. 읽기만 하며 게임에는 아무것도 보내지 않는다.
+/// 저장된 스냅샷을 순서대로 다시 풀어 목표 배치가 바뀌는 순간과 풀이 시간을 표시한다.
 /// </summary>
-public static class SnapshotRecorder
+public static class SnapshotReplay
 {
     private static readonly JsonSerializerOptions Options = new() { PropertyNameCaseInsensitive = true };
 
@@ -22,7 +16,7 @@ public static class SnapshotRecorder
     private static Plan? _previous;
 
     /// <summary>녹화해 둔 스냅샷들을 순서대로 다시 풀어 본다. 솔버를 고친 뒤 같은 세션으로 검증하는 용도다.</summary>
-    public static int Replay(string dir)
+    public static int Run(string dir)
     {
         var catalog = LoadCatalog();
         if (catalog is null) return 1;
@@ -48,56 +42,14 @@ public static class SnapshotRecorder
 
     private static Catalog? LoadCatalog()
     {
-        var tablets = Load<List<TabletDefinition>>(IpcContract.TabletDbFile);
-        var charms = Load<List<CharmDefinition>>(IpcContract.CharmDbFile);
+        var tablets = Load<List<TabletDefinition>>(PlannerData.TabletDbFile);
+        var charms = Load<List<CharmDefinition>>(PlannerData.CharmDbFile);
         if (tablets is null || charms is null)
         {
-            Console.Error.WriteLine($"카탈로그가 없습니다. 게임을 한 번 실행해 {IpcContract.DataDirectory} 를 채우세요.");
+            Console.Error.WriteLine($"카탈로그가 없습니다. 게임을 한 번 실행해 {PlannerData.DataDirectory} 를 채우세요.");
             return null;
         }
-        return new Catalog(tablets, charms, Load<List<ComboDefinition>>(IpcContract.ComboDbFile));
-    }
-
-    public static int Run(string outDir)
-    {
-        var catalog = LoadCatalog();
-        if (catalog is null) return 1;
-
-        Directory.CreateDirectory(outDir);
-        Console.WriteLine($"저장 위치: {outDir}");
-
-        var index = 0;
-        Dictionary<int, (GridPos To, int Rotation)>? lastTargets = null;
-
-        while (true)
-        {
-            try
-            {
-                using var pipe = new NamedPipeClientStream(".", IpcContract.PipeName, PipeDirection.In);
-                pipe.Connect(2000);
-                Console.WriteLine("게임에 연결됐습니다. 스냅샷을 기다립니다...");
-
-                using var reader = new StreamReader(pipe, Encoding.UTF8);
-                string? line;
-                while ((line = reader.ReadLine()) != null)
-                {
-                    index++;
-                    File.WriteAllText(Path.Combine(outDir, $"{index:00000}.json"), line);
-                    lastTargets = Describe(index, line, catalog, lastTargets);
-                }
-                Console.WriteLine("연결이 끊겼습니다. 다시 기다립니다...");
-            }
-            catch (TimeoutException)
-            {
-                // 게임이 아직 안 떠 있거나 다른 클라이언트(오버레이)가 붙어 있다. 조용히 재시도한다.
-                Thread.Sleep(1000);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("오류: " + ex.Message);
-                Thread.Sleep(1000);
-            }
-        }
+        return new Catalog(tablets, charms, Load<List<ComboDefinition>>(PlannerData.ComboDbFile));
     }
 
     private static Dictionary<int, (GridPos To, int Rotation)>? Describe(
@@ -150,7 +102,7 @@ public static class SnapshotRecorder
 
     private static T? Load<T>(string fileName)
     {
-        var path = Path.Combine(IpcContract.DataDirectory, fileName);
+        var path = Path.Combine(PlannerData.DataDirectory, fileName);
         return File.Exists(path) ? JsonSerializer.Deserialize<T>(File.ReadAllText(path), Options) : default;
     }
 }

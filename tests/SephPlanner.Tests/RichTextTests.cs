@@ -3,8 +3,7 @@ using SephPlanner.Core.Model;
 namespace SephPlanner.Tests;
 
 /// <summary>
-/// 게임이 만들어 주는 효과 설명에는 TextMeshPro 서식이 섞여 있다. 오버레이는 그 문법을 모르고,
-/// 색은 Theme 에서만 가져오기로 했으므로 걷어내고 문장만 남긴다.
+/// 게임이 만들어 주는 효과 설명에서 TextMeshPro 서식을 걷어내고 문장만 남긴다.
 /// </summary>
 public class RichTextTests
 {

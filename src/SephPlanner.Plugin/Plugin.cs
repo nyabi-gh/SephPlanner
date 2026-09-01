@@ -3,27 +3,25 @@ using System.Collections.Generic;
 using BepInEx;
 using BepInEx.Configuration;
 using Newtonsoft.Json;
-using SephPlanner.Core.Ipc;
 using SephPlanner.Core.Planning;
+using SephPlanner.Core.Runtime;
 using SephPlanner.Plugin.Ui;
 using UnityEngine;
 
 namespace SephPlanner.Plugin
 {
     /// <summary>
-    /// 세피리아 상태를 읽어 SephPlanner 오버레이로 내보내고, 싱글플레이에서는 오버레이가 요청한
-    /// 자동 배치를 게임 자체의 이동 경로로 적용하는 브리지. 멀티 세션에서는 읽기만 한다.
+    /// 세피리아 상태를 읽어 게임 HUD에 배치와 추천을 표시하고, 싱글플레이에서는 제안된 배치를
+    /// 게임 자체의 이동 경로로 적용한다. 멀티 세션에서는 읽기만 한다.
     /// </summary>
-    [BepInPlugin(PluginGuid, "SephPlanner Bridge", "0.2.0")]
+    [BepInPlugin(PluginGuid, "SephPlanner", "0.2.0")]
     public sealed class SephPlannerPlugin : BaseUnityPlugin
     {
         public const string PluginGuid = "dev.nyabi.sephplanner.bridge";
 
-        private SnapshotPipeServer _server;
-        private CommandPipeServer _commands;
         private PluginSettings _settings;
         private float _nextPoll;
-        private string _lastJson;
+        private string _lastStateJson;
         private bool _catalogChecked;
         private string _lastSimulationIssue;
         private string _lastSephiriteReport;
@@ -65,9 +63,7 @@ namespace SephPlanner.Plugin
             _prefs = PluginPreferences.Load(Logger.LogWarning);
             _window = new SettingsWindow(_settings.Rows);
             _build = new BuildWindow(_prefs, CurrentBuild);
-            _server = new SnapshotPipeServer(Logger.LogInfo);
-            _commands = new CommandPipeServer(Logger.LogInfo);
-            Logger.LogInfo("SephPlanner 브리지 시작");
+            Logger.LogInfo("SephPlanner 시작");
         }
 
         private void Update()
@@ -105,51 +101,17 @@ namespace SephPlanner.Plugin
                 if (!CatalogDump.HasCatalog()) StartDump();
             }
 
-            DrainCommands();
             UpdateNativePanel();
 
             if (Time.unscaledTime < _nextPoll) return;
             _nextPoll = Time.unscaledTime + Mathf.Max(0.05f, _settings.PollInterval.Value);
-            PublishSnapshot();
-        }
-
-        private void DrainCommands()
-        {
-            while (_commands.TryDequeue(out var pending))
-            {
-                // 파이프 쪽 응답 대기는 이미 시간을 넘겼다. 층 이동 등으로 한참 뒤에야 꺼낸
-                // 명령을 실행하면 그 사이 바뀐 인벤토리에 낡은 배치를 적용하게 된다.
-                if (pending.AgeSeconds > 10)
-                {
-                    Logger.LogInfo("오래된 자동 배치 명령을 건너뜁니다.");
-                    pending.Complete("명령이 너무 오래 기다려 실행하지 않았습니다. 다시 시도하세요.");
-                    continue;
-                }
-
-                string result;
-                try
-                {
-                    result = PlanApplier.Apply(pending.Command, _settings.MultiplayerAutoPlace.Value);
-                    Logger.LogInfo(result);
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogError("자동 배치 실패: " + ex);
-                    result = "자동 배치 중 오류가 났습니다. BepInEx 로그를 확인하세요.";
-                }
-
-                // 결과가 오버레이 화면까지 가야 한다. 로그에만 남기면 무음 실패가 된다.
-                pending.Complete(result);
-
-                // 적용 결과가 화면에 바로 보이도록 다음 폴링을 기다리지 않는다.
-                _nextPoll = 0;
-            }
+            PollGameState();
         }
 
         private bool _dumping;
 
         /// <summary>
-        /// 아이콘 인코딩과 질의 전수 검증이 무거워, 한 프레임에 다 하면 게임이 수 초 멈춘다.
+        /// 질의 전수 검증이 무거워, 한 프레임에 다 하면 게임이 수 초 멈춘다.
         /// 코루틴으로 프레임에 나눠 돌린다.
         /// </summary>
         private void StartDump()
@@ -215,7 +177,7 @@ namespace SephPlanner.Plugin
             }
         }
 
-        private void PublishSnapshot()
+        private void PollGameState()
         {
             try
             {
@@ -223,17 +185,11 @@ namespace SephPlanner.Plugin
                 VerifySimulation();
                 ReportSephirites(snapshot);
 
-                var timestamp = snapshot.TimestampMs;
-                snapshot.TimestampMs = 0;
                 var json = JsonConvert.SerializeObject(snapshot);
-                var changed = json != _lastJson;
-                _lastJson = json;
+                var changed = json != _lastStateJson;
+                _lastStateJson = json;
 
-                snapshot.TimestampMs = timestamp;
                 FeedNativePanel(snapshot, changed);
-                if (!changed) return;
-
-                _server.Publish(JsonConvert.SerializeObject(snapshot));
             }
             catch (Exception ex)
             {
@@ -246,7 +202,7 @@ namespace SephPlanner.Plugin
         /// <summary>
         /// 근처 세피라이트의 상태를 남긴다. 무엇이 왜 후보에 못 들어갔는지 나중에 읽을 수 있어야 한다.
         /// </summary>
-        private void ReportSephirites(SephPlanner.Core.Ipc.GameSnapshot snapshot)
+        private void ReportSephirites(GameSnapshot snapshot)
         {
             var report = OfferReader.LastSephiriteReport;
             if (report == _lastSephiriteReport) return;
@@ -274,7 +230,7 @@ namespace SephPlanner.Plugin
         }
 
         /// <summary>
-        /// 인게임 화면이 쓸 배치를 푼다. 오버레이가 붙어 있든 아니든 도는데, 스냅샷이 그대로면
+        /// 인게임 화면이 쓸 배치를 푼다. 스냅샷이 그대로면
         /// 다시 풀지 않는다 - 같은 답을 얻자고 매번 빔 서치를 돌릴 이유가 없다.
         /// </summary>
         private void FeedNativePanel(GameSnapshot snapshot, bool changed)
@@ -310,7 +266,7 @@ namespace SephPlanner.Plugin
             var stale = _solvedRevision != _prefs.Revision;
             if (!changed && !stale && !_resubmit && _runner.Latest != null) return;
 
-            // 거절된 변경은 _lastJson 이 이미 갱신돼 다음 폴링에 "그대로"로 보인다.
+            // 거절된 변경은 _lastStateJson 이 이미 갱신돼 다음 폴링에 "그대로"로 보인다.
             // 받아들여질 때까지 최신 스냅샷으로 다시 낸다.
             if (_runner.Submit(snapshot, Preferences()))
             {
@@ -750,8 +706,6 @@ namespace SephPlanner.Plugin
             _hud.Destroy();
             _window.Destroy();
             _build.Destroy();
-            _server?.Dispose();
-            _commands?.Dispose();
         }
     }
 }

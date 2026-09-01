@@ -4,9 +4,7 @@ namespace SephPlanner.Core.Model
 {
     /// <summary>
     /// 게임 텍스트에서 TextMeshPro 서식 태그를 걷어낸다. 게임이 만들어 주는 효과 설명에는
-    /// <c>&lt;color=…&gt;</c>, <c>&lt;sprite=…&gt;</c>, <c>&lt;indent&gt;</c> 같은 것이 섞여 있는데
-    /// WPF 는 그 문법을 모른다. 색을 옮겨오지 않는 것은 의도이기도 하다 — 오버레이 색은 Theme 에서만
-    /// 가져온다.
+    /// <c>&lt;color=…&gt;</c>, <c>&lt;sprite=…&gt;</c>, <c>&lt;indent&gt;</c> 같은 것이 섞여 있다.
     /// </summary>
     public static class RichText
     {

@@ -5,21 +5,6 @@ using UnityEngine;
 namespace SephPlanner.Plugin.Ui
 {
     /// <summary>
-    /// 게임에서 빌려 온 글꼴·판때기와, 오버레이가 쓰던 것과 같은 색.
-    ///
-    /// 글꼴은 게임이 지금 쓰고 있는 것을 그대로 가리킨다. 씬에 떠 있는 것을 참조할 뿐이라
-    /// 추출도 배포도 하지 않는다(docs/LEGAL.md).
-    ///
-    /// <b>크기도 게임에서 온다.</b> HUD 캔버스는 픽셀 아트라 크게 확대돼 있어서 화면 픽셀을
-    /// 생각하고 숫자를 넣으면 글자가 네 배로 나온다. 그래서 기준 크기를 우리가 정하지 않고
-    /// HUD 글자 크기의 중앙값에서 가져오고, 나머지는 전부 그 비율로 잡는다.
-    ///
-    /// <b>판때기는 빌리지 않는다.</b> HUD 에서 9-slice 를 골라 쓰게 했더니 전체 화면짜리 선택
-    /// 테두리를 물어 왔고, 속이 비어 있어 글자가 게임 위에 그대로 떴다. 어느 스프라이트가
-    /// "창틀"인지 게임 데이터만으로는 가릴 수가 없다. 색은 오버레이가 게임 패널에서 채집해 둔
-    /// 값이 이미 있으므로 그것으로 직접 그린다.
-    /// </summary>
-    /// <summary>
     /// 우리가 만든 화면임을 알리는 표시. 게임에서 크기를 빌릴 때 우리 글자를 걸러내는 데 쓴다.
     /// 붙이는 것 말고는 하는 일이 없다.
     /// </summary>
@@ -27,6 +12,10 @@ namespace SephPlanner.Plugin.Ui
     {
     }
 
+    /// <summary>
+    /// 게임이 로드한 글꼴과 HUD 글자 크기를 빌리고, 게임 패널에서 채집한 색으로 화면을 그린다.
+    /// 씬의 글꼴을 참조할 뿐 추출하거나 배포하지 않는다.
+    /// </summary>
     internal sealed class NativeSkin
     {
         public TMP_FontAsset Font { get; private set; }
@@ -38,7 +27,7 @@ namespace SephPlanner.Plugin.Ui
         /// <summary>무엇을 어디서 빌려 왔는지. 스파이크의 판단 근거라 로그로 남긴다.</summary>
         public string Origin { get; private set; } = "";
 
-        // 오버레이 Theme 과 같은 값. 한쪽만 고치면 두 화면이 갈라지므로 여기를 옮길 때 저쪽도 본다.
+        // 게임 패널에서 채집한 팔레트.
         public static readonly Color Outline = Rgb(0x10, 0x0A, 0x0C);
         public static readonly Color Frame = Rgb(0xA9, 0x7C, 0x74);
         public static readonly Color PanelFill = Rgb(0x24, 0x1A, 0x1D);

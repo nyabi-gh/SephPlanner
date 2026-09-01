@@ -1,16 +1,13 @@
 using System.Collections.Generic;
 using SephPlanner.Core.Model;
 
-namespace SephPlanner.Core.Ipc
+namespace SephPlanner.Core.Runtime
 {
     /// <summary>
-    /// 오버레이가 플러그인에 보내는 "이 배치로 맞춰 달라"는 명령. 걸음 순서가 아니라 최종 배치를
-    /// 보낸다. 명령이 만들어진 뒤 게임 상태가 바뀌었을 수 있으므로, 어떤 순서로 옮길지는
-    /// 살아 있는 상태를 아는 플러그인이 정한다.
+    /// 계산한 최종 배치와 계산 당시의 게임 상태. 적용 직전에 살아 있는 상태와 대조한다.
     /// </summary>
     public sealed class ApplyPlanCommand
     {
-        public int ProtocolVersion { get; set; } = IpcContract.ProtocolVersion;
         public int ExpectedWidth { get; set; }
         public int ExpectedHeight { get; set; }
         public int ExpectedStorage { get; set; }

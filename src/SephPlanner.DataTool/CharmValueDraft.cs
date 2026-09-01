@@ -1,7 +1,7 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
-using SephPlanner.Core.Ipc;
 using SephPlanner.Core.Model;
+using SephPlanner.Core.Runtime;
 using SephPlanner.Core.Solver;
 
 namespace SephPlanner.DataTool;
@@ -30,11 +30,11 @@ public static class CharmValueDraft
 
     public static int Run(string repoRoot)
     {
-        var charmPath = Path.Combine(IpcContract.DataDirectory, IpcContract.CharmDbFile);
-        var statPath = Path.Combine(IpcContract.DataDirectory, IpcContract.StatMeasurementFile);
+        var charmPath = Path.Combine(PlannerData.DataDirectory, PlannerData.CharmDbFile);
+        var statPath = Path.Combine(PlannerData.DataDirectory, PlannerData.StatMeasurementFile);
         if (!File.Exists(charmPath) || !File.Exists(statPath))
         {
-            Console.Error.WriteLine($"카탈로그 덤프가 없습니다: {IpcContract.DataDirectory}");
+            Console.Error.WriteLine($"카탈로그 덤프가 없습니다: {PlannerData.DataDirectory}");
             Console.Error.WriteLine("게임을 한 번 켜서 카탈로그를 다시 덤프하세요(F9).");
             return 1;
         }

@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using SephPlanner.Core.Charms;
-using SephPlanner.Core.Ipc;
 using SephPlanner.Core.Model;
+using SephPlanner.Core.Runtime;
 using SephPlanner.Core.Solver;
 using SephPlanner.Core.Tablets;
 

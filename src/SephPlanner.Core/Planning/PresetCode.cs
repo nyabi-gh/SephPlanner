@@ -156,7 +156,7 @@ namespace SephPlanner.Core.Planning
 
         /// <summary>
         /// 테스트가 코드를 만들어 넣기 위한 역방향. 게임과 같은 알고리즘이라 왕복이 성립하는지로
-        /// 디코딩을 검증할 수 있다. 오버레이는 프리셋을 내보내지 않으므로 여기서만 쓴다.
+        /// 디코딩을 검증할 수 있다. 현재는 테스트와 진단에서만 쓴다.
         /// </summary>
         public static string Encode(string plain)
         {

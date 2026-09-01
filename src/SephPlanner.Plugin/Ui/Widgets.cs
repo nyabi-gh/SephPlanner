@@ -5,13 +5,6 @@ using UnityEngine.UI;
 namespace SephPlanner.Plugin.Ui
 {
     /// <summary>
-    /// uGUI 조각을 만드는 손. XAML 이 없으니 만드는 일이 코드로 오는데, 같은 다섯 줄을 곳곳에
-    /// 되풀이하지 않으려고 모아 두었다.
-    ///
-    /// <b>그리는 것마다 <c>raycastTarget</c>이 꺼져 있다.</b> 마우스를 그대로 통과시켜야 게임
-    /// 조작을 방해하지 않는다. 여기를 거치지 않고 직접 Image/Text 를 붙이면 그 보장이 깨진다.
-    /// </summary>
-    /// <summary>
     /// 우리 화면이 게임 UI 중 어디쯤에 그려지는지.
     ///
     /// 값은 게임에서 잰 것이다(인벤토리 덤프의 <c>[ui]</c> 절). 게임의 화면 공간 캔버스는
@@ -30,6 +23,9 @@ namespace SephPlanner.Plugin.Ui
         public const int Tooltip = 7;
     }
 
+    /// <summary>
+    /// 게임 조작을 가로막지 않도록 기본 그래픽의 레이캐스트를 끈 uGUI 팩터리.
+    /// </summary>
     internal static class Widgets
     {
         /// <summary>

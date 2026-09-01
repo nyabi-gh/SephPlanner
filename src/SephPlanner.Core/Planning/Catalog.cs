@@ -5,8 +5,8 @@ using SephPlanner.Core.Model;
 namespace SephPlanner.Core.Planning
 {
     /// <summary>
-    /// 엔티티 번호로 석판과 아티팩트 정의를 찾는다. 오버레이는 플러그인이 덤프한 파일을 읽어
-    /// 채우고, 테스트와 진단 도구는 손으로 만든 목록을 넣는다.
+    /// 엔티티 번호로 석판과 아티팩트 정의를 찾는다. 플러그인은 게임 리소스로 채우고,
+    /// 테스트와 진단 도구는 저장된 정의나 손으로 만든 목록을 넣는다.
     /// </summary>
     public interface ICatalog
     {

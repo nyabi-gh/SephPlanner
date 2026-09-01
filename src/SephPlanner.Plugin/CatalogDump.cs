@@ -2,18 +2,16 @@ using System;
 using System.Collections;
 using System.IO;
 using Newtonsoft.Json;
-using SephPlanner.Core.Ipc;
+using SephPlanner.Core.Runtime;
 using SephPlanner.Core.Solver;
 using UnityEngine;
 
 namespace SephPlanner.Plugin
 {
     /// <summary>
-    /// 게임에서 읽은 정적 데이터를 오버레이가 쓸 수 있는 위치에 저장한다.
-    /// 저장 위치는 사용자 PC 안이며, 배포물에는 포함하지 않는다.
+    /// 게임에서 읽은 정적 데이터와 질의 검증 결과를 진단 도구가 읽을 수 있게 저장한다.
     ///
-    /// 아이콘 인코딩과 질의 전수 검증이 무거워서 한 프레임에 다 하면 게임이 수 초 멈춘다.
-    /// 그래서 코루틴으로 프레임에 나눠 돌린다. 첫 실행마다 모든 사용자가 겪는 경로다.
+    /// 질의 전수 검증을 한 프레임에 다 하면 게임이 멈추므로 코루틴으로 나눠 실행한다.
     /// </summary>
     internal static class CatalogDump
     {
@@ -29,7 +27,7 @@ namespace SephPlanner.Plugin
         public static IEnumerator WriteRoutine(Action<string> report)
         {
             _queryVerified = null;
-            Directory.CreateDirectory(IpcContract.DataDirectory);
+            Directory.CreateDirectory(PlannerData.DataDirectory);
 
             var tablets = ItemCatalog.LoadTablets();
             yield return null;
@@ -40,40 +38,32 @@ namespace SephPlanner.Plugin
             var measurement = ItemCatalog.LoadStatMeasurement();
             yield return null;
 
-            // 아티팩트가 레벨마다 실제로 주는 값어치를 여기서 한 번 재어 정의에 실어 둔다.
-            // 오버레이가 매번 다시 재지 않아도 되고, 콤보 가중치와 같은 환산율로 잰 값이 된다.
+            // 아티팩트가 레벨마다 실제로 주는 값어치를 콤보와 같은 환산율로 재어 정의에 실어 둔다.
             var worth = CharmStatWorth.Apply(charms, measurement);
             yield return null;
 
-            WriteJson(IpcContract.TabletDbFile, tablets);
-            WriteJson(IpcContract.CharmDbFile, charms);
-            WriteJson(IpcContract.ComboDbFile, combos);
-            WriteJson(IpcContract.StatMeasurementFile, measurement);
+            WriteJson(PlannerData.TabletDbFile, tablets);
+            WriteJson(PlannerData.CharmDbFile, charms);
+            WriteJson(PlannerData.ComboDbFile, combos);
+            WriteJson(PlannerData.StatMeasurementFile, measurement);
             yield return null;
-
-            var icons = 0;
-            foreach (var count in IconDump.WriteBatched())
-            {
-                icons = count;
-                yield return null;
-            }
 
             var verification = new QueryVerifier.Report();
             foreach (var _ in QueryVerifier.RunBatched(tablets, verification))
                 yield return null;
-            WriteText(IpcContract.VerificationReportFile, QueryVerifier.Format(verification));
-            WriteJson(IpcContract.VerificationStatusFile, new VerificationStatus
+            WriteText(PlannerData.VerificationReportFile, QueryVerifier.Format(verification));
+            WriteJson(PlannerData.VerificationStatusFile, new VerificationStatus
             {
                 GameVersion = Application.version,
                 Comparisons = verification.Comparisons,
                 Mismatches = verification.Mismatches,
             });
-            WriteText(IpcContract.CatalogVersionFile, IpcContract.CatalogVersion.ToString());
+            WriteText(PlannerData.CatalogVersionFile, PlannerData.CatalogVersion.ToString());
             _queryVerified = verification.Passed;
 
             report($"석판 {tablets.Count}종, 아티팩트 {charms.Count}종, 콤보 {combos.Count}종, " +
-                   $"아이콘 {icons}개 저장. 아티팩트 가치 {worth.ByEntity.Count}종 측정. " +
-                   $"질의 검증 {verification.Comparisons}건 중 불일치 {verification.Mismatches}건.");
+                   $"아티팩트 가치 {worth.ByEntity.Count}종 측정. 질의 검증 " +
+                   $"{verification.Comparisons}건 중 불일치 {verification.Mismatches}건.");
         }
 
         /// <summary>
@@ -84,16 +74,16 @@ namespace SephPlanner.Plugin
         {
             var required = new[]
             {
-                IpcContract.TabletDbFile,
-                IpcContract.CharmDbFile,
-                IpcContract.ComboDbFile,
-                IpcContract.StatMeasurementFile,
-                IpcContract.VerificationReportFile,
-                IpcContract.VerificationStatusFile,
+                PlannerData.TabletDbFile,
+                PlannerData.CharmDbFile,
+                PlannerData.ComboDbFile,
+                PlannerData.StatMeasurementFile,
+                PlannerData.VerificationReportFile,
+                PlannerData.VerificationStatusFile,
             };
             foreach (var file in required)
             {
-                var path = Path.Combine(IpcContract.DataDirectory, file);
+                var path = Path.Combine(PlannerData.DataDirectory, file);
                 if (!File.Exists(path) || new FileInfo(path).Length == 0) return false;
             }
 
@@ -102,11 +92,11 @@ namespace SephPlanner.Plugin
                 verification.Comparisons <= 0)
                 return false;
 
-            var stamp = Path.Combine(IpcContract.DataDirectory, IpcContract.CatalogVersionFile);
+            var stamp = Path.Combine(PlannerData.DataDirectory, PlannerData.CatalogVersionFile);
             if (!File.Exists(stamp)) return false;
 
             return int.TryParse(File.ReadAllText(stamp).Trim(), out var version)
-                   && version == IpcContract.CatalogVersion;
+                   && version == PlannerData.CatalogVersion;
         }
 
         public static bool QueryVerificationPassed()
@@ -121,7 +111,7 @@ namespace SephPlanner.Plugin
 
         private static VerificationStatus ReadVerificationStatus()
         {
-            var path = Path.Combine(IpcContract.DataDirectory, IpcContract.VerificationStatusFile);
+            var path = Path.Combine(PlannerData.DataDirectory, PlannerData.VerificationStatusFile);
             if (!File.Exists(path)) return null;
             try
             {
@@ -137,11 +127,11 @@ namespace SephPlanner.Plugin
             WriteText(fileName, JsonConvert.SerializeObject(value, Formatting.Indented));
 
         /// <summary>
-        /// 임시 파일에 쓰고 바꿔치기한다. 바로 덮어쓰면 오버레이가 반쯤 쓰인 파일을 읽을 수 있다.
+        /// 임시 파일에 쓰고 바꿔치기해 중단되더라도 잘린 파일을 남기지 않는다.
         /// </summary>
         private static void WriteText(string fileName, string content)
         {
-            var path = Path.Combine(IpcContract.DataDirectory, fileName);
+            var path = Path.Combine(PlannerData.DataDirectory, fileName);
             var temp = path + ".tmp";
             File.WriteAllText(temp, content);
 

@@ -1,6 +1,6 @@
 using System.IO;
 using System.Text;
-using SephPlanner.Core.Ipc;
+using SephPlanner.Core.Runtime;
 using UnityEngine;
 
 namespace SephPlanner.Plugin
@@ -113,8 +113,8 @@ namespace SephPlanner.Plugin
             WriteOffers(text, inv, player, offerRadius);
             UiDiagnostics.Write(text);
 
-            Directory.CreateDirectory(IpcContract.DataDirectory);
-            var path = Path.Combine(IpcContract.DataDirectory, FileName);
+            Directory.CreateDirectory(PlannerData.DataDirectory);
+            var path = Path.Combine(PlannerData.DataDirectory, FileName);
             File.WriteAllText(path, text.ToString());
             return path;
         }

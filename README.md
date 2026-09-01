@@ -9,17 +9,12 @@ TEAM HORAY와 무관한 팬 제작 도구이며, 비영리로 배포한다.
 ## 구조
 
 ```
-SephPlanner.Core      도메인 모델 + IPC 계약 + 솔버와 배치 계산 (netstandard2.1)
+SephPlanner.Core      게임 상태 모델 + 솔버와 배치 계산 (netstandard2.1)
 SephPlanner.Plugin    BepInEx 플러그인. 게임 상태를 읽어 배치를 풀고 게임 HUD 안에 직접
                       그린다. 싱글플레이 한정으로 자동 배치를 적용한다
-SephPlanner.Overlay   WPF 별도 창. 인게임 화면이 대신하게 되어 걷어내는 중 (net10.0-windows)
 SephPlanner.DataTool  게임 없이 도는 CLI. 텍스트 추출, 스냅샷 대조, 콤보·아티팩트 값어치 측정
 SephPlanner.Tests     Core 단위 테스트. 게임 없이 돈다
 ```
-
-오버레이가 아직 붙어 있는 동안 게임 ↔ 오버레이 통신에는 localhost HTTP 대신 **명명 파이프**를
-쓴다. 방화벽 팝업이 뜨지 않고 포트가 충돌하지 않는다. 로컬 통신이지만 보안 경계로 간주하지는 않는다.
-오버레이를 걷어내면 이 배관도 함께 없어진다.
 
 ## 빌드
 
@@ -79,9 +74,8 @@ scripts/make-release.ps1
 # -> artifacts/SephPlanner-v{버전}.zip
 ```
 
-기본 배포물에는 플러그인 DLL 두 개만 들어간다. 이전 오버레이를 함께 시험해야 할 때만
-`scripts/make-release.ps1 -IncludeOverlay`를 사용한다. 릴리스 전에 포맷, 테스트, 빌드를 검증하고
-커밋과 파일 해시가 적힌 `manifest.json`을 만든다. BepInEx와 게임 파일은 넣지 않는다.
+배포물에는 플러그인 DLL 두 개만 들어간다. 릴리스 전에 포맷, 테스트, 빌드를 검증하고 커밋과
+파일 해시가 적힌 `manifest.json`을 만든다. BepInEx와 게임 파일은 넣지 않는다.
 
 ## 문서
 
@@ -266,45 +260,3 @@ BepInEx 로그에 저절로 남는다.** 상태가 바뀔 때만 한 줄씩이�
 
 같은 폴더의 `query-verification.txt`에 질의 파서 검증 결과가 남는다. 불일치가 0이 아니면
 솔버 결과를 믿을 수 없으므로 먼저 확인한다.
-
-## 오버레이 (걷어내는 중)
-
-WPF 로 된 별도 창이다. **인게임 화면이 생기기 전의 표시 수단이고, 이제 기본 배포물에는 넣지 않는다.**
-회귀 확인과 개발용 미리보기 때문에 소스만 유지한다.
-
-```powershell
-dotnet run --project src/SephPlanner.Overlay -c Release
-```
-
-게임이 실행 중이면 명명 파이프로 자동 연결된다. 창은 끌어서 옮기고 Esc 또는 오른쪽 위 X로 닫는다.
-`Ctrl+Alt+I` 로 접고 펴며 `Ctrl+Alt+O` 로 통째로 숨긴다(게임에 포커스가 있어도 동작한다).
-강화 우선은 격자 칸 우클릭, 빌드 우선은 칩 클릭, 후보 미리보기는 후보 클릭이고, 인게임에는
-없는 아이콘/글자 모드 토글이 범례 줄에 있다 — 인게임은 게임 스프라이트를 그대로 가리켜 늘
-아이콘이라 옮길 것이 없었다.
-
-빌드 지정은 **플러그인과 파일을 나눠 쓴다**(`overlay-settings.json` / `plugin-settings.json`).
-한 파일을 함께 쓰면 나중에 쓴 쪽이 상대의 변경을 덮기 때문인데, 대신 둘을 나란히 켜 두는 동안
-빌드 지정이 갈릴 수 있다.
-
-게임 없이 화면만 확인하려면 `--preview` 를 붙인다. 가짜 스냅샷으로 전체 UI 가 채워져 뜨고,
-파이프를 열지 않으므로 실제 오버레이와 같이 떠 있어도 서로 방해하지 않는다.
-
-```powershell
-dotnet run --project src/SephPlanner.Overlay -- --preview
-```
-
-XAML 은 컴파일 때 검증되지 않아 빌드가 성공해도 창이 안 뜰 수 있다(없는 리소스를 참조하면
-로드에서 터진다). 프로세스만 보면 그 상태를 놓치므로, 보이는 창이 있는지까지 확인한다.
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-overlay-window.ps1
-```
-
-화면은 게임 자체 UI 의 문법을 따른다. 색은 게임 패널(가방·콤보 효과·스킬)에서 채집했고 값은
-전부 `Theme.cs` 한곳에 있다. 글꼴은 [Galmuri](https://github.com/quiple/galmuri) 픽셀
-폰트를 임베드한다(OFL-1.1, 라이선스는 `src/SephPlanner.Overlay/Fonts/LICENSE.txt`에 동봉).
-인게임 화면은 게임이 이미 Galmuri 를 쓰고 있어 그것을 그대로 가리키므로 임베드도 재배포 의무도
-없다.
-
-설명 문장은 두 화면이 `SephPlanner.Core` 의 `Explain` 을 함께 쓴다. 갈라 두면 한쪽만 고쳐져
-같은 아티팩트를 두고 다른 말을 하게 된다.

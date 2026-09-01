@@ -7,7 +7,7 @@ namespace SephPlanner.Plugin
 {
     /// <summary>
     /// Core 의 질의 파서를 게임 원본 <c>StoneTablet.ParseQuery</c>와 전수 대조한다.
-    /// 오버레이는 게임 없이 돌아가야 하므로 파서를 포팅할 수밖에 없고, 그 포팅이 맞다는 근거가 이 검증이다.
+    /// 게임 객체와 분리해 포팅한 파서가 맞다는 근거가 이 검증이다.
     /// </summary>
     internal static class QueryVerifier
     {

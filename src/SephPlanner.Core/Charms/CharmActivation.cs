@@ -4,8 +4,7 @@ using SephPlanner.Core.Model;
 namespace SephPlanner.Core.Charms
 {
     /// <summary>
-    /// 아티팩트의 효과가 꺼진 이유. 게임의 <c>Charm_Basic.RefreshCharm</c>이 보는 조건들에 대응하며,
-    /// 오버레이가 그대로 설명 문구로 쓴다.
+    /// 아티팩트의 효과가 꺼진 이유. 게임의 <c>Charm_Basic.RefreshCharm</c>이 보는 조건들에 대응한다.
     /// </summary>
     public enum CharmInactiveReason
     {

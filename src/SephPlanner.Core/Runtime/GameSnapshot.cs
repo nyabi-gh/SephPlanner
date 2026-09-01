@@ -1,16 +1,14 @@
 using System.Collections.Generic;
 using SephPlanner.Core.Model;
 
-namespace SephPlanner.Core.Ipc
+namespace SephPlanner.Core.Runtime
 {
-    /// <summary>플러그인이 오버레이로 보내는 게임 상태 한 장면.</summary>
+    /// <summary>한 번의 폴링에서 읽은 게임 상태.</summary>
     public sealed class GameSnapshot
     {
-        public int ProtocolVersion { get; set; } = IpcContract.ProtocolVersion;
         public string GameVersion { get; set; } = "";
-        public long TimestampMs { get; set; }
 
-        /// <summary>멀티 세션에서는 오버레이가 게임에 영향을 주는 기능을 전부 잠근다.</summary>
+        /// <summary>멀티 세션에서는 자동 배치를 잠근다.</summary>
         public bool IsMultiplayer { get; set; }
 
         public InventoryState? Inventory { get; set; }

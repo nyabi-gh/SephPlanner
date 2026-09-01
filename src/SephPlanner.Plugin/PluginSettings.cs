@@ -71,7 +71,7 @@ namespace SephPlanner.Plugin
 
             Panel = config.Bind(
                 "NativePanel", "Enabled", true,
-                "게임 HUD 안에 점수 패널을 직접 그린다. 별도 오버레이 창과 함께 써도 된다.");
+                "게임 HUD 안에 점수 패널을 직접 그린다.");
             // 열쇠 이름이 예전과 다르다. 뜻이 바뀌었는데 이름을 그대로 두면 저장된 옛 값이
             // 쓰여 화면이 엉뚱한 곳으로 간다.
             Corner = config.Bind(

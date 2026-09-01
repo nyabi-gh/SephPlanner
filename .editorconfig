@@ -15,15 +15,6 @@ dotnet_diagnostic.CA1305.severity = none
 dotnet_diagnostic.CA1859.severity = none
 dotnet_diagnostic.CA1861.severity = none
 
-[src/SephPlanner.Plugin/Plugin.cs]
-dotnet_diagnostic.CA1001.severity = none
-
-[src/SephPlanner.Plugin/CommandPipeServer.cs]
-dotnet_diagnostic.CA1001.severity = none
-
-[src/SephPlanner.Overlay/MainWindow.xaml.cs]
-dotnet_diagnostic.CA1001.severity = none
-
 [*.{json,yml,yaml}]
 indent_size = 2
 

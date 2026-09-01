@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <!-- netstandard2.1: Unity Mono(BepInEx 플러그인)와 WPF(net10) 양쪽에서 참조 가능한 유일한 공통분모 -->
+    <!-- Unity Mono에서 로드할 수 있는 대상 프레임워크를 유지한다. -->
     <TargetFramework>netstandard2.1</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>

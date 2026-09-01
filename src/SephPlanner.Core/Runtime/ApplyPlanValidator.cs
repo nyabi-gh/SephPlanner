@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using SephPlanner.Core.Model;
 
-namespace SephPlanner.Core.Ipc
+namespace SephPlanner.Core.Runtime
 {
     public sealed class LivePlanItem
     {
@@ -18,9 +18,6 @@ namespace SephPlanner.Core.Ipc
             ApplyPlanCommand command, IReadOnlyCollection<LivePlanItem> liveItems,
             int width, int height, int storage)
         {
-            if (command.ProtocolVersion != IpcContract.ProtocolVersion)
-                return "자동 배치 프로토콜 버전이 맞지 않습니다. 플러그인과 화면을 함께 업데이트하세요.";
-
             if (command.Targets is null || command.Targets.Count == 0)
                 return "적용할 배치가 없습니다.";
             if (command.ExpectedWidth != width || command.ExpectedHeight != height ||

@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using System.Text;
 using SephPlanner.Core.Charms;
-using SephPlanner.Core.Ipc;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
+using SephPlanner.Core.Runtime;
 using SephPlanner.Core.Solver;
 using SephPlanner.Core.Tablets;
 using TMPro;
@@ -46,7 +46,7 @@ namespace SephPlanner.Plugin.Ui
     }
 
     /// <summary>
-    /// 게임 HUD 캔버스 안에 직접 그리는 화면. 오버레이 창이 하던 표시를 게임 안으로 옮긴 것이다.
+    /// 게임 HUD 캔버스 안에 직접 그리는 화면.
     ///
     /// 게임 UI 의 일부라서 전용 전체화면에서도 보이고, 게임 UI 배율을 따르며, 게임이 UI 를 감출 때
     /// 함께 감춰진다 - <c>UIManager.Hide</c>가 <c>UIRoot</c>의 CanvasGroup 알파를 0 으로 만드는데
@@ -154,7 +154,7 @@ namespace SephPlanner.Plugin.Ui
             _cells.Clear();
             _hover.Clear();
 
-            // 장미빛 테두리 한 겹과 그 안의 어두운 속. 오버레이 패널의 골격을 옮긴 것이다.
+            // 장미빛 테두리 한 겹과 그 안의 어두운 속.
             var frame = Widgets.Fill("SephPlannerHud", root.transform, NativeSkin.Frame);
             _root = frame.gameObject;
 
@@ -462,7 +462,7 @@ namespace SephPlanner.Plugin.Ui
         }
 
         /// <summary>
-        /// 지금 화면에서 알려야 할 것. 오버레이와 같은 순서다 - 점수를 믿을 수 없는 상황이
+        /// 지금 화면에서 알려야 할 것. 점수를 믿을 수 없는 상황이
         /// 멀티 안내보다 먼저다.
         /// </summary>
         private static string Warning(
@@ -575,8 +575,7 @@ namespace SephPlanner.Plugin.Ui
         }
 
         /// <summary>
-        /// 게임이 들고 있는 스프라이트를 그대로 쓴다. 오버레이는 PNG 로 떠 둔 것을 읽어야 했지만
-        /// 게임 안에서는 원본이 이미 메모리에 있다.
+        /// 게임이 들고 있는 스프라이트를 그대로 쓴다. 원본이 이미 메모리에 있다.
         /// </summary>
         private static Sprite IconOf(int entityId)
         {

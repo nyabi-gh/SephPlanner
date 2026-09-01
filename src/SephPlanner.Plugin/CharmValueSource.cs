@@ -10,9 +10,6 @@ namespace SephPlanner.Plugin
     /// <summary>
     /// 손으로 채운 아티팩트 가치(<c>data/values/charms.json</c>). 게임에서 나오는 데이터가 아니라
     /// 우리가 만드는 데이터라서 DLL 안에 함께 들어 있다.
-    ///
-    /// 오버레이도 같은 파일을 같은 이름으로 품고 있다. 한쪽만 읽으면 같은 배치를 두고 두 화면이
-    /// 다른 점수를 말하게 되므로 양쪽 다 읽는다.
     /// </summary>
     internal static class CharmValueSource
     {

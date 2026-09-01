@@ -1,5 +1,5 @@
 using System.Text.Json;
-using SephPlanner.Core.Ipc;
+using SephPlanner.Core.Runtime;
 using SephPlanner.Core.Solver;
 
 namespace SephPlanner.DataTool;
@@ -12,7 +12,7 @@ public static class ComboMeasure
 {
     public static int Run()
     {
-        var path = Path.Combine(IpcContract.DataDirectory, IpcContract.StatMeasurementFile);
+        var path = Path.Combine(PlannerData.DataDirectory, PlannerData.StatMeasurementFile);
         if (!File.Exists(path))
         {
             Console.Error.WriteLine($"측정 자료가 없습니다: {path}");

@@ -1,7 +1,7 @@
 using System;
 using System.Threading;
-using SephPlanner.Core.Ipc;
 using SephPlanner.Core.Planning;
+using SephPlanner.Core.Runtime;
 
 namespace SephPlanner.Plugin
 {
@@ -44,8 +44,8 @@ namespace SephPlanner.Plugin
         /// <summary>
         /// 설정은 풀 때마다 새로 받는다. 설정 탭에서 바뀐 값이 다음 풀이부터 곧바로 걸리고,
         /// 백그라운드 스레드가 읽는 동안 메인 스레드가 같은 것을 고치는 일도 없다.
+        /// 받아들였으면 참. 이미 풀고 있는 중이면 거짓이고, 그때는 부른 쪽이 다시 내야 한다.
         /// </summary>
-        /// <summary>받아들였으면 참. 이미 풀고 있는 중이면 거짓이고, 그때는 부른 쪽이 다시 내야 한다.</summary>
         public bool Submit(GameSnapshot snapshot, PlanPreferences preferences)
         {
             if (snapshot == null) return false;

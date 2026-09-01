@@ -42,13 +42,7 @@ namespace SephPlanner.Core.Solver
     public static class CharmStatWorth
     {
         /// <summary>
-        /// <paramref name="maxLevelOf"/>는 아티팩트의 레벨 상한을 돌려준다. 게임이 표를
-        /// 상한에서 자르므로(<c>LevelToIdx</c>) 그보다 위의 칸은 값어치가 늘지 않는다.
-        /// 음수를 돌려주면 상한을 모른다는 뜻이고, 그때는 표 길이를 그대로 쓴다.
-        /// </summary>
-        /// <summary>
-        /// 잰 값을 아티팩트 정의에 실어 둔다. 덤프 시점에 한 번만 하면 되고, 그러면 오버레이와
-        /// 솔버는 표를 그대로 읽기만 한다.
+        /// 잰 값을 아티팩트 정의에 실어 둔다. 이후 솔버는 표를 그대로 읽기만 한다.
         /// </summary>
         public static CharmWorthReport Apply(
             IReadOnlyCollection<CharmDefinition> charms, StatMeasurement measurement)
@@ -68,6 +62,9 @@ namespace SephPlanner.Core.Solver
             return report;
         }
 
+        /// <summary>
+        /// <paramref name="maxLevelOf"/>가 알려진 아티팩트는 게임의 레벨 상한에서 표를 자른다.
+        /// </summary>
         public static CharmWorthReport Run(StatMeasurement measurement, Func<int, int>? maxLevelOf = null)
         {
             var exchange = StatExchange.From(measurement.CharmStats);

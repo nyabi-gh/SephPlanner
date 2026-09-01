@@ -1,7 +1,7 @@
 using System.Text.Json;
-using SephPlanner.Core.Ipc;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
+using SephPlanner.Core.Runtime;
 
 namespace SephPlanner.DataTool;
 
@@ -12,7 +12,7 @@ namespace SephPlanner.DataTool;
 /// 새 코드가 돈다. 어긋나는 칸이 있으면 우리가 아직 읽지 않는 효과(각인, 세트 효과, 배치 보너스)가
 /// 걸려 있다는 뜻이다.
 ///
-/// 계산은 오버레이와 같은 <see cref="PlanBuilder"/> 를 그대로 쓴다. 여기서 따로 계산하면
+/// 계산은 플러그인과 같은 <see cref="PlanBuilder"/>를 그대로 쓴다. 여기서 따로 계산하면
 /// 진단 도구와 실제 동작이 어긋나 버린다.
 /// </summary>
 public static class SnapshotCheck
@@ -35,17 +35,17 @@ public static class SnapshotCheck
             return 1;
         }
 
-        var tablets = Load<List<TabletDefinition>>(IpcContract.TabletDbFile);
-        var charms = Load<List<CharmDefinition>>(IpcContract.CharmDbFile);
+        var tablets = Load<List<TabletDefinition>>(PlannerData.TabletDbFile);
+        var charms = Load<List<CharmDefinition>>(PlannerData.CharmDbFile);
         if (tablets is null || charms is null)
         {
-            Console.Error.WriteLine($"카탈로그가 없습니다. 게임을 한 번 실행해 {IpcContract.DataDirectory} 를 채우세요.");
+            Console.Error.WriteLine($"카탈로그가 없습니다. 게임을 한 번 실행해 {PlannerData.DataDirectory} 를 채우세요.");
             return 1;
         }
 
-        // 콤보를 빼고 만들면 오버레이와 다른 점수가 나온다. 진단 도구가 실제 동작과 어긋나면
+        // 콤보를 빼고 만들면 플러그인과 다른 점수가 나온다. 진단 도구가 실제 동작과 어긋나면
         // 여기서 통과한 것이 실사용에서 재현되지 않는다. 콤보 파일은 없을 수 있어 선택이다.
-        var combos = Load<List<ComboDefinition>>(IpcContract.ComboDbFile);
+        var combos = Load<List<ComboDefinition>>(PlannerData.ComboDbFile);
         var catalog = new Catalog(tablets, charms, combos);
         var plan = PlanBuilder.Build(snapshot, catalog);
         if (plan is null)
@@ -94,7 +94,7 @@ public static class SnapshotCheck
 
     private static T? Load<T>(string fileName)
     {
-        var path = Path.Combine(IpcContract.DataDirectory, fileName);
+        var path = Path.Combine(PlannerData.DataDirectory, fileName);
         return File.Exists(path) ? JsonSerializer.Deserialize<T>(File.ReadAllText(path), Options) : default;
     }
 }

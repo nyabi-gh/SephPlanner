@@ -1,6 +1,4 @@
-﻿param([switch]$IncludeOverlay)
-
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
 $solution = Join-Path $root "SephPlanner.slnx"
 $artifacts = Join-Path $root "artifacts"
@@ -34,18 +32,6 @@ try {
     Copy-Item (Join-Path $root "docs/INSTALL.md") (Join-Path $zipRoot "설치안내.md")
     Copy-Item (Join-Path $root "LICENSE") (Join-Path $zipRoot "LICENSE.txt")
 
-    if ($IncludeOverlay) {
-        $overlayProject = Join-Path $root "src/SephPlanner.Overlay/SephPlanner.Overlay.csproj"
-        $overlayOut = Join-Path $stage "overlay"
-        Invoke-DotNet @(
-            "publish", $overlayProject, "-c", "Release", "-r", "win-x64", "--self-contained", "true",
-            "-p:PublishSingleFile=true", "-p:IncludeNativeLibrariesForSelfExtract=true",
-            "-p:EnableCompressionInSingleFile=true", "-o", $overlayOut) "오버레이 빌드 실패"
-        Copy-Item (Join-Path $overlayOut "SephPlanner.Overlay.exe") $zipRoot
-        Copy-Item (Join-Path $root "src/SephPlanner.Overlay/Fonts/LICENSE.txt") `
-            (Join-Path $zipRoot "LICENSE-Galmuri.txt")
-    }
-
     $commit = (& git -C $root rev-parse HEAD).Trim()
     $managedDir = (& dotnet msbuild $pluginProject -nologo -getProperty:SephiriaManagedDir).Trim()
     if ($LASTEXITCODE -ne 0) { throw "게임 어셈블리 경로 확인 실패" }
@@ -61,7 +47,6 @@ try {
         version = [string]$version
         commit = $commit
         createdUtc = [DateTime]::UtcNow.ToString("o")
-        overlayIncluded = [bool]$IncludeOverlay
         gameAssembly = [ordered]@{
             fileVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($gameAssembly).FileVersion
             sha256 = (Get-FileHash $gameAssembly -Algorithm SHA256).Hash.ToLowerInvariant()
