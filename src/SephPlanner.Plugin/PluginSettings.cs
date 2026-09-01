@@ -42,6 +42,7 @@ namespace SephPlanner.Plugin
         public ConfigEntry<KeyboardShortcut> PreviewKey { get; }
 
         private readonly Action<string> _log;
+        private readonly ConfigFile _config;
         private readonly List<ConfigEntry<KeyboardShortcut>> _shortcuts =
             new List<ConfigEntry<KeyboardShortcut>>();
 
@@ -52,6 +53,7 @@ namespace SephPlanner.Plugin
 
         public PluginSettings(ConfigFile config, Action<string> log)
         {
+            _config = config;
             _log = log;
 
             PollInterval = config.Bind(
@@ -206,6 +208,14 @@ namespace SephPlanner.Plugin
             Corner.Value = corner;
             MarginX.Value = DefaultPanelMargin;
             MarginY.Value = DefaultPanelMargin;
+            _config.Save();
+        }
+
+        public void SavePanelMargin(float x, float y)
+        {
+            MarginX.Value = x;
+            MarginY.Value = y;
+            _config.Save();
         }
 
         private static OptionRow Switch(string label, ConfigEntry<bool> entry) => new OptionRow

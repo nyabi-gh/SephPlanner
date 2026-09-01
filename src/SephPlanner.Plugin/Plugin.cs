@@ -737,8 +737,7 @@ namespace SephPlanner.Plugin
             }
 
             var margin = _hud.Margin;
-            _settings.MarginX.Value = margin.x;
-            _settings.MarginY.Value = margin.y;
+            _settings.SavePanelMargin(margin.x, margin.y);
 
             // 화면은 이미 그 자리에 가 있다. 여백이 바뀌었다고 다시 짓게 두면 같은 자리에
             // 같은 것을 짓느라 한 프레임 깜빡일 뿐이다.
@@ -757,6 +756,11 @@ namespace SephPlanner.Plugin
 
         private void OnDestroy()
         {
+            if (_moving && _settings != null && _hud.IsAlive)
+            {
+                var margin = _hud.Margin;
+                _settings.SavePanelMargin(margin.x, margin.y);
+            }
             _hud.Destroy();
             _window.Destroy();
             _build.Destroy();
