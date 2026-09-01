@@ -58,8 +58,6 @@ namespace SephPlanner.Plugin
         private bool _resubmit;
         private string _autoPlaceResult = "";
         private float _autoPlaceShownUntil;
-        private string _autoPlaceConfirmation = "";
-        private float _autoPlaceConfirmUntil;
 
         private void Awake()
         {
@@ -623,7 +621,7 @@ namespace SephPlanner.Plugin
                                (_lastSnapshot == null || !_lastSnapshot.IsMultiplayer ||
                                 _settings.MultiplayerAutoPlace.Value);
             if (canAutoPlace)
-                text += "   " + Describe(_settings.AutoPlaceKey) + " 자동 배치(두 번)";
+                text += "   " + Describe(_settings.AutoPlaceKey) + " 자동 배치";
 
             if (plan != null && plan.Offers.Count > 0)
                 text += "   " + Describe(_settings.PreviewKey) + " 후보 미리보기";
@@ -678,18 +676,6 @@ namespace SephPlanner.Plugin
                 Report("옮길 것이 없습니다.");
                 return;
             }
-
-            var signature = string.Join("|", plan.Targets.ConvertAll(target =>
-                $"{target.InstanceId}:{target.From}>{target.To}:{target.FromRotation}>{target.Rotation}"));
-            if (Time.unscaledTime > _autoPlaceConfirmUntil || _autoPlaceConfirmation != signature)
-            {
-                _autoPlaceConfirmation = signature;
-                _autoPlaceConfirmUntil = Time.unscaledTime + 3f;
-                Report($"배치를 적용하려면 3초 안에 {Describe(_settings.AutoPlaceKey)} 을(를) 한 번 더 누르세요.");
-                return;
-            }
-            _autoPlaceConfirmation = "";
-            _autoPlaceConfirmUntil = 0f;
 
             try
             {

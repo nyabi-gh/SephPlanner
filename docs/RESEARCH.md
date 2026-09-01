@@ -202,8 +202,8 @@ public void Swap(sbyte xLeft, sbyte yLeft, sbyte xRight, sbyte yRight)
 
 회전은 인스턴스 단위로 잠길 수 있다(`DungeonManager.IsTabletRotatable(instanceID, isRotatable)`).
 스냅샷의 `PlacedTablet.IsRotatable`이 인스턴스별 잠금을 실어 보내고 솔버가 이를 존중한다
-(잠긴 석판은 지금 각도 그대로만 쓴다). 적용기는 계산 이후 잠겼을 가능성에 대비해 적용 직전에
-한 번 더 확인하고, 잠긴 회전은 건너뛰며 결과에 남긴다.
+(잠긴 석판은 지금 각도 그대로만 쓴다). 적용기는 계산 이후 잠겼을 가능성에 대비해 이동 전과
+회전 직전에 다시 확인하고, 그 사이 잠겼다면 이미 옮긴 항목을 되돌린 뒤 적용을 중단한다.
 
 ### 게임 내장 자동 정리
 
