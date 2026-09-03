@@ -153,7 +153,8 @@ namespace SephPlanner.Plugin
             _activeGeneration = _hasCatalog ? info.Generation : "";
         }
 
-        private static string GameAssemblyId() =>
+        /// <summary>게임 어셈블리의 MVID. 카탈로그가 어느 빌드에서 나왔는지 가르는 값이다.</summary>
+        public static string GameAssemblyId() =>
             typeof(GridInventory).Assembly.ManifestModule.ModuleVersionId.ToString("N");
 
         private static void WriteJson(string fileName, object value) =>

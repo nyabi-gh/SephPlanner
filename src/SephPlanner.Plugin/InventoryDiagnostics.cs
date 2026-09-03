@@ -75,6 +75,8 @@ namespace SephPlanner.Plugin
         public static string Write(GridInventory inv, PlayerAvatar player, float offerRadius)
         {
             var text = new StringBuilder();
+            text.AppendLine(PluginIdentity.Describe());
+            text.AppendLine();
             text.AppendLine($"Width={inv.Width} Height={inv.Height} Storage={inv.CurrentInventoryStorage} " +
                             $"SubBag={inv.numberOfSubBagStorage} Potion={inv.numberOfPotionStorage}");
 

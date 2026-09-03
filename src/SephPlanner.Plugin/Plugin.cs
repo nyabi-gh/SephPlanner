@@ -64,7 +64,7 @@ namespace SephPlanner.Plugin
             _prefs = PluginPreferences.Load(Logger.LogWarning);
             _window = new SettingsWindow(_settings.Rows);
             _build = new BuildWindow(_prefs, CurrentBuild);
-            Logger.LogInfo("SephPlanner 시작");
+            Logger.LogInfo(PluginIdentity.Describe());
         }
 
         private void Update()

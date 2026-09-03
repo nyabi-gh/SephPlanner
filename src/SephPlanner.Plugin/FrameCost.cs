@@ -82,14 +82,16 @@ namespace SephPlanner.Plugin
         public static string Summary() =>
             string.Format(
                 CultureInfo.InvariantCulture,
-                "메인 스레드 부담 - 폴링 평균 {0:0.00}ms/최악 {1:0.00}ms " +
-                "(가방 {2:0.00} 합성기 {3:0.00} 세피라이트 {4:0.00} 상자 {5:0.00} " +
-                "대조 {6:0.00} 지문 {7:0.00}), " +
-                "화면 평균 {8:0.000}ms, 프레임 {9}회 중 다시 그린 것 {10}회",
-                Poll.AverageMs, Poll.WorstMs,
+                "메인 스레드 부담 - 폴링 {0}회 평균 {1:0.00}ms/최악 {2:0.00}ms " +
+                "(가방 {3:0.00} 합성기 {4:0.00} 세피라이트 {5:0.00} 상자 {6:0.00} " +
+                "대조 {7:0.00} 지문 {8:0.00}), " +
+                "화면 평균 {9:0.000}ms, 프레임 {10}회 중 다시 그린 것 {11}회, " +
+                "카탈로그 짓기 {12}회 합계 {13:0.0}ms (시도 {14}회)",
+                Poll.Count, Poll.AverageMs, Poll.WorstMs,
                 Inventory.AverageMs, Mixer.AverageMs, Sephirites.AverageMs, Chests.AverageMs,
                 Simulation.AverageMs, Feed.AverageMs,
-                Panel.AverageMs, Frames, Draws);
+                Panel.AverageMs, Frames, Draws,
+                Catalog.Count, Catalog.TotalMs, CatalogSource.Attempts);
 
         public static void Write(StringBuilder text)
         {
