@@ -79,7 +79,7 @@ scripts/make-release.ps1
 
 zip은 릴리스 전용 공개 저장소 [nyattic/SephPlanner-Release](https://github.com/nyattic/SephPlanner-Release)의
 Releases에 올린다. 이 저장소는 비공개라 여기 Releases는 링크가 공개되지 않는다. 그쪽에는 소스
-없이 zip, 변경 기록, Issues(제보 창구)만 둔다. 커뮤니티 글에는 그 링크를 걸고 zip을 직접
+없이 zip과 Issues(제보 창구)만 둔다. 변경 기록은 이 저장소의 CHANGELOG.md가 정본이고 릴리스 노트에 옮겨 적는다. 커뮤니티 글에는 그 링크를 걸고 zip을 직접
 첨부하지 않는다 - 첨부하면 옛 버전이 돌아다닌다. 올리기 전에 manifest의 커밋에 `v{버전}` 태그를
 달아 어느 소스로 만든 zip인지 되짚을 수 있게 한다.
 
