@@ -190,14 +190,25 @@ namespace SephPlanner.Core.Solver
         {
             if (problem.Tablets.Count == 0 || problem.PlannedTablets.Count == 0) return null;
 
-            var reserved = new HashSet<GridPos>();
+            // 직전 계획은 그때의 상황에서 나온 것이라 지금은 실행할 수 없을 수 있다. 그 사이에
+            // 회전이 잠겼거나(저주) 가방이 줄어 칸이 닫혔으면, 그 석판만 계획에서 떼어 아래 탐욕
+            // 배치로 넘긴다. 그대로 두면 계획이 스스로를 되먹여 불가능한 지시가 영영 남는다 -
+            // HUD 는 따라 할 수 없는 걸음을 보여주고 자동 배치는 매번 회전 잠금에서 물러선다.
+            var open = new HashSet<GridPos>(cells);
+            var planned = new Dictionary<int, TabletSpot>();
             foreach (var slot in problem.Tablets)
             {
-                if (problem.PlannedTablets.TryGetValue(slot.InstanceId, out var spot) &&
-                    !reserved.Add(spot.Position))
-                {
-                    return null;
-                }
+                if (!problem.PlannedTablets.TryGetValue(slot.InstanceId, out var spot)) continue;
+                if (!open.Contains(spot.Position)) continue;
+                if (!slot.Rotatable && spot.Rotation != CurrentRotation(problem, slot)) continue;
+                planned[slot.InstanceId] = spot;
+            }
+            if (planned.Count == 0) return null;
+
+            var reserved = new HashSet<GridPos>();
+            foreach (var spot in planned.Values)
+            {
+                if (!reserved.Add(spot.Position)) return null;
             }
 
             // 후보 배치는 problem.Tablets 순서를 지켜야 한다. Describe 와 Targets 가 같은
@@ -205,16 +216,13 @@ namespace SephPlanner.Core.Solver
             var layout = new List<TabletPlacement>(problem.Tablets.Count);
             foreach (var slot in problem.Tablets)
             {
-                if (problem.PlannedTablets.TryGetValue(slot.InstanceId, out var spot))
+                if (planned.TryGetValue(slot.InstanceId, out var spot))
                 {
                     layout.Add(slot.At(spot.Position, spot.Rotation));
                     continue;
                 }
 
-                var currentRotation = problem.CurrentTablets.TryGetValue(slot.InstanceId, out var current)
-                    ? current.Rotation
-                    : 0;
-                var rotations = DistinctRotations(slot, currentRotation);
+                var rotations = DistinctRotations(slot, CurrentRotation(problem, slot));
 
                 List<TabletPlacement>? grown = null;
                 var bestScore = double.NegativeInfinity;
@@ -293,6 +301,10 @@ namespace SephPlanner.Core.Solver
         /// 회전은 효과가 같아, 걸러내지 않으면 "회전 3 → 1" 같은 아무 일도 하지 않는 회전 지시가
         /// 나온다 - 실제 세션에서 관측됐다.
         /// </summary>
+        /// <summary>지금 돌아가 있는 각도. 아직 집지 않은 석판은 0 이다.</summary>
+        private static int CurrentRotation(PlacementProblem problem, TabletSlot slot) =>
+            problem.CurrentTablets.TryGetValue(slot.InstanceId, out var spot) ? spot.Rotation : 0;
+
         private static List<int> DistinctRotations(TabletSlot slot, int currentRotation)
         {
             if (!slot.Rotatable) return new List<int> { currentRotation };

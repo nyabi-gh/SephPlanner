@@ -191,4 +191,45 @@ public class PlacementSolverTests
         Assert.Equal(0, arrangement.UnplacedTablets);
         Assert.Equal(2, arrangement.Tablets.Count);
     }
+
+    /// <summary>
+    /// 직전 계획은 그때의 상황에서 나온 것이다. 그 사이 회전이 잠겼으면(저주) 계획의 회전 지시를
+    /// 그대로 되살리면 안 된다 - 계획이 스스로를 되먹여 불가능한 지시가 영영 남는다.
+    /// </summary>
+    [Fact]
+    public void APlannedRotationIsDroppedOnceTheTabletIsLocked()
+    {
+        var problem = new PlacementProblem { Grid = OneRow };
+        var tablet = Tablet(1, "RIGHT 3");
+        tablet.Rotatable = false;
+        problem.Tablets.Add(tablet);
+        problem.Charms.Add(Charm(10));
+
+        // 맨 오른쪽에서 RIGHT 는 격자 밖이라 회전 2(LEFT)가 이득인데, 이제는 돌릴 수 없다.
+        problem.CurrentTablets[1] = new TabletSpot(new GridPos(5, 0), 0);
+        problem.CurrentCharms[10] = new GridPos(4, 0);
+        problem.PlannedTablets[1] = new TabletSpot(new GridPos(5, 0), 2);
+
+        var arrangement = PlacementSolver.Solve(problem);
+
+        Assert.Equal(0, arrangement.Tablets[0].Rotation);
+    }
+
+    /// <summary>가방이 줄어 계획된 칸이 닫혔으면 그 칸을 다시 제안하지 않는다.</summary>
+    [Fact]
+    public void APlannedCellOutsideTheOpenGridIsDropped()
+    {
+        var problem = new PlacementProblem { Grid = OneRow };
+        problem.Tablets.Add(Tablet(1, "RIGHT 3"));
+        problem.Charms.Add(Charm(10));
+        problem.CurrentTablets[1] = new TabletSpot(new GridPos(0, 0), 0);
+        problem.CurrentCharms[10] = new GridPos(1, 0);
+
+        // 두 번째 줄은 열려 있지 않다.
+        problem.PlannedTablets[1] = new TabletSpot(new GridPos(3, 1), 0);
+
+        var arrangement = PlacementSolver.Solve(problem);
+
+        Assert.Equal(0, arrangement.Tablets[0].Position.Y);
+    }
 }

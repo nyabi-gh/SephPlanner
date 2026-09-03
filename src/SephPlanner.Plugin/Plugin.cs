@@ -71,6 +71,34 @@ namespace SephPlanner.Plugin
             if (panelEnabled && !_panelEnabledLastFrame) _panelAwaitingRefresh = true;
             _panelEnabledLastFrame = panelEnabled;
 
+            // 단축키·화면 쪽에서 난 예외가 폴링까지 굶기면 안 된다. Update 안의 예외는 유니티가
+            // Player.log 에만 쌓고 우리 로그는 조용하므로, 여기서 잡아 같은 것 한 번씩 남긴다.
+            Guarded(HandleInput, "입력 처리");
+            Guarded(UpdateNativePanel, "화면 갱신");
+
+            if (Time.unscaledTime < _nextPoll) return;
+            _nextPoll = Time.unscaledTime + Mathf.Max(0.05f, _settings.PollInterval.Value);
+            PollGameState();
+        }
+
+        private void Guarded(Action step, string label)
+        {
+            try
+            {
+                step();
+            }
+            catch (Exception ex)
+            {
+                var message = label + " - " + ex.GetType().Name + ": " + ex.Message;
+                if (message == _lastRenderError) return;
+
+                _lastRenderError = message;
+                Logger.LogError(label + " 실패 - " + ex);
+            }
+        }
+
+        private void HandleInput()
+        {
             if (_settings.DumpKey.Value.IsDown()) StartDump();
             if (_settings.InventoryDumpKey.Value.IsDown()) DumpInventory();
             // 화면 스위치 밖이어야 한다. 화면을 끈 뒤 이 키까지 죽으면 되켤 길이 없다.
@@ -103,12 +131,6 @@ namespace SephPlanner.Plugin
                 _catalogChecked = true;
                 if (!CatalogDump.HasCatalog()) StartDump();
             }
-
-            UpdateNativePanel();
-
-            if (Time.unscaledTime < _nextPoll) return;
-            _nextPoll = Time.unscaledTime + Mathf.Max(0.05f, _settings.PollInterval.Value);
-            PollGameState();
         }
 
         private bool _dumping;

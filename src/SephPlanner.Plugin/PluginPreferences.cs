@@ -163,10 +163,9 @@ namespace SephPlanner.Plugin
                 Directory.CreateDirectory(PlannerData.DataDirectory);
 
                 // 바로 덮어쓰면 쓰는 도중 게임이 죽었을 때 잘린 JSON 이 남아 지정이 통째로 날아간다.
-                var temp = Path_ + ".tmp";
-                File.WriteAllText(temp, JsonConvert.SerializeObject(this));
-                if (File.Exists(Path_)) File.Delete(Path_);
-                File.Move(temp, Path_);
+                // Delete 뒤 Move 도 그 사이에 죽으면 파일이 없어지므로, 카탈로그와 같은 원자적
+                // 교체를 쓴다.
+                CatalogBundleStore.WriteAtomic(Path_, JsonConvert.SerializeObject(this));
             }
             catch (Exception)
             {

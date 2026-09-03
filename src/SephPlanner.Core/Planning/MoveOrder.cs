@@ -44,6 +44,11 @@ namespace SephPlanner.Core.Planning
                 else remaining.Add(item);
             }
 
+            // 대피는 고리 하나에 한 번이면 충분하므로 남은 개수를 넘을 수 없다. 넘었다는 것은
+            // 입력이 순열이 아니라는 뜻이고(어떤 목표 칸이 정지 칸이거나 둘이 같은 칸을 원한다),
+            // 그대로 두면 같은 물건을 빈 칸으로 옮겼다 되돌리기를 무한히 반복한다.
+            var parks = 0;
+
             while (remaining.Count > 0)
             {
                 var movedSomething = false;
@@ -64,7 +69,7 @@ namespace SephPlanner.Core.Planning
 
                 // 남은 것들이 서로의 자리를 물고 있다. 하나를 빈 칸으로 빼서 고리를 끊는다.
                 var shelter = Shelter(grid, occupied);
-                if (shelter is null)
+                if (shelter is null || ++parks > pending.Count)
                 {
                     complete = false;
                     moves.Clear();

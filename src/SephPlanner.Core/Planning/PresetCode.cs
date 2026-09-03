@@ -132,10 +132,18 @@ namespace SephPlanner.Core.Planning
             return true;
         }
 
-        /// <summary>Base64 → XOR → GZip. 어느 단계가 깨져도 빈 문자열로 돌아온다.</summary>
+        /// <summary>
+        /// 코드와 그 평문의 크기 상한. 게임이 만드는 프리셋은 수백 바이트이고 차원 주머니를 가득
+        /// 채워도 몇 KB 라, 이보다 큰 것은 프리셋이 아니다. 클립보드에서 오는 남의 문자열이므로
+        /// 상한 없이 풀면 작은 코드 하나가 GB 단위 할당을 일으킬 수 있다(gzip 폭탄).
+        /// </summary>
+        public const int MaxCodeLength = 64 * 1024;
+        public const int MaxPlainBytes = 64 * 1024;
+
+        /// <summary>Base64 → XOR → GZip. 어느 단계가 깨져도, 너무 커도 빈 문자열로 돌아온다.</summary>
         private static string Decode(string payload)
         {
-            if (payload.Length == 0) return "";
+            if (payload.Length == 0 || payload.Length > MaxCodeLength) return "";
             try
             {
                 var bytes = Convert.FromBase64String(payload);
@@ -143,10 +151,20 @@ namespace SephPlanner.Core.Planning
 
                 using var source = new MemoryStream(bytes);
                 using var gzip = new GZipStream(source, CompressionMode.Decompress);
-                using var plain = new MemoryStream();
-                gzip.CopyTo(plain);
+                var plain = new byte[MaxPlainBytes];
+                var length = 0;
+                while (length < plain.Length)
+                {
+                    var read = gzip.Read(plain, length, plain.Length - length);
+                    if (read <= 0) break;
+                    length += read;
+                }
 
-                return Encoding.UTF8.GetString(plain.ToArray());
+                // 상한까지 채웠는데 아직 남아 있으면 프리셋이 아니다. 잘라 쓰면 남의 빌드를
+                // 반만 읽은 채로 돌아가므로 통째로 버린다.
+                if (length == plain.Length && gzip.ReadByte() != -1) return "";
+
+                return Encoding.UTF8.GetString(plain, 0, length);
             }
             catch (Exception)
             {

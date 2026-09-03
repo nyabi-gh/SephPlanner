@@ -256,7 +256,7 @@ namespace SephPlanner.Core.Runtime
         internal static void MarkReady(string dataDirectory, string generation) =>
             MarkState(dataDirectory, CatalogRefreshStatus.Ready, generation, "");
 
-        internal static void WriteAtomic(string path, string content)
+        public static void WriteAtomic(string path, string content)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             var temp = path + ".tmp-" + Guid.NewGuid().ToString("N");

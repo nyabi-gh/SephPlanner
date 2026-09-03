@@ -171,6 +171,16 @@ namespace SephPlanner.Plugin
                               Rollback(inventory, journal);
                     return swaps;
                 }
+
+                // 게임의 LocalSwap 은 쓰기 권한이 없거나 포션 줄이면 예외 없이 로그만 남기고
+                // 돌아온다. 그런 걸음을 저널에 올리면 나중 되돌리기가 "되돌리기"가 아니라
+                // "처음 적용"이 되어 원래 배치와 다른 순열을 남긴다. 실제로 옮겨졌는지 본다.
+                if (InstanceAt(inventory, to) != target.InstanceId)
+                {
+                    failure = $"{from} → {to} 이동이 게임에서 받아들여지지 않아 자동 배치를 중단했습니다. " +
+                              Rollback(inventory, journal);
+                    return swaps;
+                }
                 journal.Add(new KeyValuePair<GridPos, GridPos>(from, to));
                 swaps++;
 
@@ -187,6 +197,17 @@ namespace SephPlanner.Plugin
                 positions[target.InstanceId] = to;
             }
             return swaps;
+        }
+
+        /// <summary>그 칸에 지금 있는 인스턴스. 비어 있으면 0.</summary>
+        private static int InstanceAt(GridInventory inventory, GridPos cell)
+        {
+            foreach (var pair in inventory.inventoryMatrix)
+            {
+                if (pair.Key.x == cell.X && pair.Key.y == cell.Y)
+                    return pair.Value != null ? pair.Value.InstanceID : 0;
+            }
+            return 0;
         }
 
         /// <summary>

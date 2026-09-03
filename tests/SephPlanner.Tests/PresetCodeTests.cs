@@ -80,4 +80,29 @@ public class PresetCodeTests
         Assert.False(PresetCode.TryParse(PresetCode.Encode(Plain("F:1237,망가짐\n")), out var preset, out _));
         Assert.Empty(preset.FavoriteCharms);
     }
+
+    /// <summary>
+    /// 코드는 남이 만든 것을 클립보드로 받는다. 작은 코드가 거대한 평문으로 풀리는 gzip 폭탄은
+    /// 프리셋일 수 없으므로, 메모리를 채우기 전에 통째로 버린다.
+    /// </summary>
+    [Fact]
+    public void AGzipBombIsRejectedWithoutInflatingIt()
+    {
+        var bomb = PresetCode.Encode(new string('0', 8 * 1024 * 1024));
+        Assert.True(bomb.Length < PresetCode.MaxCodeLength);
+
+        var before = GC.GetTotalAllocatedBytes(precise: true);
+        Assert.False(PresetCode.TryParse(bomb, out _, out var error));
+        var allocated = GC.GetTotalAllocatedBytes(precise: true) - before;
+
+        Assert.Contains("깨졌", error);
+        Assert.True(allocated < 2L * 1024 * 1024, $"풀다가 {allocated:N0} 바이트를 할당했다");
+    }
+
+    [Fact]
+    public void AnOversizedCodeIsRejectedBeforeDecoding()
+    {
+        var code = PresetCode.Prefix + new string('A', PresetCode.MaxCodeLength + 1);
+        Assert.False(PresetCode.TryParse(code, out _, out _));
+    }
 }
