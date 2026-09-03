@@ -25,30 +25,29 @@ namespace SephPlanner.Plugin
         }
 
         private static bool _loaded;
-        private static bool? _queryVerified;
-        private static CatalogRefreshStatus _status;
+        private static bool _hasCatalog;
+        private static bool _queryVerified;
         private static string _activeGeneration = "";
+        private static CatalogRefreshStatus _refresh = CatalogRefreshStatus.Unavailable;
         private static CatalogBundleWriter _writer;
 
+        /// <summary>
+        /// 갱신을 시작해도 활성 카탈로그는 그대로 둔다. 새 세대가 게시되기 전까지는 이전 것이
+        /// 답이고, 갱신이 실패하면 그대로 이전 것으로 계속 돈다.
+        /// </summary>
         public static string BeginRefresh()
         {
             var generation = CatalogBundleStore.NewGeneration();
             _writer = CatalogBundleStore.Begin(
                 PlannerData.DataDirectory, generation, Application.version, GameAssemblyId());
-            _loaded = true;
-            _queryVerified = null;
-            _status = CatalogRefreshStatus.Refreshing;
-            _activeGeneration = "";
+            _refresh = CatalogRefreshStatus.Refreshing;
             return generation;
         }
 
         public static void FailRefresh(string generation, string reason)
         {
             CatalogBundleStore.MarkFailed(PlannerData.DataDirectory, generation, reason);
-            _loaded = true;
-            _queryVerified = false;
-            _status = CatalogRefreshStatus.Failed;
-            _activeGeneration = "";
+            _refresh = CatalogRefreshStatus.Failed;
             _writer = null;
         }
 
@@ -92,9 +91,10 @@ namespace SephPlanner.Plugin
             _writer.Publish(verification.Comparisons, verification.Mismatches);
 
             _loaded = true;
+            _hasCatalog = true;
             _queryVerified = verification.Passed;
-            _status = CatalogRefreshStatus.Ready;
             _activeGeneration = generation;
+            _refresh = CatalogRefreshStatus.Ready;
             _writer = null;
 
             // 덤프도 같은 리소스 목록을 썼다. 다 썼으면 놓아줘야 게임이 에셋을 정리할 수 있다.
@@ -112,13 +112,13 @@ namespace SephPlanner.Plugin
         public static bool HasCatalog()
         {
             LoadActive();
-            return _status == CatalogRefreshStatus.Ready;
+            return _hasCatalog;
         }
 
         public static bool QueryVerificationPassed()
         {
             LoadActive();
-            return _status == CatalogRefreshStatus.Ready && _queryVerified == true;
+            return _hasCatalog && _queryVerified;
         }
 
         public static string ActiveGeneration
@@ -126,7 +126,17 @@ namespace SephPlanner.Plugin
             get
             {
                 LoadActive();
-                return _status == CatalogRefreshStatus.Ready ? _activeGeneration : "";
+                return _hasCatalog ? _activeGeneration : "";
+            }
+        }
+
+        /// <summary>마지막 갱신이 어디까지 갔는지. 활성 카탈로그가 있는지와는 별개다.</summary>
+        public static CatalogRefreshStatus RefreshStatus
+        {
+            get
+            {
+                LoadActive();
+                return _refresh;
             }
         }
 
@@ -135,19 +145,12 @@ namespace SephPlanner.Plugin
             if (_loaded) return;
             _loaded = true;
 
-            if (!CatalogBundleStore.TryGetActive(
-                    PlannerData.DataDirectory, Application.version, GameAssemblyId(),
-                    out var info, out _))
-            {
-                _status = CatalogRefreshStatus.Unavailable;
-                _queryVerified = false;
-                _activeGeneration = "";
-                return;
-            }
-
-            _status = CatalogRefreshStatus.Ready;
-            _queryVerified = info.VerificationPassed;
-            _activeGeneration = info.Generation;
+            _refresh = CatalogBundleStore.ReadRefreshStatus(PlannerData.DataDirectory, out _, out _);
+            _hasCatalog = CatalogBundleStore.TryGetActive(
+                PlannerData.DataDirectory, Application.version, GameAssemblyId(),
+                out var info, out _);
+            _queryVerified = _hasCatalog && info.VerificationPassed;
+            _activeGeneration = _hasCatalog ? info.Generation : "";
         }
 
         private static string GameAssemblyId() =>

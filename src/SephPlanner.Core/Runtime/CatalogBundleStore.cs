@@ -79,6 +79,7 @@ namespace SephPlanner.Core.Runtime
             CatalogBundleStore.WriteAtomic(
                 Path.Combine(_dataDirectory, PlannerData.ActiveCatalogFile), Generation);
             CatalogBundleStore.MarkReady(_dataDirectory, Generation);
+            CatalogBundleStore.PruneOtherGenerations(_dataDirectory, Generation);
         }
     }
 
@@ -134,34 +135,64 @@ namespace SephPlanner.Core.Runtime
             out CatalogBundleInfo info, out string error)
         {
             info = new CatalogBundleInfo();
-            if (!TryReadState(dataDirectory, out var state, out var stateGeneration) ||
-                state != CatalogRefreshStatus.Ready)
-            {
-                error = state switch
-                {
-                    CatalogRefreshStatus.Refreshing => "카탈로그 갱신이 완료되지 않았습니다.",
-                    CatalogRefreshStatus.Failed => "마지막 카탈로그 갱신이 실패했습니다.",
-                    _ => "게시된 카탈로그 상태가 없습니다.",
-                };
-                return false;
-            }
 
+            // 활성 카탈로그는 포인터와 그 세대의 manifest 만으로 정해진다. 갱신 상태 파일은 새
+            // 세대의 진행 상황일 뿐이라 여기서 보지 않는다 - 보면 갱신을 시작하는 순간 멀쩡한
+            // 이전 세대가 함께 죽고, 갱신이 실패하면 그 세션 내내 쓸 카탈로그가 없어진다.
             var pointer = Path.Combine(dataDirectory, PlannerData.ActiveCatalogFile);
             if (!File.Exists(pointer))
             {
-                error = "활성 카탈로그 포인터가 없습니다.";
+                error = "활성 카탈로그가 없습니다.";
                 return false;
             }
 
-            var generation = File.ReadAllText(pointer).Trim();
-            if (!IsGeneration(generation) || generation != stateGeneration)
-            {
-                error = "활성 카탈로그와 게시 상태의 generation이 다릅니다.";
-                return false;
-            }
             return TryReadGeneration(
-                dataDirectory, generation, expectedGameVersion, expectedGameAssemblyId,
-                out info, out error);
+                dataDirectory, File.ReadAllText(pointer).Trim(),
+                expectedGameVersion, expectedGameAssemblyId, out info, out error);
+        }
+
+        /// <summary>
+        /// 마지막 갱신이 어디까지 갔는지. 활성 카탈로그와는 별개다 - 갱신이 실패해도 이전
+        /// 카탈로그는 그대로 활성이고, 이 값은 화면에 "다시 시도하라"고 알리는 데만 쓴다.
+        /// </summary>
+        public static CatalogRefreshStatus ReadRefreshStatus(
+            string dataDirectory, out string generation, out string reason)
+        {
+            generation = "";
+            reason = "";
+            try
+            {
+                return TryReadState(dataDirectory, out var state, out generation, out reason)
+                    ? state
+                    : CatalogRefreshStatus.Unavailable;
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                return CatalogRefreshStatus.Unavailable;
+            }
+        }
+
+        /// <summary>
+        /// 게시된 세대만 남기고 나머지 세대 디렉터리를 지운다. 없으면 F9 를 누를 때마다 한 벌씩
+        /// 쌓인다. 지우지 못하는 것은 그냥 둔다 - 정리는 곁다리라 갱신을 실패시킬 이유가 없다.
+        /// </summary>
+        public static void PruneOtherGenerations(string dataDirectory, string keepGeneration)
+        {
+            var root = Path.Combine(dataDirectory, PlannerData.CatalogGenerationsDirectory);
+            if (!Directory.Exists(root)) return;
+
+            foreach (var directory in Directory.GetDirectories(root))
+            {
+                if (string.Equals(Path.GetFileName(directory), keepGeneration, StringComparison.Ordinal))
+                    continue;
+                try
+                {
+                    Directory.Delete(directory, recursive: true);
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                }
+            }
         }
 
         internal static bool TryReadGeneration(
@@ -274,10 +305,11 @@ namespace SephPlanner.Core.Runtime
         }
 
         private static bool TryReadState(
-            string dataDirectory, out CatalogRefreshStatus state, out string generation)
+            string dataDirectory, out CatalogRefreshStatus state, out string generation, out string reason)
         {
             state = CatalogRefreshStatus.Unavailable;
             generation = "";
+            reason = "";
             var path = Path.Combine(dataDirectory, PlannerData.CatalogRefreshStateFile);
             if (!File.Exists(path)) return false;
 
@@ -286,6 +318,17 @@ namespace SephPlanner.Core.Runtime
                 !IsGeneration(lines[1]))
                 return false;
             generation = lines[1];
+            if (lines.Length >= 3)
+            {
+                try
+                {
+                    reason = Decode(lines[2]);
+                }
+                catch (FormatException)
+                {
+                    reason = "";
+                }
+            }
             return true;
         }
 

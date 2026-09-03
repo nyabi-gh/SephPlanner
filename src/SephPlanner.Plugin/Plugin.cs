@@ -22,6 +22,8 @@ namespace SephPlanner.Plugin
         private PluginSettings _settings;
         private float _nextPoll;
         private bool _catalogChecked;
+        private bool _catalogRetryArmed;
+        private bool _inRun;
         private PlanVerificationStatus _simulationVerification;
         private string _simulationReason = "실시간 시뮬레이션 검증이 아직 완료되지 않았습니다.";
         private string _lastSephiriteReport;
@@ -154,8 +156,25 @@ namespace SephPlanner.Plugin
             if (!_catalogChecked)
             {
                 _catalogChecked = true;
+                _catalogRetryArmed = true;
+            }
+
+            if (_catalogRetryArmed && !_dumping)
+            {
+                _catalogRetryArmed = false;
                 if (!CatalogDump.HasCatalog()) StartDump();
             }
+        }
+
+        /// <summary>
+        /// 카탈로그가 없는 채로 남았으면 다음 런 시작에 한 번 더 시도한다. 부팅 때의 확인은
+        /// 한 번뿐이라, 그때 실패하면 F9 를 누르기 전까지 아무것도 되지 않는다.
+        /// </summary>
+        private void ArmCatalogRetry(GameSnapshot snapshot)
+        {
+            var inRun = snapshot?.Inventory != null;
+            if (inRun && !_inRun) _catalogRetryArmed = true;
+            _inRun = inRun;
         }
 
         private bool _dumping;
@@ -273,6 +292,7 @@ namespace SephPlanner.Plugin
                 VerifySimulation(simulation);
 
                 ReportSephirites(snapshot);
+                ArmCatalogRetry(snapshot);
 
                 step = FrameCost.Now;
                 FeedNativePanel(snapshot);
@@ -513,7 +533,14 @@ namespace SephPlanner.Plugin
         /// </summary>
         private string Waiting(PlanRunState state)
         {
-            if (state == null) return "데이터 준비 중";
+            if (state == null)
+            {
+                // 실패는 로그에만 남고 화면은 영영 "준비 중"이었다. 되살릴 키를 여기서 말한다.
+                return CatalogDump.RefreshStatus == CatalogRefreshStatus.Failed
+                    ? "데이터 생성 실패 - " + Describe(_settings.DumpKey) +
+                      " 로 다시 시도하세요(BepInEx 로그에 이유가 있습니다)."
+                    : "데이터 준비 중";
+            }
 
             switch (state.Blocker)
             {
