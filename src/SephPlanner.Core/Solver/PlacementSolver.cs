@@ -421,6 +421,11 @@ namespace SephPlanner.Core.Solver
             Dictionary<GridPos, CharmSlot>? neighbors = null;
             SimulationResult result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid, problem.FixedEffects);
 
+            var bestPositions = positions;
+            var bestOccupancy = occupancy;
+            var bestResult = result;
+            var bestScore = double.NegativeInfinity;
+
             for (var iteration = 0; iteration < options.FixpointIterations; iteration++)
             {
                 var next = Assign(problem, free, result, occupancy, neighbors);
@@ -434,9 +439,40 @@ namespace SephPlanner.Core.Solver
                 // 못하고 빠져나가도, result 는 언제나 마지막 positions 와 같은 상태를 보고 있어야
                 // 보고되는 점수가 실제 배치의 점수가 된다.
                 result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid, problem.FixedEffects);
+
+                // 조건부 아티팩트는 배정과 조건이 서로 물려 2주기로 진동할 수 있고, 반복이 나쁜
+                // 쪽 위상에서 끝날 수 있다. 마지막을 그대로 돌려주면 같은 판의 점수가 폴링마다
+                // 달라져 이긴 석판 배치가 뒤바뀐다. 그래서 지나온 것 중 최선을 들고 있는다.
+                var score = ScoreOf(problem, layout, positions, occupancy, result, neighbors);
+                if (score <= bestScore) continue;
+
+                bestScore = score;
+                bestPositions = positions;
+                bestOccupancy = occupancy;
+                bestResult = result;
             }
 
-            return Describe(problem, layout, positions, occupancy, result);
+            return Describe(problem, layout, bestPositions, bestOccupancy, bestResult);
+        }
+
+        /// <summary>
+        /// <see cref="Describe"/>가 매기는 것과 같은 점수. 반복마다 견주기만 하면 되므로 격자와
+        /// 목록까지 짓지 않는다 - 후보 배치마다 도는 자리라 그 할당이 그대로 GC 부담이 된다.
+        /// </summary>
+        private static double ScoreOf(
+            PlacementProblem problem, List<TabletPlacement> layout, Dictionary<int, GridPos> positions,
+            GridOccupancy occupancy, SimulationResult result, Dictionary<GridPos, CharmSlot>? neighbors)
+        {
+            var score = Familiarity(problem, layout);
+            foreach (var charm in problem.Charms)
+            {
+                if (charm.IsFiller) continue;
+                if (!positions.TryGetValue(charm.InstanceId, out var position)) continue;
+                if (Reason(charm, position, result, problem.Grid, occupancy) != CharmInactiveReason.None) continue;
+
+                score += Value(problem, charm, position, result, occupancy, neighbors);
+            }
+            return score;
         }
 
         private static Dictionary<GridPos, CharmSlot> CharmsByCell(
@@ -492,7 +528,12 @@ namespace SephPlanner.Core.Solver
             // 필러도 자리 유지·계획 유지 몫은 받아야 한다. 없으면 전 칸이 0점 동률이라 배정
             // 순서에 따라 필러끼리 자리를 맞바꾸는 제안이 나온다.
             if (charm.IsFiller) return Anchors(problem, charm, cell);
-            if (Reason(charm, cell, result, problem.Grid, occupancy) != CharmInactiveReason.None) return 0;
+
+            // 꺼진 아티팩트도 마찬가지다. 0 만 돌려주면 전 칸이 동률이라 배정기가 풀 때마다
+            // 아무 데나 보내고, 그 자리가 바뀌면 이웃을 보는 조건과 이웃 의존 가치가 따라 흔들려
+            // 석판 배치의 점수까지 폴링마다 달라진다.
+            if (Reason(charm, cell, result, problem.Grid, occupancy) != CharmInactiveReason.None)
+                return Anchors(problem, charm, cell);
 
             var level = result.EffectiveLevel(cell, charm.Enchant);
             var effective = Math.Min(charm.Definition.MaxLevel, level);

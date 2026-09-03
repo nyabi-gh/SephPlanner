@@ -56,6 +56,84 @@ public class StabilityTests
         Assert.Equal(new GridPos(0, 0), arrangement.CharmPositions[11]);
     }
 
+    [Fact]
+    public void CharmsThatAreTurnedOffAreNotAskedToSwapPlaces()
+    {
+        // 무기가 맞지 않아 꺼진 아티팩트는 어느 칸에서든 0점 동률이다. 그래도 자리를 맞바꾸라고
+        // 해서는 안 된다 - 이득 0 이동일 뿐 아니라, 그 자리가 흔들리면 이웃을 보는 조건과
+        // 이웃 의존 가치가 함께 흔들려 석판 배치의 점수까지 폴링마다 달라진다.
+        var problem = new PlacementProblem { Grid = new GridSpec(6, 7, 6) };
+        problem.Charms.Add(new CharmSlot
+        {
+            InstanceId = 10,
+            IsDormant = true,
+            Definition = new CharmDefinition { MaxLevel = 5 },
+        });
+        problem.Charms.Add(new CharmSlot
+        {
+            InstanceId = 11,
+            IsDormant = true,
+            Definition = new CharmDefinition { MaxLevel = 5 },
+        });
+
+        // 배정기가 자연히 고르는 순서와 반대로 놓여 있어야 실제로 맞바꾸기가 생긴다.
+        problem.CurrentCharms[10] = new GridPos(1, 0);
+        problem.CurrentCharms[11] = new GridPos(0, 0);
+
+        var arrangement = PlacementSolver.Solve(problem);
+
+        Assert.Equal(new GridPos(1, 0), arrangement.CharmPositions[10]);
+        Assert.Equal(new GridPos(0, 0), arrangement.CharmPositions[11]);
+    }
+
+    [Fact]
+    public void MoreFixpointIterationsNeverGiveAWorseAnswer()
+    {
+        // 조건 판정과 배정이 서로 물리면 수렴하지 못하고 2주기로 진동할 수 있다. 반복을 더
+        // 돌린 쪽이 더 나쁜 답을 내면, 같은 판인데 폴링마다 점수가 달라져 이긴 석판 배치가
+        // 뒤바뀐다. 궤적은 결정적이라 반복이 많은 쪽은 적은 쪽이 지나온 상태를 다 지나므로,
+        // 최선을 들고 있기만 하면 점수는 반복 수에 대해 줄어들지 않는다.
+        var scores = new List<double>();
+        for (var iterations = 1; iterations <= 6; iterations++)
+        {
+            var arrangement = PlacementSolver.Solve(
+                OscillatingProblem(), new SolverOptions { FixpointIterations = iterations });
+            scores.Add(arrangement.Score);
+        }
+
+        for (var i = 1; i < scores.Count; i++)
+        {
+            Assert.True(scores[i] >= scores[i - 1] - 1e-9,
+                $"반복 {i + 1}회의 점수 {scores[i]} 가 {i}회의 {scores[i - 1]} 보다 낮다");
+        }
+    }
+
+    /// <summary>
+    /// 배정이 2주기로 진동하는 판. 열린 칸 넷에 조건이 서로 어긋나는 셋이 들어가, 한 번 배정할
+    /// 때마다 상대의 조건이 무너지고 다음 배정이 원래대로 돌아온다. 고치기 전 구현에서 반복
+    /// 수를 1에서 6까지 올리면 점수가 2 와 1 을 오갔다(탐색으로 찾은 판이다).
+    /// </summary>
+    private static PlacementProblem OscillatingProblem()
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(6, 7, 4) };
+
+        AddConditional(problem, 10, "C1", "BothSideCharm", new GridPos(1, 0));
+        AddConditional(problem, 11, "C2", "BothSidesAreEmpty", new GridPos(3, 0));
+        AddConditional(problem, 12, "C3", "Outlined", new GridPos(0, 0));
+        return problem;
+    }
+
+    private static void AddConditional(
+        PlacementProblem problem, int instanceId, string id, string criteria, GridPos at)
+    {
+        problem.Charms.Add(new CharmSlot
+        {
+            InstanceId = instanceId,
+            Definition = new CharmDefinition { Id = id, MaxLevel = 5, CriteriaType = criteria },
+        });
+        problem.CurrentCharms[instanceId] = at;
+    }
+
     private static Catalog ReorderableCatalog() => new(
         new[]
         {
