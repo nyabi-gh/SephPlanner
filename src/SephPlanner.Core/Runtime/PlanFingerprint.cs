@@ -132,8 +132,11 @@ namespace SephPlanner.Core.Runtime
         {
             var builder = new StringBuilder();
             Add(builder, "catalog", catalogGeneration);
-            foreach (var charm in preferences.PinnedCharms.OrderBy(value => value))
-                Add(builder, "pinned", charm);
+            foreach (var pin in preferences.PinnedCharms.OrderBy(pair => pair.Key))
+            {
+                Add(builder, "pinned", pin.Key);
+                Add(builder, "pinLevel", pin.Value);
+            }
             foreach (var pair in preferences.CharmValues.EntityValues.OrderBy(value => value.Key))
                 AddCharmValue(builder, "valueEntity", pair.Key.ToString(CultureInfo.InvariantCulture), pair.Value);
             foreach (var pair in preferences.CharmValues.IdValues.OrderBy(value => value.Key, StringComparer.Ordinal))

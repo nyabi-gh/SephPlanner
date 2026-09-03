@@ -246,7 +246,7 @@ namespace SephPlanner.Plugin.Ui
         {
             if (entry == null) return;
 
-            if (entry.EntityId != 0) _prefs.TogglePin(entry.EntityId);
+            if (entry.EntityId != 0) _prefs.CyclePin(entry.EntityId);
             else _prefs.TogglePriority(entry.Key);
 
             Refresh();
@@ -304,6 +304,21 @@ namespace SephPlanner.Plugin.Ui
             }
         }
 
+        /// <summary>
+        /// 줄 앞의 단계 표시. 폭이 흔들리지 않게 세 칸으로 맞춘다 - 누를 때마다 이름이 좌우로
+        /// 밀리면 연달아 누르기가 어렵다.
+        /// </summary>
+        private static string PinMark(int level)
+        {
+            switch (level)
+            {
+                case 1: return "★   ";
+                case 2: return "★★  ";
+                case 3: return "★★★ ";
+                default: return "○   ";
+            }
+        }
+
         private static int Count(Dictionary<string, int> counts, string id) =>
             counts != null && counts.TryGetValue(id, out var value) ? value : 0;
 
@@ -351,6 +366,7 @@ namespace SephPlanner.Plugin.Ui
                         Count = 1,
                         Level = level,
                         Selected = _prefs.IsPinned(entityId),
+                        Mark = PinMark(_prefs.PinLevel(entityId)),
                     };
                     found[entityId] = entry;
                     order.Add(entityId);
@@ -358,7 +374,7 @@ namespace SephPlanner.Plugin.Ui
             }
 
             // 가방에 없는데 지정돼 있는 것도 보여야 푼다. 다른 판에서 지정한 것이 남아 있는 경우다.
-            foreach (var entityId in _prefs.PinnedCharms)
+            foreach (var entityId in _prefs.PinnedLevels.Keys)
             {
                 if (found.ContainsKey(entityId)) continue;
 
@@ -371,6 +387,7 @@ namespace SephPlanner.Plugin.Ui
                         : "아티팩트 #" + entityId,
                     Detail = "가방에 없음",
                     Selected = true,
+                    Mark = PinMark(_prefs.PinLevel(entityId)),
                 };
                 order.Add(entityId);
             }
@@ -432,6 +449,12 @@ namespace SephPlanner.Plugin.Ui
             public string Name = "";
             public string Detail = "";
             public bool Selected;
+
+            /// <summary>
+            /// 줄 앞에 붙는 표시. 콤보는 켜고 끄기라 <see cref="Selected"/>의 ●/○ 를 쓰고,
+            /// 아티팩트는 단계가 있어 ★ 개수로 대신한다.
+            /// </summary>
+            public string Mark;
             public int Count;
             public int Level;
         }
@@ -464,7 +487,7 @@ namespace SephPlanner.Plugin.Ui
             public void Show(Entry entry)
             {
                 _entry = entry;
-                _name.text = (entry.Selected ? "● " : "○ ") + entry.Name;
+                _name.text = (entry.Mark ?? (entry.Selected ? "● " : "○ ")) + entry.Name;
                 _name.color = entry.Selected ? NativeSkin.Mint : NativeSkin.Text;
                 _detail.text = entry.Detail;
                 Widgets.SetActive(_background, true);

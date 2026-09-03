@@ -19,6 +19,16 @@ namespace SephPlanner.Plugin
         private const string FileName = "plugin-settings.json";
 
         public List<string> PriorityCategories { get; set; } = new List<string>();
+
+        /// <summary>
+        /// 강화 우선 지정. 엔티티 번호 → 단계(1~<see cref="PlanPreferences.MaxPinLevel"/>).
+        /// </summary>
+        public Dictionary<int, int> PinnedLevels { get; set; } = new Dictionary<int, int>();
+
+        /// <summary>
+        /// 0.1.3 까지의 형식(단계 없이 목록뿐). 읽어서 1단계로 옮기고 비운다. 지우면 예전 파일을
+        /// 가진 사람의 지정이 조용히 사라진다.
+        /// </summary>
         public List<int> PinnedCharms { get; set; } = new List<int>();
 
         /// <summary>
@@ -45,15 +55,24 @@ namespace SephPlanner.Plugin
             return _decoded;
         }
 
-        public bool IsPinned(int entityId) => entityId != 0 && PinnedCharms.Contains(entityId);
+        /// <summary>지정 단계. 지정하지 않았으면 0.</summary>
+        public int PinLevel(int entityId) =>
+            entityId != 0 && PinnedLevels.TryGetValue(entityId, out var level) ? level : 0;
+
+        public bool IsPinned(int entityId) => PinLevel(entityId) > 0;
 
         public bool IsPriority(string categoryId) => PriorityCategories.Contains(categoryId);
 
-        public void TogglePin(int entityId)
+        /// <summary>
+        /// 다음 단계로 돌린다. 마지막 다음은 지정 없음이라 한 손가락으로 켜고 끌 수 있다.
+        /// </summary>
+        public void CyclePin(int entityId)
         {
             if (entityId == 0) return;
 
-            if (!PinnedCharms.Remove(entityId)) PinnedCharms.Add(entityId);
+            var next = PinLevel(entityId) + 1;
+            if (next > PlanPreferences.MaxPinLevel) PinnedLevels.Remove(entityId);
+            else PinnedLevels[entityId] = next;
             Changed();
         }
 
@@ -117,12 +136,24 @@ namespace SephPlanner.Plugin
         {
             Recommendations = recommendations,
             PriorityCategories = new HashSet<string>(PriorityCategories),
-            PinnedCharms = new HashSet<int>(PinnedCharms),
+            PinnedCharms = new Dictionary<int, int>(PinnedLevels),
             CharmValues = CharmValueSource.Book,
             PresetCharms = recommendations && Preset() is BuildPreset preset
                 ? new HashSet<int>(preset.FavoriteCharms)
                 : new HashSet<int>(),
         };
+
+        /// <summary>예전 형식의 지정을 1단계로 옮긴다. 옮긴 뒤에는 새 형식만 남는다.</summary>
+        private void MigrateLegacyPins()
+        {
+            if (PinnedCharms.Count == 0) return;
+
+            foreach (var entityId in PinnedCharms)
+            {
+                if (entityId != 0 && !PinnedLevels.ContainsKey(entityId)) PinnedLevels[entityId] = 1;
+            }
+            PinnedCharms.Clear();
+        }
 
         private static string Path_ => Path.Combine(PlannerData.DataDirectory, FileName);
 
@@ -137,6 +168,8 @@ namespace SephPlanner.Plugin
                     {
                         loaded.PriorityCategories = loaded.PriorityCategories ?? new List<string>();
                         loaded.PinnedCharms = loaded.PinnedCharms ?? new List<int>();
+                        loaded.PinnedLevels = loaded.PinnedLevels ?? new Dictionary<int, int>();
+                        loaded.MigrateLegacyPins();
                         return loaded;
                     }
                 }

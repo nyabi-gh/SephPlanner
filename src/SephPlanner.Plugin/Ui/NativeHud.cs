@@ -679,7 +679,7 @@ namespace SephPlanner.Plugin.Ui
                     names.TryGetValue(position, out var name);
                     charms.TryGetValue(position, out var charmId);
 
-                    var pinned = frame.Prefs != null && frame.Prefs.IsPinned(charmId);
+                    var pinned = frame.Prefs != null ? frame.Prefs.PinLevel(charmId) : 0;
                     cell.SetCharm(
                         name ?? "", level, effective, reason, marked.Contains(position),
                         IconOf(charmId), pinned);
@@ -694,7 +694,7 @@ namespace SephPlanner.Plugin.Ui
 
         private void HoverCell(
             Cell cell, string name, int level, int effective, CharmInactiveReason reason,
-            int charmId, bool pinned, HudFrame frame)
+            int charmId, int pinned, HudFrame frame)
         {
             var definition = frame.Catalog != null ? frame.Catalog.Charm(charmId) : null;
             var values = frame.Values;
@@ -705,7 +705,12 @@ namespace SephPlanner.Plugin.Ui
 
                 // 첫 줄은 쪽지의 제목으로 올라간다.
                 lines.RemoveAt(0);
-                if (pinned) lines.Add("강화 우선으로 지정돼 있습니다. 가치를 2배로 칩니다.");
+                if (pinned > 0)
+                {
+                    lines.Add(
+                        $"강화 우선 {new string('★', pinned)} - 가치를 " +
+                        $"{PlanPreferences.WeightOf(pinned):0.#}배로 칩니다.");
+                }
                 return Explain.Join(lines);
             });
         }
@@ -1076,15 +1081,16 @@ namespace SephPlanner.Plugin.Ui
 
             public void SetCharm(
                 string name, int level, int effective, CharmInactiveReason reason, bool moved,
-                Sprite icon, bool pinned)
+                Sprite icon, int pinned)
             {
                 Paint(moved ? NativeSkin.GoldEdge : NativeSkin.SlotEdge, NativeSkin.SlotFill, moved);
                 SetIcon(icon);
-                _name.text = icon == null ? (pinned ? "★ " + name : name) : "";
+                _name.text = icon == null ? (pinned > 0 ? "★ " + name : name) : "";
                 _name.color = NativeSkin.Text;
 
-                // 아이콘이 있으면 이름 줄이 비므로 강화 표시가 레벨 줄로 내려온다.
-                var star = pinned && icon != null ? "★" : "";
+                // 아이콘이 있으면 이름 줄이 비므로 강화 표시가 레벨 줄로 내려온다. 칸이 좁아
+                // 단계는 별 개수로 적지 않는다 - 몇 단계인지는 쪽지가 말한다.
+                var star = pinned > 0 && icon != null ? "★" : "";
 
                 if (reason != CharmInactiveReason.None)
                 {

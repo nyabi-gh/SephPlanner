@@ -126,8 +126,9 @@ namespace SephPlanner.Core.Planning
                     Enchant = definition is null ? 0 : item.Enchant,
                     IsFiller = definition is null,
                     IsDormant = definition is not null && WeaponMatch.IsDormant(definition, weapon),
-                    Weight = definition is not null && preferences.PinnedCharms.Contains(item.DefinitionId)
-                        ? PlanPreferences.PinnedWeight
+                    Weight = definition is not null &&
+                             preferences.PinnedCharms.TryGetValue(item.DefinitionId, out var pin)
+                        ? PlanPreferences.WeightOf(pin)
                         : 1,
                 };
                 if (definition is not null) slot.Worth = CharmWorth.Resolve(definition, values.Of(definition));
@@ -302,7 +303,7 @@ namespace SephPlanner.Core.Planning
             return names;
         }
 
-        /// <summary>칸을 우클릭해 강화 우선을 지정하려면 그 칸의 아티팩트가 무엇인지 알아야 한다.</summary>
+        /// <summary>격자 칸에 ★ 를 그리고 쪽지를 띄우려면 그 칸의 아티팩트가 무엇인지 알아야 한다.</summary>
         private static Dictionary<GridPos, int> CharmsByCell(PlacementProblem problem, Arrangement best)
         {
             var cells = new Dictionary<GridPos, int>();
