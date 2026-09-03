@@ -21,7 +21,7 @@ namespace SephPlanner.Plugin
         private readonly float _interval;
         private readonly FindObjectsInactive _inactive;
 
-        private T[] _found = new T[0];
+        private T[] _found = System.Array.Empty<T>();
         private float _refreshedAt = float.NegativeInfinity;
 
         /// <param name="interval">다시 찾기까지 최소로 기다릴 시간(초).</param>
