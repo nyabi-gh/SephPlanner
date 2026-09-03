@@ -1,77 +1,197 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Mirror;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Runtime;
+using SephPlanner.Core.Tablets;
+using UnityEngine;
 
 namespace SephPlanner.Plugin
 {
     /// <summary>
     /// 솔버가 만든 최종 배치를 게임에 적용한다. 게임이 스스로 쓰는 경로만 탄다.
-    /// 자리는 수동 드래그와 같은 <c>GridInventory.Swap</c>, 회전은 게임 내장 자동 정리
-    /// (<c>AutoArrangeInventoryForBestCharmLevels</c>)와 같은 <c>Permission</c> 스코프 안의
+    ///
+    /// <b>호스트(싱글 포함)</b>에서는 쓰기가 그 자리에서 끝난다. 자리는 수동 드래그와 같은
+    /// <c>GridInventory.Swap</c>, 회전은 게임 내장 자동 정리와 같은 <c>Permission</c> 스코프 안의
     /// <c>Networkrotation</c> 설정이다.
     ///
-    /// 멀티 세션은 기본으로 잠그고 설정으로만 연다(실험). 클라이언트 쓰기의 동기화가 검증되지
-    /// 않았고 개발사도 잠가 두는 편이 안전하다고 답했기 때문이다(docs/LEGAL.md). 켜더라도 쓰기는
-    /// 서버 API라 <b>호스트에서만</b> 실제로 돈다. 싱글은 호스트 모드라 그대로 쓸 수 있다.
+    /// <b>참가자로 접속한 세션</b>에서는 같은 경로가 서버로 가는 Command 가 된다 - <c>Swap</c> 은
+    /// <c>CmdSwap</c>, 회전은 우클릭이 타는 <c>DoClickAction</c>(→ <c>CmdDoClickAction</c> →
+    /// <c>StoneTablet.Rotate</c>)이다. 왕복이라 부른 즉시 반영되지 않으므로 걸음마다 동기화를
+    /// 기다린다. 이 적용기가 코루틴인 이유가 그것이다.
+    ///
+    /// 멀티 세션은 기본으로 잠그고 설정으로만 연다(실험). 동기화가 검증되지 않았고 개발사도
+    /// 잠가 두는 편이 안전하다고 답했기 때문이다(docs/LEGAL.md).
     /// </summary>
     internal static class PlanApplier
     {
+        /// <summary>클라이언트의 한 걸음이 서버를 돌아 반영될 때까지 기다리는 한계(초).</summary>
+        private const float SyncTimeout = 3f;
+
         /// <summary>
-        /// 적용 결과를 사람이 읽을 한 줄로 돌려준다. 사전 검증에서 물러서면 아무것도 바꾸지 않은
-        /// 상태고, 적용 도중 실패하면 이미 실행한 걸음을 역순으로 되돌린다. 되돌리기까지 실패한
-        /// 경우에만 중간 상태가 남으며 그 사실이 결과에 그대로 적힌다.
+        /// 적용이 진행 중인가. 클라이언트에서는 여러 프레임에 걸치므로, 겹쳐 시작하면 두 적용기가
+        /// 같은 격자를 서로 다른 예상 위에서 밀게 된다.
         /// </summary>
-        public static string Apply(ApplyPlanCommand command, bool allowMultiplayer = false)
+        public static bool InProgress { get; private set; }
+
+        /// <summary>
+        /// 배치를 적용하고 사람이 읽을 한 줄을 <paramref name="report"/> 로 돌려준다. 사전 검증에서
+        /// 물러서면 아무것도 바꾸지 않은 상태고, 적용 도중 실패하면 이미 실행한 걸음을 역순으로
+        /// 되돌린다. 되돌리기까지 실패한 경우에만 중간 상태가 남으며 그 사실이 결과에 그대로 적힌다.
+        /// </summary>
+        public static IEnumerator Apply(
+            ApplyPlanCommand command, bool allowMultiplayer, Action<string> report)
         {
-            if (!CatalogDump.QueryVerificationPassed())
-                return "석판 질의 검증이 완료되지 않았거나 실패해 자동 배치를 실행하지 않습니다. F9로 데이터를 다시 만드세요.";
-            if (command.ExpectedCatalogGeneration.Length == 0 ||
-                command.ExpectedCatalogGeneration != CatalogDump.ActiveGeneration)
-                return "계획을 만든 카탈로그가 더 이상 최신이 아니어서 자동 배치를 실행하지 않습니다.";
-            if (command.ExpectedPlacementFingerprint.Length == 0 ||
-                command.ExpectedPlanningContextFingerprint.Length == 0)
-                return "계획의 상태 지문이 없어 자동 배치를 실행하지 않습니다.";
-
-            if (GameReader.IsMultiplayerSession() && !allowMultiplayer)
-                return "멀티플레이 세션에서는 자동 배치를 실행하지 않습니다. 설정에서 열 수 있습니다(실험).";
-
-            // 쓰기는 서버 API(Swap, Networkrotation)라 호스트에서만 된다. 클라이언트로 접속한
-            // 세션은 허용을 켜도 여기서 물러선다.
-            if (!NetworkServer.active)
-                return "서버가 활성 상태가 아니라 자동 배치를 실행할 수 없습니다. (호스트에서만 동작)";
-
-            var avatar = GameReader.FindLocalPlayer();
-            var inventory = avatar != null ? avatar.Inventory : null;
-            if (inventory == null || avatar.IsDead)
-                return "적용할 인벤토리가 없습니다.";
-
-            var liveSnapshot = GameReader.Read(0, includeRecommendations: false);
-            var livePlacementFingerprint = PlanFingerprint.Placement(
-                liveSnapshot, command.ExpectedPlanningContextFingerprint);
-            var liveWeaponId = liveSnapshot.Run?.WeaponId ?? "";
-
-            // 명령이 만들어진 뒤 상태가 바뀌었을 수 있다. 하나라도 어긋나면 통째로 물러선다.
-            var error = Validate(
-                command, inventory, livePlacementFingerprint, liveWeaponId,
-                out var positions, out var occupants);
-            if (error != null) return error;
-
-            var journal = new List<Step>();
-            var swaps = ApplySwaps(
-                command, inventory, positions, occupants, journal, allowMultiplayer, out var failure);
-            if (failure != null) return failure;
-
-            var rotations = ApplyRotations(command, inventory, out failure);
-            if (failure != null)
+            if (InProgress)
             {
-                // 옮겨졌지만 안 돌아간 배치는 솔버가 평가한 적 없는 상태다. 이동도 함께 되돌린다.
-                return failure + " " + Rollback(inventory, journal);
+                report("이전 자동 배치가 아직 끝나지 않았습니다. 잠시 뒤 다시 누르세요.");
+                yield break;
             }
 
-            return $"자동 배치 완료 - 이동 {swaps}건, 회전 {rotations}건" + LevelDrift(command, inventory);
+            InProgress = true;
+            try
+            {
+                var setup = Prepare(command, allowMultiplayer);
+                if (setup.Failure != null)
+                {
+                    report(setup.Failure);
+                    yield break;
+                }
+
+                var inventory = setup.Inventory;
+                var journal = new List<Step>();
+
+                // 안쪽 코루틴은 `yield return` 으로 넘기지 않고 직접 돌린다. 유니티에 넘기면
+                // 기다릴 것이 없어도 단계마다 프레임을 쓰는데, 호스트의 적용은 예전처럼 키를
+                // 누른 그 프레임에 통째로 끝나야 한다 - 중간에 프레임이 끼면 그 사이에 게임
+                // 상태가 바뀔 수 있고, 그러면 원자적이라는 전제가 무너진다.
+                var moves = new Outcome();
+                var swapping = ApplySwaps(
+                    command, inventory, setup.Positions, setup.Occupants, journal, allowMultiplayer, moves);
+                while (swapping.MoveNext()) yield return swapping.Current;
+
+                if (moves.Failure != null)
+                {
+                    var undone = new Outcome();
+                    var undo = Rollback(inventory, journal, undone);
+                    while (undo.MoveNext()) yield return undo.Current;
+                    report(moves.Failure + " " + undone.Note);
+                    yield break;
+                }
+
+                var rotations = new Outcome();
+                if (NetworkServer.active)
+                {
+                    RotateHere(command, inventory, rotations);
+                }
+                else
+                {
+                    var turning = RotateOverNetwork(command, inventory, rotations);
+                    while (turning.MoveNext()) yield return turning.Current;
+                }
+
+                if (rotations.Failure != null)
+                {
+                    // 옮겨졌지만 안 돌아간 배치는 솔버가 평가한 적 없는 상태다. 이동도 함께 되돌린다.
+                    var undone = new Outcome();
+                    var undo = Rollback(inventory, journal, undone);
+                    while (undo.MoveNext()) yield return undo.Current;
+                    report(rotations.Failure + " " + undone.Note);
+                    yield break;
+                }
+
+                // 레벨은 서버가 다시 계산해 따로 동기화한다. 참가자 세션에서는 마지막 걸음이 반영된
+                // 뒤에도 잠시 옛 값이 남아 있으므로, 어긋났다고 알리기 전에 그만큼 기다린다.
+                var settle = Time.unscaledTime + (NetworkServer.active ? 0f : SyncTimeout);
+                while (LevelDrift(command, inventory).Length > 0 && Time.unscaledTime < settle)
+                    yield return null;
+
+                report($"자동 배치 완료 - 이동 {moves.Count}건, 회전 {rotations.Count}건" +
+                       LevelDrift(command, inventory));
+            }
+            finally
+            {
+                InProgress = false;
+            }
         }
+
+        /// <summary>코루틴이 값을 돌려줄 자리.</summary>
+        private sealed class Outcome
+        {
+            /// <summary>실패했으면 사람이 읽을 이유. 성공이면 null.</summary>
+            public string Failure;
+
+            /// <summary>해낸 걸음 수.</summary>
+            public int Count;
+
+            /// <summary>되돌리기 결과처럼 결과에 덧붙일 한 마디.</summary>
+            public string Note;
+        }
+
+        private sealed class Preparation
+        {
+            public string Failure;
+            public GridInventory Inventory;
+            public Dictionary<int, GridPos> Positions;
+            public Dictionary<GridPos, int> Occupants;
+        }
+
+        /// <summary>
+        /// 쓰기 전에 물러설 이유를 전부 본다. 여기서 실패하면 아무것도 바꾸지 않은 상태다.
+        /// 프레임을 넘기지 않으므로 예외도 여기서 잡는다 - 코루틴 본문에서는 잡을 수 없다.
+        /// </summary>
+        private static Preparation Prepare(ApplyPlanCommand command, bool allowMultiplayer)
+        {
+            try
+            {
+                if (!CatalogDump.QueryVerificationPassed())
+                    return Denied("석판 질의 검증이 완료되지 않았거나 실패해 자동 배치를 실행하지 않습니다. F9로 데이터를 다시 만드세요.");
+                if (command.ExpectedCatalogGeneration.Length == 0 ||
+                    command.ExpectedCatalogGeneration != CatalogDump.ActiveGeneration)
+                    return Denied("계획을 만든 카탈로그가 더 이상 최신이 아니어서 자동 배치를 실행하지 않습니다.");
+                if (command.ExpectedPlacementFingerprint.Length == 0 ||
+                    command.ExpectedPlanningContextFingerprint.Length == 0)
+                    return Denied("계획의 상태 지문이 없어 자동 배치를 실행하지 않습니다.");
+
+                if (GameReader.IsMultiplayerSession() && !allowMultiplayer)
+                    return Denied("멀티플레이 세션에서는 자동 배치를 실행하지 않습니다. 설정에서 열 수 있습니다(실험).");
+
+                // 호스트면 서버 로컬에서 끝나고, 참가자면 Command 로 서버에 간다. 둘 다 아니면
+                // 쓰기가 나갈 곳이 없다.
+                if (!NetworkServer.active && !NetworkClient.active)
+                    return Denied("네트워크 세션이 없어 자동 배치를 실행할 수 없습니다.");
+
+                var avatar = GameReader.FindLocalPlayer();
+                var inventory = avatar != null ? avatar.Inventory : null;
+                if (inventory == null || avatar.IsDead)
+                    return Denied("적용할 인벤토리가 없습니다.");
+
+                var liveSnapshot = GameReader.Read(0, includeRecommendations: false);
+                var livePlacementFingerprint = PlanFingerprint.Placement(
+                    liveSnapshot, command.ExpectedPlanningContextFingerprint);
+                var liveWeaponId = liveSnapshot.Run?.WeaponId ?? "";
+
+                // 명령이 만들어진 뒤 상태가 바뀌었을 수 있다. 하나라도 어긋나면 통째로 물러선다.
+                var error = Validate(
+                    command, inventory, livePlacementFingerprint, liveWeaponId,
+                    out var positions, out var occupants);
+                if (error != null) return Denied(error);
+
+                return new Preparation
+                {
+                    Inventory = inventory,
+                    Positions = positions,
+                    Occupants = occupants,
+                };
+            }
+            catch (Exception ex)
+            {
+                return Denied($"자동 배치를 준비하다 오류가 나 아무것도 바꾸지 않았습니다({ex.Message}).");
+            }
+        }
+
+        private static Preparation Denied(string reason) => new Preparation { Failure = reason };
 
         /// <summary>
         /// 적용이 끝난 상태의 레벨이 계산과 같은지. 어긋나면 우리가 읽지 않는 효과가 걸려 있다는
@@ -112,6 +232,21 @@ namespace SephPlanner.Plugin
             public GridPos From { get; }
             public GridPos To { get; }
             public int InstanceId { get; }
+        }
+
+        /// <summary>돌려야 할 석판 하나. 사라진 뒤에도 무엇이었는지 댈 수 있게 인스턴스를 함께 든다.</summary>
+        private readonly struct Turn
+        {
+            public Turn(StoneTablet tablet, int instanceId, int presses)
+            {
+                Tablet = tablet;
+                InstanceId = instanceId;
+                Presses = presses;
+            }
+
+            public StoneTablet Tablet { get; }
+            public int InstanceId { get; }
+            public int Presses { get; }
         }
 
         private static string Validate(
@@ -183,54 +318,65 @@ namespace SephPlanner.Plugin
             return null;
         }
 
-        private static int ApplySwaps(
+        private static IEnumerator ApplySwaps(
             ApplyPlanCommand command, GridInventory inventory,
             Dictionary<int, GridPos> positions, Dictionary<GridPos, int> occupants,
-            List<Step> journal, bool allowMultiplayer, out string failure)
+            List<Step> journal, bool allowMultiplayer, Outcome outcome)
         {
-            failure = null;
-            var swaps = 0;
             foreach (var target in command.Targets)
             {
                 var from = positions[target.InstanceId];
                 var to = target.To;
                 if (from == to) continue;
 
+                if (inventory == null)
+                {
+                    outcome.Failure = "적용 도중 인벤토리가 사라져 자동 배치를 중단했습니다.";
+                    yield break;
+                }
+
                 // 적용을 시작한 뒤에 동료가 접속했을 수 있다. 멀티가 된 순간 더 진행하지 않는다.
                 if (!allowMultiplayer && GameReader.IsMultiplayerSession())
                 {
-                    failure = "적용 도중 멀티플레이 세션이 되어 자동 배치를 중단했습니다. " +
-                              Rollback(inventory, journal);
-                    return swaps;
+                    outcome.Failure = "적용 도중 멀티플레이 세션이 되어 자동 배치를 중단했습니다.";
+                    yield break;
                 }
 
-                try
+                var displaced = occupants.TryGetValue(to, out var occupant);
+                var expected = displaced ? occupant : 0;
+
+                var error = Swap(inventory, from, to);
+                if (error != null)
                 {
-                    inventory.Swap((sbyte)from.X, (sbyte)from.Y, (sbyte)to.X, (sbyte)to.Y);
+                    outcome.Failure = $"이동 중 오류({error})가 나 자동 배치를 중단했습니다.";
+                    yield break;
                 }
-                catch (Exception ex)
+
+                // 호스트의 쓰기는 그 자리에서 끝나므로 기다릴 것이 없다. 참가자 세션에서는 CmdSwap
+                // 이 서버를 돌아 SyncDictionary 로 돌아올 때까지 아직 아무것도 바뀌지 않았다.
+                var deadline = Time.unscaledTime + (NetworkServer.active ? 0f : SyncTimeout);
+                while (!Swapped(inventory, from, to, target.InstanceId, expected) &&
+                       Time.unscaledTime < deadline)
                 {
-                    failure = $"이동 중 오류({ex.Message})가 나 자동 배치를 중단했습니다. " +
-                              Rollback(inventory, journal);
-                    return swaps;
+                    yield return null;
                 }
 
                 // 게임의 LocalSwap 은 쓰기 권한이 없거나 포션 줄이면 예외 없이 로그만 남기고
                 // 돌아온다. 그런 걸음을 저널에 올리면 나중 되돌리기가 "되돌리기"가 아니라
                 // "처음 적용"이 되어 원래 배치와 다른 순열을 남긴다. 실제로 옮겨졌는지 본다.
-                if (InstanceAt(inventory, to) != target.InstanceId)
+                if (!Swapped(inventory, from, to, target.InstanceId, expected))
                 {
-                    failure = $"{from} → {to} 이동이 게임에서 받아들여지지 않아 자동 배치를 중단했습니다. " +
-                              Rollback(inventory, journal);
-                    return swaps;
+                    outcome.Failure = $"{from} → {to} 이동이 게임에 반영되지 않아 자동 배치를 중단했습니다.";
+                    yield break;
                 }
-                journal.Add(new Step(from, to, target.InstanceId));
-                swaps++;
 
-                if (occupants.TryGetValue(to, out var displaced))
+                journal.Add(new Step(from, to, target.InstanceId));
+                outcome.Count++;
+
+                if (displaced)
                 {
-                    occupants[from] = displaced;
-                    positions[displaced] = from;
+                    occupants[from] = occupant;
+                    positions[occupant] = from;
                 }
                 else
                 {
@@ -239,8 +385,29 @@ namespace SephPlanner.Plugin
                 occupants[to] = target.InstanceId;
                 positions[target.InstanceId] = to;
             }
-            return swaps;
         }
+
+        /// <summary>맞바꿈 한 번. 예외를 메시지로 바꿔 돌려준다 - 코루틴 안에서는 잡을 수 없다.</summary>
+        private static string Swap(GridInventory inventory, GridPos from, GridPos to)
+        {
+            try
+            {
+                inventory.Swap((sbyte)from.X, (sbyte)from.Y, (sbyte)to.X, (sbyte)to.Y);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                return ex.Message;
+            }
+        }
+
+        /// <summary>
+        /// 그 걸음이 실제로 반영됐는가. 맞바꿈이라 밀려난 쪽까지 제자리에 와야 끝난 것이다 -
+        /// 옮긴 쪽만 보면 참가자 세션에서 절반만 도착한 상태를 완료로 읽을 수 있다.
+        /// </summary>
+        private static bool Swapped(
+            GridInventory inventory, GridPos from, GridPos to, int moved, int displaced) =>
+            InstanceAt(inventory, to) == moved && InstanceAt(inventory, from) == displaced;
 
         /// <summary>그 칸에 지금 있는 인스턴스. 비어 있으면 0.</summary>
         private static int InstanceAt(GridInventory inventory, GridPos cell)
@@ -257,80 +424,68 @@ namespace SephPlanner.Plugin
         /// 실행한 맞바꿈을 역순으로 재생해 원래 배치로 되돌린다. Swap 은 자기 자신이 역연산이라
         /// 이전 상태를 따로 저장할 필요가 없다.
         /// </summary>
-        private static string Rollback(GridInventory inventory, List<Step> journal)
+        private static IEnumerator Rollback(
+            GridInventory inventory, List<Step> journal, Outcome outcome)
         {
             for (var i = journal.Count - 1; i >= 0; i--)
             {
                 var step = journal[i];
-                try
+                var error = Swap(inventory, step.To, step.From);
+                if (error != null)
                 {
-                    inventory.Swap((sbyte)step.To.X, (sbyte)step.To.Y, (sbyte)step.From.X, (sbyte)step.From.Y);
+                    outcome.Note = $"되돌리기도 실패해 인벤토리가 중간 상태로 남았습니다({error}). " +
+                                   "손으로 정리한 뒤 다시 시도하세요.";
+                    yield break;
                 }
-                catch (Exception ex)
+
+                var deadline = Time.unscaledTime + (NetworkServer.active ? 0f : SyncTimeout);
+                while (InstanceAt(inventory, step.From) != step.InstanceId &&
+                       Time.unscaledTime < deadline)
                 {
-                    return $"되돌리기도 실패해 인벤토리가 중간 상태로 남았습니다({ex.Message}). " +
-                           "손으로 정리한 뒤 다시 시도하세요.";
+                    yield return null;
                 }
 
                 // 앞으로 가는 길과 같은 이유다. LocalSwap 은 거부해도 예외 없이 돌아오므로,
                 // 확인하지 않으면 거부된 되돌리기를 "원래 배치로 되돌렸습니다"로 보고하게 된다.
                 if (InstanceAt(inventory, step.From) != step.InstanceId)
                 {
-                    return "되돌리기가 게임에서 받아들여지지 않아 인벤토리가 중간 상태로 남았습니다. " +
-                           "손으로 정리한 뒤 다시 시도하세요.";
+                    outcome.Note = "되돌리기가 게임에 반영되지 않아 인벤토리가 중간 상태로 남았습니다. " +
+                                   "손으로 정리한 뒤 다시 시도하세요.";
+                    yield break;
                 }
             }
-            return "원래 배치로 되돌렸습니다.";
+            outcome.Note = "원래 배치로 되돌렸습니다.";
         }
 
-        private static int ApplyRotations(
-            ApplyPlanCommand command, GridInventory inventory, out string failure)
+        /// <summary>
+        /// 호스트의 회전. 각도를 그대로 쓴다. <c>Permission</c> 이 닫힐 때 레벨 행렬이 다시
+        /// 계산되므로 회전을 모아 한 번에 처리한다.
+        /// </summary>
+        private static void RotateHere(
+            ApplyPlanCommand command, GridInventory inventory, Outcome outcome)
         {
-            failure = null;
-
-            var pending = new List<KeyValuePair<StoneTablet, int>>();
-            try
+            var pending = new List<Turn>();
+            var error = Collect(command, inventory, pending);
+            if (error != null)
             {
-                foreach (var target in command.Targets)
-                {
-                    if (!target.IsTablet) continue;
-
-                    var tablet = FindTablet(inventory, target.InstanceId);
-                    if (tablet == null)
-                    {
-                        failure = "적용 도중 석판이 사라져 자동 배치를 중단합니다.";
-                        return 0;
-                    }
-                    if (tablet.rotation == target.Rotation) continue;
-
-                    // 솔버도 스냅샷의 인스턴스별 회전 가능 여부를 보지만, 계산 이후 저주 등으로
-                    // 잠겼을 수 있어 적용 직전에 한 번 더 확인한다.
-                    if (!DungeonManager.IsTabletRotatable(tablet.instanceID, tablet.isRotatable))
-                    {
-                        failure = $"적용 도중 석판(인스턴스 {target.InstanceId})의 회전이 잠겨 중단합니다.";
-                        return 0;
-                    }
-                    pending.Add(new KeyValuePair<StoneTablet, int>(tablet, target.Rotation));
-                }
+                outcome.Failure = error;
+                return;
             }
-            catch (Exception ex)
-            {
-                // 아직 아무것도 쓰지 않았다. 회전만 포기하면 이동을 되돌릴지 호출자가 정한다.
-                failure = $"회전 준비 중 오류가 났습니다({ex.Message}).";
-                return 0;
-            }
-            if (pending.Count == 0) return 0;
+            if (pending.Count == 0) return;
 
-            // Permission 이 닫힐 때 레벨 행렬이 다시 계산된다. 회전을 모아 한 번에 처리한다.
             var original = new List<KeyValuePair<StoneTablet, int>>();
             try
             {
                 using (new GridInventory.Permission(inventory))
                 {
-                    foreach (var pair in pending)
+                    foreach (var turn in pending)
                     {
-                        original.Add(new KeyValuePair<StoneTablet, int>(pair.Key, pair.Key.rotation));
-                        pair.Key.Networkrotation = pair.Value;
+                        original.Add(new KeyValuePair<StoneTablet, int>(turn.Tablet, turn.Tablet.rotation));
+
+                        // 여기서는 각도를 그대로 줄 수 있다. 걸음 수로 셈하는 것은 참가자 쪽과
+                        // 같은 값을 쓰기 위해서고, 결과는 목표 각도를 0~3 으로 접은 것과 같다.
+                        turn.Tablet.Networkrotation =
+                            (turn.Tablet.rotation + turn.Presses) % TabletRotation.Steps;
                     }
                 }
             }
@@ -343,15 +498,153 @@ namespace SephPlanner.Plugin
                     {
                         foreach (var pair in original) pair.Key.Networkrotation = pair.Value;
                     }
-                    failure = $"회전 중 오류가 나 원래 각도로 되돌렸습니다({ex.Message}).";
+                    outcome.Failure = $"회전 중 오류가 나 원래 각도로 되돌렸습니다({ex.Message}).";
                 }
                 catch (Exception restore)
                 {
-                    failure = $"회전 중 오류가 났고 되돌리기도 실패했습니다({ex.Message} / {restore.Message}).";
+                    outcome.Failure = $"회전 중 오류가 났고 되돌리기도 실패했습니다({ex.Message} / {restore.Message}).";
                 }
-                return 0;
+                return;
             }
-            return pending.Count;
+            outcome.Count = pending.Count;
+        }
+
+        /// <summary>
+        /// 참가자 세션의 회전. 각도를 직접 쓰는 길이 없다 - <c>Networkrotation</c> 은 SyncVar 라
+        /// 클라이언트에서 써 봐야 서버 값이 덮는다. 대신 우클릭이 타는 <c>DoClickAction</c> 을
+        /// 필요한 횟수만큼 누른다. 서버가 한 번에 90도씩 돌리므로 누를 때마다 반영을 기다리고,
+        /// 도중에 막히면 눌러 둔 만큼 마저 눌러 원래 각도로 되돌린다.
+        /// </summary>
+        private static IEnumerator RotateOverNetwork(
+            ApplyPlanCommand command, GridInventory inventory, Outcome outcome)
+        {
+            var pending = new List<Turn>();
+            var error = Collect(command, inventory, pending);
+            if (error != null)
+            {
+                outcome.Failure = error;
+                yield break;
+            }
+            if (pending.Count == 0) yield break;
+
+            var pressed = new List<Turn>();
+            foreach (var turn in pending)
+            {
+                var count = 0;
+                string failure = null;
+                while (count < turn.Presses)
+                {
+                    if (turn.Tablet == null)
+                    {
+                        failure = $"적용 도중 석판(인스턴스 {turn.InstanceId})이 사라져 자동 배치를 중단합니다.";
+                        break;
+                    }
+
+                    var before = turn.Tablet.rotation;
+                    var pressError = Press(inventory, turn.Tablet);
+                    if (pressError != null)
+                    {
+                        failure = $"석판(인스턴스 {turn.InstanceId}) 회전 중 오류가 나 자동 배치를 중단합니다({pressError}).";
+                        break;
+                    }
+
+                    var deadline = Time.unscaledTime + SyncTimeout;
+                    while (turn.Tablet != null && turn.Tablet.rotation == before &&
+                           Time.unscaledTime < deadline)
+                    {
+                        yield return null;
+                    }
+
+                    if (turn.Tablet == null || turn.Tablet.rotation == before)
+                    {
+                        failure = $"석판(인스턴스 {turn.InstanceId}) 회전이 시간 안에 반영되지 않아 자동 배치를 중단합니다.";
+                        break;
+                    }
+                    count++;
+                }
+
+                pressed.Add(new Turn(turn.Tablet, turn.InstanceId, count));
+                if (failure == null)
+                {
+                    outcome.Count++;
+                    continue;
+                }
+
+                outcome.Failure = failure;
+                var restoring = RestoreRotations(inventory, pressed);
+                while (restoring.MoveNext()) yield return restoring.Current;
+                yield break;
+            }
+        }
+
+        /// <summary>눌러 둔 만큼 마저 눌러 한 바퀴를 채운다. 회전이 4 걸음이라 그것이 역연산이다.</summary>
+        private static IEnumerator RestoreRotations(GridInventory inventory, List<Turn> pressed)
+        {
+            foreach (var turn in pressed)
+            {
+                var back = TabletRotation.PressesBack(turn.Presses);
+                for (var i = 0; i < back; i++)
+                {
+                    if (turn.Tablet == null) yield break;
+
+                    var before = turn.Tablet.rotation;
+                    if (Press(inventory, turn.Tablet) != null) yield break;
+
+                    var deadline = Time.unscaledTime + SyncTimeout;
+                    while (turn.Tablet != null && turn.Tablet.rotation == before &&
+                           Time.unscaledTime < deadline)
+                    {
+                        yield return null;
+                    }
+                }
+            }
+        }
+
+        /// <summary>회전 한 걸음. 게임이 우클릭에 쓰는 그 경로다.</summary>
+        private static string Press(GridInventory inventory, StoneTablet tablet)
+        {
+            try
+            {
+                inventory.DoClickAction(new ItemPosition(tablet.xIdx, tablet.yIdx));
+                return null;
+            }
+            catch (Exception ex)
+            {
+                return ex.Message;
+            }
+        }
+
+        /// <summary>
+        /// 돌려야 할 석판과 횟수를 모은다. 솔버도 스냅샷의 인스턴스별 회전 가능 여부를 보지만,
+        /// 계산 이후 저주 등으로 잠겼을 수 있어 쓰기 직전에 한 번 더 확인한다.
+        /// </summary>
+        private static string Collect(
+            ApplyPlanCommand command, GridInventory inventory, List<Turn> pending)
+        {
+            try
+            {
+                foreach (var target in command.Targets)
+                {
+                    if (!target.IsTablet) continue;
+
+                    var tablet = FindTablet(inventory, target.InstanceId);
+                    if (tablet == null) return "적용 도중 석판이 사라져 자동 배치를 중단합니다.";
+
+                    var presses = TabletRotation.PressesFrom(tablet.rotation, target.Rotation);
+                    if (presses == 0) continue;
+
+                    if (!DungeonManager.IsTabletRotatable(tablet.instanceID, tablet.isRotatable))
+                        return $"적용 도중 석판(인스턴스 {target.InstanceId})의 회전이 잠겨 중단합니다.";
+
+                    pending.Add(new Turn(tablet, target.InstanceId, presses));
+                }
+                return null;
+            }
+            catch (Exception ex)
+            {
+                // 아직 아무것도 쓰지 않았다. 회전만 포기하면 이동을 되돌릴지 호출자가 정한다.
+                return $"회전 준비 중 오류가 났습니다({ex.Message}).";
+            }
         }
 
         private static StoneTablet FindTablet(GridInventory inventory, int instanceId)

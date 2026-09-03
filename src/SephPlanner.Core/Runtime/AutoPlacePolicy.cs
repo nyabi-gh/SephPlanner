@@ -12,7 +12,9 @@ namespace SephPlanner.Core.Runtime
         public string CurrentPlacementFingerprint { get; set; } = "";
         public bool IsMultiplayer { get; set; }
         public bool AllowMultiplayer { get; set; }
-        public bool ServerActive { get; set; }
+
+        /// <summary>네트워크 세션이 살아 있는가. 호스트든 참가자든 상관없다 - 쓰기가 나갈 곳이 있는지다.</summary>
+        public bool SessionActive { get; set; }
     }
 
     public sealed class AutoPlaceDecision
@@ -63,11 +65,13 @@ namespace SephPlanner.Core.Runtime
                 return AutoPlaceDecision.Deny("옮길 것이 없습니다.");
             // 멀티 세션은 기본으로 잠근다. 개발사가 금지한 것은 아니고 인벤토리 동기화 구현을
             // 바꾸는 중이라 잠가 두는 편이 안전하다고 답했다(docs/LEGAL.md "받은 답변"). 그래서
-            // 켜는 길은 두되 기본은 꺼짐이고, 켜도 아래 ServerActive 가 호스트로 한정한다.
+            // 켜는 길은 두되 기본은 꺼짐이다. 켜면 호스트와 참가자 양쪽에서 돈다 - 이동은
+            // CmdSwap, 회전은 CmdDoClickAction 으로 게임 자신이 클라이언트에게 열어 둔 길이 있다
+            // (docs/RESEARCH.md 의 "멀티플레이").
             if (context.IsMultiplayer && !context.AllowMultiplayer)
                 return AutoPlaceDecision.Deny("멀티플레이 세션에서는 자동 배치를 실행하지 않습니다.");
-            if (!context.ServerActive)
-                return AutoPlaceDecision.Deny("서버가 활성 상태가 아니라 자동 배치를 실행할 수 없습니다. (호스트에서만 동작)");
+            if (!context.SessionActive)
+                return AutoPlaceDecision.Deny("네트워크 세션이 없어 자동 배치를 실행할 수 없습니다.");
 
             return AutoPlaceDecision.Allow();
         }

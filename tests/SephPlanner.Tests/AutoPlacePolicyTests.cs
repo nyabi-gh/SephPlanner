@@ -69,7 +69,6 @@ public class AutoPlacePolicyTests
     {
         var context = Context();
         context.IsMultiplayer = true;
-        context.ServerActive = true;
 
         var decision = AutoPlacePolicy.Evaluate(context);
 
@@ -77,33 +76,32 @@ public class AutoPlacePolicyTests
         Assert.Contains("멀티플레이", decision.Reason);
     }
 
+    /// <summary>
+    /// 호스트와 참가자를 가리지 않는다. 이동은 <c>CmdSwap</c>, 회전은 <c>CmdDoClickAction</c> 으로
+    /// 게임이 클라이언트에게 열어 둔 길이 있다(docs/RESEARCH.md 의 "멀티플레이"). 한때 여기서
+    /// 클라이언트를 막았는데, "호스트에서만 된다"를 정책이 아니라 사실로 잘못 알았기 때문이다.
+    /// </summary>
     [Fact]
-    public void OpeningMultiplayerAllowsItOnTheHost()
+    public void OpeningMultiplayerAllowsHostAndClientAlike()
     {
         var context = Context();
         context.IsMultiplayer = true;
         context.AllowMultiplayer = true;
-        context.ServerActive = true;
 
         Assert.True(AutoPlacePolicy.Evaluate(context).Allowed);
     }
 
-    /// <summary>
-    /// 쓰기는 서버 API 라 클라이언트에서는 애초에 돌지 않는다. 허용을 켜도 여기서 막혀야 한다 -
-    /// 선례가 된 커뮤니티 모드가 망가뜨린 곳이 정확히 클라이언트 쓰기다(docs/LEGAL.md).
-    /// </summary>
+    /// <summary>세션 자체가 없으면 쓰기가 나갈 곳이 없다.</summary>
     [Fact]
-    public void OpeningMultiplayerStillDeniesAClient()
+    public void NoNetworkSessionIsDenied()
     {
         var context = Context();
-        context.IsMultiplayer = true;
-        context.AllowMultiplayer = true;
-        context.ServerActive = false;
+        context.SessionActive = false;
 
         var decision = AutoPlacePolicy.Evaluate(context);
 
         Assert.False(decision.Allowed);
-        Assert.Contains("호스트", decision.Reason);
+        Assert.Contains("네트워크 세션", decision.Reason);
     }
 
     private static AutoPlaceContext Context()
@@ -133,7 +131,7 @@ public class AutoPlacePolicyTests
             CatalogGeneration = "catalog",
             RuntimeVerification = PlanVerificationStatus.Passed,
             CurrentPlacementFingerprint = "placement",
-            ServerActive = true,
+            SessionActive = true,
         };
     }
 }

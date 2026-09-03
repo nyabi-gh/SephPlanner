@@ -114,9 +114,9 @@ namespace SephPlanner.Plugin
             // 잠가 두는 편이 안전하다고 답했다(docs/LEGAL.md "받은 답변").
             MultiplayerAutoPlace = config.Bind(
                 "NativePanel", "MultiplayerAutoPlace", false,
-                "멀티플레이 세션에서도 자동 배치를 허용한다(실험). 호스트에서만 실제로 동작한다. " +
-                "동기화가 검증되지 않았고 개발사도 잠가 두는 편이 안전하다고 했으므로, 같이 하는 " +
-                "사람의 동의를 얻고 켠다.");
+                "멀티플레이 세션에서도 자동 배치를 허용한다(실험). 방을 연 쪽이든 참가한 쪽이든 " +
+                "동작한다. 동기화가 검증되지 않았고 개발사도 잠가 두는 편이 안전하다고 했으므로, " +
+                "같이 하는 사람의 동의를 얻고 켠다.");
 
             // 게임이 쓰지 않는 키로 고른다. 게임은 수정키를 보지 않으므로 Ctrl+Alt 를 붙여도
             // 글자 키는 게임 조작을 함께 발동시킨다(docs/RESEARCH.md 의 "게임 단축키").
@@ -126,7 +126,7 @@ namespace SephPlanner.Plugin
                 "패널을 접고 펴는 단축키. 상자·상점을 열면 저절로 펼쳐진다.");
             AutoPlaceKey = config.Bind(
                 "NativePanel", "AutoPlaceKey", new KeyboardShortcut(KeyCode.F8),
-                "제안된 배치를 게임에 적용하는 단축키. 싱글플레이에서만 동작한다.");
+                "제안된 배치를 게임에 적용하는 단축키. 멀티 세션에서는 위 허용을 켜야 동작한다.");
             OpacityKey = config.Bind(
                 "NativePanel", "OpacityKey", new KeyboardShortcut(KeyCode.F5),
                 "불투명도를 차례로 바꾸는 단축키.");

@@ -191,14 +191,30 @@ public void Swap(sbyte xLeft, sbyte yLeft, sbyte xRight, sbyte yRight)
 물건의 자리를 따로 관리하면 대피 걸음 없이 어떤 순열이든 만들어진다. 단 **여러 칸을 차지하는
 아이템은 한 칸짜리 Swap 으로 옮기면 망가지므로**, 하나라도 보이면 적용 전체를 중단한다.
 
-### 회전: `Permission` 스코프 안에서 `Networkrotation`
+### 회전: 호스트는 `Networkrotation`, 참가자는 `DoClickAction`
 
-배치된 석판의 회전을 바꾸는 전용 Cmd 는 없다. 게임 내장 자동 정리(아래)가 하는 방식을 그대로
-따른다: `using (new GridInventory.Permission(inv))` 안에서 `StoneTablet.Networkrotation`(SyncVar)을
+**호스트에서는** 게임 내장 자동 정리(아래)가 하는 방식을 그대로 따른다:
+`using (new GridInventory.Permission(inv))` 안에서 `StoneTablet.Networkrotation`(SyncVar)을
 설정한다. `Permission`은 공개 중첩 클래스로, 생성 시 쓰기 권한을 얻고 Dispose 때
 `ReleasePermission`이 레벨 행렬 전체를 다시 계산한다. `LocalSwap`도 내부에서 같은 스코프를
 여므로, **우리 Permission 스코프 안에서 Swap 을 부르면 권한 중복으로 터진다.** 이동과 회전을
 분리한 이유다.
+
+**참가자로 접속한 세션에서는 `Networkrotation` 을 쓸 수 없다.** SyncVar 라 클라이언트에서 써 봐야
+서버 값이 덮는다. 대신 우클릭이 타는 길이 있다:
+
+```
+GridInventory.DoClickAction(ItemPosition)             // 서버면 Local, 아니면 Cmd
+  → [Command, requiresAuthority: true] CmdDoClickAction(ItemPosition)
+  → [Server] LocalDoClickAction → using (new Permission(this)) { item.DoClickAction() }
+  → NewItemOwnInstance.DoClickAction() → StoneTablet.Rotate()      // 한 번에 90도
+```
+
+`Rotate()`는 `rotation`을 1 올리고 4에서 0으로 돌린다(잠긴 석판이면 아무것도 하지 않는다). 각도를
+직접 줄 수 없으므로 필요한 횟수만큼 누른다. 세는 것은 `TabletRotation.PressesFrom` 이고 Core 에
+두고 시험한다 - **방향을 뒤집어 세면 누를 때마다 어긋난 채로 굳는다**(같은 일을 하는 커뮤니티
+도구가 겪은 드리프트). 그 칸에 아티팩트가 있으면 `DoClickAction`은 아무것도 하지 않는다
+(`Charm != null` 이면 회전으로 가지 않는다).
 
 회전은 인스턴스 단위로 잠길 수 있다(`DungeonManager.IsTabletRotatable(instanceID, isRotatable)`).
 스냅샷의 `PlacedTablet.IsRotatable`이 인스턴스별 잠금을 실어 보내고 솔버가 이를 존중한다
@@ -227,27 +243,43 @@ public void Swap(sbyte xLeft, sbyte yLeft, sbyte xRight, sbyte yRight)
 데이터베이스 로드·세션 시작·`GridInventoryStartPermission`/`EndPermission` 등의 이벤트를 제공한다.
 아직 초기 단계라 쓰지는 않지만, 게임이 모드를 공식적으로 상정하고 있다는 근거다.
 
-### 멀티플레이는 기본으로 잠그고, 켜도 호스트까지다
+### 멀티플레이는 기본으로 잠그고, 켜면 호스트와 참가자 양쪽에서 돈다
 
 싱글은 호스트 모드라 위 경로가 전부 서버 로컬에서 끝난다. 멀티 세션은 기본으로 적용을 거부하고,
 설정(`MultiplayerAutoPlace`, 기본 꺼짐)으로만 연다. 판정은 `AutoPlacePolicy`(화면 안내와 F8)와
 `PlanApplier`(쓰기 직전, 적용 도중 접속이 늘어난 경우까지) 두 겹이다.
 
-**켜도 클라이언트에서는 돌지 않는다.** 이것은 정책이 아니라 게임 구조다.
+**참가자로 접속한 세션에서도 돈다.** 게임이 클라이언트에게 열어 둔 길이 이동과 회전 모두 있다.
 
-- **이동**은 클라이언트에서도 길이 있다 - `Swap` 이 서버가 아니면 `CmdSwap`(Mirror Command,
-  `requiresAuthority: true`)으로 서버에 보낸다. 다만 **왕복이라 즉시 반영되지 않는다.** 우리
-  적용기는 걸음마다 `InstanceAt` 으로 옮겨졌는지 확인하고 아니면 되돌리는데, 클라이언트에서는
-  그 확인이 언제나 실패한다(아직 서버 응답이 안 왔으므로). 열려면 걸음마다 동기화를 기다리는
-  비동기 적용기가 필요하다.
-- **회전은 길 자체가 없다.** 배치된 석판의 회전을 바꾸는 클라이언트용 Cmd 가 게임에 없고,
-  `Networkrotation` 은 SyncVar 라 클라이언트에서 써 봐야 서버 값이 덮는다. 커뮤니티의 다른
-  자동배치 모드가 겪은 "클라이언트 회전 미동작"이 이것이다.
-- 그래서 회전이 낀 계획을 클라이언트에서 반쯤 적용하면 **솔버가 평가한 적 없는 배치**가 남는다.
-  적용기가 호스트 경로에서 회전 실패 시 이동까지 되돌리는 이유와 같다.
+- **이동**은 `Swap` 이 서버가 아니면 `CmdSwap`(Mirror Command, `requiresAuthority: true`)으로 서버에
+  보내고, 서버 핸들러(`UserCode_CmdSwap`)는 `LocalSwap` 을 그대로 부른다. 인벤토리는 내 플레이어
+  오브젝트에 붙어 있어 권한 조건을 만족한다.
+- **회전**은 `DoClickAction` → `CmdDoClickAction` 이다(위 "회전").
+- 둘 다 신뢰 채널 0 으로 나가므로 **서버가 보낸 순서대로 처리한다.** 이동을 다 보낸 뒤 회전을
+  보내면 서버도 그 순서로 본다.
+
+다만 **왕복이라 부른 즉시 반영되지 않는다.** `Swap` 을 부른 프레임에는 아직 아무것도 바뀌지 않았고,
+서버가 처리해 SyncDictionary 로 돌려줄 때까지 옛 상태가 보인다. 그래서 `PlanApplier`는 코루틴이고
+걸음마다 반영을 기다린다(3초 한계, 밀려난 쪽까지 제자리에 와야 한 걸음이 끝난 것으로 본다).
+호스트에서는 첫 확인이 곧바로 참이라 예전처럼 한 프레임에 끝난다.
+
+**기다리지 않고 쏘기만 하면 무엇이 남는지**는 같은 일을 하는 커뮤니티 도구가 보여 준다. 그쪽은
+확인을 하지 않아 `LocalSwap` 이 조용히 거부한 걸음까지 "이동 N건 완료"로 보고하고, 도중에 막히면
+솔버가 평가한 적 없는 반쯤 배치가 남는다. 확인과 되돌리기가 우리가 붙이는 값이다.
+
+**남은 사각지대 하나.** 고정 각인(`fixedEngravingsOnServer`)은 순수 `List` 라 참가자 세션에서는
+읽을 수 없다(아래 "고정 각인은 호스트에서 읽는다"). 다만 `levelMatrix` 는 SyncDictionary 라
+클라이언트에도 오고 `SimulationVerifier` 가 그것을 정답지로 대조하므로, **각인이 걸린 참가자
+세션은 실시간 검증이 스스로 실패해 자동 배치가 잠긴다.** 모르는 채로 어긋난 계획을 적용하는 일은
+없다.
 
 한때 이 토글을 두었다가 개발사 답변을 "잠가 두라"로 읽고 2026-09-03에 뺐고, 같은 날 그 답변이
 금지가 아니라 안전상의 권고임을 다시 읽고 되살렸다(`docs/LEGAL.md` "받은 답변").
+
+**정정(2026-09-04).** 그때 이 절에 "회전은 길 자체가 없다"고 적었는데 **틀렸다.** `DoClickAction` 을
+놓쳤다. 커뮤니티 모드의 "클라이언트 회전 미동작"을 게임에 길이 없다는 증거로 읽은 것이 원인이고,
+실제로는 그 모드가 아직 그 경로를 쓰지 않던 판이었다. 게임 어셈블리에서 확인하고 참가자 세션까지
+열었다.
 
 ## 아티팩트 효과 설명
 
@@ -410,8 +442,12 @@ fixedMultiplyLevel)를 들고 있고, 배수는 석판과 같은 `multiplyLevelM
 
 싱글은 호스트 모드라 이 목록을 그대로 읽을 수 있다. `GameReader.ReadFixedEffects`가 칸 효과로
 합쳐 스냅샷(`FixedEffects`)에 싣고, `TabletSimulator`가 행렬에 먼저 깔고 시작한다.
-`SimulationVerifier`도 같은 기준으로 대조한다. **클라이언트로 접속한 세션에서만 여전히 못 읽고**,
-그때는 예전처럼 레벨 불일치 경고로 드러난다.
+`SimulationVerifier`도 같은 기준으로 대조한다.
+
+**참가자로 접속한 세션에서만 여전히 못 읽는다.** 그 자체가 자물쇠 역할을 한다 - `levelMatrix` 는
+SyncDictionary 라 클라이언트에도 오므로, 각인이 걸려 있으면 `SimulationVerifier` 가 그것과
+어긋나는 것을 보고 실시간 검증이 실패하며 자동 배치까지 함께 잠긴다. 화면에는 레벨 불일치로
+드러난다.
 
 ### 배치 보너스는 레벨과 무관했다
 

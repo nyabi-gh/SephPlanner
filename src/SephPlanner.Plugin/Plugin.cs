@@ -738,11 +738,21 @@ namespace SephPlanner.Plugin
         /// <summary>
         /// 제안된 배치를 게임에 적용한다. 화면이 마우스를 받지 않으므로 버튼이 아니라 단축키다.
         /// 멀티 잠금과 사전 검증은 <see cref="PlanApplier"/>가 한다.
+        ///
+        /// 참가자로 접속한 세션에서는 걸음마다 서버 왕복을 기다리므로 여러 프레임에 걸친다.
+        /// 그래서 적용기는 코루틴이고 결과는 끝난 뒤에 돌아온다.
         /// </summary>
         private void AutoPlace()
         {
             try
             {
+                if (PlanApplier.InProgress)
+                {
+                    Report("자동 배치가 아직 진행 중입니다.");
+                    _nextPoll = 0;
+                    return;
+                }
+
                 var snapshot = GameReader.Read(_settings.OfferRadius.Value);
                 VerifySimulation(GameReader.CheckSimulation());
                 FeedNativePanel(snapshot);
@@ -754,20 +764,26 @@ namespace SephPlanner.Plugin
                 if (!decision.Allowed)
                 {
                     Report(decision.Reason);
+                    _nextPoll = 0;
                     return;
                 }
 
                 var plan = state.Latest;
-                var result = PlanApplier.Apply(
-                    plan.CreateApplyCommand(), _settings.MultiplayerAutoPlace.Value);
-                Logger.LogInfo(result);
-                Report(result);
+                StartCoroutine(PlanApplier.Apply(
+                    plan.CreateApplyCommand(), _settings.MultiplayerAutoPlace.Value, AutoPlaceFinished));
             }
             catch (Exception ex)
             {
                 Logger.LogError("자동 배치 실패: " + ex);
                 Report("자동 배치 중 오류가 났습니다. BepInEx 로그를 확인하세요.");
+                _nextPoll = 0;
             }
+        }
+
+        private void AutoPlaceFinished(string result)
+        {
+            Logger.LogInfo(result);
+            Report(result);
 
             // 적용 결과가 화면에 바로 보이도록 다음 폴링을 기다리지 않는다.
             _nextPoll = 0;
@@ -792,7 +808,7 @@ namespace SephPlanner.Plugin
                 CurrentPlacementFingerprint = placementFingerprint,
                 IsMultiplayer = snapshot != null && snapshot.IsMultiplayer,
                 AllowMultiplayer = _settings.MultiplayerAutoPlace.Value,
-                ServerActive = NetworkServer.active,
+                SessionActive = NetworkServer.active || NetworkClient.active,
             });
 
         /// <summary>
