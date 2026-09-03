@@ -6,7 +6,7 @@ namespace SephPlanner.Core.Runtime
 {
     public delegate Plan? PlanBuildOperation(
         GameSnapshot snapshot, ICatalog catalog, PlanPreferences preferences,
-        out PlanBlocker blocker, Plan? previous);
+        out PlanBlocker blocker, Plan? previous, CancellationToken cancellation);
 
     public sealed class PlanRunState
     {
@@ -24,7 +24,7 @@ namespace SephPlanner.Core.Runtime
 
     public sealed class PlanRunner
     {
-        private sealed class Request
+        private sealed class Request : IDisposable
         {
             public long Generation;
             public GameSnapshot Snapshot = new GameSnapshot();
@@ -34,6 +34,18 @@ namespace SephPlanner.Core.Runtime
             public string PlanningContextFingerprint = "";
             public string CatalogGeneration = "";
             public Plan? Previous;
+
+            /// <summary>
+            /// 이 요청이 낡았다고 알리는 자리. 뒤에 요청이 오면 지금 도는 풀이의 답은 어차피
+            /// 버려지므로, 끝까지 돌게 두면 CPU 와 할당을 그대로 버린다.
+            /// </summary>
+            public readonly CancellationTokenSource Cancellation = new CancellationTokenSource();
+
+            /// <summary>
+            /// <b>자물쇠 안에서만 부른다.</b> 취소를 거는 쪽(<see cref="Submit"/>)도 같은 자물쇠를
+            /// 쥐고 있어야, 버리는 순간과 취소하는 순간이 겹쳐 터지는 일이 없다.
+            /// </summary>
+            public void Dispose() => Cancellation.Dispose();
         }
 
         private readonly object _gate = new object();
@@ -116,17 +128,27 @@ namespace SephPlanner.Core.Runtime
                 _error = null;
 
                 if (_running is not null)
+                {
+                    // 돌고 있는 풀이의 답은 이제 쓰이지 않는다. 실측에서 한 번이 1초, 할당
+                    // 2GB 까지 갔으므로 그냥 끝까지 두면 그만큼을 버리는 셈이다.
+                    _running.Cancellation.Cancel();
+
+                    // 시작도 못 한 채 밀려난 요청. 여기서 정리하지 않으면 그대로 새어 나간다.
+                    _pending?.Dispose();
                     _pending = request;
+                }
                 else
+                {
                     StartLocked(request);
+                }
                 return request.Generation;
             }
         }
 
         private static Plan? Build(
             GameSnapshot snapshot, ICatalog catalog, PlanPreferences preferences,
-            out PlanBlocker blocker, Plan? previous) =>
-            PlanBuilder.Build(snapshot, catalog, preferences, out blocker, previous);
+            out PlanBlocker blocker, Plan? previous, CancellationToken cancellation) =>
+            PlanBuilder.Build(snapshot, catalog, preferences, out blocker, previous, cancellation);
 
         private void StartLocked(Request request)
         {
@@ -141,7 +163,9 @@ namespace SephPlanner.Core.Runtime
             Exception? failure = null;
             try
             {
-                plan = _build(request.Snapshot, _catalog, request.Preferences, out blocker, request.Previous);
+                plan = _build(
+                    request.Snapshot, _catalog, request.Preferences, out blocker, request.Previous,
+                    request.Cancellation.Token);
                 if (plan is not null)
                 {
                     plan.RequestGeneration = request.Generation;
@@ -158,7 +182,10 @@ namespace SephPlanner.Core.Runtime
 
             lock (_gate)
             {
-                if (request.Generation == _requestedGeneration)
+                // 취소된 요청의 결과는 도중에 그만둔 것이라 쓸 수 없다. 세대 검사만으로도 걸리지만,
+                // 반쪽짜리 계획을 최신이라고 게시하는 일만은 확실히 막아 둔다.
+                if (!request.Cancellation.IsCancellationRequested &&
+                    request.Generation == _requestedGeneration)
                 {
                     _publishedGeneration = request.Generation;
                     if (failure is null)
@@ -183,6 +210,10 @@ namespace SephPlanner.Core.Runtime
                     next.Previous = _latest;
                     StartLocked(next);
                 }
+
+                // 다 쓴 요청이다. 자물쇠 안이라 취소를 거는 쪽과 겹치지 않고, _running 에서
+                // 이미 떼어 냈으므로 이제 아무도 닿지 못한다.
+                request.Dispose();
             }
         }
     }

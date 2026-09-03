@@ -43,11 +43,23 @@ namespace SephPlanner.Core.Solver
         public static Arrangement Solve(PlacementProblem problem, SolverOptions? options = null)
         {
             options ??= new SolverOptions();
+            return EvaluateLayouts(problem, SearchLayouts(problem, options), options);
+        }
 
-            var cells = Enumerable.Range(0, problem.Grid.Storage)
-                                  .Select(problem.Grid.ToPosition)
-                                  .ToList();
+        /// <summary>
+        /// 채점까지 가 볼 석판 배치 후보들.
+        ///
+        /// <b>풀이 비용의 대부분이 여기다</b> - 42칸 판에서 재어 보면 <see cref="Solve"/>의 97%가
+        /// 이 탐색이고, 나머지 3%가 <see cref="EvaluateLayouts"/>의 정확한 배정이다. 그래서 같은
+        /// 석판 구성을 여러 번 채점해야 할 때는 이것을 한 번만 짓고 돌려 쓴다
+        /// (<see cref="LayoutCache"/>).
+        /// </summary>
+        public static List<List<TabletPlacement>> SearchLayouts(
+            PlacementProblem problem, SolverOptions? options = null)
+        {
+            options ??= new SolverOptions();
 
+            var cells = Cells(problem);
             EstimateStats(problem, out var scoring, out var levelCap, out var anyMagic);
             var searched = SearchTabletLayouts(problem, cells, options, scoring, levelCap, anyMagic);
 
@@ -73,14 +85,35 @@ namespace SephPlanner.Core.Solver
             if (candidates.Count == 0)
                 candidates = searched.Take(options.ExactCandidates).ToList();
 
+            return candidates;
+        }
+
+        /// <summary>
+        /// 주어진 배치 후보들을 정확히 채점해 가장 좋은 것을 고른다. 석판이 고정되면 아티팩트
+        /// 배치는 배정 문제라 여기서 헝가리안으로 정확히 풀린다.
+        /// </summary>
+        public static Arrangement EvaluateLayouts(
+            PlacementProblem problem, IReadOnlyList<List<TabletPlacement>> layouts,
+            SolverOptions? options = null)
+        {
+            options ??= new SolverOptions();
+
+            var cells = Cells(problem);
             Arrangement? best = null;
-            foreach (var layout in candidates)
+            foreach (var layout in layouts)
             {
+                if (best != null && options.Cancellation.IsCancellationRequested) break;
+
                 var arrangement = Evaluate(problem, cells, layout, options);
                 if (best == null || arrangement.Score > best.Score) best = arrangement;
             }
             return best ?? Evaluate(problem, cells, new List<TabletPlacement>(), options);
         }
+
+        private static List<GridPos> Cells(PlacementProblem problem) =>
+            Enumerable.Range(0, problem.Grid.Storage)
+                      .Select(problem.Grid.ToPosition)
+                      .ToList();
 
         /// <summary>이미 정해진 배치를 같은 기준으로 채점한다. 현재 배치와 제안을 비교할 때 쓴다.</summary>
         public static Arrangement Score(
@@ -258,6 +291,10 @@ namespace SephPlanner.Core.Solver
 
             foreach (var slot in problem.Tablets)
             {
+                // 이 풀이를 버릴 것이 이미 정해졌으면 여기서 그만둔다. 석판 한 장을 놓는 단계마다
+                // 보는 것으로 충분하다 - 비용이 거기에 몰려 있다.
+                if (options.Cancellation.IsCancellationRequested) break;
+
                 // 돌릴 수 없는 석판은 지금 돌아가 있는 각도 그대로만 쓴다. 0으로 고정하면
                 // 이미 돌아간 채로 잠긴 석판(저주 등)에 불가능한 회전을 제안하게 된다.
                 var currentRotation = problem.CurrentTablets.TryGetValue(slot.InstanceId, out var spot)

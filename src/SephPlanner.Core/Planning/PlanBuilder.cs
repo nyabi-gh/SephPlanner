@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using SephPlanner.Core.Charms;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Runtime;
@@ -42,9 +43,15 @@ namespace SephPlanner.Core.Planning
         /// 직전에 내놓은 계획. 동점 배치 사이에서 저번에 말한 쪽을 고르는 앵커로만 쓰이고,
         /// 점수가 실제로 나은 배치를 이기지는 못한다.
         /// </param>
+        /// <param name="cancellation">
+        /// 이 계획이 이미 쓸모없어졌다는 신호. 켜지면 도중에 그만두고 <c>null</c> 을 돌려준다 -
+        /// 중간까지 푼 것은 쓰지 않는다. 폴링이 풀이보다 빠를 때 버릴 답을 끝까지 계산하지
+        /// 않으려는 것이다.
+        /// </param>
         public static Plan? Build(
             GameSnapshot snapshot, ICatalog catalog, PlanPreferences? preferences,
-            out PlanBlocker blocker, Plan? previous = null)
+            out PlanBlocker blocker, Plan? previous = null,
+            CancellationToken cancellation = default)
         {
             blocker = PlanBlocker.None;
             preferences ??= PlanPreferences.None;
@@ -149,7 +156,8 @@ namespace SephPlanner.Core.Planning
             }
 
             var current = PlacementSolver.Score(problem, layout, positions);
-            var best = PlacementSolver.Solve(problem);
+            var best = PlacementSolver.Solve(problem, new SolverOptions { Cancellation = cancellation });
+            if (cancellation.IsCancellationRequested) return null;
 
             // 조건부 아티팩트는 배정과 조건이 서로 물려 수렴 반복이 소진될 수 있고, 그 결과가
             // 지금 배치보다 나쁠 수 있다(실제로 재현됐다). 지금이 이기면 지금이 답이다.
@@ -160,18 +168,24 @@ namespace SephPlanner.Core.Planning
             var skippedOffers = 0;
             if (preferences.Recommendations)
             {
+                // 두 조언이 같은 기준 배치를 쓴다. 따로 풀면 같은 탐색을 두 번 돌리는 셈이고,
+                // 그 한 번이 실측에서 백 밀리초대다.
+                var layouts = new LayoutCache();
+
                 // 합성기를 이미 썼으면 이 층에서는 더 권할 것이 없다.
                 if (snapshot.Mixer is { Used: false } mixer)
                 {
                     mixes = TabletMixAdvisor.Rank(
-                        problem, catalog, mixer.Cost, snapshot.Run?.Gold ?? int.MaxValue);
+                        problem, catalog, mixer.Cost, snapshot.Run?.Gold ?? int.MaxValue,
+                        layouts: layouts, cancellation: cancellation);
                 }
 
                 var candidates = Candidates(snapshot, catalog, weapon, out skippedOffers);
                 offers = OfferAdvisor.Rank(
                     problem, candidates, snapshot.Run?.Gold ?? int.MaxValue,
                     inventory.ComboCounts, catalog.Combo, preferences.PriorityCategories,
-                    preferences.PresetCharms, values);
+                    preferences.PresetCharms, values, layouts, cancellation);
+                if (cancellation.IsCancellationRequested) return null;
 
                 // 후보마다 이미 배치를 다 풀어 두었다. 그 결과를 버리지 않고 화면이 쓸 모양으로
                 // 옮겨 두면, 증가분이라는 숫자 하나 대신 무엇이 어떻게 달라지는지 보여줄 수 있다.

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using SephPlanner.Core.Charms;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
@@ -119,10 +120,18 @@ namespace SephPlanner.Core.Solver
             public Arrangement Solved = new Arrangement();
             public OfferDisplacement? Displacement;
             public CharmSlot? DisplacedCharm;
+
+            /// <summary>
+            /// 이 갈래가 빼낸 석판이 원래 목록에서 몇 번째였는지. 석판을 그대로 둔 갈래는 -1 이다.
+            /// 석판을 하나 뺀 갈래의 배치는 그대로 둔 갈래의 배치에서 그 자리만 빼면 나오므로,
+            /// 이 번호가 있으면 탐색을 다시 돌리지 않아도 된다.
+            /// </summary>
+            public int RemovedTabletIndex = -1;
         }
 
         /// <summary>후보마다 한 번씩 푸는 만큼, 기본 탐색보다 가볍게 잡는다.</summary>
-        private static readonly SolverOptions Faster = new() { BeamWidth = 150, ExactCandidates = 40 };
+        private static SolverOptions Faster(CancellationToken cancellation) =>
+            new() { BeamWidth = 150, ExactCandidates = 40, Cancellation = cancellation };
 
         /// <summary>밀고 있는 카테고리의 콤보 가치를 몇 배로 칠지.</summary>
         private const double PriorityMultiplier = 3.0;
@@ -142,19 +151,32 @@ namespace SephPlanner.Core.Solver
             Func<string, ComboDefinition?>? combos = null,
             IReadOnlyCollection<string>? priorityCategories = null,
             IReadOnlyCollection<int>? presetCharms = null,
-            CharmValueBook? values = null)
+            CharmValueBook? values = null,
+            LayoutCache? layouts = null,
+            CancellationToken cancellation = default)
         {
-            // 기준과 후보를 같은 탐색 강도로 풀어야 증가분이 순수하게 후보의 몫이 된다. 기준만
-            // 촘촘한 탐색으로 풀면, 명백히 좋은 후보에도 탐색 강도 차이만큼 음수가 나온다.
-            var baseScore = PlacementSolver.Solve(problem, Faster).Score;
+            // 볼 것이 없으면 기준 점수조차 풀 이유가 없다. 상자도 상점도 열지 않은 평상시가
+            // 이 경우이고, 그때가 프레임을 가장 아껴야 할 때다.
+            if (candidates.Count == 0) return new List<OfferAdvice>();
+
+            layouts ??= new LayoutCache();
+            var faster = Faster(cancellation);
+
+            // 기준과 후보를 같은 탐색 강도로, 그리고 같은 배치 후보들 위에서 풀어야 증가분이
+            // 순수하게 후보의 몫이 된다. 기준만 촘촘한 탐색으로 풀면, 명백히 좋은 후보에도 탐색
+            // 강도 차이만큼 음수가 나온다.
+            var baseScore = PlacementSolver.EvaluateLayouts(problem, layouts.Of(problem, faster), faster).Score;
 
             var advice = new List<OfferAdvice>();
             var nextInstanceId = -1;
 
             foreach (var candidate in candidates)
             {
+                // 버릴 것이 정해진 풀이다. 남은 후보를 마저 보는 것은 그대로 낭비다.
+                if (cancellation.IsCancellationRequested) break;
+
                 var candidateId = nextInstanceId--;
-                var outcome = BestTrial(problem, candidate, candidateId, values);
+                var outcome = BestTrial(problem, candidate, candidateId, values, layouts, faster);
                 var entry = new OfferAdvice
                 {
                     Candidate = candidate,
@@ -307,19 +329,48 @@ namespace SephPlanner.Core.Solver
             return TabletEffectSummary.Of(placement.Query, trial.Grid, placement.Position, placement.Rotation);
         }
 
+        /// <summary>
+        /// 이 후보를 집는 여러 갈래 중 가장 좋은 것. 가방이 차 있으면 무엇을 밀어내느냐로 갈래가
+        /// 갈리는데, <b>아티팩트를 밀어내는 갈래들은 석판 구성이 모두 같다</b>. 그래서 배치 탐색은
+        /// <see cref="LayoutCache"/>가 한 번만 돌리고, 갈래마다는 정확한 배정만 다시 푼다.
+        /// </summary>
         private static TrialOutcome? BestTrial(
-            PlacementProblem problem, OfferCandidate candidate, int candidateId, CharmValueBook? values)
+            PlacementProblem problem, OfferCandidate candidate, int candidateId, CharmValueBook? values,
+            LayoutCache layouts, SolverOptions faster)
         {
             TrialOutcome? best = null;
+
+            // 석판을 그대로 둔 갈래들의 배치. 석판을 하나 빼는 갈래는 여기서 그 자리만 빼면
+            // 되므로, 그런 갈래마다 탐색을 다시 돌리지 않는다 - 그 탐색들이 남은 비용의 대부분이었다.
+            IReadOnlyList<List<TabletPlacement>>? kept = null;
+
             foreach (var outcome in Trials(problem, candidate, candidateId, values))
             {
-                outcome.Solved = PlacementSolver.Solve(outcome.Trial, Faster);
+                IReadOnlyList<List<TabletPlacement>> yardstick;
+                if (outcome.RemovedTabletIndex < 0)
+                {
+                    yardstick = layouts.Yardstick(outcome.Trial, faster);
+                    kept = yardstick;
+                }
+                else
+                {
+                    yardstick = Without(kept, outcome.RemovedTabletIndex)
+                                ?? layouts.Yardstick(outcome.Trial, faster);
+                }
+
+                outcome.Solved = PlacementSolver.EvaluateLayouts(outcome.Trial, yardstick, faster);
                 var placed = candidate.Charm is not null
                     ? outcome.Solved.CharmPositions.ContainsKey(candidateId)
                     : outcome.Solved.TabletPositions.ContainsKey(candidateId);
                 if (!placed) continue;
                 if (best is null || outcome.Solved.Score > best.Solved.Score) best = outcome;
             }
+            if (best is null) return null;
+
+            // 이긴 갈래만 배치 후보 전부로 다시 푼다. 화면에 나가는 증가분은 기준 점수와 같은
+            // 잣대에서 나와야 하고, 미리보기도 이 결과를 그대로 쓴다.
+            best.Solved = PlacementSolver.EvaluateLayouts(
+                best.Trial, layouts.Of(best.Trial, faster), faster);
             return best;
         }
 
@@ -364,6 +415,7 @@ namespace SephPlanner.Core.Solver
 
             foreach (var tablet in problem.Tablets.OrderBy(value => value.InstanceId))
             {
+                var removed = problem.Tablets.FindIndex(value => value.InstanceId == tablet.InstanceId);
                 var trial = Clone(problem);
                 trial.Tablets.RemoveAll(value => value.InstanceId == tablet.InstanceId);
                 trial.CurrentTablets.Remove(tablet.InstanceId);
@@ -375,6 +427,7 @@ namespace SephPlanner.Core.Solver
                 yield return new TrialOutcome
                 {
                     Trial = trial,
+                    RemovedTabletIndex = removed,
                     Displacement = new OfferDisplacement
                     {
                         InstanceId = tablet.InstanceId,
@@ -384,6 +437,24 @@ namespace SephPlanner.Core.Solver
                     },
                 };
             }
+        }
+
+        /// <summary>
+        /// 석판 하나를 뺀 배치. 자리는 <c>problem.Tablets</c> 순서와 짝지어져 있으므로 그 번호의
+        /// 자리만 빼면 그대로 쓸 수 있다. 배치가 온전하지 않으면(석판이 다 놓이지 못했으면)
+        /// 짝이 어긋나므로 만들지 않는다.
+        /// </summary>
+        private static IReadOnlyList<List<TabletPlacement>>? Without(
+            IReadOnlyList<List<TabletPlacement>>? layouts, int index)
+        {
+            if (layouts is null || layouts.Count == 0) return null;
+
+            var layout = layouts[0];
+            if (index < 0 || index >= layout.Count) return null;
+
+            var reduced = new List<TabletPlacement>(layout);
+            reduced.RemoveAt(index);
+            return new List<List<TabletPlacement>> { reduced };
         }
 
         private static bool AddCandidate(

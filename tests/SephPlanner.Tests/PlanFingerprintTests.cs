@@ -59,6 +59,48 @@ public class PlanFingerprintTests
             PlanFingerprint.Placement(snapshot, high, "catalog-1"));
     }
 
+    /// <summary>
+    /// 동전을 줍는 것만으로 판이 다시 풀리면 안 된다. 소지금이 계획에 미치는 영향은 "살 수
+    /// 있는가" 하나뿐이므로, 그 답이 그대로면 지문도 그대로여야 한다.
+    /// </summary>
+    [Fact]
+    public void PickingUpGoldWithoutCrossingAPriceKeepsTheFingerprint()
+    {
+        var snapshot = Snapshot();
+        snapshot.Offers.Clear();
+        snapshot.Offers.Add(new OfferedItem { DefinitionId = 3, Kind = "charm", SlotIndex = 1, Price = 500 });
+        var before = PlanFingerprint.Full(snapshot, PlanPreferences.None, "catalog-1");
+
+        snapshot.Run!.Gold = 143;
+
+        Assert.Equal(before, PlanFingerprint.Full(snapshot, PlanPreferences.None, "catalog-1"));
+    }
+
+    [Fact]
+    public void ReachingAnOfferPriceInvalidatesTheFullPlan()
+    {
+        var snapshot = Snapshot();
+        snapshot.Offers.Clear();
+        snapshot.Offers.Add(new OfferedItem { DefinitionId = 3, Kind = "charm", SlotIndex = 1, Price = 150 });
+        var before = PlanFingerprint.Full(snapshot, PlanPreferences.None, "catalog-1");
+
+        snapshot.Run!.Gold = 150;
+
+        Assert.NotEqual(before, PlanFingerprint.Full(snapshot, PlanPreferences.None, "catalog-1"));
+    }
+
+    [Fact]
+    public void ReachingTheMixerCostInvalidatesTheFullPlan()
+    {
+        var snapshot = Snapshot();
+        snapshot.Mixer = new MixerState { Cost = 150 };
+        var before = PlanFingerprint.Full(snapshot, PlanPreferences.None, "catalog-1");
+
+        snapshot.Run!.Gold = 150;
+
+        Assert.NotEqual(before, PlanFingerprint.Full(snapshot, PlanPreferences.None, "catalog-1"));
+    }
+
     private static PlanPreferences PreferencesWithValue(int tier) => new()
     {
         CharmValues = new CharmValueBook(new CharmValueFile

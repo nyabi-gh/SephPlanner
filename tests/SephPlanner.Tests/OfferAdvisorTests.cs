@@ -29,6 +29,30 @@ public class OfferAdvisorTests
         Tablet("cheap", "RIGHT 1", price: 10),
     };
 
+    /// <summary>
+    /// 상자도 상점도 열지 않은 평상시다. 볼 것이 없으면 기준 배치조차 풀지 않아야 한다 -
+    /// 그 한 번이 실측에서 100ms 대였고, 폴링마다 돌면 그대로 프레임이 된다.
+    /// </summary>
+    [Fact]
+    public void WithNoCandidatesNothingIsSolved()
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(6, 7, 6) };
+        problem.Tablets.Add(new TabletSlot
+        {
+            InstanceId = 1,
+            Definition = new TabletDefinition { Id = "t", Query = "HORIZONTAL 2" },
+        });
+        for (var i = 0; i < 5; i++)
+            problem.Charms.Add(new CharmSlot { InstanceId = i, Definition = new CharmDefinition { MaxLevel = 5 } });
+
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        var advice = OfferAdvisor.Rank(problem, System.Array.Empty<OfferCandidate>(), gold: 1000);
+        watch.Stop();
+
+        Assert.Empty(advice);
+        Assert.True(watch.ElapsedMilliseconds < 5, $"후보가 없는데 {watch.ElapsedMilliseconds}ms 를 썼다");
+    }
+
     [Fact]
     public void WithEnoughGoldTheBestOfferComesFirst()
     {

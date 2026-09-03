@@ -17,10 +17,16 @@ namespace SephPlanner.Core.Runtime
             var builder = new StringBuilder();
             Add(builder, "placement", Placement(snapshot, preferences, catalogGeneration));
             Add(builder, "recommendations", preferences.Recommendations);
-            Add(builder, "gold", snapshot.Run?.Gold ?? 0);
+
+            // 소지금 자체는 넣지 않는다. 계획이 소지금을 보는 곳은 "지금 살 수 있는가" 하나뿐인데,
+            // 값을 그대로 넣으면 동전 한 닢을 주울 때마다 판 전체가 다시 풀린다. 살 수 있는지가
+            // 실제로 뒤집힐 때만 다시 푼다.
+            var gold = snapshot.Run?.Gold ?? 0;
+
             Add(builder, "mixer", snapshot.Mixer is not null);
             Add(builder, "mixerCost", snapshot.Mixer?.Cost ?? 0);
             Add(builder, "mixerUsed", snapshot.Mixer?.Used ?? false);
+            Add(builder, "mixerAffordable", (snapshot.Mixer?.Cost ?? 0) <= gold);
 
             foreach (var category in preferences.PriorityCategories.OrderBy(value => value, StringComparer.Ordinal))
                 Add(builder, "priority", category);
@@ -36,6 +42,7 @@ namespace SephPlanner.Core.Runtime
                 Add(builder, "offerDefinition", offer.DefinitionId);
                 Add(builder, "offerSlot", offer.SlotIndex);
                 Add(builder, "offerPrice", offer.Price);
+                Add(builder, "offerAffordable", offer.Price <= gold);
             }
             return Hash(builder);
         }

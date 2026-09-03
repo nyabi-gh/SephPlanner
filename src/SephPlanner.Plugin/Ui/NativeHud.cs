@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text;
 using SephPlanner.Core.Charms;
@@ -71,12 +72,77 @@ namespace SephPlanner.Plugin.Ui
         public const int OfferRows = 6;
         private const int MixRows = 3;
 
-        /// <summary>커서가 올라오면 설명할 것 하나. 그리는 자리마다 여기에 등록한다.</summary>
+        /// <summary>
+        /// 커서가 올라오면 설명할 것 하나. 그리는 자리마다 여기에 등록한다.
+        ///
+        /// <b>본문은 커서가 왔을 때 짓는다.</b> 화면에 있는 설명을 전부 미리 지어 두면 갱신마다
+        /// 마흔 몇 개의 문장을 만들게 되는데, 그중 실제로 읽히는 것은 많아야 하나다.
+        /// </summary>
         private struct HoverTarget
         {
             public RectTransform Rect;
             public string Title;
-            public string Body;
+            public Func<string> Body;
+        }
+
+        /// <summary>
+        /// 한 번 그린 근거. 이것이 그대로면 그린 결과도 그대로다.
+        ///
+        /// <see cref="Render"/>는 매 프레임 불리지만 내용이 바뀌는 것은 폴링마다 한 번이다.
+        /// 프레임마다 격자와 목록을 다시 지으면 아무것도 달라지지 않은 프레임에서도 쓰레기가
+        /// 쌓이고, 그것이 결국 게임을 세운다 - 이 게임은 증분 GC 가 프레임당 3ms 를 가져간다
+        /// (<c>Sephiria_Data/boot.config</c>의 <c>gc-max-time-slice</c>).
+        /// </summary>
+        private readonly struct FrameKey
+        {
+            private readonly object _snapshot;
+            private readonly object _plan;
+            private readonly object _catalog;
+            private readonly object _values;
+            private readonly string _hint;
+            private readonly string _reason;
+            private readonly string _previewKey;
+            private readonly PlanVerificationStatus _verification;
+            private readonly int _prefs;
+            private readonly bool _expanded;
+            private readonly bool _recommendations;
+            private readonly bool _queryVerified;
+            private readonly bool _hintIsPreview;
+
+            public FrameKey(HudFrame frame)
+            {
+                _snapshot = frame.Snapshot;
+                _plan = frame.Plan;
+                _catalog = frame.Catalog;
+                _values = frame.Values;
+                _hint = frame.Hint;
+                _reason = frame.RuntimeVerificationReason;
+                _previewKey = frame.PreviewKey;
+                _verification = frame.RuntimeVerification;
+
+                // 빌드 창에서 강화 우선이나 밀고 있는 콤보를 바꾸면, 계획이 다시 풀리기 전에도
+                // 격자와 칩의 표시가 달라진다. 개정 번호가 그 순간을 잡는다.
+                _prefs = frame.Prefs != null ? frame.Prefs.Revision : -1;
+                _expanded = frame.Expanded;
+                _recommendations = frame.Recommendations;
+                _queryVerified = frame.QueryVerified;
+                _hintIsPreview = frame.HintIsPreview;
+            }
+
+            public bool Matches(in FrameKey other) =>
+                ReferenceEquals(_snapshot, other._snapshot) &&
+                ReferenceEquals(_plan, other._plan) &&
+                ReferenceEquals(_catalog, other._catalog) &&
+                ReferenceEquals(_values, other._values) &&
+                _verification == other._verification &&
+                _prefs == other._prefs &&
+                _expanded == other._expanded &&
+                _recommendations == other._recommendations &&
+                _queryVerified == other._queryVerified &&
+                _hintIsPreview == other._hintIsPreview &&
+                string.Equals(_hint, other._hint, StringComparison.Ordinal) &&
+                string.Equals(_reason, other._reason, StringComparison.Ordinal) &&
+                string.Equals(_previewKey, other._previewKey, StringComparison.Ordinal);
         }
 
         private NativeSkin _skin;
@@ -117,6 +183,13 @@ namespace SephPlanner.Plugin.Ui
         private readonly List<HoverTarget> _hover = new List<HoverTarget>();
         private bool _hoverable;
 
+        /// <summary>마지막으로 그린 근거와, 그린 것이 있는지.</summary>
+        private FrameKey _drawn;
+        private bool _hasDrawn;
+
+        /// <summary>지금 화면에 떠 있는 안내문. null 이면 안내문이 아니라 계획을 그리고 있다.</summary>
+        private string _noticeDrawn;
+
         public string Origin { get; private set; } = "";
         public string Blocker { get; private set; } = "";
         public bool IsAlive => _root != null;
@@ -154,6 +227,11 @@ namespace SephPlanner.Plugin.Ui
             // 캔버스가 밖에서 파괴되면 Destroy() 를 거치지 않는다. 죽은 셀을 재사용하면 안 된다.
             _cells.Clear();
             _hover.Clear();
+
+            // 새로 지은 화면은 비어 있다. 직전에 그린 근거를 그대로 두면, 같은 계획이라는 이유로
+            // 아무것도 그리지 않고 빈 화면이 남는다.
+            _hasDrawn = false;
+            _noticeDrawn = null;
 
             // 장미빛 테두리 한 겹과 그 안의 어두운 속.
             var frame = Widgets.Fill("SephPlannerHud", root.transform, NativeSkin.Frame);
@@ -343,6 +421,12 @@ namespace SephPlanner.Plugin.Ui
         public void RenderNotice(string message)
         {
             if (!IsAlive) return;
+            if (_noticeDrawn == message) return;
+
+            _noticeDrawn = message;
+
+            // 안내문이 계획 화면을 덮었다. 다음에 계획을 그릴 때는 처음부터 다시 그려야 한다.
+            _hasDrawn = false;
 
             _score.text = "SephPlanner";
             _gain.text = "";
@@ -362,6 +446,15 @@ namespace SephPlanner.Plugin.Ui
         public void Render(HudFrame frame)
         {
             if (!IsAlive) return;
+
+            // 매 프레임 불리지만 내용이 바뀌는 것은 폴링마다 한 번이다. 근거가 그대로면 그린 것도
+            // 그대로이므로, 같은 글자를 다시 짓지 않고 물러선다.
+            var key = new FrameKey(frame);
+            if (_hasDrawn && key.Matches(_drawn)) return;
+
+            _drawn = key;
+            _hasDrawn = true;
+            _noticeDrawn = null;
 
             var snapshot = frame.Snapshot;
             var plan = frame.Plan;
@@ -441,20 +534,26 @@ namespace SephPlanner.Plugin.Ui
                 if (target.Rect == null || !target.Rect.gameObject.activeInHierarchy) continue;
                 if (!RectTransformUtility.RectangleContainsScreenPoint(target.Rect, cursor, camera)) continue;
 
-                _tooltip.Show(target.Title, target.Body, cursor);
+                var body = target.Body != null ? target.Body() : "";
+
+                // 할 말이 없으면 띄우지 않는다. 빈 쪽지가 뜨면 커서를 옮길 때마다 빈 상자가
+                // 깜빡인다. 그려 둔 자리는 서로 겹치지 않으므로 여기서 끝내면 된다.
+                if (target.Title.Length == 0 && body.Length == 0) break;
+
+                _tooltip.Show(target.Title, body, cursor);
                 return;
             }
             _tooltip.Hide();
         }
 
-        private void Hover(RectTransform rect, string title, IReadOnlyList<string> lines)
+        /// <summary>
+        /// 커서가 오면 무엇을 띄울지 등록한다. <b>본문은 그때 짓는다</b> - 화면에 있는 설명을
+        /// 전부 미리 지어 두면, 읽히지도 않을 마흔 몇 개의 문장을 갱신마다 만들게 된다.
+        /// 할 말이 없는 자리는 <see cref="UpdateHover"/>가 걸러낸다.
+        /// </summary>
+        private void Hover(RectTransform rect, string title, Func<string> body)
         {
             if (rect == null) return;
-
-            var body = Explain.Join(lines);
-
-            // 할 말이 없으면 달지 않는다. 빈 쪽지가 뜨면 커서를 옮길 때마다 빈 상자가 깜빡인다.
-            if (title.Length == 0 && body.Length == 0) return;
 
             _hover.Add(new HoverTarget
             {
@@ -540,10 +639,11 @@ namespace SephPlanner.Plugin.Ui
                 else if (tabletCells.TryGetValue(position, out var tablet))
                 {
                     var name = Naming.OfTablet(tablet);
+                    var rotation = tablet.Rotation;
                     cell.SetTablet(
-                        name, tablet.Rotation, marked.Contains(position),
+                        name, rotation, marked.Contains(position),
                         IconOf(tablet.Definition.EntityId));
-                    Hover(cell.Rect, name, new[] { "회전 " + tablet.Rotation * 90 + "°" });
+                    Hover(cell.Rect, name, () => "회전 " + rotation * 90 + "°");
                 }
                 else if (levels.TryGetValue(position, out var level))
                 {
@@ -570,13 +670,17 @@ namespace SephPlanner.Plugin.Ui
             int charmId, bool pinned, HudFrame frame)
         {
             var definition = frame.Catalog != null ? frame.Catalog.Charm(charmId) : null;
-            var lines = Explain.Cell(name, level, effective, reason, definition, frame.Values);
+            var values = frame.Values;
 
-            // 첫 줄은 쪽지의 제목으로 올라간다.
-            lines.RemoveAt(0);
-            if (pinned) lines.Add("강화 우선으로 지정돼 있습니다. 가치를 2배로 칩니다.");
+            Hover(cell.Rect, name, () =>
+            {
+                var lines = Explain.Cell(name, level, effective, reason, definition, values);
 
-            Hover(cell.Rect, name, lines);
+                // 첫 줄은 쪽지의 제목으로 올라간다.
+                lines.RemoveAt(0);
+                if (pinned) lines.Add("강화 우선으로 지정돼 있습니다. 가치를 2배로 칩니다.");
+                return Explain.Join(lines);
+            });
         }
 
         /// <summary>
@@ -631,7 +735,9 @@ namespace SephPlanner.Plugin.Ui
                 var row = _offers.Add(
                     (picked ? "> " : "") + advice.Candidate.Name, Detail(advice),
                     picked ? NativeSkin.GoldEdge : NameTone(advice));
-                Hover(row, advice.Candidate.Name, Explain.Offer(advice, frame.Gold, frame.Values));
+                var gold = frame.Gold;
+                var values = frame.Values;
+                Hover(row, advice.Candidate.Name, () => Explain.Join(Explain.Offer(advice, gold, values)));
             }
             _offers.End();
 
@@ -703,7 +809,7 @@ namespace SephPlanner.Plugin.Ui
                     Turn(advice) + Tint($"+{advice.Gain:0.#}",
                         advice.Gain > 0.001 ? NativeSkin.Good : NativeSkin.TextDim),
                     advice.Affordable ? NativeSkin.Text : NativeSkin.TextDim);
-                Hover(row, name, Explain.Mix(advice));
+                Hover(row, name, () => Explain.Join(Explain.Mix(advice)));
             }
             _mixes.End();
 
@@ -793,11 +899,13 @@ namespace SephPlanner.Plugin.Ui
         public void Destroy()
         {
             _tooltip.Destroy();
-            if (_root != null) Object.Destroy(_root);
+            if (_root != null) UnityEngine.Object.Destroy(_root);
 
             _root = null;
             _cells.Clear();
             _hover.Clear();
+            _hasDrawn = false;
+            _noticeDrawn = null;
         }
 
         internal static string Tint(string text, Color color) =>

@@ -17,12 +17,12 @@ public class PlanRunnerTests
         var calls = new ConcurrentQueue<int>();
         PlanBuildOperation build = (
             GameSnapshot snapshot, ICatalog _, PlanPreferences _,
-            out PlanBlocker blocker, Plan? _) =>
+            out PlanBlocker blocker, Plan? _, CancellationToken _) =>
         {
             blocker = PlanBlocker.None;
             var storage = snapshot.Inventory!.Storage;
             calls.Enqueue(storage);
-            if (storage == 1) releaseFirst.Wait(TimeSpan.FromSeconds(5));
+            if (storage == 1) releaseFirst.Wait(TimeSpan.FromSeconds(5), CancellationToken.None);
             return new Plan();
         };
         var runner = new PlanRunner(EmptyCatalog, build, TimeSpan.Zero);
@@ -47,12 +47,12 @@ public class PlanRunnerTests
         var calls = 0;
         PlanBuildOperation build = (
             GameSnapshot snapshot, ICatalog _, PlanPreferences _,
-            out PlanBlocker blocker, Plan? _) =>
+            out PlanBlocker blocker, Plan? _, CancellationToken _) =>
         {
             blocker = PlanBlocker.None;
             var call = Interlocked.Increment(ref calls);
-            if (call == 1) releaseFirst.Wait(TimeSpan.FromSeconds(5));
-            if (call == 2) releaseSecond.Wait(TimeSpan.FromSeconds(5));
+            if (call == 1) releaseFirst.Wait(TimeSpan.FromSeconds(5), CancellationToken.None);
+            if (call == 2) releaseSecond.Wait(TimeSpan.FromSeconds(5), CancellationToken.None);
             return new Plan();
         };
         var runner = new PlanRunner(EmptyCatalog, build, TimeSpan.Zero);
@@ -76,7 +76,7 @@ public class PlanRunnerTests
         var calls = 0;
         PlanBuildOperation build = (
             GameSnapshot snapshot, ICatalog _, PlanPreferences _,
-            out PlanBlocker blocker, Plan? _) =>
+            out PlanBlocker blocker, Plan? _, CancellationToken _) =>
         {
             blocker = PlanBlocker.None;
             if (Interlocked.Increment(ref calls) == 2) throw new InvalidOperationException("broken");
@@ -104,7 +104,7 @@ public class PlanRunnerTests
     {
         PlanBuildOperation build = (
             GameSnapshot _, ICatalog _, PlanPreferences _,
-            out PlanBlocker blocker, Plan? _) =>
+            out PlanBlocker blocker, Plan? _, CancellationToken _) =>
         {
             blocker = PlanBlocker.None;
             return new Plan();
@@ -118,6 +118,43 @@ public class PlanRunnerTests
         Assert.True(SpinWait.SpinUntil(
             () => runner.State.IsCurrent && runner.State.RequestedGeneration == 2,
             TimeSpan.FromSeconds(5)));
+    }
+
+    /// <summary>
+    /// 뒤에 요청이 오면 지금 도는 풀이의 답은 어차피 버려진다. 그것을 끝까지 돌게 두면 CPU 와
+    /// 할당을 그대로 버리는 것이고, 실측에서 그 한 번이 1초에 2GB 까지 갔다.
+    /// </summary>
+    [Fact]
+    public void ASupersededRunIsToldToStop()
+    {
+        using var started = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var toldToStop = false;
+        var calls = 0;
+        PlanBuildOperation build = (
+            GameSnapshot _, ICatalog _, PlanPreferences _,
+            out PlanBlocker blocker, Plan? _, CancellationToken cancellation) =>
+        {
+            blocker = PlanBlocker.None;
+            if (Interlocked.Increment(ref calls) == 1)
+            {
+                started.Set();
+                release.Wait(TimeSpan.FromSeconds(5), CancellationToken.None);
+                toldToStop = cancellation.IsCancellationRequested;
+            }
+            return new Plan();
+        };
+        var runner = new PlanRunner(EmptyCatalog, build, TimeSpan.Zero);
+
+        runner.Submit(Snapshot(1), PlanPreferences.None, "catalog");
+        Assert.True(started.Wait(TimeSpan.FromSeconds(5), CancellationToken.None));
+
+        runner.Submit(Snapshot(2), PlanPreferences.None, "catalog");
+        release.Set();
+
+        Assert.True(SpinWait.SpinUntil(() => runner.State.IsCurrent, TimeSpan.FromSeconds(5)));
+        Assert.True(toldToStop, "낡아진 풀이가 멈추라는 신호를 받지 못했다");
+        Assert.Equal(2, runner.State.RequestedGeneration);
     }
 
     private static GameSnapshot Snapshot(int storage) => new()

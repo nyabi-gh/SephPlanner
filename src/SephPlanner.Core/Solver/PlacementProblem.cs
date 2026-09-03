@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using SephPlanner.Core.Charms;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Tablets;
@@ -141,6 +142,14 @@ namespace SephPlanner.Core.Solver
 
         /// <summary>조건 판정과 배정이 서로를 참조하므로 몇 번 되풀이해 수렴시킬지.</summary>
         public int FixpointIterations { get; set; } = 3;
+
+        /// <summary>
+        /// 이 풀이가 이미 쓸모없어졌는지. 폴링이 풀이보다 빠르면 답이 나오기도 전에 그 답을 버릴
+        /// 것이 정해지는데, 그런 계산을 끝까지 돌리면 CPU 와 할당을 고스란히 버린다.
+        ///
+        /// 중간에 멈춘 결과는 <b>쓰지 않는다</b>. 부르는 쪽이 통째로 버릴 때만 켜는 신호다.
+        /// </summary>
+        public CancellationToken Cancellation { get; set; }
     }
 
     public sealed class Arrangement
