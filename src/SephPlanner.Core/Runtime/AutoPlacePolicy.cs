@@ -11,7 +11,6 @@ namespace SephPlanner.Core.Runtime
         public string RuntimeVerificationReason { get; set; } = "";
         public string CurrentPlacementFingerprint { get; set; } = "";
         public bool IsMultiplayer { get; set; }
-        public bool AllowMultiplayer { get; set; }
         public bool ServerActive { get; set; }
     }
 
@@ -61,7 +60,9 @@ namespace SephPlanner.Core.Runtime
                 return AutoPlaceDecision.Deny("배치 계산 이후 게임 상태가 바뀌어 최신 계획을 기다립니다.");
             if (!plan.HasPlacementChanges || plan.Targets.Count == 0)
                 return AutoPlaceDecision.Deny("옮길 것이 없습니다.");
-            if (context.IsMultiplayer && !context.AllowMultiplayer)
+            // 멀티 세션은 예외 없이 잠근다. 개발사가 인벤토리 동기화 구현을 바꾸는 중이라
+            // 잠가 두라고 답했다(docs/LEGAL.md "받은 답변"). 여는 옵션은 두지 않는다.
+            if (context.IsMultiplayer)
                 return AutoPlaceDecision.Deny("멀티플레이 세션에서는 자동 배치를 실행하지 않습니다.");
             if (!context.ServerActive)
                 return AutoPlaceDecision.Deny("서버가 활성 상태가 아니라 자동 배치를 실행할 수 없습니다. (호스트에서만 동작)");

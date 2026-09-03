@@ -64,6 +64,19 @@ public class AutoPlacePolicyTests
         Assert.Equal("비활성 행렬 불일치", decision.Reason);
     }
 
+    [Fact]
+    public void AMultiplayerSessionIsAlwaysDeniedEvenOnTheHost()
+    {
+        var context = Context();
+        context.IsMultiplayer = true;
+        context.ServerActive = true;
+
+        var decision = AutoPlacePolicy.Evaluate(context);
+
+        Assert.False(decision.Allowed);
+        Assert.Contains("멀티플레이", decision.Reason);
+    }
+
     private static AutoPlaceContext Context()
     {
         var plan = new Plan
