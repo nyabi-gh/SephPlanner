@@ -101,14 +101,14 @@ public static class CharmValueDraft
         Console.WriteLine($"  도감 밖 경로로만 오는 것 {ordered.Count - mainstream,4}종  (기적 보상 등. 뒤로 미뤄 두었다)");
         Console.WriteLine();
 
-        var draft = new CharmValueFile
+        var draft = new DraftFile
         {
             Version = 1,
-            Charms = ordered.Select(charm => new CharmValueEntry
+            Charms = ordered.Select(charm => new DraftEntry
             {
                 Id = charm.Id,
                 EntityId = charm.EntityId,
-                Note = string.Join(" / ", charm.EffectLines),
+                Effect = string.Join(" / ", charm.EffectLines),
             }).ToList(),
         };
 
@@ -118,8 +118,32 @@ public static class CharmValueDraft
 
         Console.WriteLine($"초안 저장: {outPath}");
         Console.WriteLine("등급(tier)을 채운 항목만 골라 charms.json 으로 옮기세요.");
-        Console.WriteLine("note 에는 지금 게임 효과 설명이 들어 있습니다. 판단 근거로 바꿔 적으면 됩니다.");
+        Console.WriteLine("effect 는 무엇에 등급을 매기는지 보라고 붙인 것입니다. 옮기지 말고,");
+        Console.WriteLine("note 에는 왜 그 등급인지를 우리 표현으로 적으세요.");
         return 0;
+    }
+
+    /// <summary>
+    /// 초안 항목. 게임의 효과 문장은 <see cref="Effect"/> 로 나간다 - <c>CharmValueEntry</c> 에
+    /// 없는 필드라 플러그인(Newtonsoft)도 도구(STJ)도 읽지 않는다.
+    ///
+    /// <c>note</c> 에 미리 채우면 등급만 매기고 넘긴 항목이 게임 문장을 단 채 <c>charms.json</c>
+    /// 으로 옮겨지고, 그 파일은 플러그인 DLL 에 임베드되어 배포물에 실려 나간다
+    /// (docs/LEGAL.md - 게임 저작물 미배포).
+    /// </summary>
+    private sealed class DraftEntry
+    {
+        public string Id { get; set; } = "";
+        public int EntityId { get; set; }
+        public int Tier { get; set; }
+        public string Effect { get; set; } = "";
+        public string Note { get; set; } = "";
+    }
+
+    private sealed class DraftFile
+    {
+        public int Version { get; set; }
+        public List<DraftEntry> Charms { get; set; } = new();
     }
 
     /// <summary>
