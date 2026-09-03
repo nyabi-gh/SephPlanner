@@ -77,6 +77,12 @@ scripts/make-release.ps1
 배포물에는 플러그인 DLL 두 개만 들어간다. 릴리스 전에 포맷, 테스트, 빌드를 검증하고 커밋과
 파일 해시가 적힌 `manifest.json`을 만든다. BepInEx와 게임 파일은 넣지 않는다.
 
+zip은 릴리스 전용 공개 저장소 [nyattic/SephPlanner-Release](https://github.com/nyattic/SephPlanner-Release)의
+Releases에 올린다. 이 저장소는 비공개라 여기 Releases는 링크가 공개되지 않는다. 그쪽에는 소스
+없이 zip, 변경 기록, Issues(제보 창구)만 둔다. 커뮤니티 글에는 그 링크를 걸고 zip을 직접
+첨부하지 않는다 - 첨부하면 옛 버전이 돌아다닌다. 올리기 전에 manifest의 커밋에 `v{버전}` 태그를
+달아 어느 소스로 만든 zip인지 되짚을 수 있게 한다.
+
 ## 문서
 
 - [docs/INSTALL.md](docs/INSTALL.md) — 사용자용 설치 안내. 배포 zip에는 메모장으로 바로 열리도록 `설치안내.txt`로 들어간다
