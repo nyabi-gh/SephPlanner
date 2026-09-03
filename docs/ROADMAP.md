@@ -13,6 +13,33 @@
 |---|---|---|---|
 | 1.1 | ~~**고사양 기준선 재기**~~ | 진입 지연 제보와 견줄 잣대가 없다 | 쟀다(2026-09-03, 아래 "고사양 기준선"). `카탈로그 짓기(시작 시)` **시도 3회, 합계 98.7ms, 최악 50.55ms** |
 | 1.2 | ~~**0.1.2 릴리스**~~ | 렉 수정과 진입 지연 수정이 사용자 손에 가야 확인된다 | 했다(2026-09-03, 커밋 `cf8b3f9`, 태그 `v0.1.2`). 순서는 버전 올림(3곳: `Directory.Build.props`, `[BepInPlugin]`, CHANGELOG) → `scripts/check.ps1` → 태그 → `scripts/make-release.ps1` → 릴리스 저장소에 zip 이었고 그대로 따랐다 |
+| 1.3 | ~~**0.1.3 고침 묶음**~~ | [REVIEW.md](REVIEW.md) 의 P0 셋과 그와 함께 가는 것들 | 코드는 다 넣었다(2026-09-03). 아래 "0.1.3" 절. **게임에서 확인한 뒤에 태그를 단다** - 고친 것 중 넷(접힌 안내 줄, 경고 여러 줄, 덤프 내용, 갱신 실패 안내)은 화면에서만 답이 나온다 |
+
+### 0.1.3 (2026-09-03, 태그 전)
+
+REVIEW 의 실행 순서 중 "0.1.3 (고침만)" 묶음을 그대로 넣었다. 화면과 조작은 0.1.2 와 같다.
+
+| 무엇 | 어디 |
+|---|---|
+| 갱신 실패가 활성 카탈로그를 죽이던 것 (P0). 상태 파일은 새 세대의 진행만 뜻하고, 활성은 포인터와 manifest 로만 정한다. 다음 런 시작에 한 번 재시도하고, 실패를 화면에 띄우고, 게시 뒤 옛 세대를 지운다 | `CatalogBundleStore`, `CatalogDump`, `Plugin` |
+| F10 덤프의 숨은 정보 (P0). 보상 번호와 인벤토리 칸 수를 보이는 것에만 적는다. `OfferReader` 의 판정을 그대로 부른다 | `InventoryDiagnostics`, `OfferReader` |
+| `--values` 초안이 게임 문장을 `note` 에 넣던 것 (P0). 두 로더가 모두 무시하는 `effect` 로 뺐다 | `CharmValueDraft` |
+| 꺼진 아티팩트에 자리 유지 몫이 없던 것, 수렴 반복이 마지막 반복을 돌려주던 것 | `PlacementSolver` |
+| 접힌 안내 줄 세로 넘침, 경고 한 줄만 보이던 것, 그리기 예외가 반쪽 화면을 남기던 것, 창이 파괴돼도 시간이 멈춘 채 남던 것 | `NativeHud`, `PlannerWindow`, `Plugin` |
+| 되돌리기가 되돌아갔는지 확인, 적용 후 레벨 사후 대조 | `PlanApplier`, `ApplyPlanCommand` |
+| 숫자 설정에 `AcceptableValueRange`. 폴링 하한이 두 군데 적혀 있던 것도 정리 | `PluginSettings` |
+| `OfferAdvisorTests` 의 벽시계 단언을 `LayoutCache.Searches` 로 | `OfferAdvisorTests` |
+| 부팅 정체 한 줄(플러그인·게임·MVID·BepInEx·카탈로그 세대와 검증), 5분 요약에 폴링 횟수와 카탈로그 횟수·합계·시도 | `PluginIdentity`, `FrameCost` |
+| F10 이 재생용 `inventory-snapshot.json` 도 남긴다. `--check`/`--replay` 의 입력이 되살아났다 | `GameReader`, `InventoryDiagnostics` |
+
+테스트는 198개다(0.1.2 때 192개). 새로 붙은 여섯은 카탈로그 갱신 실패·중단·정리 셋, 꺼진
+아티팩트의 자리 유지, 수렴 반복의 단조성, 적용 명령이 싣는 기대 레벨이다.
+
+**진동하는 판은 탐색으로 찾았다.** 수렴 반복이 나쁜 쪽 위상에서 끝나는 것을 손으로 만들지
+못해, 작은 판을 무작위로 돌려 반복 수에 따라 점수가 2↔1 로 오가는 것을 찾아 테스트에 박았다
+(`StabilityTests.OscillatingProblem`).
+
+**남은 것은 REVIEW 의 "0.2 (구조)" 부터다.**
 
 ### 고사양 기준선 (2026-09-03, 0.1.2 릴리스 바이너리 그대로)
 
@@ -72,10 +99,10 @@ ROADMAP 이 적은 2~3분보다 짧지만, 핵심 숫자인 카탈로그 짓기�
   `SephPlanner.Core` 로 더 옮겨 CI 가 검사할 수 있는 표면을 넓히는 것이다.
 - **감사가 아직 덮지 않은 곳.** `SettingsWindow`·`BuildWindow` 의 렌더링, `CatalogDump` 의 쓰기
   경로, `QueryVerifier`, 진단 파일들, `DataTool`. 위험 패턴 검색만 돌렸고 정독하지 않았다.
-- **사소한 것 셋.** `Plugin.OnDestroy` 가 `_settings` 는 null 검사를 하면서 `_window`/`_build` 는
+- **사소한 것 둘.** `Plugin.OnDestroy` 가 `_settings` 는 null 검사를 하면서 `_window`/`_build` 는
   하지 않는다(Awake 가 실패한 경우에만 문제). 릴리스 `manifest.json` 의
   `gameAssembly.fileVersion` 이 `0.0.0.0` 이라 그 칸이 쓸모가 없다(SHA-256 은 정상).
-  `PollIntervalSeconds` 의 하한 0.05초는 성능을 고려한 값이 아니다(초당 20회 폴링이 된다).
+  ~~`PollIntervalSeconds` 의 하한 0.05초~~ 는 0.1.3 에서 `AcceptableValueRange(0.1, 5)` 가 됐다.
 
 ### 5. 기능 쪽 (이번 작업 밖)
 
@@ -127,7 +154,7 @@ ROADMAP 이 적은 2~3분보다 짧지만, 핵심 숫자인 카탈로그 짓기�
   쪽지(`Tooltip`)로 옮겼다. 아래 "옮기고 나서" 절에 정한 것과 남은 것이 있다.
 - **P1 계획 안전성과 카탈로그 일관성.** `5233acd`에서 계획 generation·상태 지문·fail-closed
   검증을 도입하고, 가득 찬 가방의 실제 교체 상태와 세대별 원자적 카탈로그 게시를 구현했다.
-  Windows에서 Plugin을 포함한 전체 Release 빌드와 테스트 176개를 통과했다. 게임 안의 F9/F8
+  Windows에서 Plugin을 포함한 전체 Release 빌드와 테스트를 통과했다(당시 176개, 지금 198개). 게임 안의 F9/F8
   수동 인수 시나리오는 아래 확인 목록과 `P1_REMEDIATION.md`에 남아 있다.
 
 ## 옮기고 나서
