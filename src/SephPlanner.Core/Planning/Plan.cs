@@ -113,6 +113,7 @@ namespace SephPlanner.Core.Planning
             ExpectedWeaponId = ExpectedWeaponId,
             ExpectedCatalogGeneration = CatalogGeneration,
             Targets = new List<PlanTarget>(Targets),
+            ExpectedCellLevels = new Dictionary<GridPos, int>(Best.CellLevels),
         };
     }
 }

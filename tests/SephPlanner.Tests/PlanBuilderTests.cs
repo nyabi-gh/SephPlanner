@@ -52,6 +52,19 @@ public class PlanBuilderTests
     }
 
     [Fact]
+    public void TheApplyCommandCarriesTheLevelsItExpectsAfterwards()
+    {
+        // 적용이 끝난 뒤 게임의 레벨과 견줄 잣대다. 이것이 비면 우리가 읽지 않는 효과가 걸려도
+        // 첫 적용에서 알아채지 못하고 다음 폴링의 검증까지 기다리게 된다.
+        var plan = PlanBuilder.Build(Snapshot(), Catalog());
+
+        var command = plan!.CreateApplyCommand();
+
+        Assert.NotEmpty(command.ExpectedCellLevels);
+        Assert.Equal(plan.Best.CellLevels, command.ExpectedCellLevels);
+    }
+
+    [Fact]
     public void TurningRecommendationsOffSkipsOffersButKeepsPlacement()
     {
         var snapshot = Snapshot();

@@ -16,6 +16,13 @@ namespace SephPlanner.Core.Runtime
         public string ExpectedWeaponId { get; set; } = "";
         public string ExpectedCatalogGeneration { get; set; } = "";
         public List<PlanTarget> Targets { get; set; } = new List<PlanTarget>();
+
+        /// <summary>
+        /// 적용이 끝났을 때 칸마다 나와야 하는 레벨. 어긋나면 우리가 읽지 않는 효과가 걸려 있다는
+        /// 뜻이다. 되돌릴 일은 아니지만(상태는 합법이다) 게임 규칙이 바뀐 것을 다음 폴링이 아니라
+        /// 첫 적용에서 잡는 유일한 신호다.
+        /// </summary>
+        public Dictionary<GridPos, int> ExpectedCellLevels { get; set; } = new Dictionary<GridPos, int>();
     }
 
     /// <summary>인스턴스 하나가 최종적으로 있어야 할 자리.</summary>

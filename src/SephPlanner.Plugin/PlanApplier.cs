@@ -57,7 +57,7 @@ namespace SephPlanner.Plugin
                 out var positions, out var occupants);
             if (error != null) return error;
 
-            var journal = new List<KeyValuePair<GridPos, GridPos>>();
+            var journal = new List<Step>();
             var swaps = ApplySwaps(command, inventory, positions, occupants, journal, out var failure);
             if (failure != null) return failure;
 
@@ -68,7 +68,48 @@ namespace SephPlanner.Plugin
                 return failure + " " + Rollback(inventory, journal);
             }
 
-            return $"자동 배치 완료 - 이동 {swaps}건, 회전 {rotations}건";
+            return $"자동 배치 완료 - 이동 {swaps}건, 회전 {rotations}건" + LevelDrift(command, inventory);
+        }
+
+        /// <summary>
+        /// 적용이 끝난 상태의 레벨이 계산과 같은지. 어긋나면 우리가 읽지 않는 효과가 걸려 있다는
+        /// 뜻이다. 배치 자체는 합법이라 되돌리지 않고 알리기만 한다.
+        /// </summary>
+        private static string LevelDrift(ApplyPlanCommand command, GridInventory inventory)
+        {
+            var mismatches = 0;
+            var first = "";
+            foreach (var pair in command.ExpectedCellLevels)
+            {
+                inventory.levelMatrix.TryGetValue(
+                    new ItemPosition((sbyte)pair.Key.X, (sbyte)pair.Key.Y), out var reported);
+                if (reported == pair.Value) continue;
+
+                mismatches++;
+                if (first.Length == 0) first = $"{pair.Key} 계산 {pair.Value} != 게임 {reported}";
+            }
+
+            return mismatches == 0
+                ? ""
+                : $". 적용 뒤 레벨이 예상과 다른 칸 {mismatches}개({first}) - 계산에 없는 효과가 걸려 있습니다";
+        }
+
+        /// <summary>
+        /// 실행한 맞바꿈 하나. 되돌린 뒤 그 자리에 무엇이 있어야 하는지까지 들고 있어야 되돌리기가
+        /// 실제로 됐는지 볼 수 있다.
+        /// </summary>
+        private readonly struct Step
+        {
+            public Step(GridPos from, GridPos to, int instanceId)
+            {
+                From = from;
+                To = to;
+                InstanceId = instanceId;
+            }
+
+            public GridPos From { get; }
+            public GridPos To { get; }
+            public int InstanceId { get; }
         }
 
         private static string Validate(
@@ -143,7 +184,7 @@ namespace SephPlanner.Plugin
         private static int ApplySwaps(
             ApplyPlanCommand command, GridInventory inventory,
             Dictionary<int, GridPos> positions, Dictionary<GridPos, int> occupants,
-            List<KeyValuePair<GridPos, GridPos>> journal, out string failure)
+            List<Step> journal, out string failure)
         {
             failure = null;
             var swaps = 0;
@@ -181,7 +222,7 @@ namespace SephPlanner.Plugin
                               Rollback(inventory, journal);
                     return swaps;
                 }
-                journal.Add(new KeyValuePair<GridPos, GridPos>(from, to));
+                journal.Add(new Step(from, to, target.InstanceId));
                 swaps++;
 
                 if (occupants.TryGetValue(to, out var displaced))
@@ -214,19 +255,26 @@ namespace SephPlanner.Plugin
         /// 실행한 맞바꿈을 역순으로 재생해 원래 배치로 되돌린다. Swap 은 자기 자신이 역연산이라
         /// 이전 상태를 따로 저장할 필요가 없다.
         /// </summary>
-        private static string Rollback(GridInventory inventory, List<KeyValuePair<GridPos, GridPos>> journal)
+        private static string Rollback(GridInventory inventory, List<Step> journal)
         {
             for (var i = journal.Count - 1; i >= 0; i--)
             {
-                var from = journal[i].Key;
-                var to = journal[i].Value;
+                var step = journal[i];
                 try
                 {
-                    inventory.Swap((sbyte)to.X, (sbyte)to.Y, (sbyte)from.X, (sbyte)from.Y);
+                    inventory.Swap((sbyte)step.To.X, (sbyte)step.To.Y, (sbyte)step.From.X, (sbyte)step.From.Y);
                 }
                 catch (Exception ex)
                 {
                     return $"되돌리기도 실패해 인벤토리가 중간 상태로 남았습니다({ex.Message}). " +
+                           "손으로 정리한 뒤 다시 시도하세요.";
+                }
+
+                // 앞으로 가는 길과 같은 이유다. LocalSwap 은 거부해도 예외 없이 돌아오므로,
+                // 확인하지 않으면 거부된 되돌리기를 "원래 배치로 되돌렸습니다"로 보고하게 된다.
+                if (InstanceAt(inventory, step.From) != step.InstanceId)
+                {
+                    return "되돌리기가 게임에서 받아들여지지 않아 인벤토리가 중간 상태로 남았습니다. " +
                            "손으로 정리한 뒤 다시 시도하세요.";
                 }
             }
