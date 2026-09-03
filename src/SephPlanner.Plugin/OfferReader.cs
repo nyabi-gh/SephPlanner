@@ -17,6 +17,23 @@ namespace SephPlanner.Plugin
     /// </summary>
     internal static class OfferReader
     {
+        /// <summary>
+        /// 상자·상점·시체의 인벤토리. 뚜껑이 열리는 것은 이미 씬에 있던 것의 상태가 바뀌는
+        /// 것이라, 목록을 들고 있어도 여는 순간이 늦어지지 않는다. 늦어질 수 있는 것은 새로
+        /// 떨어진 꾸러미뿐이고 그것도 이 간격만큼이다.
+        /// </summary>
+        private static readonly SceneCache<GridInventory> Inventories =
+            new SceneCache<GridInventory>(1f);
+
+        /// <summary>
+        /// 세피라이트는 <b>보상 창이 열려 있을 때만</b> 찾는다. 후보가 될 수 있는 것은 그 창이
+        /// 지금 보여주는 하나뿐이므로, 닫혀 있으면 아무리 찾아도 후보가 나올 수 없다.
+        ///
+        /// 비활성까지 뒤지는 것은 여는 동안 본체가 잠시 꺼지기 때문인데, 그 순간이 바로 창이
+        /// 열려 있는 때다. 그래서 정확히 필요한 동안에만 가장 비싼 탐색을 한다.
+        /// </summary>
+        private static readonly SceneCache<Sephirite> Sephirites =
+            new SceneCache<Sephirite>(1f, FindObjectsInactive.Include);
         public static void Fill(GameSnapshot snapshot, PlayerAvatar player, float radius)
         {
             var playerInventory = player.Inventory;
@@ -24,11 +41,14 @@ namespace SephPlanner.Plugin
 
             // 세피라이트를 먼저 담는다. 후보 수에 상한이 있어서, 뒤로 밀리면 상자가 많은 자리에서
             // 석판이 통째로 잘려 나간다. 석판은 대개 세피라이트로만 나오므로 이쪽이 우선이다.
+            var step = FrameCost.Now;
             CollectSephirites(snapshot.Offers, origin, radius);
+            FrameCost.Sephirites.Add(step);
 
+            step = FrameCost.Now;
             var shown = ShownInventory();
             var nearby = new List<GridInventory>();
-            foreach (var inventory in UnityEngine.Object.FindObjectsByType<GridInventory>(FindObjectsSortMode.None))
+            foreach (var inventory in Inventories.Get())
             {
                 if (inventory == null || inventory == playerInventory) continue;
                 if (inventory.UnitAvatar is PlayerAvatar) continue;
@@ -42,6 +62,7 @@ namespace SephPlanner.Plugin
             // 재계산이 돌고 후보 순번이 바뀐다.
             nearby.Sort((a, b) => a.netId.CompareTo(b.netId));
             foreach (var inventory in nearby) Collect(snapshot.Offers, inventory, player);
+            FrameCost.Chests.Add(step);
         }
 
         /// <summary>
@@ -104,8 +125,6 @@ namespace SephPlanner.Plugin
         /// </summary>
         private static void CollectSephirites(List<OfferedItem> offers, Vector3 origin, float radius)
         {
-            var report = new StringBuilder();
-
             // 판정 기준은 하나다: 보상 창이 열려 있고, 그 창이 지금 보여주는 세피라이트인가.
             // isGenerated 만으로는 부족하다 - 레벨업 보상은 창을 열기 전에 미리 생성될 수 있고
             // (실제로 레벨업을 미룬 채 다른 세피라이트를 열면 그 내용이 섞여 나왔다), 이전 방에
@@ -115,12 +134,17 @@ namespace SephPlanner.Plugin
                 : null;
             var showing = rewardPanel != null && rewardPanel.IsOpened ? rewardPanel.sephirite : null;
 
-            // 비활성 오브젝트도 함께 찾는다. 세피라이트를 여는 동안 본체가 잠시 꺼져 있으면
-            // 기본 탐색으로는 보이지 않아, 정작 고르는 순간에 후보가 사라진다.
-            var found = UnityEngine.Object.FindObjectsByType<Sephirite>(
-                FindObjectsInactive.Include, FindObjectsSortMode.None);
+            // 창이 닫혀 있으면 후보가 될 수 있는 것이 하나도 없다. 그런데도 씬을 뒤지면 실기에서
+            // 폴링마다 7ms 를 그냥 버린다(비활성까지 뒤지는 가장 비싼 형태다). 가까이 있는
+            // 세피라이트의 상태가 궁금할 때는 F10 덤프가 따로 훑어 준다.
+            if (showing == null)
+            {
+                LastSephiriteReport = "보상 창 닫힘";
+                return;
+            }
 
-            foreach (var sephirite in found)
+            var report = new StringBuilder();
+            foreach (var sephirite in Sephirites.Get())
             {
                 if (sephirite == null) continue;
 

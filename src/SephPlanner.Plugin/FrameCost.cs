@@ -52,10 +52,20 @@ namespace SephPlanner.Plugin
         public static long Now => Stopwatch.GetTimestamp();
 
         public static readonly Step Poll = new Step("폴링 전체");
-        public static readonly Step Read = new Step("  게임 상태 읽기(씬 탐색)");
+        public static readonly Step Read = new Step("  게임 상태 읽기");
+        public static readonly Step Inventory = new Step("    가방 읽기");
+        public static readonly Step Mixer = new Step("    합성기 찾기(씬 탐색)");
+        public static readonly Step Sephirites = new Step("    세피라이트 찾기(씬 탐색)");
+        public static readonly Step Chests = new Step("    상자·상점 찾기(씬 탐색)");
         public static readonly Step Simulation = new Step("  시뮬레이터 대조");
         public static readonly Step Feed = new Step("  지문 계산과 제출");
         public static readonly Step Panel = new Step("화면 갱신(매 프레임)");
+
+        /// <summary>
+        /// 카탈로그를 짓느라 쓴 시간. 부팅 직후에는 지역화가 준비될 때까지 실패하며 여러 번
+        /// 시도하므로, 횟수와 합계가 시작 화면의 체감 지연을 설명한다.
+        /// </summary>
+        public static readonly Step Catalog = new Step("카탈로그 짓기(시작 시)");
 
         /// <summary>Update 가 돈 횟수.</summary>
         public static int Frames { get; private set; }
@@ -73,9 +83,12 @@ namespace SephPlanner.Plugin
             string.Format(
                 CultureInfo.InvariantCulture,
                 "메인 스레드 부담 - 폴링 평균 {0:0.00}ms/최악 {1:0.00}ms " +
-                "(읽기 {2:0.00} 대조 {3:0.00} 지문 {4:0.00}), " +
-                "화면 평균 {5:0.000}ms, 프레임 {6}회 중 다시 그린 것 {7}회",
-                Poll.AverageMs, Poll.WorstMs, Read.AverageMs, Simulation.AverageMs, Feed.AverageMs,
+                "(가방 {2:0.00} 합성기 {3:0.00} 세피라이트 {4:0.00} 상자 {5:0.00} " +
+                "대조 {6:0.00} 지문 {7:0.00}), " +
+                "화면 평균 {8:0.000}ms, 프레임 {9}회 중 다시 그린 것 {10}회",
+                Poll.AverageMs, Poll.WorstMs,
+                Inventory.AverageMs, Mixer.AverageMs, Sephirites.AverageMs, Chests.AverageMs,
+                Simulation.AverageMs, Feed.AverageMs,
                 Panel.AverageMs, Frames, Draws);
 
         public static void Write(StringBuilder text)
@@ -84,9 +97,15 @@ namespace SephPlanner.Plugin
             text.AppendLine("[perf] 메인 스레드에서 쓴 시간 (세션 누적)");
             text.AppendLine("  " + Poll.Describe());
             text.AppendLine("  " + Read.Describe());
+            text.AppendLine("  " + Inventory.Describe());
+            text.AppendLine("  " + Mixer.Describe());
+            text.AppendLine("  " + Sephirites.Describe());
+            text.AppendLine("  " + Chests.Describe());
             text.AppendLine("  " + Simulation.Describe());
             text.AppendLine("  " + Feed.Describe());
             text.AppendLine("  " + Panel.Describe());
+            text.AppendLine("  " + Catalog.Describe() +
+                            "  시도 " + CatalogSource.Attempts + "회");
             text.AppendLine(
                 string.Format(
                     CultureInfo.InvariantCulture,

@@ -97,6 +97,9 @@ namespace SephPlanner.Plugin
             _activeGeneration = generation;
             _writer = null;
 
+            // 덤프도 같은 리소스 목록을 썼다. 다 썼으면 놓아줘야 게임이 에셋을 정리할 수 있다.
+            ItemCatalog.Release();
+
             report($"석판 {tablets.Count}종, 아티팩트 {charms.Count}종, 콤보 {combos.Count}종, " +
                    $"아티팩트 가치 {worth.ByEntity.Count}종 측정. 질의 검증 " +
                    $"{verification.Comparisons}건 중 불일치 {verification.Mismatches}건.");

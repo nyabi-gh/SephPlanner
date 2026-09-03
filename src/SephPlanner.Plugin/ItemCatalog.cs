@@ -13,10 +13,38 @@ namespace SephPlanner.Plugin
     /// </summary>
     internal static class ItemCatalog
     {
+        private static ItemEntity[] _items;
+        private static ItemCategoryEntity[] _categories;
+
+        /// <summary>
+        /// 리소스 목록. <b>한 번만 훑고 들고 있는다.</b>
+        ///
+        /// 카탈로그를 짓는 일은 게임 부팅 직후에는 실패한다 - 지역화 표가 아직 없어서 이름을
+        /// 읽는 순간 터진다. 그런데 부르는 쪽은 준비될 때까지 되풀이해 물어보므로(폴링마다,
+        /// 초당 네 번), 실패할 때마다 리소스를 통째로 다시 훑으면 그 몇 초 동안 메인 스레드가
+        /// 같은 일을 수십 번 한다. 시작 화면에서 인게임 진입이 느리다는 제보가 여기와 맞물린다.
+        ///
+        /// 목록 자체는 한 번 읽으면 바뀌지 않으므로, 준비를 기다리는 동안 들고 있다가
+        /// <see cref="Release"/> 로 놓아준다.
+        /// </summary>
+        private static ItemEntity[] Items() =>
+            _items ?? (_items = Resources.LoadAll<ItemEntity>("Item"));
+
+        private static ItemCategoryEntity[] Categories() =>
+            _categories ?? (_categories = Resources.LoadAll<ItemCategoryEntity>("ItemCategory"));
+
+        /// <summary>
+        /// 다 짓고 나면 놓아준다. 계속 들고 있으면 게임이 쓰지 않는 에셋을 정리하지 못한다.
+        /// </summary>
+        public static void Release()
+        {
+            _items = null;
+            _categories = null;
+        }
         public static List<TabletDefinition> LoadTablets()
         {
             var result = new List<TabletDefinition>();
-            foreach (var entity in Resources.LoadAll<ItemEntity>("Item"))
+            foreach (var entity in Items())
             {
                 if (entity.type != EItemType.StoneTablet) continue;
                 if (entity.activeType == EItemActiveType.Disabled) continue;
@@ -44,7 +72,7 @@ namespace SephPlanner.Plugin
         public static List<CharmDefinition> LoadCharms()
         {
             var result = new List<CharmDefinition>();
-            foreach (var entity in Resources.LoadAll<ItemEntity>("Item"))
+            foreach (var entity in Items())
             {
                 if (entity.type != EItemType.Charm) continue;
                 if (entity.activeType == EItemActiveType.Disabled) continue;
@@ -85,7 +113,7 @@ namespace SephPlanner.Plugin
         public static List<ComboDefinition> LoadCombos()
         {
             var result = new List<ComboDefinition>();
-            foreach (var category in Resources.LoadAll<ItemCategoryEntity>("ItemCategory"))
+            foreach (var category in Categories())
             {
                 if (!category.isEnabled) continue;
 
@@ -128,7 +156,7 @@ namespace SephPlanner.Plugin
         {
             var measurement = new StatMeasurement();
 
-            foreach (var entity in Resources.LoadAll<ItemEntity>("Item"))
+            foreach (var entity in Items())
             {
                 if (entity.type != EItemType.Charm) continue;
                 if (entity.activeType == EItemActiveType.Disabled) continue;
@@ -147,7 +175,7 @@ namespace SephPlanner.Plugin
                 }
             }
 
-            foreach (var category in Resources.LoadAll<ItemCategoryEntity>("ItemCategory"))
+            foreach (var category in Categories())
             {
                 if (!category.isEnabled || category.comboEffectPrefab == null) continue;
 
