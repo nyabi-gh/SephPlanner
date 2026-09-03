@@ -496,6 +496,9 @@ namespace SephPlanner.Plugin
             {
                 // 유니티 쪽 예외는 Player.log 에만 쌓여 우리 로그가 조용하다. 매 프레임 도는
                 // 자리라 같은 예외는 한 번만 남긴다.
+                // 반쯤 그려진 화면이 굳지 않게 다음 프레임에 처음부터 다시 그리게 한다.
+                _hud.Invalidate();
+
                 var message = ex.GetType().Name + ": " + ex.Message;
                 if (message == _lastRenderError) return;
 

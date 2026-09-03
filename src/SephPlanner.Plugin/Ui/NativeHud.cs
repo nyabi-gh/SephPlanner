@@ -154,6 +154,8 @@ namespace SephPlanner.Plugin.Ui
         private ContentSizeFitter _fitter;
         private float _width;
         private float _inner;
+        private float _compactWidth;
+        private float _compactInner;
         private bool _compact;
         private Vector2 _grab;
 
@@ -166,6 +168,7 @@ namespace SephPlanner.Plugin.Ui
         private TextMeshProUGUI _score;
         private TextMeshProUGUI _gain;
         private TextMeshProUGUI _notice;
+        private LayoutElement _noticeSize;
         private TextMeshProUGUI _nextMove;
 
         private RectTransform _detail;
@@ -270,11 +273,19 @@ namespace SephPlanner.Plugin.Ui
             // 안쪽에 실제로 쓸 수 있는 폭. 격자와 오른쪽 열이 이 값을 넘으면 테두리 밖으로
             // 삐져나가 화면이 깨진다 - 폭을 좁게 잡았을 때 실제로 그랬다.
             _inner = _width - 2f * (edge + pad);
+
+            // 접으면 판이 좁아진다. 그 폭으로 재지 않으면 안내 줄이 서너 줄로 접히면서 할당된
+            // 높이를 넘어 게임 화면 위로 흘러내린다.
+            _compactWidth = Mathf.Min(_width, S(18f));
+            _compactInner = _compactWidth - 2f * (edge + pad);
             var content = body.rectTransform;
             Widgets.Column(content, S(0.2f), new RectOffset(pad, pad, pad, pad));
 
             BuildHeader(content);
-            _notice = Line(content, S(0.8f), NativeSkin.Amber);
+            // 경고는 여러 개가 한꺼번에 걸린다. 한 줄짜리로 두면 첫 것만 보이고, 멀티 안내처럼
+            // 목록 끝에 있는 것은 다른 경고가 하나라도 있으면 영영 보이지 않는다.
+            _notice = Widgets.Paragraph("Notice", content, _skin, S(0.8f), NativeSkin.Amber);
+            _noticeSize = Widgets.Fixed(_notice.rectTransform, S(0.8f) * 1.4f);
             _nextMove = Line(content, S(0.95f), NativeSkin.Text);
 
             _detail = Widgets.Rect("Detail", content);
@@ -444,6 +455,16 @@ namespace SephPlanner.Plugin.Ui
             _tooltip.Hide();
         }
 
+        /// <summary>
+        /// 그린 것을 없던 일로 한다. 그리다 예외가 나면 화면은 반쯤 그려진 채로 남는데, 근거가
+        /// 그대로면 다음 프레임이 "이미 그렸다"며 물러서서 그 상태가 굳는다.
+        /// </summary>
+        public void Invalidate()
+        {
+            _hasDrawn = false;
+            _noticeDrawn = null;
+        }
+
         public void Render(HudFrame frame)
         {
             if (!IsAlive) return;
@@ -462,9 +483,12 @@ namespace SephPlanner.Plugin.Ui
             var plan = frame.Plan;
             var expanded = frame.Expanded;
 
+            // 접힌 판은 좁다. 접을 참이면 접힌 폭으로 재야 넘치지 않는다.
+            var inner = expanded ? _inner : _compactInner;
+
             _hint.text = frame.Hint;
             _hint.color = frame.HintIsPreview ? NativeSkin.Mint : NativeSkin.TextDim;
-            Widgets.FitHeight(_hint, _hintSize, _inner);
+            Widgets.FitHeight(_hint, _hintSize, inner);
             Widgets.SetActive(_hint, frame.Hint.Length > 0);
 
             _hover.Clear();
@@ -479,6 +503,7 @@ namespace SephPlanner.Plugin.Ui
                 snapshot, plan, frame.QueryVerified,
                 frame.RuntimeVerification, frame.RuntimeVerificationReason);
             _notice.text = warning;
+            Widgets.FitHeight(_notice, _noticeSize, inner);
             Widgets.SetActive(_notice, warning.Length > 0);
 
             // 접었을 때는 지금 옮길 것 하나만. 펼치면 아래 목록이 그 일을 하므로 겹치지 않게 접는다.
@@ -884,7 +909,7 @@ namespace SephPlanner.Plugin.Ui
 
             _compact = compact;
             _fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
-            _rect.sizeDelta = new Vector2(compact ? Mathf.Min(_width, S(18f)) : _width, _rect.sizeDelta.y);
+            _rect.sizeDelta = new Vector2(compact ? _compactWidth : _width, _rect.sizeDelta.y);
         }
 
         public void SetVisible(bool visible)

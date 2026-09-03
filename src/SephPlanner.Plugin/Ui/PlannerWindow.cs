@@ -208,6 +208,17 @@ namespace SephPlanner.Plugin.Ui
         public override void OnClosed()
         {
             base.OnClosed();
+            Resume();
+        }
+
+        /// <summary>
+        /// 창이 열린 채 파괴되면(<c>Destroy</c>, 씬 언로드) <see cref="OnClosed"/>를 거치지 않는다.
+        /// 그대로 두면 시간이 멈춘 채로 남는다.
+        /// </summary>
+        private void OnDestroy() => Resume();
+
+        private void Resume()
+        {
             if (!_paused) return;
 
             _paused = false;
