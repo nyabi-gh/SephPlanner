@@ -100,18 +100,22 @@ namespace SephPlanner.Plugin
         /// </summary>
         private static MixerState ReadMixer()
         {
+            // 씬 전수 탐색은 폴링마다 도는 것이라 한 번으로 끝낸다. 쓸 수 있는 것을 찾으면서
+            // 아무거나 하나를 함께 기억해 두면, 다 썼을 때를 위해 다시 훑지 않아도 된다.
+            TabletMix any = null;
             foreach (var mixer in UnityEngine.Object.FindObjectsByType<TabletMix>(FindObjectsSortMode.None))
             {
                 if (mixer == null) continue;
 
                 // 여럿이면 아직 쓸 수 있는 쪽이 답이다.
                 if (!mixer.LocalUsed) return new MixerState { Cost = mixer.mixCost, Used = false };
+
+                // 유니티 객체에는 ?? 를 쓰지 않는다. 파괴된 객체를 null 로 보는 것은 유니티가
+                // 덮어쓴 == 뿐이라, ?? 로는 이미 파괴된 것을 붙들게 된다.
+                if (any == null) any = mixer;
             }
 
-            foreach (var mixer in UnityEngine.Object.FindObjectsByType<TabletMix>(FindObjectsSortMode.None))
-                if (mixer != null) return new MixerState { Cost = mixer.mixCost, Used = true };
-
-            return null;
+            return any == null ? null : new MixerState { Cost = any.mixCost, Used = true };
         }
 
         private static RunState ReadRun(PlayerAvatar avatar)

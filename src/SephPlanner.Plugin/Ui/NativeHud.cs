@@ -424,6 +424,7 @@ namespace SephPlanner.Plugin.Ui
             if (_noticeDrawn == message) return;
 
             _noticeDrawn = message;
+            FrameCost.CountDraw();
 
             // 안내문이 계획 화면을 덮었다. 다음에 계획을 그릴 때는 처음부터 다시 그려야 한다.
             _hasDrawn = false;
@@ -455,6 +456,7 @@ namespace SephPlanner.Plugin.Ui
             _drawn = key;
             _hasDrawn = true;
             _noticeDrawn = null;
+            FrameCost.CountDraw();
 
             var snapshot = frame.Snapshot;
             var plan = frame.Plan;

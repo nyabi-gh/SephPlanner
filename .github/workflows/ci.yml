@@ -7,6 +7,10 @@ on:
 permissions:
   contents: read
 
+# 플러그인(src/SephPlanner.Plugin)은 여기서 빌드하지 않는다. 게임 어셈블리를 참조하는데
+# 그것을 저장소나 CI 에 둘 수 없기 때문이다(docs/LEGAL.md - 게임 저작물 미배포).
+# 그래서 플러그인만 깨지는 변경은 이 검사를 초록으로 통과한다. 밀기 전에 scripts/check.ps1 을
+# 돌리면 같은 검사에 플러그인 빌드까지 함께 세운다.
 jobs:
   core:
     runs-on: windows-latest

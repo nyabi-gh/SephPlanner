@@ -1,4 +1,6 @@
 ﻿$ErrorActionPreference = "Stop"
+# 콘솔이 한글을 깨뜨리지 않게 한다. 실패 이유를 읽을 수 없으면 검사가 반쪽이 된다.
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $root = Split-Path $PSScriptRoot -Parent
 $solution = Join-Path $root "SephPlanner.slnx"
 $artifacts = Join-Path $root "artifacts"

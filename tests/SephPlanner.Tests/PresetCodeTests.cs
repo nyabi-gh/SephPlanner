@@ -91,9 +91,11 @@ public class PresetCodeTests
         var bomb = PresetCode.Encode(new string('0', 8 * 1024 * 1024));
         Assert.True(bomb.Length < PresetCode.MaxCodeLength);
 
-        var before = GC.GetTotalAllocatedBytes(precise: true);
+        // 이 스레드가 쓴 것만 센다. GetTotalAllocatedBytes 는 프로세스 전체를 세는데, xUnit 이
+        // 테스트를 병렬로 돌리므로 옆 테스트의 할당이 섞여 들어 이따금 거짓으로 실패했다.
+        var before = GC.GetAllocatedBytesForCurrentThread();
         Assert.False(PresetCode.TryParse(bomb, out _, out var error));
-        var allocated = GC.GetTotalAllocatedBytes(precise: true) - before;
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
 
         Assert.Contains("깨졌", error);
         Assert.True(allocated < 2L * 1024 * 1024, $"풀다가 {allocated:N0} 바이트를 할당했다");

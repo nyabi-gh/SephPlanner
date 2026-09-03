@@ -71,14 +71,39 @@ namespace SephPlanner.Plugin
             if (panelEnabled && !_panelEnabledLastFrame) _panelAwaitingRefresh = true;
             _panelEnabledLastFrame = panelEnabled;
 
+            FrameCost.CountFrame();
+
             // 단축키·화면 쪽에서 난 예외가 폴링까지 굶기면 안 된다. Update 안의 예외는 유니티가
             // Player.log 에만 쌓고 우리 로그는 조용하므로, 여기서 잡아 같은 것 한 번씩 남긴다.
             Guarded(HandleInput, "입력 처리");
+
+            var panelStarted = FrameCost.Now;
             Guarded(UpdateNativePanel, "화면 갱신");
+            FrameCost.Panel.Add(panelStarted);
+
+            ReportFrameCost();
 
             if (Time.unscaledTime < _nextPoll) return;
             _nextPoll = Time.unscaledTime + Mathf.Max(0.05f, _settings.PollInterval.Value);
             PollGameState();
+        }
+
+        private float _nextCostReport;
+
+        /// <summary>
+        /// 메인 스레드 부담을 이따금 로그에 남긴다. F10 을 누르지 않아도 숫자가 남아야, 끊긴다는
+        /// 제보를 받았을 때 추측 대신 로그로 답할 수 있다.
+        /// </summary>
+        private void ReportFrameCost()
+        {
+            if (Time.unscaledTime < _nextCostReport) return;
+
+            // 첫 보고는 한 바퀴 돌고 나서 한다. 부팅 직후의 몇 프레임은 대표값이 아니다.
+            var first = _nextCostReport == 0f;
+            _nextCostReport = Time.unscaledTime + 300f;
+            if (first || FrameCost.Poll.Count == 0) return;
+
+            Logger.LogInfo(FrameCost.Summary());
         }
 
         private void Guarded(Action step, string label)
@@ -235,12 +260,23 @@ namespace SephPlanner.Plugin
 
         private void PollGameState()
         {
+            var started = FrameCost.Now;
             try
             {
+                var step = FrameCost.Now;
                 var snapshot = GameReader.Read(_settings.OfferRadius.Value);
-                VerifySimulation(GameReader.CheckSimulation());
+                FrameCost.Read.Add(step);
+
+                step = FrameCost.Now;
+                var simulation = GameReader.CheckSimulation();
+                FrameCost.Simulation.Add(step);
+                VerifySimulation(simulation);
+
                 ReportSephirites(snapshot);
+
+                step = FrameCost.Now;
                 FeedNativePanel(snapshot);
+                FrameCost.Feed.Add(step);
             }
             catch (Exception ex)
             {
@@ -248,6 +284,7 @@ namespace SephPlanner.Plugin
                 Logger.LogError("스냅샷 생성 실패: " + ex);
                 _nextPoll = Time.unscaledTime + 5f;
             }
+            FrameCost.Poll.Add(started);
         }
 
         /// <summary>

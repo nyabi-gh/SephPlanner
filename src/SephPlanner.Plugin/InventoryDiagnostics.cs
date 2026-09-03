@@ -112,6 +112,7 @@ namespace SephPlanner.Plugin
 
             WriteOffers(text, inv, player, offerRadius);
             UiDiagnostics.Write(text);
+            FrameCost.Write(text);
 
             Directory.CreateDirectory(PlannerData.DataDirectory);
             var path = Path.Combine(PlannerData.DataDirectory, FileName);
