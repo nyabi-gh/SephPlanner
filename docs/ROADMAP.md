@@ -12,7 +12,7 @@
 | | 할 일 | 왜 | 끝나는 조건 |
 |---|---|---|---|
 | 1.1 | **고사양 기준선 재기** | 진입 지연 제보와 견줄 잣대가 없다 | 이 PC 에서 배치 → 2~3분 플레이 → F10. `[perf]` 의 `카탈로그 짓기(시작 시) … 시도 N회` 를 기록해 둔다 |
-| 1.2 | **0.1.2 릴리스** | 렉 수정과 진입 지연 수정이 사용자 손에 가야 확인된다 | 버전 올림(3곳: `Directory.Build.props`, `[BepInPlugin]`, CHANGELOG) → `scripts/check.ps1` → 태그 → `scripts/make-release.ps1` → 릴리스 저장소에 zip |
+| 1.2 | ~~**0.1.2 릴리스**~~ | 렉 수정과 진입 지연 수정이 사용자 손에 가야 확인된다 | 했다(2026-09-03, 커밋 `cf8b3f9`, 태그 `v0.1.2`). 순서는 버전 올림(3곳: `Directory.Build.props`, `[BepInPlugin]`, CHANGELOG) → `scripts/check.ps1` → 태그 → `scripts/make-release.ps1` → 릴리스 저장소에 zip 이었고 그대로 따랐다 |
 
 ### 2. 남의 손을 빌려야 확정되는 것
 
