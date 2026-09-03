@@ -519,6 +519,7 @@ namespace SephPlanner.Plugin
                 Values = CharmValueSource.Book,
                 Expanded = _expanded,
                 Recommendations = _settings.Recommendations.Value,
+                MultiplayerAutoPlace = _settings.MultiplayerAutoPlace.Value,
                 QueryVerified = CatalogDump.QueryVerificationPassed(),
                 RuntimeVerification = _simulationVerification,
                 RuntimeVerificationReason = _simulationReason,
@@ -757,7 +758,8 @@ namespace SephPlanner.Plugin
                 }
 
                 var plan = state.Latest;
-                var result = PlanApplier.Apply(plan.CreateApplyCommand());
+                var result = PlanApplier.Apply(
+                    plan.CreateApplyCommand(), _settings.MultiplayerAutoPlace.Value);
                 Logger.LogInfo(result);
                 Report(result);
             }
@@ -789,6 +791,7 @@ namespace SephPlanner.Plugin
                 RuntimeVerificationReason = _simulationReason,
                 CurrentPlacementFingerprint = placementFingerprint,
                 IsMultiplayer = snapshot != null && snapshot.IsMultiplayer,
+                AllowMultiplayer = _settings.MultiplayerAutoPlace.Value,
                 ServerActive = NetworkServer.active,
             });
 

@@ -65,7 +65,7 @@ public class AutoPlacePolicyTests
     }
 
     [Fact]
-    public void AMultiplayerSessionIsAlwaysDeniedEvenOnTheHost()
+    public void AMultiplayerSessionIsDeniedUnlessItWasOpenedOnPurpose()
     {
         var context = Context();
         context.IsMultiplayer = true;
@@ -75,6 +75,35 @@ public class AutoPlacePolicyTests
 
         Assert.False(decision.Allowed);
         Assert.Contains("멀티플레이", decision.Reason);
+    }
+
+    [Fact]
+    public void OpeningMultiplayerAllowsItOnTheHost()
+    {
+        var context = Context();
+        context.IsMultiplayer = true;
+        context.AllowMultiplayer = true;
+        context.ServerActive = true;
+
+        Assert.True(AutoPlacePolicy.Evaluate(context).Allowed);
+    }
+
+    /// <summary>
+    /// 쓰기는 서버 API 라 클라이언트에서는 애초에 돌지 않는다. 허용을 켜도 여기서 막혀야 한다 -
+    /// 선례가 된 커뮤니티 모드가 망가뜨린 곳이 정확히 클라이언트 쓰기다(docs/LEGAL.md).
+    /// </summary>
+    [Fact]
+    public void OpeningMultiplayerStillDeniesAClient()
+    {
+        var context = Context();
+        context.IsMultiplayer = true;
+        context.AllowMultiplayer = true;
+        context.ServerActive = false;
+
+        var decision = AutoPlacePolicy.Evaluate(context);
+
+        Assert.False(decision.Allowed);
+        Assert.Contains("호스트", decision.Reason);
     }
 
     private static AutoPlaceContext Context()

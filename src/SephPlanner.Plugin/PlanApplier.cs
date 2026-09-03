@@ -12,9 +12,9 @@ namespace SephPlanner.Plugin
     /// (<c>AutoArrangeInventoryForBestCharmLevels</c>)와 같은 <c>Permission</c> 스코프 안의
     /// <c>Networkrotation</c> 설정이다.
     ///
-    /// 멀티 세션에서는 예외 없이 실행하지 않는다. 클라이언트 쓰기의 동기화가 검증되지 않았고,
-    /// 개발사도 동기화 구현을 바꾸는 중이라 잠가 두라고 답했다(docs/LEGAL.md). 싱글은 호스트
-    /// 모드라 서버 API를 그대로 쓸 수 있다.
+    /// 멀티 세션은 기본으로 잠그고 설정으로만 연다(실험). 클라이언트 쓰기의 동기화가 검증되지
+    /// 않았고 개발사도 잠가 두는 편이 안전하다고 답했기 때문이다(docs/LEGAL.md). 켜더라도 쓰기는
+    /// 서버 API라 <b>호스트에서만</b> 실제로 돈다. 싱글은 호스트 모드라 그대로 쓸 수 있다.
     /// </summary>
     internal static class PlanApplier
     {
@@ -23,7 +23,7 @@ namespace SephPlanner.Plugin
         /// 상태고, 적용 도중 실패하면 이미 실행한 걸음을 역순으로 되돌린다. 되돌리기까지 실패한
         /// 경우에만 중간 상태가 남으며 그 사실이 결과에 그대로 적힌다.
         /// </summary>
-        public static string Apply(ApplyPlanCommand command)
+        public static string Apply(ApplyPlanCommand command, bool allowMultiplayer = false)
         {
             if (!CatalogDump.QueryVerificationPassed())
                 return "석판 질의 검증이 완료되지 않았거나 실패해 자동 배치를 실행하지 않습니다. F9로 데이터를 다시 만드세요.";
@@ -34,10 +34,11 @@ namespace SephPlanner.Plugin
                 command.ExpectedPlanningContextFingerprint.Length == 0)
                 return "계획의 상태 지문이 없어 자동 배치를 실행하지 않습니다.";
 
-            if (GameReader.IsMultiplayerSession())
-                return "멀티플레이 세션에서는 자동 배치를 실행하지 않습니다.";
+            if (GameReader.IsMultiplayerSession() && !allowMultiplayer)
+                return "멀티플레이 세션에서는 자동 배치를 실행하지 않습니다. 설정에서 열 수 있습니다(실험).";
 
-            // 쓰기는 서버 API(Swap, Networkrotation)라 호스트에서만 된다.
+            // 쓰기는 서버 API(Swap, Networkrotation)라 호스트에서만 된다. 클라이언트로 접속한
+            // 세션은 허용을 켜도 여기서 물러선다.
             if (!NetworkServer.active)
                 return "서버가 활성 상태가 아니라 자동 배치를 실행할 수 없습니다. (호스트에서만 동작)";
 
@@ -58,7 +59,8 @@ namespace SephPlanner.Plugin
             if (error != null) return error;
 
             var journal = new List<Step>();
-            var swaps = ApplySwaps(command, inventory, positions, occupants, journal, out var failure);
+            var swaps = ApplySwaps(
+                command, inventory, positions, occupants, journal, allowMultiplayer, out var failure);
             if (failure != null) return failure;
 
             var rotations = ApplyRotations(command, inventory, out failure);
@@ -184,7 +186,7 @@ namespace SephPlanner.Plugin
         private static int ApplySwaps(
             ApplyPlanCommand command, GridInventory inventory,
             Dictionary<int, GridPos> positions, Dictionary<GridPos, int> occupants,
-            List<Step> journal, out string failure)
+            List<Step> journal, bool allowMultiplayer, out string failure)
         {
             failure = null;
             var swaps = 0;
@@ -195,7 +197,7 @@ namespace SephPlanner.Plugin
                 if (from == to) continue;
 
                 // 적용을 시작한 뒤에 동료가 접속했을 수 있다. 멀티가 된 순간 더 진행하지 않는다.
-                if (GameReader.IsMultiplayerSession())
+                if (!allowMultiplayer && GameReader.IsMultiplayerSession())
                 {
                     failure = "적용 도중 멀티플레이 세션이 되어 자동 배치를 중단했습니다. " +
                               Rollback(inventory, journal);

@@ -33,6 +33,7 @@ namespace SephPlanner.Plugin.Ui
         public CharmValueBook Values = CharmValueBook.Empty;
         public bool Expanded;
         public bool Recommendations = true;
+        public bool MultiplayerAutoPlace;
         public bool QueryVerified;
         public PlanVerificationStatus RuntimeVerification;
         public string RuntimeVerificationReason = "";
@@ -500,7 +501,7 @@ namespace SephPlanner.Plugin.Ui
             _gain.color = improved ? NativeSkin.Good : NativeSkin.TextDim;
 
             var warning = Warning(
-                snapshot, plan, frame.QueryVerified,
+                snapshot, plan, frame.MultiplayerAutoPlace, frame.QueryVerified,
                 frame.RuntimeVerification, frame.RuntimeVerificationReason);
             _notice.text = warning;
             Widgets.FitHeight(_notice, _noticeSize, inner);
@@ -595,7 +596,7 @@ namespace SephPlanner.Plugin.Ui
         /// 멀티 안내보다 먼저다.
         /// </summary>
         private static string Warning(
-            GameSnapshot snapshot, Plan plan, bool queryVerified,
+            GameSnapshot snapshot, Plan plan, bool multiplayerAutoPlace, bool queryVerified,
             PlanVerificationStatus runtimeVerification, string runtimeVerificationReason)
         {
             var warnings = new List<string>();
@@ -620,7 +621,11 @@ namespace SephPlanner.Plugin.Ui
                 warnings.Add($"선택지가 많아 {plan.SkippedOffers}개는 평가하지 못했습니다.");
 
             if (snapshot.IsMultiplayer)
-                warnings.Add("멀티플레이 세션 - 제안만 표시합니다.");
+            {
+                warnings.Add(multiplayerAutoPlace
+                    ? "멀티플레이 세션 - 자동 배치 허용됨 (실험, 호스트만). 같이 하는 사람의 동의를 받으세요."
+                    : "멀티플레이 세션 - 제안만 표시합니다.");
+            }
             return string.Join("\n", warnings);
         }
 
