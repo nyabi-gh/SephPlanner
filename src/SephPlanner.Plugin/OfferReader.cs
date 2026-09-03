@@ -66,6 +66,22 @@ namespace SephPlanner.Plugin
         }
 
         /// <summary>
+        /// 진단이 쓰는 같은 판정. 덤프도 보이지 않는 인벤토리의 내용을 적으면 안 되므로, 규칙을
+        /// 복사하지 않고 여기 하나를 부른다.
+        /// </summary>
+        public static bool IsShown(GridInventory inventory) =>
+            inventory != null && IsVisible(inventory, ShownInventory());
+
+        /// <summary>보상 창이 지금 보여 주는 세피라이트. 없으면 <c>null</c>.</summary>
+        public static Sephirite ShownSephirite()
+        {
+            var panel = UIManager.Instance != null
+                ? UIManager.Instance.GetElement<UI_SephiriteRewardPanel>()
+                : null;
+            return panel != null && panel.IsOpened ? panel.sephirite : null;
+        }
+
+        /// <summary>
         /// 지금 플레이어가 볼 수 있는 인벤토리인가. 동기화돼 있어서 읽을 수 있는 것과 화면에
         /// 보이는 것은 다르고, 보이지 않는 것을 알려주는 순간 손으로도 할 수 있는 일의 대행이
         /// 아니게 된다.
@@ -129,10 +145,7 @@ namespace SephPlanner.Plugin
             // isGenerated 만으로는 부족하다 - 레벨업 보상은 창을 열기 전에 미리 생성될 수 있고
             // (실제로 레벨업을 미룬 채 다른 세피라이트를 열면 그 내용이 섞여 나왔다), 이전 방에
             // 열어 두고 온 세피라이트도 생성된 채 남아 있다. 화면에 보이는 것만 후보다.
-            var rewardPanel = UIManager.Instance != null
-                ? UIManager.Instance.GetElement<UI_SephiriteRewardPanel>()
-                : null;
-            var showing = rewardPanel != null && rewardPanel.IsOpened ? rewardPanel.sephirite : null;
+            var showing = ShownSephirite();
 
             // 창이 닫혀 있으면 후보가 될 수 있는 것이 하나도 없다. 그런데도 씬을 뒤지면 실기에서
             // 폴링마다 7ms 를 그냥 버린다(비활성까지 뒤지는 가장 비싼 형태다). 가까이 있는
@@ -152,12 +165,16 @@ namespace SephPlanner.Plugin
 
                 // own: 멀티에서는 세피라이트가 플레이어마다 겹쳐 스폰되고 내 것만 열린다
                 // (SephiriteSpawner.TrySpawnForConnection). 남의 것 앞의 "후보 0개"를 가리는 값이다.
+                // 보상 개수는 보이는 세피라이트에만 적는다. 열기 전에 내용이 채워지는 것이
+                // 있어서(레벨업 보상), 안 보이는 것의 개수까지 적으면 화면에 없는 것을 알리게 된다.
+                var shown = sephirite == showing;
                 report.Append($"[{sephirite.type} d={distance:0.0} gen={sephirite.isGenerated} ")
-                      .Append($"acq={sephirite.isAcquired} n={sephirite.Rewards.Count} ")
+                      .Append($"acq={sephirite.isAcquired} ")
+                      .Append(shown ? $"n={sephirite.Rewards.Count} " : "")
                       .Append($"active={sephirite.gameObject.activeInHierarchy} ")
-                      .Append($"own={sephirite.isOwned} shown={sephirite == showing}] ");
+                      .Append($"own={sephirite.isOwned} shown={shown}] ");
 
-                if (sephirite != showing) continue;
+                if (!shown) continue;
                 if (sephirite.isAcquired || !sephirite.isGenerated) continue;
 
                 foreach (var reward in sephirite.Rewards)

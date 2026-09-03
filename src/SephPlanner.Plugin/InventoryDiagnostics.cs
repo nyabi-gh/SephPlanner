@@ -16,10 +16,16 @@ namespace SephPlanner.Plugin
         /// <summary>
         /// 왜 어떤 선택지가 추천에 안 들어왔는지 보려면 후보가 될 뻔한 것들의 상태를 알아야 한다.
         /// 거리, 생성 여부, 이미 가져갔는지가 전부 여기서 갈린다.
+        ///
+        /// <b>내용물은 지금 화면에 보이는 것만 적는다.</b> 이 파일은 플레이 중에도 열어 볼 수
+        /// 있으므로, 열지 않은 상자의 개수나 보상 창을 열기 전 세피라이트의 보상 번호를 적으면
+        /// 손으로는 알 수 없는 것을 알려주는 셈이 된다(레벨업 보상은 창을 열기 전에 채워진다).
+        /// 보임 판정은 <see cref="OfferReader"/> 의 것을 그대로 부른다.
         /// </summary>
         private static void WriteOffers(StringBuilder text, GridInventory own, PlayerAvatar player, float radius)
         {
             var origin = player.transform.position;
+            var showing = OfferReader.ShownSephirite();
 
             text.AppendLine();
             text.AppendLine($"[offers] radius={radius}");
@@ -29,11 +35,15 @@ namespace SephPlanner.Plugin
                 if (sephirite == null) continue;
 
                 var distance = Vector3.Distance(origin, sephirite.transform.position);
+                var shown = sephirite == showing;
                 text.AppendLine(
                     $"  Sephirite type={sephirite.type} dist={distance:0.0} " +
                     $"generated={sephirite.isGenerated} acquired={sephirite.isAcquired} " +
-                    $"rewards={sephirite.Rewards.Count} " +
+                    $"owned={sephirite.isOwned} shown={shown} " +
+                    (shown ? $"rewards={sephirite.Rewards.Count} " : "") +
                     $"inRange={distance <= radius}");
+
+                if (!shown) continue;
 
                 foreach (var reward in sephirite.Rewards)
                     text.AppendLine($"      reward entity={reward.entityID} instance={reward.instanceID}");
@@ -45,15 +55,21 @@ namespace SephPlanner.Plugin
 
                 var distance = Vector3.Distance(origin, inventory.transform.position);
                 var owner = inventory.UnitAvatar == null ? "none" : inventory.UnitAvatar.GetType().Name;
-
-                var count = 0;
-                foreach (var pair in inventory.inventoryMatrix)
-                    if (pair.Value != null) count++;
+                var shown = OfferReader.IsShown(inventory);
 
                 text.AppendLine(
-                    $"  GridInventory owner={owner} dist={distance:0.0} cells={count} " +
+                    $"  GridInventory owner={owner} dist={distance:0.0} shown={shown} " +
+                    (shown ? $"cells={Occupied(inventory)} " : "") +
                     $"inRange={distance <= radius}");
             }
+        }
+
+        private static int Occupied(GridInventory inventory)
+        {
+            var count = 0;
+            foreach (var pair in inventory.inventoryMatrix)
+                if (pair.Value != null) count++;
+            return count;
         }
 
         public static string Write(GridInventory inv, PlayerAvatar player, float offerRadius)
