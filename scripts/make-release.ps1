@@ -29,7 +29,7 @@ try {
     $pluginOut = Join-Path $root "src/SephPlanner.Plugin/bin/Release"
     Copy-Item (Join-Path $pluginOut "SephPlanner.Plugin.dll") (Join-Path $zipRoot "BepInEx-plugins")
     Copy-Item (Join-Path $pluginOut "SephPlanner.Core.dll") (Join-Path $zipRoot "BepInEx-plugins")
-    Copy-Item (Join-Path $root "docs/INSTALL.md") (Join-Path $zipRoot "설치안내.md")
+    Copy-Item (Join-Path $root "docs/INSTALL.txt") (Join-Path $zipRoot "설치안내.txt")
     Copy-Item (Join-Path $root "LICENSE") (Join-Path $zipRoot "LICENSE.txt")
 
     $commit = (& git -C $root rev-parse HEAD).Trim()
@@ -66,7 +66,7 @@ try {
         $required = @(
             "SephPlanner/BepInEx-plugins/SephPlanner.Plugin.dll",
             "SephPlanner/BepInEx-plugins/SephPlanner.Core.dll",
-            "SephPlanner/설치안내.md",
+            "SephPlanner/설치안내.txt",
             "SephPlanner/LICENSE.txt",
             "SephPlanner/manifest.json")
         foreach ($entry in $required) {

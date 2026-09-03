@@ -11,7 +11,7 @@ TEAM HORAY와 무관한 팬 제작 도구이며, 비영리로 배포한다.
 ```
 SephPlanner.Core      게임 상태 모델 + 솔버와 배치 계산 (netstandard2.1)
 SephPlanner.Plugin    BepInEx 플러그인. 게임 상태를 읽어 배치를 풀고 게임 HUD 안에 직접
-                      그린다. 자동 배치는 기본적으로 싱글플레이에서만 적용한다
+                      그린다. 자동 배치는 싱글플레이에서만 적용한다
 SephPlanner.DataTool  게임 없이 도는 CLI. 텍스트 추출, 스냅샷 대조, 콤보·아티팩트 값어치 측정
 SephPlanner.Tests     Core 단위 테스트. 게임 없이 돈다
 ```
@@ -79,7 +79,7 @@ scripts/make-release.ps1
 
 ## 문서
 
-- [docs/INSTALL.md](docs/INSTALL.md) — 사용자용 설치 안내 (배포 zip에 포함)
+- [docs/INSTALL.txt](docs/INSTALL.txt) — 사용자용 설치 안내 (배포 zip에 `설치안내.txt`로 포함). 메모장에서 그대로 읽히도록 마크다운 없이 쓴다
 - [docs/RESEARCH.md](docs/RESEARCH.md) — 게임 내부 구조 조사 결과
 - [docs/LEGAL.md](docs/LEGAL.md) — 약관·저작권 검토와 그에 따른 설계 제약
 - [docs/ROADMAP.md](docs/ROADMAP.md) — 남은 작업과 우선순위, 고치지 않기로 한 것
@@ -105,7 +105,7 @@ scripts/make-release.ps1
 | `F5` | 불투명도 |
 | `F6` | 이동 모드 (커서를 따라오고, 다시 누르면 고정) |
 | `F7` | 접기/펼치기 |
-| `F8` | 자동 배치 적용 (기본 싱글플레이, 멀티 호스트는 실험 옵션) |
+| `F8` | 자동 배치 적용 (싱글플레이만) |
 
 **게임이 쓰지 않는 키만 고른다.** 게임은 수정키를 보지 않아서 `Ctrl+Alt+P` 같은 조합도 글자
 키가 게임 조작을 함께 발동시킨다. F 키는 게임이 하나도 쓰지 않는다
