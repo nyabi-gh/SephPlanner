@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text;
+using Newtonsoft.Json;
 using SephPlanner.Core.Runtime;
 using UnityEngine;
 
@@ -12,6 +13,22 @@ namespace SephPlanner.Plugin
     internal static class InventoryDiagnostics
     {
         private const string FileName = "inventory-dump.txt";
+        private const string SnapshotFileName = "inventory-snapshot.json";
+
+        /// <summary>
+        /// 덤프와 같은 순간의 스냅샷을 그대로 남긴다. <c>DataTool</c> 의 <c>--check</c> 와
+        /// <c>--replay</c> 가 먹는 것이 이 파일이라, 제보에 재생 가능한 입력이 딸려 온다.
+        ///
+        /// 스냅샷에는 <see cref="OfferReader"/> 가 지금 보인다고 판정한 것만 들어 있으므로,
+        /// 이것을 함께 남긴다고 덤프가 아는 것이 늘지는 않는다.
+        /// </summary>
+        public static string WriteSnapshot(GameSnapshot snapshot)
+        {
+            Directory.CreateDirectory(PlannerData.DataDirectory);
+            var path = Path.Combine(PlannerData.DataDirectory, SnapshotFileName);
+            File.WriteAllText(path, JsonConvert.SerializeObject(snapshot, Formatting.Indented));
+            return path;
+        }
 
         /// <summary>
         /// 왜 어떤 선택지가 추천에 안 들어왔는지 보려면 후보가 될 뻔한 것들의 상태를 알아야 한다.

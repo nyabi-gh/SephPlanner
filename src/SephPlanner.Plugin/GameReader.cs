@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Mirror;
 using SephPlanner.Core.Model;
@@ -48,9 +49,18 @@ namespace SephPlanner.Plugin
         public static string DumpInventory(float offerRadius)
         {
             var avatar = FindLocalPlayer();
-            return avatar?.Inventory == null
-                ? null
-                : InventoryDiagnostics.Write(avatar.Inventory, avatar, offerRadius);
+            if (avatar?.Inventory == null) return null;
+
+            var dump = InventoryDiagnostics.Write(avatar.Inventory, avatar, offerRadius);
+            try
+            {
+                return dump + ", " + InventoryDiagnostics.WriteSnapshot(Read(offerRadius));
+            }
+            catch (Exception ex)
+            {
+                // 스냅샷을 못 남겼다고 덤프까지 없던 일이 되면 안 된다. 진단의 본체는 덤프다.
+                return dump + " (스냅샷은 남기지 못했습니다: " + ex.Message + ")";
+            }
         }
 
         public static RuntimeSimulationCheck CheckSimulation()
