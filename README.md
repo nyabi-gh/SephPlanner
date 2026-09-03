@@ -79,7 +79,7 @@ scripts/make-release.ps1
 
 ## 문서
 
-- [docs/INSTALL.txt](docs/INSTALL.txt) — 사용자용 설치 안내 (배포 zip에 `설치안내.txt`로 포함). 메모장에서 그대로 읽히도록 마크다운 없이 쓴다
+- [docs/INSTALL.md](docs/INSTALL.md) — 사용자용 설치 안내. 배포 zip에는 메모장으로 바로 열리도록 `설치안내.txt`로 들어간다
 - [docs/RESEARCH.md](docs/RESEARCH.md) — 게임 내부 구조 조사 결과
 - [docs/LEGAL.md](docs/LEGAL.md) — 약관·저작권 검토와 그에 따른 설계 제약
 - [docs/ROADMAP.md](docs/ROADMAP.md) — 남은 작업과 우선순위, 고치지 않기로 한 것
