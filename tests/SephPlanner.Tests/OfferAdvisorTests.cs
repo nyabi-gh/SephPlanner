@@ -45,12 +45,15 @@ public class OfferAdvisorTests
         for (var i = 0; i < 5; i++)
             problem.Charms.Add(new CharmSlot { InstanceId = i, Definition = new CharmDefinition { MaxLevel = 5 } });
 
-        var watch = System.Diagnostics.Stopwatch.StartNew();
-        var advice = OfferAdvisor.Rank(problem, System.Array.Empty<OfferCandidate>(), gold: 1000);
-        watch.Stop();
+        // 벽시계로 재면 콜드 JIT 과 병렬 실행 때문에 느린 기계에서 깨진다. 재려던 성질은
+        // 시간이 아니라 "탐색을 한 번도 돌리지 않는다"이므로 그것을 그대로 센다.
+        var layouts = new LayoutCache();
+        var advice = OfferAdvisor.Rank(
+            problem, System.Array.Empty<OfferCandidate>(), gold: 1000, layouts: layouts);
 
         Assert.Empty(advice);
-        Assert.True(watch.ElapsedMilliseconds < 5, $"후보가 없는데 {watch.ElapsedMilliseconds}ms 를 썼다");
+        Assert.Equal(0, layouts.Searches);
+        Assert.Equal(0, layouts.Reuses);
     }
 
     [Fact]

@@ -86,7 +86,8 @@ namespace SephPlanner.Plugin
             ReportFrameCost();
 
             if (Time.unscaledTime < _nextPoll) return;
-            _nextPoll = Time.unscaledTime + Mathf.Max(0.05f, _settings.PollInterval.Value);
+            // 하한은 설정의 범위가 지킨다. 여기서 다시 자르면 그 범위가 무슨 값인지 두 군데에 적힌다.
+            _nextPoll = Time.unscaledTime + _settings.PollInterval.Value;
             PollGameState();
         }
 

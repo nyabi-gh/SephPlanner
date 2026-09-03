@@ -50,14 +50,26 @@ namespace SephPlanner.Plugin
         private static readonly float[] ScaleSteps = { 0.8f, 0.9f, 1.0f, 1.15f, 1.3f, 1.5f };
         private static readonly float[] WidthSteps = { 18f, 22f, 26f, 30f, 36f };
 
+        public static float MinScale => ScaleSteps[0];
+        public static float MaxScale => ScaleSteps[ScaleSteps.Length - 1];
+        public static float MinWidth => WidthSteps[0];
+        public static float MaxWidth => WidthSteps[WidthSteps.Length - 1];
+
+        /// <summary>
+        /// 범위를 붙여 묶는다. 붙여 두면 BepInEx 가 설정 파일의 값을 잘라 주고 설명에 범위도
+        /// 적어 준다. 없으면 NaN 이나 0 이 그대로 들어와, 폴링 주기의 경우 매 프레임 폴링이 된다.
+        /// </summary>
+        private static ConfigDescription Ranged(string description, float min, float max) =>
+            new ConfigDescription(description, new AcceptableValueRange<float>(min, max));
+
         public PluginSettings(ConfigFile config, Action<string> log)
         {
             _config = config;
             _log = log;
 
             PollInterval = config.Bind(
-                "General", "PollIntervalSeconds", 0.25f,
-                "인벤토리를 다시 읽는 주기(초).");
+                "General", "PollIntervalSeconds", 0.25f, Ranged(
+                    "인벤토리를 다시 읽는 주기(초).", 0.1f, 5f));
             DumpKey = config.Bind(
                 "General", "DumpCatalogKey", new KeyboardShortcut(KeyCode.F9),
                 "석판/아티팩트 데이터를 다시 덤프하고 질의 파서를 검증하는 단축키.");
@@ -65,8 +77,8 @@ namespace SephPlanner.Plugin
                 "General", "DumpInventoryKey", new KeyboardShortcut(KeyCode.F10),
                 "인벤토리 내용을 그대로 파일로 남기는 단축키. 인식 문제를 확인할 때 쓴다.");
             OfferRadius = config.Bind(
-                "General", "OfferRadius", 12f,
-                "선택지로 볼 상자/상점까지의 거리. 넓히면 멀리 있는 것까지 추천에 들어온다.");
+                "General", "OfferRadius", 12f, Ranged(
+                    "선택지로 볼 상자/상점까지의 거리. 넓히면 멀리 있는 것까지 추천에 들어온다.", 1f, 50f));
 
             Panel = config.Bind(
                 "NativePanel", "Enabled", true,
@@ -77,20 +89,21 @@ namespace SephPlanner.Plugin
                 "NativePanel", "Corner", PanelCorner.TopRight,
                 "화면을 붙일 모서리. 게임 HUD 와 겹치면 옮긴다.");
             MarginX = config.Bind(
-                "NativePanel", "MarginX", DefaultPanelMargin,
-                "모서리에서 가로로 띄울 거리. 게임 HUD 글자 크기의 배수라 해상도가 달라도 같게 보인다.");
+                "NativePanel", "MarginX", DefaultPanelMargin, Ranged(
+                    "모서리에서 가로로 띄울 거리. 게임 HUD 글자 크기의 배수라 해상도가 달라도 같게 보인다.",
+                    0f, 40f));
             MarginY = config.Bind(
-                "NativePanel", "MarginY", DefaultPanelMargin,
-                "모서리에서 세로로 띄울 거리. 이동 모드로 옮기면 여기에 저장된다.");
+                "NativePanel", "MarginY", DefaultPanelMargin, Ranged(
+                    "모서리에서 세로로 띄울 거리. 이동 모드로 옮기면 여기에 저장된다.", 0f, 40f));
             Width = config.Bind(
-                "NativePanel", "WidthScale", 26f,
-                "화면의 가로 폭. 역시 게임 HUD 글자 크기의 배수다. 글씨가 잘리면 키운다.");
+                "NativePanel", "WidthScale", 26f, Ranged(
+                    "화면의 가로 폭. 역시 게임 HUD 글자 크기의 배수다. 글씨가 잘리면 키운다.",
+                    MinWidth, MaxWidth));
             Scale = config.Bind(
-                "NativePanel", "Scale", 1.0f,
-                "화면 전체의 크기 배율. 1 이 게임 HUD 글자와 같은 크기다.");
+                "NativePanel", "Scale", 1.0f, Ranged(
+                    "화면 전체의 크기 배율. 1 이 게임 HUD 글자와 같은 크기다.", MinScale, MaxScale));
             Opacity = config.Bind(
-                "NativePanel", "Opacity", 1.0f,
-                "화면의 불투명도(0~1).");
+                "NativePanel", "Opacity", 1.0f, Ranged("화면의 불투명도(0~1).", 0.1f, 1f));
             Recommendations = config.Bind(
                 "NativePanel", "Recommendations", true,
                 "무엇을 집을지에 대한 후보 추천을 계산할지. 끄면 가리는 것이 아니라 계산 자체를 " +

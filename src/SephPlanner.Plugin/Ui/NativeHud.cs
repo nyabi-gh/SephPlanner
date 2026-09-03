@@ -215,10 +215,10 @@ namespace SephPlanner.Plugin.Ui
             Blocker = "";
 
             _skin = NativeSkin.Borrow(root);
-            _base = _skin.BaseSize * Mathf.Clamp(scale, 0.8f, 1.5f);
+            _base = _skin.BaseSize * Mathf.Clamp(scale, PluginSettings.MinScale, PluginSettings.MaxScale);
             Build(
                 root, corner, new Vector2(Mathf.Max(0f, margin.x), Mathf.Max(0f, margin.y)),
-                Mathf.Clamp(widthScale, 18f, 36f));
+                Mathf.Clamp(widthScale, PluginSettings.MinWidth, PluginSettings.MaxWidth));
             Origin = _skin.Origin;
             return true;
         }
