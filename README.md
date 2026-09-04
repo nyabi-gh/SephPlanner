@@ -103,6 +103,7 @@ Releases에 올린다. 이 저장소는 비공개라 여기 Releases는 링크�
 - [docs/LEGAL.md](docs/LEGAL.md) — 약관·저작권 검토와 그에 따른 설계 제약
 - [docs/ROADMAP.md](docs/ROADMAP.md) — 남은 작업과 우선순위, 고치지 않기로 한 것
 - [docs/REVIEW.md](docs/REVIEW.md) — 0.1.2 직후 전체 검토. 보완·개선점, UI/UX, 코드 품질, 추가 기능과 실행 순서
+- [docs/REVIEW-0.1.3.md](docs/REVIEW-0.1.3.md) — 0.1.3 태그 전 전체 검토. 멀티 참가자 경로와 강화 우선 단계를 중심으로, 태그 전에 고칠 것부터
 - [CHANGELOG.md](CHANGELOG.md) — 버전별 사용자 영향 변경 사항
 - [LICENSE](LICENSE) — 배포 조건. 독점 라이선스이고 소스는 공개하지 않는다
 
