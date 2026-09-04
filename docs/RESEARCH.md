@@ -183,7 +183,9 @@ Mirror.NetworkClient.localPlayer -> GetComponent<PlayerAvatar>()
 public void Swap(sbyte xLeft, sbyte yLeft, sbyte xRight, sbyte yRight)
 ```
 
-수동 드래그가 타는 그 경로다. 서버(=싱글 호스트)면 `LocalSwap`을 바로 부르고, 클라이언트면
+수동 드래그가 타는 그 경로다 - `UI_CharacterStatusPanel` 이 집은 칸과 누른 칸을 그대로 `Swap` 에
+넘기며 **목표 칸이 비었는지 보지 않는다**(로그도 "Icon Swapped"라고 찍는다). 서버(=싱글 호스트)면
+`LocalSwap`을 바로 부르고, 클라이언트면
 `CmdSwap`(Mirror Command, `requiresAuthority: true`)으로 서버에 보낸다. `LocalSwap`은
 `inventoryMatrix`/`charms`/`stoneTablets` 세 딕셔너리를 함께 갱신하고, 빈 칸과의 맞바꿈도
 그대로 처리하므로 "이동"과 "맞바꿈"을 구분할 필요가 없다. 임시 저장(손에 들기)을 거치는
