@@ -431,7 +431,10 @@ namespace SephPlanner.Plugin.Ui
             }
 
             // 가방에 없는데 지정돼 있는 것도 보여야 푼다. 다른 판에서 지정한 것이 남아 있는 경우다.
-            foreach (var entityId in _prefs.PinnedLevels.Keys.Concat(_prefs.HeldCharms).Distinct().ToList())
+            // 가져온 빌드의 아티팩트도 같이 보인다 - 무엇을 아직 못 모았는지가 곧 살 목록이다.
+            var favorites = new HashSet<int>(_prefs.Preset()?.FavoriteCharms ?? new List<int>());
+            var listed = _prefs.PinnedLevels.Keys.Concat(_prefs.HeldCharms).Concat(favorites).Distinct().ToList();
+            foreach (var entityId in listed)
             {
                 if (found.ContainsKey(entityId)) continue;
 
@@ -442,7 +445,7 @@ namespace SephPlanner.Plugin.Ui
                     Name = definition != null
                         ? Naming.Of(definition.Names, definition.Id, "아티팩트")
                         : "아티팩트 #" + entityId,
-                    Detail = "가방에 없음",
+                    Detail = favorites.Contains(entityId) ? "빌드 · 가방에 없음" : "가방에 없음",
                     Selected = _prefs.IsPinned(entityId),
                     Mark = PinMark(_prefs.PinLevel(entityId)),
                     Held = _prefs.IsHeld(entityId),
@@ -463,7 +466,8 @@ namespace SephPlanner.Plugin.Ui
                 var entry = found[entityId];
                 if (entry.Detail.Length == 0)
                 {
-                    entry.Detail = (entry.Level > 0 ? "+" + entry.Level : entry.Level.ToString()) +
+                    entry.Detail = (favorites.Contains(entityId) ? "빌드  " : "") +
+                                   (entry.Level > 0 ? "+" + entry.Level : entry.Level.ToString()) +
                                    (entry.Count > 1 ? "  x" + entry.Count : "");
                 }
                 _entries.Add(entry);

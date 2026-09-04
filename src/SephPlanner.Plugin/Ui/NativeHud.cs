@@ -824,6 +824,8 @@ namespace SephPlanner.Plugin.Ui
 
             if (!advice.Available) return Tint("선택 불가", NativeSkin.Bad);
 
+            if (advice.MatchesPreset) parts.Append(Tint("빌드", NativeSkin.Mint)).Append("  ");
+
             if (advice.ComboText.Length > 0)
             {
                 parts.Append(Tint(

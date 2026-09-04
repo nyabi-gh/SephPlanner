@@ -135,11 +135,6 @@ namespace SephPlanner.Core.Solver
         /// <summary>콤보 진행과 무관하게, 밀고 있는 카테고리라는 것만으로 얹는 가치.</summary>
         private const double PriorityWorth = 0.5;
 
-        /// <summary>
-        /// 프리셋 빌드가 즐겨찾기로 찍은 아티팩트에 얹는 가치. 카테고리보다 구체적인 지목이라
-        /// 조금 더 크게 잡았다. 다른 값들과 마찬가지로 실측 근거가 없는 설계값이다.
-        /// </summary>
-        private const double PresetCharmWorth = 1.0;
 
         public static List<OfferAdvice> Rank(
             PlacementProblem problem, IReadOnlyList<OfferCandidate> candidates, int gold,
@@ -196,12 +191,14 @@ namespace SephPlanner.Core.Solver
             }
 
             // 살 수 없는 것은 아무리 좋아도 지금 고를 수 없다. 지우지는 않고 아래로 내린다.
+            // 그다음은 가져온 빌드가 지목한 아티팩트다 - 빌드의 축이라 점수와 상관없이 먼저 권한다.
             // 콤보 가치는 배치 점수에 안 잡히므로 여기서 더해 줄을 세운다. 증가분까지 같으면
             // 여력이 큰 쪽을 위로 올린다. 아티팩트가 적을 때는 여러 석판이 똑같이 최대치를
             // 뽑아내 증가분만으로는 우열이 드러나지 않는다. 그래도 같으면 정의 번호로 가른다 -
             // 입력 순서는 게임의 오브젝트 열거 순서라 폴링마다 흔들릴 수 있다.
             return advice.OrderByDescending(entry => entry.Available)
                          .ThenByDescending(entry => entry.Affordable)
+                         .ThenByDescending(entry => entry.MatchesPreset)
                          .ThenByDescending(entry => entry.Gain + entry.ComboBonus)
                          .ThenByDescending(entry => entry.Effect.Reach)
                          .ThenBy(entry => entry.Candidate.DefinitionId)
@@ -224,11 +221,9 @@ namespace SephPlanner.Core.Solver
             var charm = advice.Candidate.Charm;
             if (charm is null) return;
 
-            if (presetCharms is not null && presetCharms.Contains(charm.EntityId))
-            {
-                advice.MatchesPreset = true;
-                advice.ComboBonus += PresetCharmWorth;
-            }
+            // 가산점이 아니라 줄 세우기의 한 단계다(Rank). 가져온 빌드가 지목한 아티팩트는 뜨기만
+            // 하면 맨 위로 온다 - 점수로 겨루게 두면 배치 이득이 큰 남에게 밀려 가져온 뜻이 없다.
+            if (presetCharms is not null && presetCharms.Contains(charm.EntityId)) advice.MatchesPreset = true;
 
             foreach (var category in charm.Categories)
             {

@@ -460,6 +460,36 @@ public class OfferAdvisorTests
     }
 
     [Fact]
+    public void AnArtifactTheImportedBuildWantsRisesAboveOneWithMoreGain()
+    {
+        // 가산점으로 겨루게 두면 배치 이득이 큰 남에게 밀린다. 빌드가 지목한 것은 뜨기만 하면
+        // 맨 위여야 "프리셋을 넣으면 그 아이템을 권한다"가 된다.
+        var candidates = new List<OfferCandidate>
+        {
+            new()
+            {
+                Kind = "charm", Name = "strong",
+                Charm = new CharmDefinition
+                {
+                    MaxLevel = 5, Behavior = "Charm_StatusInstance",
+                    StatWorthByLevel = new List<double> { 10, 20, 30, 40, 50, 60 },
+                },
+            },
+            new()
+            {
+                Kind = "charm", Name = "wanted",
+                Charm = new CharmDefinition { EntityId = WantedCharm, MaxLevel = 5 },
+            },
+        };
+
+        var advice = OfferAdvisor.Rank(
+            BaseProblem(), candidates, gold: 0, presetCharms: new[] { WantedCharm });
+
+        Assert.Equal("wanted", advice[0].Candidate.Name);
+        Assert.True(advice[0].Gain < advice[1].Gain, $"wanted {advice[0].Gain} / strong {advice[1].Gain}");
+    }
+
+    [Fact]
     public void WithNoImportedBuildNothingIsMarked()
     {
         var candidates = new List<OfferCandidate>
