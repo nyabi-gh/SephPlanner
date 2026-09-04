@@ -15,6 +15,12 @@ namespace SephPlanner.Core.Runtime
 
         /// <summary>네트워크 세션이 살아 있는가. 호스트든 참가자든 상관없다 - 쓰기가 나갈 곳이 있는지다.</summary>
         public bool SessionActive { get; set; }
+
+        /// <summary>
+        /// 앞선 적용이 아직 도는 중인가. 참가자 세션에서는 걸음마다 서버 왕복을 기다리므로 수 초가
+        /// 걸린다. 그동안 안내 줄이 계속 키를 광고하면 눌러야만 진행 중인 줄 알게 된다.
+        /// </summary>
+        public bool Applying { get; set; }
     }
 
     public sealed class AutoPlaceDecision
@@ -37,6 +43,8 @@ namespace SephPlanner.Core.Runtime
     {
         public static AutoPlaceDecision Evaluate(AutoPlaceContext context)
         {
+            if (context.Applying) return AutoPlaceDecision.Deny("자동 배치가 아직 진행 중입니다.");
+
             var state = context.Runner;
             if (state is null) return AutoPlaceDecision.Deny("계획 데이터가 아직 준비되지 않았습니다.");
             if (state.Error is not null) return AutoPlaceDecision.Deny("계산 실패 - " + state.Error);
@@ -61,6 +69,11 @@ namespace SephPlanner.Core.Runtime
             if (plan.PlacementFingerprint.Length == 0 ||
                 plan.PlacementFingerprint != context.CurrentPlacementFingerprint)
                 return AutoPlaceDecision.Deny("배치 계산 이후 게임 상태가 바뀌어 최신 계획을 기다립니다.");
+            // 놓을 자리가 없는 석판이 있으면 계획이 목표를 비우므로, 사유를 가르지 않으면
+            // "옮길 것이 없습니다"가 되어 화면의 경고와 딴소리를 하게 된다.
+            if (plan.Best.UnplacedTablets > 0)
+                return AutoPlaceDecision.Deny(
+                    $"석판 {plan.Best.UnplacedTablets}개를 놓을 자리가 없어 자동 배치를 실행하지 않습니다.");
             if (!plan.HasPlacementChanges || plan.Targets.Count == 0)
                 return AutoPlaceDecision.Deny("옮길 것이 없습니다.");
             // 멀티 세션은 기본으로 잠근다. 개발사가 금지한 것은 아니고 인벤토리 동기화 구현을

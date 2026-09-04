@@ -109,6 +109,7 @@ namespace SephPlanner.Plugin.Ui
             private readonly bool _recommendations;
             private readonly bool _queryVerified;
             private readonly bool _hintIsPreview;
+            private readonly bool _multiplayerAutoPlace;
 
             public FrameKey(HudFrame frame)
             {
@@ -128,6 +129,9 @@ namespace SephPlanner.Plugin.Ui
                 _recommendations = frame.Recommendations;
                 _queryVerified = frame.QueryVerified;
                 _hintIsPreview = frame.HintIsPreview;
+
+                // 멀티 동의 안내가 이 값으로 갈린다. 빠뜨리면 설정을 바꾼 직후 옛 문구가 남는다.
+                _multiplayerAutoPlace = frame.MultiplayerAutoPlace;
             }
 
             public bool Matches(in FrameKey other) =>
@@ -141,6 +145,7 @@ namespace SephPlanner.Plugin.Ui
                 _recommendations == other._recommendations &&
                 _queryVerified == other._queryVerified &&
                 _hintIsPreview == other._hintIsPreview &&
+                _multiplayerAutoPlace == other._multiplayerAutoPlace &&
                 string.Equals(_hint, other._hint, StringComparison.Ordinal) &&
                 string.Equals(_reason, other._reason, StringComparison.Ordinal) &&
                 string.Equals(_previewKey, other._previewKey, StringComparison.Ordinal);
@@ -171,6 +176,8 @@ namespace SephPlanner.Plugin.Ui
         private TextMeshProUGUI _notice;
         private LayoutElement _noticeSize;
         private TextMeshProUGUI _nextMove;
+        private TextMeshProUGUI _waiting;
+        private LayoutElement _waitingSize;
 
         private RectTransform _detail;
         private RectTransform _grid;
@@ -288,6 +295,11 @@ namespace SephPlanner.Plugin.Ui
             _notice = Widgets.Paragraph("Notice", content, _skin, S(0.8f), NativeSkin.Amber);
             _noticeSize = Widgets.Fixed(_notice.rectTransform, S(0.8f) * 1.4f);
             _nextMove = Line(content, S(0.95f), NativeSkin.Text);
+
+            // 안내문은 접힌 판에 뜨는데 접힌 폭이 좁다. 한 줄짜리로 두면 "데이터 생성 실패 -
+            // F9 로 다시 시도하세요(로그에 이유가 있습니다)" 같은 문장이 앞머리만 남고 잘린다.
+            _waiting = Widgets.Paragraph("Waiting", content, _skin, S(0.95f), NativeSkin.Text);
+            _waitingSize = Widgets.Fixed(_waiting.rectTransform, S(0.95f) * 1.4f);
 
             _detail = Widgets.Rect("Detail", content);
             Widgets.Column(_detail, S(0.3f));
@@ -444,9 +456,12 @@ namespace SephPlanner.Plugin.Ui
             _score.text = "SephPlanner";
             _gain.text = "";
             _hint.text = "";
-            _nextMove.text = message;
+            _nextMove.text = "";
+            _waiting.text = message;
+            Widgets.FitHeight(_waiting, _waitingSize, _compactInner);
             Widgets.SetActive(_hint, false);
-            Widgets.SetActive(_nextMove, message.Length > 0);
+            Widgets.SetActive(_nextMove, false);
+            Widgets.SetActive(_waiting, message.Length > 0);
             Widgets.SetActive(_notice, false);
             Widgets.SetActive(_detail, false);
             SetCompact(true);
@@ -491,6 +506,7 @@ namespace SephPlanner.Plugin.Ui
             _hint.color = frame.HintIsPreview ? NativeSkin.Mint : NativeSkin.TextDim;
             Widgets.FitHeight(_hint, _hintSize, inner);
             Widgets.SetActive(_hint, frame.Hint.Length > 0);
+            Widgets.SetActive(_waiting, false);
 
             _hover.Clear();
             _hoverable = expanded;

@@ -104,6 +104,38 @@ public class AutoPlacePolicyTests
         Assert.Contains("네트워크 세션", decision.Reason);
     }
 
+    /// <summary>
+    /// 참가자 세션의 적용은 걸음마다 서버 왕복을 기다려 수 초가 걸린다. 그동안 판정이 허용으로
+    /// 남으면 안내 줄이 계속 키를 광고하고, 눌러야만 진행 중인 줄 알게 된다.
+    /// </summary>
+    [Fact]
+    public void AnApplyInFlightDeniesTheNextOne()
+    {
+        var context = Context();
+        context.Applying = true;
+
+        var decision = AutoPlacePolicy.Evaluate(context);
+
+        Assert.False(decision.Allowed);
+        Assert.Contains("진행 중", decision.Reason);
+    }
+
+    /// <summary>
+    /// 놓을 자리가 없는 석판이 있으면 계획이 목표를 비운다. 사유를 가르지 않으면 "옮길 것이
+    /// 없습니다"가 되어, 같은 화면의 경고("석판 N개는 놓을 자리가 없어…")와 딴소리를 한다.
+    /// </summary>
+    [Fact]
+    public void UnplacedTabletsSayWhatIsActuallyWrong()
+    {
+        var context = Context();
+        context.Runner!.Latest!.Best.UnplacedTablets = 2;
+
+        var decision = AutoPlacePolicy.Evaluate(context);
+
+        Assert.False(decision.Allowed);
+        Assert.Contains("석판 2개", decision.Reason);
+    }
+
     private static AutoPlaceContext Context()
     {
         var plan = new Plan

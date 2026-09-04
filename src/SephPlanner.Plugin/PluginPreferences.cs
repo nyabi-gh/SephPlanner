@@ -26,7 +26,7 @@ namespace SephPlanner.Plugin
         public Dictionary<int, int> PinnedLevels { get; set; } = new Dictionary<int, int>();
 
         /// <summary>
-        /// 0.1.3 까지의 형식(단계 없이 목록뿐). 읽어서 1단계로 옮기고 비운다. 지우면 예전 파일을
+        /// 0.1.2 까지의 형식(단계 없이 목록뿐). 읽어서 1단계로 옮기고 비운다. 지우면 예전 파일을
         /// 가진 사람의 지정이 조용히 사라진다.
         /// </summary>
         public List<int> PinnedCharms { get; set; } = new List<int>();

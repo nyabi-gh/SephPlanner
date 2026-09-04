@@ -88,6 +88,11 @@ namespace SephPlanner.Plugin
             if (Time.unscaledTime < _nextPoll) return;
             // 하한은 설정의 범위가 지킨다. 여기서 다시 자르면 그 범위가 무슨 값인지 두 군데에 적힌다.
             _nextPoll = Time.unscaledTime + _settings.PollInterval.Value;
+
+            // 적용 중에는 격자가 걸음마다 바뀐다. 그때마다 다시 풀면 돌고 있던 빔 서치를 취소하고
+            // 새로 시작하는 일을 초당 몇 번씩 하게 된다 - 하필 서버 왕복을 기다리는 동안이다.
+            // 끝나면 AutoPlaceFinished 가 _nextPoll 을 0 으로 두어 곧바로 다시 읽는다.
+            if (PlanApplier.InProgress) return;
             PollGameState();
         }
 
@@ -666,6 +671,10 @@ namespace SephPlanner.Plugin
         /// </summary>
         private string Hint(Plan plan, string preview)
         {
+            // 참가자 세션의 적용은 걸음마다 서버 왕복을 기다려 수 초가 걸린다. 그동안 아무 말이
+            // 없으면 인벤토리가 저 혼자 움직이는 것으로만 보인다.
+            if (PlanApplier.InProgress) return PlanApplier.Progress;
+
             // 이동 중에는 커서 좌표를 그대로 보여준다. 화면이 따라오지 않을 때 커서를 못 읽는
             // 것인지 자리가 안 먹는 것인지, 로그를 뒤지지 않고 화면에서 바로 갈린다.
             if (_moving)
@@ -809,6 +818,7 @@ namespace SephPlanner.Plugin
                 IsMultiplayer = snapshot != null && snapshot.IsMultiplayer,
                 AllowMultiplayer = _settings.MultiplayerAutoPlace.Value,
                 SessionActive = NetworkServer.active || NetworkClient.active,
+                Applying = PlanApplier.InProgress,
             });
 
         /// <summary>
