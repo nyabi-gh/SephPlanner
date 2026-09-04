@@ -47,10 +47,13 @@ public readonly SyncDictionary<ItemPosition, StoneTablet>        stoneTablets;
 (반대로 포션을 격자로 꺼내는 것은 막지 않는다).
 
 그래서 딕셔너리를 그냥 훑으면 **포션이 격자 아이템으로 섞여 든다.** 배치 쪽은 원래부터 격자
-밖 좌표를 걸러 냈지만(`PlanBuilder.IsOnGrid`, `PlanApplier.IsOnGrid`), 스냅샷의 아이템 목록에는
-그대로 들어 있어 "가방에 아이템 몇 개" 같은 셈이 조용히 어긋날 자리였다. 지금은 `GameReader`가
-읽을 때 걸러 내고, 진단이 필요할 때는 F10 덤프가 딕셔너리를 있는 그대로 보여준다(덤프 머리에
-`Potion=`, `SubBag=` 개수도 함께 적힌다).
+밖 좌표를 걸러 냈지만 스냅샷의 아이템 목록에는 그대로 들어 있어 "가방에 아이템 몇 개" 같은
+셈이 조용히 어긋날 자리였다. 지금은 `GameReader`가 읽을 때 걸러 내고, 진단이 필요할 때는
+F10 덤프가 딕셔너리를 있는 그대로 보여준다(덤프 머리에 `Potion=`, `SubBag=` 개수도 함께 적힌다).
+
+이 판정은 `GridSpec.Contains` 하나다. 한동안 같은 뜻의 함수가 네 벌(계획·적용 전 검사·적용기·
+읽기) 있었고 그중 읽기 쪽만 아직 잠긴 칸(`CurrentInventoryStorage` 밖)을 보지 않았다. 넷이
+갈리면 솔버와 자동 배치가 서로 다른 격자를 보게 되므로 한 벌로 모았다.
 
 **보조 가방**(`numberOfSubBagStorage`)은 아예 다른 딕셔너리(`subBagMatrix`, 키가 `sbyte`)라
 `inventoryMatrix` 에 나타나지 않는다. 격자와 오가는 길은 `ServerSwapSubBagAndInventory` 뿐이다.
@@ -1159,7 +1162,7 @@ F9 덤프, F10 인벤토리 덤프). 단축키를 새로 정할 일이 생기면
 
 ### 게임의 컨트롤 스택에 올린다
 
-창을 우리 손으로 관리하지 않는다. `SettingsPanel`이 게임의 **`UIBase`를 상속**해서
+창을 우리 손으로 관리하지 않는다. `PlannerPanel`이 게임의 **`UIBase`를 상속**해서
 `ParentRoot.AddControl` 로 컨트롤 스택에 올라가면, 게임이 다음을 알아서 해 준다.
 
 - **여는 동안 캐릭터 조작이 멈춘다.** 플레이어 입력 처리기가 이동·공격·핑을 전부
