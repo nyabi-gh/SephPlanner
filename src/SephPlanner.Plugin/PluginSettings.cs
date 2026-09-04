@@ -89,6 +89,12 @@ namespace SephPlanner.Plugin
         private static readonly float[] ScaleSteps = { 0.8f, 0.9f, 1.0f, 1.15f, 1.3f, 1.5f };
         private static readonly float[] WidthSteps = { 18f, 22f, 26f, 30f, 36f };
 
+        // 두 값은 오랫동안 설정 파일에만 있었다. 그런데 갱신 주기는 느린 기계가 제일 먼저
+        // 손대야 하는 값이고, 추천 범위는 "왜 저 상자가 후보에 없지"의 답이다. 게임을 끄고
+        // 텍스트 편집기를 열어야만 닿을 수 있는 자리에 둘 값이 아니다.
+        private static readonly float[] PollSteps = { 0.15f, 0.25f, 0.5f, 1f };
+        private static readonly float[] RadiusSteps = { 8f, 12f, 20f, 30f };
+
         public static float MinScale => ScaleSteps[0];
         public static float MaxScale => ScaleSteps[ScaleSteps.Length - 1];
         public static float MinWidth => WidthSteps[0];
@@ -258,7 +264,11 @@ namespace SephPlanner.Plugin
                     new[] { "아주 좁게", "좁게", "보통", "넓게", "아주 넓게" }),
                 Steps("불투명도", Opacity, OpacitySteps, new[] { "55%", "70%", "85%", "100%" }),
                 Switch("후보 추천", Recommendations),
+                Steps("추천 범위", OfferRadius, RadiusSteps,
+                    new[] { "좁게", "보통", "넓게", "아주 넓게" }),
                 Switch("멀티 자동 배치(실험)", MultiplayerAutoPlace),
+                Steps("갱신 주기", PollInterval, PollSteps,
+                    new[] { "0.15초", "0.25초", "0.5초", "1초" }),
                 Key("접기/펼치기", ExpandKey, keys, keyNames, divider: true),
                 Key("자동 배치", AutoPlaceKey, keys, keyNames),
                 Key("후보 미리보기", PreviewKey, keys, keyNames),

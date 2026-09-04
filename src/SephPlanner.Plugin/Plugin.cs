@@ -37,7 +37,7 @@ namespace SephPlanner.Plugin
         private GameSnapshot _lastSnapshot;
         private string _lastPanelOrigin;
         private string _lastPanelBlocker;
-        private string _lastRenderError;
+        private readonly Dictionary<string, string> _lastErrors = new Dictionary<string, string>();
         private string _lastWindowOrigin;
         private string _lastCatalogError = "";
         private string _lastWindowBlocker;
@@ -114,6 +114,21 @@ namespace SephPlanner.Plugin
             Logger.LogInfo(FrameCost.Summary());
         }
 
+        /// <summary>
+        /// 이 자리에서 처음 보는 오류인가. 매 프레임 도는 자리들이라 같은 것을 되풀이해 남기면
+        /// 로그가 못 쓰게 된다.
+        ///
+        /// <b>자리마다 따로 센다.</b> 예전에는 입력·화면 갱신·그리기가 마지막 오류 하나를 함께
+        /// 썼는데, 서로 다른 둘이 번갈아 나면 억제가 아예 듣지 않아 프레임마다 두 줄씩 쌓였다.
+        /// </summary>
+        private bool NewError(string label, string message)
+        {
+            if (_lastErrors.TryGetValue(label, out var previous) && previous == message) return false;
+
+            _lastErrors[label] = message;
+            return true;
+        }
+
         private void Guarded(Action step, string label)
         {
             try
@@ -122,10 +137,8 @@ namespace SephPlanner.Plugin
             }
             catch (Exception ex)
             {
-                var message = label + " - " + ex.GetType().Name + ": " + ex.Message;
-                if (message == _lastRenderError) return;
+                if (!NewError(label, ex.GetType().Name + ": " + ex.Message)) return;
 
-                _lastRenderError = message;
                 Logger.LogError(label + " 실패 - " + ex);
             }
         }
@@ -505,10 +518,8 @@ namespace SephPlanner.Plugin
                 // 반쯤 그려진 화면이 굳지 않게 다음 프레임에 처음부터 다시 그리게 한다.
                 _hud.Invalidate();
 
-                var message = ex.GetType().Name + ": " + ex.Message;
-                if (message == _lastRenderError) return;
+                if (!NewError("화면 그리기", ex.GetType().Name + ": " + ex.Message)) return;
 
-                _lastRenderError = message;
                 Logger.LogError("화면 그리기 실패 - " + ex);
             }
         }
@@ -813,7 +824,11 @@ namespace SephPlanner.Plugin
         private void AutoPlaceFinished(string result)
         {
             Logger.LogInfo(result);
-            Report(result);
+
+            // 자동 배치 결과는 다른 안내보다 오래 띄운다. 실패하면 "손으로 정리한 뒤 다시
+            // 시도하세요" 같은 긴 문장이 오는데, 전투 중이면 여섯 초로는 읽다 만다.
+            // 이 길이는 재어 본 값이 아니라 읽는 데 걸릴 시간을 어림한 것이다.
+            Report(result, AutoPlaceNoticeSeconds);
 
             // 적용 결과가 화면에 바로 보이도록 다음 폴링을 기다리지 않는다.
             _nextPoll = 0;
@@ -882,10 +897,13 @@ namespace SephPlanner.Plugin
             Logger.LogInfo($"이동 모드 끝 - 커서 {Cursor()} 여백 {margin}");
         }
 
-        private void Report(string message)
+        private const float NoticeSeconds = 6f;
+        private const float AutoPlaceNoticeSeconds = 12f;
+
+        private void Report(string message, float seconds = NoticeSeconds)
         {
             _autoPlaceResult = message;
-            _autoPlaceShownUntil = Time.unscaledTime + 6f;
+            _autoPlaceShownUntil = Time.unscaledTime + seconds;
         }
 
         private void OnDestroy()
