@@ -403,7 +403,15 @@ namespace SephPlanner.Plugin
         {
             Catalog = _runner != null ? CatalogSource.Get() : null,
             Snapshot = _lastSnapshot,
-            Plan = CurrentPlan(),
+
+            // 최신 계획이 아니라 마지막으로 게시된 계획을 준다. 강화 우선을 누르면 그 지정이
+            // 계획 지문에 들어가 곧바로 다시 풀리는데, 그동안 "최신이 아니다"를 "계획이 없다"로
+            // 읽으면 가방에 있는 아티팩트가 목록에서 사라지고 지정해 둔 것만 "가방에 없음"으로
+            // 남는다. 누른 순간이 재계산과 겹치느냐에 따라 그랬다 말았다 한다.
+            //
+            // 이 창이 계획에서 읽는 것은 가방에 무엇이 있느냐인데, 지정을 바꾼다고 가방이
+            // 바뀌지는 않는다. 그래서 최신성을 요구할 이유가 없다.
+            Plan = _runner?.State?.Latest,
             Recommendations = _settings.Recommendations.Value,
         };
 
