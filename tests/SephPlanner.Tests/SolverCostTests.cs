@@ -19,10 +19,13 @@ public class SolverCostTests
 {
     private const int Tablets = 6;
 
-    /// <summary>가방이 꽉 찬 판. 후보를 집으려면 무엇이든 하나는 빠져야 한다.</summary>
-    private static PlacementProblem FullBag(int charmCount)
+    /// <summary>
+    /// 가방이 꽉 찬 판. 후보를 집으려면 무엇이든 하나는 빠져야 한다.
+    /// <paramref name="spare"/>를 주면 그만큼 자리가 남아 밀어내는 갈래가 생기지 않는다.
+    /// </summary>
+    private static PlacementProblem FullBag(int charmCount, int spare = 0)
     {
-        var storage = Tablets + charmCount;
+        var storage = Tablets + charmCount + spare;
         var problem = new PlacementProblem { Grid = new GridSpec(6, 7, storage) };
 
         var queries = new[] { "RIGHT 1", "HORIZONTAL 2", "UP 1", "O 2", "VERTICAL 1", "KNIGHTUPLEFT 2" };
@@ -112,6 +115,52 @@ public class SolverCostTests
         Assert.True(large.Reuses > small.Reuses, "갈래가 늘었으면 돌려 쓴 횟수는 늘어야 한다.");
     }
 
+    private static Catalog MixCatalog() => new(
+        new[] { new TabletDefinition { Id = "mixed", EntityId = TabletMix.ResultEntityId } },
+        Array.Empty<CharmDefinition>());
+
+    /// <summary>
+    /// 후보 추천과 석판 합성은 <b>같은 기준 배치</b> 위에서 겨뤄야 한다.
+    ///
+    /// 둘은 탐색 강도를 저마다 적어 두고 기준을 따로 풀고 있었다. 강도가 <see cref="LayoutCache"/>의
+    /// 열쇠에 들어가므로, 한쪽만 고치면 캐시가 조용히 갈라져 <b>두 조언이 서로 다른 배치를 기준으로
+    /// 증가분을 말하게 된다.</b> 컴파일도 되고 테스트도 통과하는 종류의 사고라 여기서 붙잡는다.
+    ///
+    /// 자리를 남긴 판을 쓰는 것은 밀어내는 갈래를 없애기 위해서다. 아티팩트 후보는 석판 구성을
+    /// 건드리지 않으므로, 두 조언이 같은 강도를 쓰는 한 석판 탐색은 처음 한 번이 전부다.
+    /// </summary>
+    [Fact]
+    public void BothAdvisorsShareOneBaseLayoutSearch()
+    {
+        var problem = FullBag(charmCount: 12, spare: 6);
+        var shared = new LayoutCache();
+
+        TabletMixAdvisor.Rank(problem, MixCatalog(), cost: 0, gold: 1000, limit: 1, layouts: shared);
+        var afterMix = shared.Searches;
+
+        OfferAdvisor.Rank(problem, Candidates(charms: 3, tablets: 0), int.MaxValue, layouts: shared);
+
+        Assert.Equal(afterMix, shared.Searches);
+    }
+
+    /// <summary>
+    /// 기준 배치는 판과 강도가 그대로일 때만 돌려 쓴다. 강도가 다른데도 남의 답을 주면, 기준과
+    /// 후보가 다른 잣대로 풀리는 것을 막으려던 자리가 도리어 그것을 만들어 낸다.
+    /// </summary>
+    [Fact]
+    public void TheBaselineIsReusedOnlyForTheSameProblemAndStrength()
+    {
+        var problem = FullBag(charmCount: 12, spare: 6);
+        var cache = new LayoutCache();
+        var advice = SolverOptions.ForAdvice(default);
+
+        var first = cache.Baseline(problem, advice);
+
+        Assert.Same(first, cache.Baseline(problem, SolverOptions.ForAdvice(default)));
+        Assert.NotSame(first, cache.Baseline(problem, new SolverOptions { BeamWidth = 32 }));
+        Assert.NotSame(first, cache.Baseline(FullBag(charmCount: 12, spare: 6), advice));
+    }
+
     /// <summary>
     /// 합성 추천은 쌍마다 처음부터 풀지 않는다. 짐작으로 줄을 세우고 상위 몇만 다시 푼다 -
     /// 석판 다섯이면 쌍이 열인데, 예전에는 그 열을 전부 풀어 2.3초에 3.2GB 였다.
@@ -121,12 +170,10 @@ public class SolverCostTests
     {
         var problem = FullBag(charmCount: 20);
         var cache = new LayoutCache();
-        var catalog = new Catalog(
-            new[] { new TabletDefinition { Id = "mixed", EntityId = TabletMix.ResultEntityId } },
-            Array.Empty<CharmDefinition>());
 
         const int limit = 5;
-        var advice = TabletMixAdvisor.Rank(problem, catalog, cost: 0, gold: 1000, limit: limit, layouts: cache);
+        var advice = TabletMixAdvisor.Rank(
+            problem, MixCatalog(), cost: 0, gold: 1000, limit: limit, layouts: cache);
 
         Assert.NotEmpty(advice);
         Assert.True(

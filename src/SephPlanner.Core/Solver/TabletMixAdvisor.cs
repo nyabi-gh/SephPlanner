@@ -46,10 +46,6 @@ namespace SephPlanner.Core.Solver
     /// </summary>
     public static class TabletMixAdvisor
     {
-        /// <summary>후보 추천과 같은 탐색 강도. 기준과 후보를 같은 잣대로 풀어야 증가분이 뜻을 갖는다.</summary>
-        private static SolverOptions Faster(CancellationToken cancellation) =>
-            new() { BeamWidth = 150, ExactCandidates = 40, Cancellation = cancellation };
-
         /// <summary>
         /// 쌍마다 배치를 처음부터 다시 푸는 대신, <b>먼저 짐작으로 줄을 세우고 상위 몇만 제대로
         /// 푼다.</b> 짐작은 지금 배치에서 재료 둘을 빼고 그 빈자리에 결과를 놓아 보는 것이다 -
@@ -71,9 +67,8 @@ namespace SephPlanner.Core.Solver
             if (materials.Count < 2) return new List<MixAdvice>();
 
             layouts ??= new LayoutCache();
-            var faster = Faster(cancellation);
-            var baseArrangement = PlacementSolver.EvaluateLayouts(
-                problem, layouts.Of(problem, faster), faster);
+            var faster = SolverOptions.ForAdvice(cancellation);
+            var baseArrangement = layouts.Baseline(problem, faster);
             var baseScore = baseArrangement.Score;
 
             // 짐작의 바탕. 석판이 다 놓이지 못한 배치는 자리와 석판의 짝이 어긋나므로 쓰지 않고,

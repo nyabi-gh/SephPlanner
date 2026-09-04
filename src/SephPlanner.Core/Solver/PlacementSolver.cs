@@ -473,7 +473,7 @@ namespace SephPlanner.Core.Solver
                 var slot = problem.Tablets[index];
 
                 // 회전이 잠긴 석판은 지금 각도가 곧 제 모양이라 쌍둥이 판정에 들어간다.
-                var signature = string.Join("", new[]
+                var signature = string.Join("\u0001", new[]
                 {
                     slot.Definition.EntityId.ToString(),
                     slot.InstanceQuery ?? slot.Definition.Query,

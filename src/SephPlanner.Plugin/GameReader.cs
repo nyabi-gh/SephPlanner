@@ -4,6 +4,7 @@ using Mirror;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
+using SephPlanner.Core.Tablets;
 using UnityEngine;
 
 namespace SephPlanner.Plugin
@@ -94,7 +95,14 @@ namespace SephPlanner.Plugin
                 if (byIdentity != null) return byIdentity;
             }
 
-            // 세션 초기화 중에는 localPlayer 가 비어 있을 수 있다.
+            // 세션 초기화 중에는 localPlayer 가 비어 있을 수 있어 씬을 훑는 폴백을 남겨 둔다.
+            // 다만 클라이언트가 서 있지 않으면 이 폴백은 반드시 빈손이다 - 게임의 Mirror 는
+            // NetworkClient 의 스폰 경로에서만 isLocalPlayer 를 켜고 Shutdown 이 그것을 지운다.
+            // 그런데 폴백이 FindObjectsByType 이라 이 게임에서 한 번에 4ms 대이고, 타이틀·로비가
+            // 정확히 localPlayer 가 비어 있는 상태여서 폴링마다 그 값을 치르고 있었다.
+            // active 는 접속 중에도 참이므로 위 초기화 구간은 그대로 살아 있다.
+            if (!NetworkClient.active) return null;
+
             foreach (var candidate in UnityEngine.Object.FindObjectsByType<PlayerAvatar>(FindObjectsSortMode.None))
             {
                 if (candidate.isLocalPlayer) return candidate;
@@ -163,6 +171,7 @@ namespace SephPlanner.Plugin
                 Storage = inv.CurrentInventoryStorage,
             };
 
+            var grid = GridOf(inv);
             var seenItems = new HashSet<int>();
             foreach (var pair in inv.inventoryMatrix)
             {
@@ -174,7 +183,7 @@ namespace SephPlanner.Plugin
                 // (x 는 0..numberOfPotionStorage-1). 석판 배치와는 아무 상관이 없는 자리이므로
                 // 아이템 목록에 섞으면 "가방에 아이템 몇 개" 같은 셈이 조용히 어긋난다.
                 // 진단이 필요할 때는 F10 덤프가 딕셔너리를 있는 그대로 보여준다.
-                if (!IsOnGrid(instance.XIdx, instance.YIdx, inv)) continue;
+                if (!grid.Contains(instance.XIdx, instance.YIdx)) continue;
 
                 state.Items.Add(new PlacedItem
                 {
@@ -278,11 +287,11 @@ namespace SephPlanner.Plugin
         };
 
         /// <summary>
-        /// 본 격자 안의 자리인가. 격자 밖 좌표는 포션 벨트(y=100)이고, 보조 가방은 아예 다른
-        /// 딕셔너리(<c>subBagMatrix</c>)라 여기 오지 않는다.
+        /// 살아 있는 인벤토리를 솔버가 쓰는 격자 규격으로. 칸 안팎을 가리는 판정이 이것 하나로
+        /// 모여, 읽기와 자동 배치와 솔버가 같은 격자를 본다(<see cref="GridSpec.Contains"/>).
         /// </summary>
-        private static bool IsOnGrid(sbyte x, sbyte y, GridInventory inv) =>
-            x >= 0 && x < inv.Width && y >= 0 && y < inv.Height;
+        internal static GridSpec GridOf(GridInventory inv) =>
+            new GridSpec(inv.Width, inv.Height, inv.CurrentInventoryStorage);
 
         private static int LookupMatrix(SyncDictionary<ItemPosition, int> matrix, sbyte x, sbyte y)
         {

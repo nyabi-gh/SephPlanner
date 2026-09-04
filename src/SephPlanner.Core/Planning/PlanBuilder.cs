@@ -115,7 +115,7 @@ namespace SephPlanner.Core.Planning
             foreach (var item in inventory.Items
                          .OrderBy(i => i.DefinitionId).ThenBy(i => i.InstanceId))
             {
-                if (!IsOnGrid(item.Position, grid)) continue;
+                if (!grid.Contains(item.Position)) continue;
 
                 // 아티팩트가 아닌 아이템도 칸을 차지한다. 빼놓으면 솔버가 그 자리를 비어 있다고 본다.
                 var definition = catalog.Charm(item.DefinitionId);
@@ -190,7 +190,9 @@ namespace SephPlanner.Core.Planning
 
                 // 후보마다 이미 배치를 다 풀어 두었다. 그 결과를 버리지 않고 화면이 쓸 모양으로
                 // 옮겨 두면, 증가분이라는 숫자 하나 대신 무엇이 어떻게 달라지는지 보여줄 수 있다.
-                FillPreviews(offers, best);
+                // 기준 배치는 조언이 이미 푼 것을 그대로 받는다 - 여기서 다시 풀지 않는다.
+                if (offers.Count > 0)
+                    FillPreviews(offers, problem, layouts.Baseline(problem, SolverOptions.ForAdvice(cancellation)));
             }
 
             var verification = Verify(inventory, current, grid);
@@ -223,11 +225,21 @@ namespace SephPlanner.Core.Planning
         }
 
         /// <summary>
-        /// 후보를 집었을 때의 격자를 채운다. 지금 최선과 견주어 달라지는 칸도 함께 표시한다 -
-        /// 미리보기의 요점은 배치 전체가 아니라 무엇이 바뀌는가이기 때문이다.
+        /// 후보를 집었을 때의 격자를 채운다. 달라지는 칸도 함께 표시한다 - 미리보기의 요점은
+        /// 배치 전체가 아니라 무엇이 바뀌는가이기 때문이다.
+        ///
+        /// 견주는 것은 <paramref name="baseline"/>, 곧 후보를 하나도 집지 않은 판을 후보와 <b>같은
+        /// 강도로</b> 푼 배치다. 화면에 늘 떠 있는 <c>Best</c>는 더 촘촘한 탐색에서 나오는데,
+        /// 두 탐색이 동점 배치를 다르게 고르면 후보 때문이 아닌 칸까지 금색으로 짚게 된다.
         /// </summary>
-        private static void FillPreviews(List<OfferAdvice> offers, Arrangement best)
+        private static void FillPreviews(
+            List<OfferAdvice> offers, PlacementProblem problem, Arrangement baseline)
         {
+            var baseNames = NamesByCell(problem, baseline);
+            var baseTablets = new HashSet<(GridPos Position, int Rotation)>();
+            foreach (var placement in baseline.Tablets)
+                baseTablets.Add((placement.Position, placement.Rotation));
+
             foreach (var advice in offers)
             {
                 if (advice.Trial is not { } trial || advice.Solved is not { } solved) continue;
@@ -243,15 +255,14 @@ namespace SephPlanner.Core.Planning
                 foreach (var pair in solved.EffectiveLevels) preview.EffectiveLevels[pair.Key] = pair.Value;
                 foreach (var pair in solved.InactiveCells) preview.InactiveCells[pair.Key] = pair.Value;
 
-                var current = NamesByCell(trial, best);
                 foreach (var pair in preview.Names)
                 {
-                    if (!current.TryGetValue(pair.Key, out var was) || was != pair.Value)
+                    if (!baseNames.TryGetValue(pair.Key, out var was) || was != pair.Value)
                         preview.Changed.Add(pair.Key);
                 }
                 foreach (var placement in solved.Tablets)
                 {
-                    if (!best.Tablets.Any(t => t.Position == placement.Position && t.Rotation == placement.Rotation))
+                    if (!baseTablets.Contains((placement.Position, placement.Rotation)))
                         preview.Changed.Add(placement.Position);
                 }
 
@@ -393,7 +404,7 @@ namespace SephPlanner.Core.Planning
                         Reason = "게임의 비활성 칸 좌표를 해석할 수 없어 자동 배치를 잠갔습니다.",
                     };
                 }
-                if (IsOnGrid(cell, grid)) reportedDisabled.Add(cell);
+                if (grid.Contains(cell)) reportedDisabled.Add(cell);
             }
 
             var disabledMismatches = 0;
@@ -408,7 +419,7 @@ namespace SephPlanner.Core.Planning
             var itemDisabledMismatches = 0;
             foreach (var item in inventory.Items)
             {
-                if (!IsOnGrid(item.Position, grid)) continue;
+                if (!grid.Contains(item.Position)) continue;
                 if (!current.Levels.TryGetValue(item.Position, out var level) || level != item.EffectiveLevel)
                     effectiveLevelMismatches++;
 
@@ -453,15 +464,6 @@ namespace SephPlanner.Core.Planning
             cell = new GridPos(x, y);
             return true;
         }
-
-        /// <summary>
-        /// 본 격자 안이면서 열려 있는 칸인가. 격자 밖 좌표는 포션 벨트(게임이 y=100 줄에 둔다)
-        /// 같은 다른 보관함이라 배치 대상이 아니다.
-        /// </summary>
-        private static bool IsOnGrid(GridPos position, GridSpec grid) =>
-            position.X >= 0 && position.X < grid.Width &&
-            position.Y >= 0 && position.Y < grid.Height &&
-            grid.ToIndex(position.X, position.Y) < grid.Storage;
 
         /// <summary>
         /// 무엇을 어디로 옮길지, 그리고 그것을 실제로 따라 할 수 있는 순서로 세운다.

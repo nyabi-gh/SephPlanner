@@ -129,10 +129,6 @@ namespace SephPlanner.Core.Solver
             public int RemovedTabletIndex = -1;
         }
 
-        /// <summary>후보마다 한 번씩 푸는 만큼, 기본 탐색보다 가볍게 잡는다.</summary>
-        private static SolverOptions Faster(CancellationToken cancellation) =>
-            new() { BeamWidth = 150, ExactCandidates = 40, Cancellation = cancellation };
-
         /// <summary>밀고 있는 카테고리의 콤보 가치를 몇 배로 칠지.</summary>
         private const double PriorityMultiplier = 3.0;
 
@@ -160,12 +156,12 @@ namespace SephPlanner.Core.Solver
             if (candidates.Count == 0) return new List<OfferAdvice>();
 
             layouts ??= new LayoutCache();
-            var faster = Faster(cancellation);
+            var faster = SolverOptions.ForAdvice(cancellation);
 
             // 기준과 후보를 같은 탐색 강도로, 그리고 같은 배치 후보들 위에서 풀어야 증가분이
             // 순수하게 후보의 몫이 된다. 기준만 촘촘한 탐색으로 풀면, 명백히 좋은 후보에도 탐색
             // 강도 차이만큼 음수가 나온다.
-            var baseScore = PlacementSolver.EvaluateLayouts(problem, layouts.Of(problem, faster), faster).Score;
+            var baseScore = layouts.Baseline(problem, faster).Score;
 
             var advice = new List<OfferAdvice>();
             var nextInstanceId = -1;
@@ -440,9 +436,12 @@ namespace SephPlanner.Core.Solver
         }
 
         /// <summary>
-        /// 석판 하나를 뺀 배치. 자리는 <c>problem.Tablets</c> 순서와 짝지어져 있으므로 그 번호의
-        /// 자리만 빼면 그대로 쓸 수 있다. 배치가 온전하지 않으면(석판이 다 놓이지 못했으면)
-        /// 짝이 어긋나므로 만들지 않는다.
+        /// 석판 하나를 뺀 배치.
+        ///
+        /// 배치 후보는 어느 경로로 만들어지든 <c>problem.Tablets</c> 순서를 지킨다 - 빔은 앞에서부터
+        /// 한 장씩 붙이고, 현재 배치와 직전 제안은 그 순서로 짓거나 아예 만들지 않는다. 그래서
+        /// 석판이 다 놓이지 못한 배치에서도 <c>layout[i]</c>는 <c>Tablets[i]</c>이고, 그 번호의
+        /// 자리만 빼면 짝이 맞는다. 만들지 못하는 것은 배치 길이보다 뒤를 빼라고 할 때뿐이다.
         /// </summary>
         private static IReadOnlyList<List<TabletPlacement>>? Without(
             IReadOnlyList<List<TabletPlacement>>? layouts, int index)

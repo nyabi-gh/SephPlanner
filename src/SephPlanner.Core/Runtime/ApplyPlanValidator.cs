@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using SephPlanner.Core.Model;
+using SephPlanner.Core.Tablets;
 
 namespace SephPlanner.Core.Runtime
 {
@@ -41,6 +42,7 @@ namespace SephPlanner.Core.Runtime
             if (liveById.Count != command.Targets.Count)
                 return Changed();
 
+            var grid = new GridSpec(width, height, storage);
             var targetIds = new HashSet<int>();
             var destinations = new HashSet<GridPos>();
             foreach (var target in command.Targets)
@@ -49,7 +51,7 @@ namespace SephPlanner.Core.Runtime
                     return "같은 아이템이 자동 배치 계획에 두 번 들어 있습니다.";
                 if (!destinations.Add(target.To))
                     return $"목표 칸 {target.To}이 겹쳐 자동 배치를 중단합니다.";
-                if (!IsOnGrid(target.To, width, height, storage))
+                if (!grid.Contains(target.To))
                     return $"목표 칸 {target.To}이 격자 밖이라 자동 배치를 중단합니다.";
                 if (!liveById.TryGetValue(target.InstanceId, out var live))
                     return Changed();
@@ -69,10 +71,5 @@ namespace SephPlanner.Core.Runtime
 
         private static string Changed() =>
             "배치 계산 이후 인벤토리가 바뀌어 자동 배치를 중단합니다. 잠시 뒤 다시 시도하세요.";
-
-        private static bool IsOnGrid(GridPos position, int width, int height, int storage) =>
-            position.X >= 0 && position.X < width &&
-            position.Y >= 0 && position.Y < height &&
-            position.Y * width + position.X < storage;
     }
 }

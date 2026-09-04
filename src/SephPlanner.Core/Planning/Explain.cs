@@ -113,11 +113,9 @@ namespace SephPlanner.Core.Planning
                 $"{advice.NameA} 와(과) {advice.NameB} 을(를) 합칩니다. 재료 둘은 사라집니다.",
             };
 
-            if (advice.RotationA != 0 || advice.RotationB != 0)
-            {
-                lines.Add("합성기에 넣기 전에 " + Turn(advice).Replace("돌려서: ", "") +
-                          " 만큼 돌려 두어야 이 결과가 나옵니다.");
-            }
+            var turn = Turn(advice);
+            if (turn.Length > 0)
+                lines.Add($"합성기에 넣기 전에 {turn} 만큼 돌려 두어야 이 결과가 나옵니다.");
 
             lines.Add(advice.Rotatable
                 ? "결과는 돌릴 수 있습니다 (재료가 둘 다 돌아가므로)."
@@ -144,13 +142,16 @@ namespace SephPlanner.Core.Planning
             return text.Trim();
         }
 
-        /// <summary>합성 전에 재료를 돌려 놓아야 하는지. 돌릴 것이 없으면 빈 문자열이다.</summary>
+        /// <summary>
+        /// 합성 전에 재료를 돌려 놓아야 하는 각도. 돌릴 것이 없으면 빈 문자열이라, 이 값 하나로
+        /// 돌릴 것이 있는지까지 답한다. 문장으로 감싸는 것은 부르는 쪽 몫이다.
+        /// </summary>
         public static string Turn(MixAdvice advice)
         {
             var parts = new List<string>();
             if (advice.RotationA != 0) parts.Add($"{advice.NameA} {advice.RotationA * 90}°");
             if (advice.RotationB != 0) parts.Add($"{advice.NameB} {advice.RotationB * 90}°");
-            return parts.Count > 0 ? "돌려서: " + string.Join(", ", parts) : "";
+            return string.Join(", ", parts);
         }
 
         public static string Join(IReadOnlyList<string> lines) => string.Join(Environment.NewLine, lines);

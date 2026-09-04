@@ -27,6 +27,11 @@
 - **저사양 PC 의 진입 지연.** 우리 잣대는 아래 "측정 기준선" 의 카탈로그 짓기 3회 / 98.7ms 다.
   제보의 `[perf]` 에서 시도 횟수가 수십 번이거나 합계가 초 단위면 우리 것이고, 3회 안팎인데도
   느리면 게임 자체 로딩이다.
+  - 짚이는 곳 하나를 닫았다. `GameReader.FindLocalPlayer` 의 폴백이 타이틀·로비에서 폴링마다
+    두 번 씬을 통째로 훑고 있었다(`FindObjectsByType` 은 이 게임에서 한 번에 4ms 대다).
+    세션이 서 있지 않으면 그 폴백은 반드시 빈손이라는 것을 게임 어셈블리에서 확인하고 잘랐다.
+    **다만 우리 손으로는 재지 못했다** - 기준선 측정이 런 안에서만 이뤄져 이 구간의 전후 값이
+    없다. 제보로 확인할 몫이다.
 - **다음 게임 패치 뒤 멀티 경로 재확인.** 개발사가 "동기화 구현이 최적화 중이라 바뀔 수 있다"고
   했다(LEGAL.md "받은 답변"). 패치 뒤에는 참가자 경로가 아직 그대로인지 다시 본다.
 
@@ -36,27 +41,11 @@
 위험이 큰 순이다. 검토 보고서 원본은 git 로그에 있다(`docs/REVIEW.md`, `docs/REVIEW-0.1.3.md`,
 `docs/P1_REMEDIATION.md`, `19ab3f3` 까지).
 
-### 위험한 중복
-
-- **`Faster()` 가 `OfferAdvisor` 와 `TabletMixAdvisor` 에 글자까지 같은 것으로 둘 있다.** 둘이
-  `PlanBuilder` 의 한 `LayoutCache` 를 나눠 쓰고 캐시 키에 옵션 값이 들어가므로, 한쪽만 고치면
-  캐시가 조용히 갈라져 **후보와 합성이 서로 다른 배치 위에서 겨루게 된다.** 위험 대비 가장 싸다.
-- `NativeHud.Reach` 는 `Explain.Reach`(public)의 완전한 복사본이다.
-- `IsOnGrid` 가 넷 있고(`PlanBuilder`, `ApplyPlanValidator`, `PlanApplier`, `GameReader`)
-  `GameReader` 만 `CurrentInventoryStorage` 를 보지 않는다. 지금은 잠긴 칸에 물건이 들어갈 일이
-  없어 살아 있는 결함은 아니다.
-
 ### 매 프레임 / 폴링마다 도는 것
 
 측정 근거가 있는 것들이다. 지금 폴링 평균은 1.92ms 라 급하지는 않다.
 
-- `PluginSettings.LayoutSignature` 가 부를 때마다 문자열을 만들고 `UpdateNativePanel` 이
-  프레임마다 두 번 부른다.
 - `PlanRunner.Submit` 이 지문 셋을 겹쳐 계산한다 — 폴링당 `Placement` 3회, `PlanningContext` 4회.
-- `GameReader.FindLocalPlayer` 에 `NetworkClient.active` 게이트가 없다. 폴백이
-  `FindObjectsByType<PlayerAvatar>` 이고 폴링마다 두 번 불린다. **타이틀·로비가 정확히 그
-  상태**라 기준선 측정이 못 본 비용이다.
-- `Hint()`/`Guide()` 연결과 `_runner.State` 가 펼친 상태에서 매 프레임 돈다.
 - 빔 확장이 확장마다 대여섯 개를 할당하고 가지치기 전에 전부 실체화한다. 먼저 실기에서 GC 끊김이
   남았는지 재고 나서 손댄다.
 
@@ -64,13 +53,6 @@
 
 - **석판 제거 갈래의 잣대가 아티팩트 밀어내기 쪽으로 기운다.** "갈래를 가르는 것은 배치가
   아니다"는 석판 집합이 같은 갈래에만 맞다.
-- **`OfferAdvisor.Without` 이 약속한 완전성 검사를 하지 않는다.** 주석은 "온전하지 않으면 만들지
-  않는다"인데 코드는 `index < layout.Count` 만 본다. 기준 배치가 불완전하면 `Describe` 에서
-  위치와 슬롯이 어긋나 엉뚱한 갈래 점수가 나온다.
-- **후보 미리보기의 "달라지는 칸"이 잣대가 다르다.** `FillPreviews` 가 후보 격자(빔 150)를 최선
-  배치(빔 400)와 견준다. 두 탐색이 동점 배치를 다르게 고르면 후보 때문이 아닌 칸이 금색이 된다.
-  증가분 쪽은 같은 강도로 다시 풀어 이 함정을 피해 두었는데(`OfferAdvisor.Rank`), 그 배치를
-  점수만 남기고 버려서 미리보기가 쓰지 못한다. 들고 있게 하면 고쳐진다.
 - **이웃 의존 아티팩트 여섯이 남았다.** 12종 중 여섯을 넣었다(하얀 종이, 조화의 수정, 북향의 침,
   거대한 망원경, 헌신의 휘장, 그리고 목록 밖의 캘세더니 열쇠). 남은 것은 `Charm_AutoMagic`,
   `Charm_ReduceMPCost`, `Charm_RightSpellCooldownHelper`, `Charm_NearMagicBullet`,
@@ -89,9 +71,8 @@
 ### 검증·도구·빌드
 
 - `LayoutCache.Of` 가 취소된 탐색 결과도 캐시한다(빌드마다 새 캐시라 지금은 안전).
-- `PluginPreferences.Save` 가 예외를 통째로 삼킨다. 세션당 한 번은 남길 만하다.
-- **`make-release.ps1` 이 확인하지 않는 것 셋**: HEAD 가 `v$version` 태그인지, `[BepInPlugin]`
-  이 `$version` 인지, CHANGELOG 에 그 절이 있는지. 버전은 여전히 세 곳에 손으로 적힌다.
+- 버전은 여전히 세 곳에 손으로 적힌다(`Directory.Build.props`, `[BepInPlugin]`, `CHANGELOG`).
+  `make-release.ps1` 이 셋이 어긋나면 멈추지만, 한 곳에서 나오게 만든 것은 아니다.
 - **CI 가 Plugin 도 DataTool 도 짓지 않는다.** `check.ps1` 로 완화했지만 구멍은 남아 있다.
   근본 해법은 Plugin 의 로직을 Core 로 더 옮겨 CI 가 검사할 표면을 넓히는 것이다(1.2 가 그 첫 걸음).
 - **`QueryVerifier` 가 카탈로그 정의만 돈다.** 합성 석판의 여러 줄 질의는 게임 원본과 대조된 적이

@@ -39,6 +39,8 @@ namespace SephPlanner.Plugin
 
         [JsonIgnore] private string _decodedFrom;
         [JsonIgnore] private BuildPreset _decoded;
+        [JsonIgnore] private Action<string> _log;
+        [JsonIgnore] private bool _saveFailureReported;
 
         /// <summary>바뀔 때마다 오른다. 스냅샷이 그대로여도 다시 풀어야 하는지를 이걸로 안다.</summary>
         [JsonIgnore] public int Revision { get; private set; }
@@ -170,6 +172,7 @@ namespace SephPlanner.Plugin
                         loaded.PinnedCharms = loaded.PinnedCharms ?? new List<int>();
                         loaded.PinnedLevels = loaded.PinnedLevels ?? new Dictionary<int, int>();
                         loaded.MigrateLegacyPins();
+                        loaded._log = log;
                         return loaded;
                     }
                 }
@@ -180,7 +183,7 @@ namespace SephPlanner.Plugin
                 // 넘어가지는 않는다 - 다음 저장에서 덮어써지므로 여기가 알릴 마지막 기회다.
                 log("빌드 설정을 읽지 못해 처음부터 시작합니다: " + ex.Message);
             }
-            return new PluginPreferences();
+            return new PluginPreferences { _log = log };
         }
 
         private void Changed()
@@ -200,9 +203,16 @@ namespace SephPlanner.Plugin
                 // 교체를 쓴다.
                 CatalogBundleStore.WriteAtomic(Path_, JsonConvert.SerializeObject(this));
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // 저장에 실패해도 이번 판에서는 지정이 살아 있다. 다음 조작 때 다시 시도된다.
+                // 저장에 실패해도 이번 판에서는 지정이 살아 있고 다음 조작 때 다시 시도된다.
+                // 다만 조용히 넘어가면 다음 실행에서 Load 가 "읽지 못했다"고 말하게 되어, 원인이
+                // 저장이었다는 것을 알 길이 없다. 세션에 한 번만 남긴다 - 조작마다 부르는 자리다.
+                if (_saveFailureReported) return;
+
+                _saveFailureReported = true;
+                _log?.Invoke("빌드 설정을 저장하지 못했습니다. 이번 판에서는 유지되지만 다음 실행에는 " +
+                             "남지 않습니다: " + ex.Message);
             }
         }
     }

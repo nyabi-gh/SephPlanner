@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
@@ -214,7 +215,7 @@ namespace SephPlanner.Plugin.Ui
                 return;
             }
 
-            _note.text = "누르면 강화 우선으로 지정합니다. 배치에서 가치를 2배로 쳐 좋은 칸을 먼저 받습니다.";
+            _note.text = PinNote();
             _note.color = NativeSkin.TextDim;
         }
 
@@ -302,6 +303,22 @@ namespace SephPlanner.Plugin.Ui
                     Selected = _prefs.IsPriority(id),
                 });
             }
+        }
+
+        /// <summary>
+        /// 아티팩트 탭의 안내. 단계와 배수를 <see cref="PlanPreferences"/>에서 읽어 짓는다 -
+        /// 여기 손으로 적어 두면 배수가 바뀌었을 때 이 줄만 옛말을 하게 된다. 실제로 단계가
+        /// 셋으로 늘어난 뒤에도 "2배로 칩니다"가 남아 있었다.
+        /// </summary>
+        private static string PinNote()
+        {
+            var note = new StringBuilder("누를 때마다 ");
+            for (var level = 1; level <= PlanPreferences.MaxPinLevel; level++)
+            {
+                note.Append(new string('★', level)).Append(' ')
+                    .Append(PlanPreferences.WeightOf(level).ToString("0.#")).Append("배 → ");
+            }
+            return note.Append("해제. 좋은 칸을 먼저 받습니다.").ToString();
         }
 
         /// <summary>

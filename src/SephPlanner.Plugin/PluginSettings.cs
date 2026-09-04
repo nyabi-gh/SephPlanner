@@ -7,6 +7,44 @@ using UnityEngine;
 namespace SephPlanner.Plugin
 {
     /// <summary>
+    /// 화면의 자리와 크기. 이것이 그대로면 지금 떠 있는 화면을 다시 지을 이유가 없다.
+    ///
+    /// 기본값은 아직 아무것도 짓지 않은 상태를 뜻한다 - 폭과 크기는 설정에서 범위가 걸려 있어
+    /// 실제 화면이 0 을 가질 수 없다.
+    /// </summary>
+    internal readonly struct PanelLayout : IEquatable<PanelLayout>
+    {
+        private readonly PanelCorner _corner;
+        private readonly float _marginX;
+        private readonly float _marginY;
+        private readonly float _width;
+        private readonly float _scale;
+
+        public PanelLayout(PanelCorner corner, float marginX, float marginY, float width, float scale)
+        {
+            _corner = corner;
+            _marginX = marginX;
+            _marginY = marginY;
+            _width = width;
+            _scale = scale;
+        }
+
+        public bool Equals(PanelLayout other) =>
+            _corner == other._corner && _marginX == other._marginX && _marginY == other._marginY &&
+            _width == other._width && _scale == other._scale;
+
+        public override bool Equals(object obj) => obj is PanelLayout other && Equals(other);
+
+        public override int GetHashCode() =>
+            (((((int)_corner * 397) ^ _marginX.GetHashCode()) * 397 ^ _marginY.GetHashCode()) * 397
+             ^ _width.GetHashCode()) * 397 ^ _scale.GetHashCode();
+
+        public static bool operator ==(PanelLayout a, PanelLayout b) => a.Equals(b);
+
+        public static bool operator !=(PanelLayout a, PanelLayout b) => !a.Equals(b);
+    }
+
+    /// <summary>
     /// 표시 설정과 단축키 전부. BepInEx 설정 파일이 원본이고, 설정 창(<see cref="SettingsWindow"/>)이
     /// <see cref="Rows"/>로 같은 값을 읽고 쓴다. 두 길이 같은 ConfigEntry 를 보므로 어느 쪽으로
     /// 고쳐도 어긋나지 않는다.
@@ -165,10 +203,24 @@ namespace SephPlanner.Plugin
             foreach (var shortcut in _shortcuts) WarnIfGameKey(shortcut);
         }
 
-        /// <summary>화면을 지을 때 쓰는 값들. 달라지면 지금 떠 있는 화면을 버리고 다시 짓는다.</summary>
-        public string LayoutSignature =>
-            $"{Corner.Value}/{MarginX.Value:0.###}/{MarginY.Value:0.###}/" +
-            $"{Width.Value:0.###}/{Scale.Value:0.###}";
+        /// <summary>
+        /// 화면을 지을 때 쓰는 값들. 달라지면 지금 떠 있는 화면을 버리고 다시 짓는다.
+        ///
+        /// 문자열이 아니라 값 구조체인 것은 <b>프레임마다 두 번</b> 읽기 때문이다. 서식으로 짓던
+        /// 때는 그때마다 실수 다섯 벌과 이어 붙인 문자열이 쓰레기로 남았는데, 이 게임은 증분 GC 가
+        /// 프레임당 3ms 를 가져간다(<c>boot.config</c> 의 <c>gc-max-time-slice</c>).
+        /// </summary>
+        public PanelLayout Layout =>
+            new PanelLayout(Corner.Value, MarginX.Value, MarginY.Value, Width.Value, Scale.Value);
+
+        private int _shortcutRevision;
+
+        /// <summary>
+        /// 단축키 배선이 바뀔 때마다 오른다. 안내 줄이 단축키 이름을 여덟 개 짓는데 그것을
+        /// 프레임마다 다시 지을 이유가 없어, 다시 지어야 할 때를 이 값으로 가른다.
+        /// 값을 쓰는 곳은 <see cref="Rebind"/>와 <see cref="Retire"/> 둘뿐이다.
+        /// </summary>
+        public int ShortcutRevision => _shortcutRevision;
 
         /// <summary>
         /// 단축키는 누를 때마다 흐려진다. 값 목록은 오름차순이라 거꾸로 훑는다 - 진하게 켜 두고
@@ -295,6 +347,7 @@ namespace SephPlanner.Plugin
         /// </summary>
         private void Rebind(ConfigEntry<KeyboardShortcut> entry, KeyCode key)
         {
+            _shortcutRevision++;
             var previous = entry.Value.MainKey;
             foreach (var other in _shortcuts)
             {
@@ -326,6 +379,7 @@ namespace SephPlanner.Plugin
         {
             if (entry.Value.ToString() != retired.ToString()) return;
 
+            _shortcutRevision++;
             entry.Value = (KeyboardShortcut)entry.DefaultValue;
             _log($"{entry.Definition.Key} 가 게임 키와 겹쳐 {entry.Value} 로 옮겼습니다.");
         }

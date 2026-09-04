@@ -167,6 +167,16 @@ namespace SephPlanner.Core.Solver
         /// 중간에 멈춘 결과는 <b>쓰지 않는다</b>. 부르는 쪽이 통째로 버릴 때만 켜는 신호다.
         /// </summary>
         public CancellationToken Cancellation { get; set; }
+
+        /// <summary>
+        /// 조언(후보 추천·석판 합성)이 쓰는 탐색 강도. 후보마다 한 번씩 푸는 만큼 기본보다 가볍다.
+        ///
+        /// <b>두 조언이 반드시 같은 값을 써야 한다.</b> 둘은 <see cref="LayoutCache"/> 하나를
+        /// 나눠 쓰는데 캐시 열쇠에 이 값들이 들어가므로, 한쪽만 달라지면 캐시가 조용히 갈라져
+        /// 후보와 합성이 서로 다른 배치 위에서 겨루게 된다. 그래서 값을 여기 한 곳에만 둔다.
+        /// </summary>
+        public static SolverOptions ForAdvice(CancellationToken cancellation) =>
+            new SolverOptions { BeamWidth = 150, ExactCandidates = 40, Cancellation = cancellation };
     }
 
     public sealed class Arrangement

@@ -41,7 +41,7 @@ namespace SephPlanner.Plugin
         private string _lastWindowOrigin;
         private string _lastCatalogError = "";
         private string _lastWindowBlocker;
-        private string _builtLayout;
+        private PanelLayout _builtLayout;
         private float _appliedOpacity = -1f;
         private bool _expanded;
         private bool _hidden;
@@ -416,7 +416,7 @@ namespace SephPlanner.Plugin
 
             // 자리·크기는 지을 때 한 번 정해진다. 설정 탭이나 설정 파일에서 바뀌었으면 지금 것을
             // 버리고 다시 짓는 것이, 살아 있는 화면을 부분부분 고치는 것보다 어긋날 여지가 없다.
-            if (_hud.IsAlive && _builtLayout != _settings.LayoutSignature) _hud.Destroy();
+            if (_hud.IsAlive && _builtLayout != _settings.Layout) _hud.Destroy();
 
             if (!_hud.TryCreate(
                     _settings.Corner.Value,
@@ -433,9 +433,9 @@ namespace SephPlanner.Plugin
                 return;
             }
 
-            if (_builtLayout != _settings.LayoutSignature)
+            if (_builtLayout != _settings.Layout)
             {
-                _builtLayout = _settings.LayoutSignature;
+                _builtLayout = _settings.Layout;
                 _appliedOpacity = -1f;
 
                 // 접힌 화면은 안내 줄을 물고 있지 않다. 처음 뜰 때 잠깐 보여 주지 않으면
@@ -496,7 +496,7 @@ namespace SephPlanner.Plugin
             var preview = PreviewName(plan);
             try
             {
-                Render(plan, preview);
+                Render(plan, preview, state);
             }
             catch (Exception ex)
             {
@@ -513,7 +513,7 @@ namespace SephPlanner.Plugin
             }
         }
 
-        private void Render(Plan plan, string preview)
+        private void Render(Plan plan, string preview, PlanRunState state)
         {
             _hud.Render(new HudFrame
             {
@@ -528,7 +528,7 @@ namespace SephPlanner.Plugin
                 QueryVerified = CatalogDump.QueryVerificationPassed(),
                 RuntimeVerification = _simulationVerification,
                 RuntimeVerificationReason = _simulationReason,
-                Hint = Hint(plan, preview),
+                Hint = Hint(plan, preview, state),
                 HintIsPreview = preview != null,
                 PreviewKey = _previewKey,
             });
@@ -669,7 +669,7 @@ namespace SephPlanner.Plugin
         /// 아래 한 줄. 누를 것이 없는 화면이라 무엇을 눌러야 하는지는 여기서만 알 수 있다.
         /// 자동 배치 결과도 잠깐 이 자리에 띄운다 - 로그에만 남기면 무음 실패가 된다.
         /// </summary>
-        private string Hint(Plan plan, string preview)
+        private string Hint(Plan plan, string preview, PlanRunState state)
         {
             // 참가자 세션의 적용은 걸음마다 서버 왕복을 기다려 수 초가 걸린다. 그동안 아무 말이
             // 없으면 인벤토리가 저 혼자 움직이는 것으로만 보인다.
@@ -695,33 +695,54 @@ namespace SephPlanner.Plugin
 
             // 접었을 때는 안내 줄도 접는다. 게임 화면을 가리지 않는 것이 접는 이유인데 안내가
             // 늘 붙어 있으면 줄어드는 것이 반뿐이다. 키를 누르면 잠깐 다시 뜬다.
-            return _expanded ? Guide() : "";
+            return _expanded ? Guide(state) : "";
         }
+
+        private string _guide = "";
+        private bool _guideExpanded;
+        private bool _guideAutoPlace;
+        private bool _guideOffers;
+        private int _guideShortcuts = -1;
+
+        private string Guide() => Guide(_runner?.State);
 
         /// <summary>
         /// 무엇을 누르면 되는지. 지금 할 수 있는 것만 적는다 - 멀티에서 자동 배치를, 후보가
         /// 없을 때 미리보기를 적어 두면 눌러도 아무 일이 없는 키를 알려주는 셈이 된다.
+        ///
+        /// <b>지은 것을 들고 있는다.</b> 이 줄은 그리는 쪽이 프레임마다 부르지만 내용이 바뀌는
+        /// 것은 접거나 펴고, 자동 배치가 열리고 닫히고, 후보가 생기고 사라지고, 단축키를 바꿀
+        /// 때뿐이다. 짓는 값에 <c>KeyCode.ToString()</c>이 여덟 번 들어 있어 프레임마다 치를
+        /// 값이 아니다 - 이 게임은 증분 GC 가 프레임당 3ms 를 가져간다.
         /// </summary>
-        private string Guide()
+        private string Guide(PlanRunState state)
         {
-            var state = _runner?.State;
             var plan = state != null && state.IsCurrent ? state.Latest : null;
+            var offers = plan != null && plan.Offers.Count > 0;
+            var autoPlace = AutoPlaceAvailability(
+                _lastSnapshot, state, _currentPlacementFingerprint, _currentCatalogGeneration).Allowed;
+            var shortcuts = _settings.ShortcutRevision;
+
+            if (_guideExpanded == _expanded && _guideAutoPlace == autoPlace &&
+                _guideOffers == offers && _guideShortcuts == shortcuts)
+                return _guide;
+
+            _guideExpanded = _expanded;
+            _guideAutoPlace = autoPlace;
+            _guideOffers = offers;
+            _guideShortcuts = shortcuts;
+
             var text = Describe(_settings.ExpandKey) + (_expanded ? " 접기" : " 펼치기");
+            if (autoPlace) text += "   " + Describe(_settings.AutoPlaceKey) + " 자동 배치";
+            if (offers) text += "   " + Describe(_settings.PreviewKey) + " 후보 미리보기";
 
-            var decision = AutoPlaceAvailability(
-                _lastSnapshot, state, _currentPlacementFingerprint, _currentCatalogGeneration);
-            if (decision.Allowed)
-                text += "   " + Describe(_settings.AutoPlaceKey) + " 자동 배치";
-
-            if (plan != null && plan.Offers.Count > 0)
-                text += "   " + Describe(_settings.PreviewKey) + " 후보 미리보기";
-
-            return text +
-                   "   " + Describe(_settings.BuildKey) + " 빌드" +
-                   "   " + Describe(_settings.OpacityKey) + " 불투명도" +
-                   "   " + Describe(_settings.MoveKey) + " 이동" +
-                   "   " + Describe(_settings.HideKey) + " 숨기기" +
-                   "   " + Describe(_settings.SettingsKey) + " 설정";
+            _guide = text +
+                     "   " + Describe(_settings.BuildKey) + " 빌드" +
+                     "   " + Describe(_settings.OpacityKey) + " 불투명도" +
+                     "   " + Describe(_settings.MoveKey) + " 이동" +
+                     "   " + Describe(_settings.HideKey) + " 숨기기" +
+                     "   " + Describe(_settings.SettingsKey) + " 설정";
+            return _guide;
         }
 
         /// <summary>
@@ -854,7 +875,7 @@ namespace SephPlanner.Plugin
 
             // 화면은 이미 그 자리에 가 있다. 여백이 바뀌었다고 다시 짓게 두면 같은 자리에
             // 같은 것을 짓느라 한 프레임 깜빡일 뿐이다.
-            _builtLayout = _settings.LayoutSignature;
+            _builtLayout = _settings.Layout;
             Report("자리를 기억했습니다.");
 
             // 커서가 움직이지 않으면 화면도 제자리에 선다. 그때 무엇이 잘못인지는 좌표를 봐야 안다.

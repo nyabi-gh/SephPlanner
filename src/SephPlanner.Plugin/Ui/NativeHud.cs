@@ -823,7 +823,7 @@ namespace SephPlanner.Plugin.Ui
                      .Append("  ");
             }
 
-            var reach = Reach(advice.Effect);
+            var reach = Explain.Reach(advice.Effect);
             if (reach.Length > 0) parts.Append(Tint(reach, NativeSkin.TextDim)).Append("  ");
 
             if (advice.Candidate.Price > 0)
@@ -840,16 +840,6 @@ namespace SephPlanner.Plugin.Ui
             return parts.ToString();
         }
 
-        private static string Reach(TabletEffectSummary effect)
-        {
-            if (effect.IsEmpty) return "";
-
-            var text = effect.RaisedCells > 0 ? $"{effect.RaisedCells}칸 +{effect.RaisedTotal}" : "";
-            if (effect.LoweredCells > 0) text += $" −{effect.LoweredTotal}";
-            if (effect.DisabledCells > 0) text += $" 막힘{effect.DisabledCells}";
-            return text.Trim();
-        }
-
         private void RenderMixes(Plan plan, MixerState mixer)
         {
             _mixes.Begin();
@@ -859,7 +849,7 @@ namespace SephPlanner.Plugin.Ui
                 var name = advice.NameA + " + " + advice.NameB;
                 var row = _mixes.Add(
                     name,
-                    Turn(advice) + Tint($"+{advice.Gain:0.#}",
+                    RotationTag(advice) + Tint($"+{advice.Gain:0.#}",
                         advice.Gain > 0.001 ? NativeSkin.Good : NativeSkin.TextDim),
                     advice.Affordable ? NativeSkin.Text : NativeSkin.TextDim);
                 Hover(row, name, () => Explain.Join(Explain.Mix(advice)));
@@ -871,9 +861,10 @@ namespace SephPlanner.Plugin.Ui
 
         /// <summary>
         /// 합성기에 넣기 전에 맞춰 두어야 하는 회전. 사람이 손으로 돌려야 하는 일이라 빠뜨리면
-        /// 답이 반쪽이 된다.
+        /// 답이 반쪽이 된다. 줄에 붙는 짧은 표이고, 어느 석판을 몇 도 돌리는지는
+        /// <see cref="Explain.Turn"/>가 쪽지에서 말한다.
         /// </summary>
-        private static string Turn(MixAdvice advice)
+        private static string RotationTag(MixAdvice advice)
         {
             if (advice.RotationA == 0 && advice.RotationB == 0) return "";
 

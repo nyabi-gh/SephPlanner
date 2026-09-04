@@ -27,11 +27,43 @@ namespace SephPlanner.Core.Solver
         private readonly Dictionary<string, List<List<TabletPlacement>>> _yardsticks =
             new Dictionary<string, List<List<TabletPlacement>>>();
 
+        private PlacementProblem? _baselineProblem;
+        private string _baselineKey = "";
+        private Arrangement? _baseline;
+
         /// <summary>실제로 돈 탐색 횟수. 돌려 쓰기가 듣고 있는지 재는 자리다.</summary>
         public int Searches { get; private set; }
 
         /// <summary>돌려 쓴 횟수. 테스트가 이 둘로 비용을 확인한다.</summary>
         public int Reuses { get; private set; }
+
+        /// <summary>
+        /// 후보를 하나도 집지 않은 지금 판의 배치.
+        ///
+        /// <b>세 곳이 같은 것을 봐야 한다.</b> 후보 추천과 석판 합성은 이것을 증가분의 기준으로
+        /// 삼고, 미리보기의 "달라지는 칸"도 이것과 견줘야 한다 - 다른 강도로 푼 배치와 견주면
+        /// 두 탐색이 동점 배치를 다르게 골라, 후보 때문이 아닌 칸이 달라진 것으로 나온다.
+        /// 예전에는 두 조언이 이것을 따로 풀어 같은 계산을 두 번 했고, 미리보기는 아예 다른
+        /// 강도의 배치와 견주고 있었다.
+        ///
+        /// 기억해 둔 것은 판도 탐색 강도도 그대로일 때만 돌려준다. 어느 한쪽이라도 다르면 조용히
+        /// 남의 답을 받는 대신 다시 푼다 - 기준과 후보가 다른 잣대로 풀리는 것이 애초에 막으려는
+        /// 일이므로, 여기서 그것을 되살리면 안 된다.
+        /// </summary>
+        public Arrangement Baseline(PlacementProblem problem, SolverOptions options)
+        {
+            var key = Key(problem, options);
+            if (_baseline is not null && ReferenceEquals(_baselineProblem, problem) && _baselineKey == key)
+            {
+                Reuses++;
+                return _baseline;
+            }
+
+            _baselineProblem = problem;
+            _baselineKey = key;
+            _baseline = PlacementSolver.EvaluateLayouts(problem, Of(problem, options), options);
+            return _baseline;
+        }
 
         public List<List<TabletPlacement>> Of(PlacementProblem problem, SolverOptions options)
         {

@@ -353,6 +353,7 @@ namespace SephPlanner.Plugin
 
             // 칸 수는 격자 안팎을 가리지 않고 센다. 열린 격자 경계에 걸친 아이템을 격자 안 칸만으로
             // 세면 한 칸짜리로 보여 가드를 빠져나가고, 한 칸짜리 맞바꿈이 그 아이템을 찢는다.
+            var grid = GameReader.GridOf(inventory);
             var cellCounts = new Dictionary<int, int>();
             var touchesGrid = new HashSet<int>();
             foreach (var pair in inventory.inventoryMatrix)
@@ -362,7 +363,7 @@ namespace SephPlanner.Plugin
 
                 cellCounts[instance.InstanceID] =
                     cellCounts.TryGetValue(instance.InstanceID, out var count) ? count + 1 : 1;
-                if (!IsOnGrid(pair.Key.x, pair.Key.y, inventory)) continue;
+                if (!grid.Contains(pair.Key.x, pair.Key.y)) continue;
 
                 touchesGrid.Add(instance.InstanceID);
                 positions[instance.InstanceID] = new GridPos(pair.Key.x, pair.Key.y);
@@ -406,7 +407,7 @@ namespace SephPlanner.Plugin
 
             foreach (var target in command.Targets)
             {
-                if (!IsOnGrid(target.To.X, target.To.Y, inventory))
+                if (!grid.Contains(target.To))
                     return $"목표 칸 {target.To}이 격자 밖이라 자동 배치를 중단합니다.";
             }
             return null;
@@ -801,10 +802,5 @@ namespace SephPlanner.Plugin
             cell = default;
             return false;
         }
-
-        private static bool IsOnGrid(int x, int y, GridInventory inventory) =>
-            x >= 0 && x < inventory.Width &&
-            y >= 0 && y < inventory.Height &&
-            y * inventory.Width + x < inventory.CurrentInventoryStorage;
     }
 }

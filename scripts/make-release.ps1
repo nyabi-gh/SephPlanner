@@ -19,6 +19,23 @@ function Invoke-DotNet([string[]]$Arguments, [string]$Failure) {
 if (-not $version) { throw "배포 버전을 읽지 못했습니다." }
 if (& git -C $root status --porcelain) { throw "작업 트리가 깨끗하지 않습니다. 커밋한 뒤 다시 실행하세요." }
 
+# 버전은 세 곳에 손으로 적힌다. 어긋나도 빌드와 테스트는 통과하므로 여기서 붙잡는다.
+# BepInEx 로그와 F10 덤프 첫 줄에 찍히는 것이 플러그인 쪽 값이라, 어긋나면 제보를 받고도
+# 어느 빌드인지 되짚을 수 없다.
+$pluginSource = Get-Content (Join-Path $root "src/SephPlanner.Plugin/Plugin.cs") -Raw
+if ($pluginSource -notmatch [regex]::Escape("[BepInPlugin(PluginGuid, ""SephPlanner"", ""$version"")]")) {
+    throw "[BepInPlugin] 의 버전이 $version 이 아닙니다. Plugin.cs 를 맞추세요."
+}
+if ((Get-Content (Join-Path $root "CHANGELOG.md")) -notcontains "## $version") {
+    throw "CHANGELOG.md 에 '## $version' 절이 없습니다."
+}
+
+# manifest 에 적는 커밋이 곧 태그가 가리켜야 할 커밋이다. 태그를 나중에 달면 zip 을 만든
+# 커밋과 태그가 갈라져, 어느 소스에서 나온 zip 인지 되짚을 수 없다.
+if ((& git -C $root tag --points-at HEAD) -notcontains "v$version") {
+    throw "HEAD 에 v$version 태그가 없습니다. 태그를 먼저 달고 다시 실행하세요."
+}
+
 if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
 New-Item -ItemType Directory -Force (Join-Path $zipRoot "BepInEx-plugins") | Out-Null
 

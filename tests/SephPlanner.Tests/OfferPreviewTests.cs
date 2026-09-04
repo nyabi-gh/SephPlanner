@@ -55,6 +55,38 @@ public class OfferPreviewTests
         Assert.Contains(where, advice.Preview.Changed);
     }
 
+    /// <summary>
+    /// 금색 테두리는 <b>후보 때문에</b> 달라지는 칸만 짚어야 한다.
+    ///
+    /// 예전에는 후보 격자(가벼운 탐색)를 화면의 최선 배치(촘촘한 탐색)와 견줬다. 두 탐색이 동점
+    /// 배치를 다르게 고르면 후보와 아무 상관 없는 칸이 금색이 되어, 미리보기가 "이것도 바뀐다"고
+    /// 거짓말을 한다. 이제는 같은 강도로 푼 기준 배치와 견준다.
+    /// </summary>
+    [Fact]
+    public void CellsUntouchedByTheCandidateAreNotMarked()
+    {
+        // 칸 둘, 가진 것 하나. 후보를 집으면 남는 한 칸에 들어가고 가진 것은 제자리를 지킨다.
+        var inventory = new InventoryState { Width = 6, Height = 4, Storage = 2 };
+        inventory.Items.Add(new PlacedItem
+        {
+            DefinitionId = Held,
+            InstanceId = 10,
+            Position = new GridPos(0, 0),
+            IsActive = true,
+        });
+        var snapshot = new GameSnapshot
+        {
+            Inventory = inventory,
+            Run = new RunState { Gold = 1000 },
+            Offers = { new OfferedItem { DefinitionId = Offered, Kind = "charm", SlotIndex = 0 } },
+        };
+
+        var advice = Assert.Single(PlanBuilder.Build(snapshot, Catalog())!.Offers);
+        var candidateCell = advice.Preview!.Names.First(pair => pair.Value == "후보").Key;
+
+        Assert.Equal(new[] { candidateCell }, advice.Preview.Changed);
+    }
+
     [Fact]
     public void TurningRecommendationsOffLeavesNoPreviews()
     {
