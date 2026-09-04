@@ -525,10 +525,8 @@ namespace SephPlanner.Plugin.Ui
 
             // 접었을 때는 지금 옮길 것 하나만. 펼치면 아래 목록이 그 일을 하므로 겹치지 않게 접는다.
             var next = plan.Moves.Count > 0 ? plan.Moves[0] : null;
-            _nextMove.text = !plan.ManualMoveInstructionsAvailable
-                ? "빈 칸이 없어 수동 이동 순서를 만들 수 없습니다."
-                : next == null ? "" : $"{next.Label}  {next.Detail}";
-            Widgets.SetActive(_nextMove, !expanded && (next != null || !plan.ManualMoveInstructionsAvailable));
+            _nextMove.text = next == null ? "" : $"{next.Label}  {next.Detail}";
+            Widgets.SetActive(_nextMove, !expanded && next != null);
 
             Widgets.SetActive(_detail, expanded);
             SetCompact(!expanded);
