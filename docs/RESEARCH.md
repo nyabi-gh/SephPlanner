@@ -468,12 +468,16 @@ SyncDictionary 라 클라이언트에도 오므로, 각인이 걸려 있으면 `
 - **이웃 의존 아티팩트.** 효과의 세기가 자기 레벨이 아니라 다른 칸의 내용에 달린 아티팩트들이다.
   디컴파일 전수 검색으로 `Inventory.FindItem`을 부르는 아티팩트 클래스를 세어 보니 12종쯤 된다:
   `Charm_NearLevelDamage`(조화의 수정 - 이웃 8칸 유효 레벨 합에 비례), `Charm_UpCharmDamage`,
-  `Charm_AutoMagic`, `Charm_ReduceMPCost`, `Charm_RightSpellCooldownHelper`(북향의 금빛침),
+  `Charm_AutoMagic`, `Charm_ReduceMPCost`(레이에 별조각),
+  `Charm_RightSpellCooldownHelper`(빛나는 모래시계),
   `Charm_NearMagicBullet`, `Charm_PlanetModule`, `Charm_WoodenBox`,
   `Charm_MagicCoolDownBonusByTag`, `Charm_BoltMagicMultiShot`, `Charm_CompanionChaos`.
-  각자 로직이 달라 일괄 모델이 없고, 레벨 행렬에는 영향이 없어 불일치 경고로도 안 잡힌다
-  (전투 스탯으로만 새므로). 배치 점수가 이들의 자리 가치를 과소평가하는 문제이며, 아직 모델에
-  없는 것은 사용자가 강화 우선 지정(`F2` 빌드 창)으로 보정한다. 12종 중 둘을 넣었다.
+  (`Charm_UpCharmDamage`가 북향의 금빛침이다 - 예전에 모래시계 쪽에 잘못 달아 두었던 이름을
+  디컴파일로 바로잡았다.) 각자 로직이 달라 일괄 모델이 없고, 레벨 행렬에는 영향이 없어 불일치
+  경고로도 안 잡힌다 (전투 스탯으로만 새므로). 배치 점수가 이들의 자리 가치를 과소평가하는
+  문제이며, 아직 모델에 없는 것은 사용자가 강화 우선 지정(`F2` 빌드 창)으로 보정한다.
+  **12종 중 다섯을 넣었고**(하얀 종이, 조화의 수정, 북향의 침, 거대한 망원경, 헌신의 휘장),
+  목록에 없던 캘세더니 열쇠(`Charm_3Elemental_ByRow`)도 같은 부류라 함께 넣었다.
 
   이 부류의 첫 사례로 **하얀 종이(`Charm_WhitePaper`)는 모델에 넣었다.** 좌우 이웃의 아티팩트가
   공유하는 카테고리를 자기 것으로 물려받아 콤보 개수에 +1을 보태는 아이템이다(둘 다 가진
@@ -505,6 +509,44 @@ SyncDictionary 라 클라이언트에도 오므로, 각인이 걸려 있으면 `
   이 처리가 없으면 이웃이 하나 모자라게 세어져 가운데 칸의 우위가 사라진다(고정 테스트
   `NeighborValueTests`가 그 경우를 잡는다). 하얀 종이 쪽은 좌우 둘 다 조건이라 같은 상황에서
   값이 0 이 되고 말아, 아직 같은 처리를 넣지 않았다.
+
+  **넷을 더 넣었다**(`PositionalWorth`, 고정 테스트 `PositionalWorthTests`). 넷 다 공통점이
+  있다 — 다른 플래너가 "대상 지정" 단추로 사람에게 묻는 것들인데, **게임은 자리만 보고 정한다.**
+  그래서 물어볼 것이 없고 솔버가 알아서 좋은 자리를 찾으면 된다.
+
+  | 아티팩트 | 게임 클래스 | 게임이 보는 것 |
+  |---|---|---|
+  | 북향의 금빛/파란 침 | `Charm_UpCharmDamage` | `(x+xOffset, y+yOffset)` 칸 하나. 기본은 바로 위 |
+  | 거대한 망원경 | `Charm_PlanetModule` | 이웃 여덟 칸의 `PLANET` 카테고리 아티팩트 |
+  | 헌신의 휘장 | `Charm_CompanionChaos` | 같은 행 전체(`0..Width-1`)의 `ICompanionCharm` |
+  | 캘세더니 열쇠 | `Charm_3Elemental_ByRow` | 자기 행 하나. `lineCategory[YIdx % 개수]` |
+
+  침이 특히 그렇다. `OnRequestCharmDamageBonus`는 대상을 못 찾으면 **0**을 돌려주므로, 대상 없이
+  선 침은 자리만 차지하고 아무 일도 하지 않는다. 대상 자격은 `IsDependencyValid`가 정한다 —
+  `IAttackableCharm`이거나 다른 침이다. 침 위에 침이 있으면 `SearchCategory`가 각 침의 오프셋을
+  따라 계속 올라가 침이 아닌 아티팩트에서 멈추고, **사슬의 침 전부가 그 아티팩트를 인정할 때만**
+  물려받는다. 우리도 같은 걸음을 걷는다. 크기는 두 표(`damageBonusByLevel`,
+  `dependencyDamageBonusByLevel`)의 **비율**로만 쓰므로 단위를 옮길 필요가 없다 - 레어도 조건
+  (`maxRarity`)까지 맞는 대상 위에 선 침이 그만큼 더 값어치가 있다.
+
+  **콤보를 세는 규칙에 여기서 예외가 생긴다.** 위의 "개수 판정" 항목은 배치·레벨·활성 여부와
+  무관하다고 적었고 평범한 아티팩트에서는 맞지만, 침과 캘세더니 열쇠는 `GetItemCategory()`를
+  덮어써 **자리에 따라 다른 카테고리를 내보인다** — 침은 대상에게 물려받은 것을,
+  열쇠는 `lineCategory[행 % 개수]`를. `SearchSetEffectInInventory`가 읽는 것이 그 값이므로,
+  이 둘에 한해서는 콤보 개수가 배치에 달려 있다. 그래서 배치 점수에 콤보 한 걸음
+  (`Worth.OfComboStep`)이 들어간다.
+
+  망원경과 휘장은 크기를 재지 못했다. 강화(`SetEnhancement`)도 혼돈 모드(`SetChaoticMode`)도
+  능력치가 아니라 소환물의 동작을 바꾸는 것이라 정적 데이터에 수치가 없다. 방향(모아 두는 쪽이
+  낫다)만 확실하므로 `PositionalWorth.EnhanceStep`을 **그 아티팩트의 레벨 한 칸**으로 두었다 -
+  콤보 한 단계(3.4)의 1/3 남짓이라 잰 값을 뒤집지 못하는 크기다. `ComboProgress`와 같은 성격의
+  값이며, 재고 나면 그 상수 하나만 고치면 된다.
+
+  이 넷을 넣으면서 **배정 뒤에 다듬는 단계**(`PlacementSolver.Polish`)가 필요해졌다. 헝가리안의
+  비용이 직전 반복의 이웃을 보고 매겨지는 근사라, 두 아티팩트가 동시에 움직여야 좋아지는 수
+  (침 둘을 한 아티팩트 아래로 쌓기 같은)를 배정기 혼자서는 못 넘는다. 이긴 배치 하나에만
+  자리 맞바꾸기를 몇 번 돌린다 - 후보마다 걸면 풀이 시간이 두 자릿수 배로 뛴다. 실측으로
+  42칸·석판 8·아티팩트 30 판에서 **점수 +2.5, 시간 차이는 측정 잡음 안**이었다.
 
 ## 콤보 가중치
 

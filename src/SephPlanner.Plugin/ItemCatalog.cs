@@ -81,7 +81,7 @@ namespace SephPlanner.Plugin
                     ? entity.resourcePrefab.GetComponent<Charm_Basic>()
                     : null;
 
-                result.Add(new CharmDefinition
+                var definition = new CharmDefinition
                 {
                     Id = IdFromKey(entity.aName?.key, "Item_", entity.id),
                     EntityId = entity.id,
@@ -98,9 +98,15 @@ namespace SephPlanner.Plugin
                     Behavior = charm != null ? charm.GetType().Name : "",
                     EffectLines = EffectLines(charm),
                     NeighborLevelBonus = NeighborLevelBonus(charm),
+                    IsAttackable = charm is IAttackableCharm,
+                    IsCompanion = charm is ICompanionCharm,
+                    NeighborEnhanceCategory = NeighborEnhanceCategory(charm),
+                    LineCategories = LineCategories(charm),
                     Categories = entity.categories ?? new List<string>(),
                     Names = DisplayName(entity),
-                });
+                };
+                Dependency(charm, definition);
+                result.Add(definition);
             }
             return result;
         }
@@ -209,6 +215,64 @@ namespace SephPlanner.Plugin
         /// 조화의 수정 계열의 레벨별 배수. 이웃 여덟 칸의 유효 레벨 합에 곱해지는 값이라, 솔버가
         /// 이 아티팩트의 자리 가치를 계산하려면 이 표가 있어야 한다.
         /// </summary>
+        /// <summary>
+        /// 북향의 침(<c>Charm_UpCharmDamage</c>)이 대상을 찾는 오프셋과, 대상에게 주는 몫.
+        /// 대상은 사람이 고르는 것이 아니라 자리가 정한다 - 침의 <c>xOffset</c>/<c>yOffset</c>이
+        /// 가리키는 칸에 있는 아티팩트다. 그래서 솔버가 알아서 좋은 자리를 찾을 수 있고,
+        /// 값어치의 크기도 두 표의 비율로만 쓰므로 단위를 옮길 필요가 없다.
+        /// </summary>
+        private static void Dependency(Charm_Basic charm, CharmDefinition definition)
+        {
+            if (!(charm is Charm_UpCharmDamage needle)) return;
+
+            definition.DependencyOffsetX = needle.xOffset;
+            definition.DependencyOffsetY = needle.yOffset;
+            definition.HasDependencyCondition = needle.hasDependencyCondition;
+            definition.DependencyMaxRarity = (Rarity)(int)needle.maxRarity;
+            definition.DependencyBonusByLevel = Doubles(needle.damageBonusByLevel);
+            definition.DependencyExtraByLevel = Doubles(needle.dependencyDamageBonusByLevel);
+
+            // 값이 하나도 없으면 솔버가 침으로 알아보지 못한다. 게임 기본값이 다섯 칸이라
+            // 실제로는 오지 않는 길이지만, 오면 조용히 평범한 아티팩트가 되는 편이 낫다.
+            if (definition.DependencyBonusByLevel.Count == 0)
+                definition.DependencyBonusByLevel.Add(1);
+        }
+
+        /// <summary>
+        /// 이웃 여덟 칸에서 강화할 아티팩트의 카테고리. 거대한 망원경이 <c>"PLANET"</c>을 찾는
+        /// 것이 유일한 예이고, 그 글자가 <c>Charm_PlanetModule.SearchPlanet</c> 안에 박혀 있어
+        /// 필드로 읽어 올 수 없다. 클래스를 보고 여기서 채운다.
+        /// </summary>
+        private static string NeighborEnhanceCategory(Charm_Basic charm) =>
+            charm is Charm_PlanetModule ? "PLANET" : "";
+
+        /// <summary>
+        /// 놓인 행이 정하는 카테고리(<c>Charm_3Elemental_ByRow.lineCategory</c>). 캘세더니 열쇠가
+        /// 어느 줄에 서느냐로 어떤 콤보를 미느냐가 갈린다.
+        /// </summary>
+        private static List<string> LineCategories(Charm_Basic charm)
+        {
+            var result = new List<string>();
+            if (charm is Charm_3Elemental_ByRow byRow && byRow.lineCategory != null)
+            {
+                foreach (var category in byRow.lineCategory)
+                {
+                    if (!string.IsNullOrEmpty(category)) result.Add(category);
+                }
+            }
+            return result;
+        }
+
+        private static List<double> Doubles(int[] values)
+        {
+            var result = new List<double>();
+            if (values != null)
+            {
+                foreach (var value in values) result.Add(value);
+            }
+            return result;
+        }
+
         private static List<double> NeighborLevelBonus(Charm_Basic charm)
         {
             var result = new List<double>();

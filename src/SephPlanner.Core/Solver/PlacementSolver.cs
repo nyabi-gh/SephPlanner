@@ -14,21 +14,28 @@ namespace SephPlanner.Core.Solver
     /// 아티팩트 배치는 배정 문제가 되므로 헝가리안으로 정확히 푼다. 조건 판정이 배치에 의존하고
     /// 배치가 다시 조건에 의존하므로 몇 번 되풀이해 수렴시킨 뒤, 마지막 점수는 수렴한 배치로
     /// 다시 계산한다. 그래서 보고되는 점수는 항상 실제 배치의 점수다.
+    ///
+    /// <b>두 단계가 같은 것을 재야 한다.</b> 1단계가 어림값으로 후보를 버리고 2단계만 진짜
+    /// 점수를 보면, 1단계에서 잘못 버린 것은 되찾을 길이 없다. 이 클래스가 겪은 문제가 그것이고
+    /// 세 자리에서 고쳤다.
+    ///
+    /// <list type="number">
+    /// <item>어림값(<see cref="EstimateModel"/>)이 아티팩트마다 다른 값어치와 사용자가 찍은
+    /// 강화 우선까지 본다. 전에는 "켜져 있으면 1, 레벨 하나에 1"이라 어느 아티팩트가 센지 몰랐다.</item>
+    /// <item>빔을 자를 때 한 부모가 다 가져가지 못하게 한다(Select). 좋은 부분 배치 하나에서
+    /// 나온 사촌들이 빔을 메우면 폭을 넓혀도 보는 넓이가 안 늘어난다.</item>
+    /// <item>이긴 배치를 자리 맞바꾸기로 다듬는다(Polish). 배정 비용이 직전 반복의 이웃을 보는
+    /// 근사라, 두 아티팩트가 함께 움직여야 좋아지는 수를 배정기 혼자서는 못 넘는다.</item>
+    /// </list>
+    ///
+    /// 셋을 넣기 전에는 <b>빔을 여덟 배로 넓혀도 점수가 안 올랐다</b>. 잘못된 잣대로 400개를
+    /// 남기든 3200개를 남기든 같은 것만 남기 때문이다. 넣은 뒤에는 빔 400 이 예전의 빔 1600 보다
+    /// 좋으면서 네 배 빠르다. 폭을 늘리는 것이 답이 아니었다는 뜻이므로, "정밀 탐색" 같은
+    /// 시간을 더 쓰는 모드는 두지 않는다.
     /// </summary>
     public static class PlacementSolver
     {
         private const double WastePenalty = 1e-4;
-
-        /// <summary>
-        /// 빔을 좁힐 때 쓰는, 켜져 있는 아티팩트 하나의 값어치. 레벨은 세기를 더할 뿐이고 레벨 0
-        /// 도 살아 있다. 이것이 없으면 꺼지는 자리(레벨 음수)와 레벨 0 자리가 똑같이 0점이라,
-        /// 아티팩트를 꺼진 채로 두고도 최적이라고 하게 된다.
-        ///
-        /// 실제 채점은 아티팩트마다 다른 <see cref="CharmWorth"/>를 쓴다. 여기서까지 그러지 않는
-        /// 것은 이 어림값이 "어느 아티팩트가 어디 갈지" 정하기 전에 배치만 줄 세우는 값이기
-        /// 때문이다. 어느 배치든 같은 잣대로 재기만 하면 되고, 뽑힌 배치는 뒤에서 다시 채점된다.
-        /// </summary>
-        private const double ActiveValue = 1;
 
         /// <summary>낭비 판단보다도 작게 두어, 정말 우열이 없을 때만 현 상태를 유지하도록 한다.</summary>
         private const double StabilityBonus = 1e-6;
@@ -60,8 +67,8 @@ namespace SephPlanner.Core.Solver
             options ??= new SolverOptions();
 
             var cells = Cells(problem);
-            EstimateStats(problem, out var scoring, out var levelCap, out var anyMagic);
-            var searched = SearchTabletLayouts(problem, cells, options, scoring, levelCap, anyMagic);
+            var model = BuildEstimateModel(problem);
+            var searched = SearchTabletLayouts(problem, cells, options, model);
 
             // 놓을 자리가 모자라면 탐색이 석판 일부를 뺀 배치를 내놓는다. 그런 배치를 그대로
             // 채점하면 존재하는 석판을 무시한 점수를 최적이라고 말하게 되므로, 완전한 배치가
@@ -77,7 +84,7 @@ namespace SephPlanner.Core.Solver
 
             // 직전 제안의 배치도 마찬가지다. 빔이 떨어뜨리면 같은 점수의 다른 배치로 갈아타
             // 따라가던 계획이 통째로 다시 쓰인다.
-            var asPlanned = PlannedLayout(problem, cells, scoring, levelCap, anyMagic);
+            var asPlanned = PlannedLayout(problem, cells, model);
             if (asPlanned != null) candidates.Insert(0, asPlanned);
 
             // 완전한 배치가 아예 없으면(석판이 열린 칸보다 많은 극단) 놓을 수 있는 만큼이라도
@@ -91,6 +98,10 @@ namespace SephPlanner.Core.Solver
         /// <summary>
         /// 주어진 배치 후보들을 정확히 채점해 가장 좋은 것을 고른다. 석판이 고정되면 아티팩트
         /// 배치는 배정 문제라 여기서 헝가리안으로 정확히 풀린다.
+        ///
+        /// 다만 배정 비용이 이웃에 기대는 아티팩트(하얀 종이, 조화의 수정, 북향의 침, 거대한
+        /// 망원경, 헌신의 휘장)에서는 그 "정확히"가 깨진다 - 비용이 직전 반복의 배정을 보고
+        /// 매겨지기 때문이다. 그래서 이긴 배치 하나만 마지막에 <see cref="Polish"/>로 다듬는다.
         /// </summary>
         public static Arrangement EvaluateLayouts(
             PlacementProblem problem, IReadOnlyList<List<TabletPlacement>> layouts,
@@ -100,14 +111,25 @@ namespace SephPlanner.Core.Solver
 
             var cells = Cells(problem);
             Arrangement? best = null;
+            List<TabletPlacement>? bestLayout = null;
             foreach (var layout in layouts)
             {
                 if (best != null && options.Cancellation.IsCancellationRequested) break;
 
                 var arrangement = Evaluate(problem, cells, layout, options);
-                if (best == null || arrangement.Score > best.Score) best = arrangement;
+                if (best != null && arrangement.Score <= best.Score) continue;
+
+                best = arrangement;
+                bestLayout = layout;
             }
-            return best ?? Evaluate(problem, cells, new List<TabletPlacement>(), options);
+            if (best is null) return Evaluate(problem, cells, new List<TabletPlacement>(), options, polish: true);
+
+            // 다듬기는 이긴 배치에만 건다. 후보마다 걸면 O(아티팩트^3)가 후보 수만큼 곱해져
+            // 실시간 폴링이 못 따라온다 - 재어 보면 풀이 시간이 두 자릿수 배로 뛴다.
+            if (options.PolishPasses <= 0 || options.Cancellation.IsCancellationRequested) return best;
+
+            var polished = Evaluate(problem, cells, bestLayout!, options, polish: true);
+            return polished.Score > best.Score ? polished : best;
         }
 
         private static List<GridPos> Cells(PlacementProblem problem) =>
@@ -198,19 +220,65 @@ namespace SephPlanner.Core.Solver
             public override bool HasMagicCharm(GridPos position) => _anyMagic && HasCharm(position);
         }
 
-        private static void EstimateStats(
-            PlacementProblem problem, out int scoring, out int levelCap, out bool anyMagic)
+        /// <summary>
+        /// 빔이 배치를 줄 세울 때 쓰는 잣대.
+        ///
+        /// <b>여기가 어림값의 전부다.</b> 예전에는 "켜져 있는 아티팩트 하나에 1, 레벨 하나에 1"
+        /// 이라는 한 가지 잣대로 모두를 쟀다. 그래서 빔은 <b>어느 아티팩트가 센지도, 사용자가
+        /// 무엇을 강화 우선으로 찍었는지도 모른 채</b> 배치를 골랐다 - 레벨 5 칸 하나를 만드는
+        /// 배치와 레벨 5 칸 하나를 만드는 다른 배치가, 그 칸에 갈 아티팩트가 전설이든 잡템이든
+        /// 똑같은 값으로 보였다. 빔을 여덟 배로 넓혀도 점수가 안 오르던 까닭이 이것이다.
+        /// 잘못된 잣대로 400개를 남기든 3200개를 남기든 같은 것만 남는다.
+        ///
+        /// 이제 아티팩트를 값어치 순으로 세워 두고, 레벨이 높은 칸부터 값어치가 큰 아티팩트를
+        /// 짝지어 본다. 재배열 부등식이라 값이 레벨에 대해 늘기만 하면 이 짝짓기가 가장 큰 합을
+        /// 주고, 그래서 어림값은 실제 배정이 낼 수 있는 값의 위쪽 어림이 된다.
+        /// </summary>
+        private sealed class EstimateModel
         {
-            scoring = 0;
-            levelCap = 0;
+            public int LevelCap;
+            public bool AnyMagic;
+
+            /// <summary>값어치 순위별, 레벨별 값어치. <c>[순위][레벨]</c>. 풀이마다 한 번만 짓는다.</summary>
+            public double[][] ValueByRank = Array.Empty<double[]>();
+        }
+
+        /// <summary>
+        /// 한 아티팩트가 그 레벨의 칸에서 갖는 값어치. <see cref="Value"/>가 매기는 것과 같은
+        /// 잣대이되, 자리에 달린 몫(조건·이웃·안정)은 뺀 것이다 - 아직 어느 칸인지 모르기 때문이다.
+        /// </summary>
+        private static double RankValue(CharmSlot charm, int level) =>
+            charm.Weight * charm.Worth.At(Math.Min(charm.Definition.MaxLevel, level));
+
+        private static EstimateModel BuildEstimateModel(PlacementProblem problem)
+        {
+            var scoring = new List<CharmSlot>(problem.Charms.Count);
+            var levelCap = 0;
+            var anyMagic = false;
+
             foreach (var charm in problem.Charms)
             {
+                if (charm.Definition.IsMagic) anyMagic = true;
                 if (charm.IsFiller || charm.IsDormant) continue;
-                scoring++;
+
+                scoring.Add(charm);
                 levelCap = Math.Max(levelCap, charm.Definition.MaxLevel);
             }
-            if (scoring == 0) levelCap = 5;
-            anyMagic = problem.Charms.Any(c => c.Definition.IsMagic);
+            if (scoring.Count == 0) levelCap = 5;
+
+            // 상한에서의 값어치로 줄 세운다. 레벨마다 순서가 뒤바뀔 수는 있지만(상한이 낮은
+            // 아티팩트는 낮은 레벨에서만 앞선다) 빔을 좁히는 잣대에는 한 줄이면 넉넉하다.
+            scoring.Sort((a, b) => RankValue(b, levelCap).CompareTo(RankValue(a, levelCap)));
+
+            var table = new double[scoring.Count][];
+            for (var rank = 0; rank < scoring.Count; rank++)
+            {
+                var row = new double[levelCap + 1];
+                for (var level = 0; level <= levelCap; level++) row[level] = RankValue(scoring[rank], level);
+                table[rank] = row;
+            }
+
+            return new EstimateModel { LevelCap = levelCap, AnyMagic = anyMagic, ValueByRank = table };
         }
 
         /// <summary>
@@ -219,7 +287,7 @@ namespace SephPlanner.Core.Solver
         /// 정확히 개편이 가장 큰 그 순간에 계획이 다시 쓰인다(실측 녹화에서 그랬다).
         /// </summary>
         private static List<TabletPlacement>? PlannedLayout(
-            PlacementProblem problem, List<GridPos> cells, int scoring, int levelCap, bool anyMagic)
+            PlacementProblem problem, List<GridPos> cells, EstimateModel model)
         {
             if (problem.Tablets.Count == 0 || problem.PlannedTablets.Count == 0) return null;
 
@@ -266,7 +334,7 @@ namespace SephPlanner.Core.Solver
                     foreach (var rotation in rotations)
                     {
                         var trial = new List<TabletPlacement>(layout) { slot.At(cell, rotation) };
-                        var estimate = Estimate(problem, cells, trial, scoring, levelCap, anyMagic);
+                        var estimate = Estimate(problem, cells, trial, model);
                         if (estimate > bestScore)
                         {
                             bestScore = estimate;
@@ -284,33 +352,40 @@ namespace SephPlanner.Core.Solver
         }
 
         private static List<List<TabletPlacement>> SearchTabletLayouts(
-            PlacementProblem problem, List<GridPos> cells, SolverOptions options,
-            int scoring, int levelCap, bool anyMagic)
+            PlacementProblem problem, List<GridPos> cells, SolverOptions options, EstimateModel model)
         {
             var beam = new List<List<TabletPlacement>> { new List<TabletPlacement>() };
+            var twin = Twins(problem);
 
-            foreach (var slot in problem.Tablets)
+            for (var index = 0; index < problem.Tablets.Count; index++)
             {
+                var slot = problem.Tablets[index];
+
                 // 이 풀이를 버릴 것이 이미 정해졌으면 여기서 그만둔다. 석판 한 장을 놓는 단계마다
                 // 보는 것으로 충분하다 - 비용이 거기에 몰려 있다.
                 if (options.Cancellation.IsCancellationRequested) break;
 
                 // 돌릴 수 없는 석판은 지금 돌아가 있는 각도 그대로만 쓴다. 0으로 고정하면
                 // 이미 돌아간 채로 잠긴 석판(저주 등)에 불가능한 회전을 제안하게 된다.
-                var currentRotation = problem.CurrentTablets.TryGetValue(slot.InstanceId, out var spot)
-                    ? spot.Rotation
-                    : 0;
-                var rotations = DistinctRotations(slot, currentRotation);
+                var rotations = DistinctRotations(slot, CurrentRotation(problem, slot));
 
-                var expanded = new List<(List<TabletPlacement> Layout, double Score)>();
+                var expanded = new List<(List<TabletPlacement> Layout, double Score, int Parent)>();
 
-                foreach (var layout in beam)
+                for (var parent = 0; parent < beam.Count; parent++)
                 {
+                    var layout = beam[parent];
                     var taken = new HashSet<GridPos>(layout.Select(p => p.Position));
+
+                    // 똑같은 석판끼리는 자리를 맞바꿔도 같은 배치다. 앞선 쌍둥이보다 뒤쪽 칸만
+                    // 보게 해 그 순열들을 한 번씩만 만든다.
+                    var floor = twin[index] >= 0 && twin[index] < layout.Count
+                        ? problem.Grid.ToIndex(layout[twin[index]].Position.X, layout[twin[index]].Position.Y)
+                        : -1;
 
                     foreach (var cell in cells)
                     {
                         if (taken.Contains(cell)) continue;
+                        if (floor >= 0 && problem.Grid.ToIndex(cell.X, cell.Y) <= floor) continue;
 
                         foreach (var rotation in rotations)
                         {
@@ -318,19 +393,98 @@ namespace SephPlanner.Core.Solver
                             {
                                 slot.At(cell, rotation),
                             };
-                            expanded.Add((next, Estimate(problem, cells, next, scoring, levelCap, anyMagic)));
+                            expanded.Add((next, Estimate(problem, cells, next, model), parent));
                         }
                     }
                 }
 
                 if (expanded.Count == 0) break;
 
-                beam = expanded.OrderByDescending(entry => entry.Score)
-                               .Take(options.BeamWidth)
-                               .Select(entry => entry.Layout)
-                               .ToList();
+                beam = Select(expanded, beam.Count, options);
             }
             return beam;
+        }
+
+        /// <summary>
+        /// 다음 빔에 남길 것을 고른다. 점수 순으로 자르되 <b>한 부모가 빔을 통째로 차지하지
+        /// 못하게</b> 한다.
+        ///
+        /// 그냥 상위 N 을 자르면 좋은 부분 배치 하나에서 나온 사촌들 - 석판 한 장만 옆 칸으로
+        /// 옮긴 것들 - 이 빔을 메운다. 서로 거의 같은 것을 400개 들고 다음 단계로 가는 셈이라,
+        /// 폭을 넓혀도 보는 넓이가 안 늘었다(빔 800 위로는 점수가 오르지 않고 1200 에서는
+        /// 오히려 떨어지는 것이 그 자국이다). 부모마다 몫을 정해 두면 같은 폭으로 훨씬 많은
+        /// 갈래를 들고 간다.
+        ///
+        /// 몫을 다 쓰고도 자리가 남으면 남은 것 중 점수 순으로 채운다 - 부모가 적을 때(첫 단계는
+        /// 하나뿐이다) 빔을 비워 두지 않기 위해서다.
+        /// </summary>
+        private static List<List<TabletPlacement>> Select(
+            List<(List<TabletPlacement> Layout, double Score, int Parent)> expanded,
+            int parents, SolverOptions options)
+        {
+            expanded.Sort((a, b) => b.Score.CompareTo(a.Score));
+
+            var quota = options.BeamWidth;
+            if (parents > 1 && options.ParentQuota > 0)
+                quota = Math.Max(options.ParentQuota, options.BeamWidth / parents);
+
+            var chosen = new List<List<TabletPlacement>>(Math.Min(options.BeamWidth, expanded.Count));
+            var used = new Dictionary<int, int>(parents);
+            var skipped = new List<List<TabletPlacement>>();
+
+            foreach (var entry in expanded)
+            {
+                if (chosen.Count >= options.BeamWidth) break;
+
+                used.TryGetValue(entry.Parent, out var count);
+                if (count >= quota)
+                {
+                    if (skipped.Count < options.BeamWidth) skipped.Add(entry.Layout);
+                    continue;
+                }
+
+                used[entry.Parent] = count + 1;
+                chosen.Add(entry.Layout);
+            }
+
+            for (var i = 0; i < skipped.Count && chosen.Count < options.BeamWidth; i++)
+                chosen.Add(skipped[i]);
+
+            return chosen;
+        }
+
+        /// <summary>
+        /// 슬롯마다, 저와 완전히 같은 앞선 슬롯의 번호(없으면 -1).
+        ///
+        /// 같은 석판을 여럿 들고 있으면 빔이 순열 중복으로 낭비된다 - 자리만 맞바꾼 배치는 효과가
+        /// 같아 추정치도 같으므로, 세 장이면 여섯 벌이 빔 400 자리를 나눠 먹는다. 실효 폭이 1/6 로
+        /// 줄어드는 셈이다. 앞선 쌍둥이보다 뒤쪽 칸만 쓰게 하면 그중 한 벌만 남는다.
+        ///
+        /// 현재 배치와 직전 제안은 이 규칙을 어겨도 <see cref="SearchLayouts"/>가 후보에 직접
+        /// 넣으므로 잃지 않는다.
+        /// </summary>
+        private static int[] Twins(PlacementProblem problem)
+        {
+            var twin = new int[problem.Tablets.Count];
+            var seen = new Dictionary<string, int>(StringComparer.Ordinal);
+
+            for (var index = 0; index < problem.Tablets.Count; index++)
+            {
+                var slot = problem.Tablets[index];
+
+                // 회전이 잠긴 석판은 지금 각도가 곧 제 모양이라 쌍둥이 판정에 들어간다.
+                var signature = string.Join("", new[]
+                {
+                    slot.Definition.EntityId.ToString(),
+                    slot.InstanceQuery ?? slot.Definition.Query,
+                    slot.InstanceConditionQuery ?? slot.Definition.ConditionQuery,
+                    slot.Rotatable ? "r" : "f" + CurrentRotation(problem, slot).ToString(),
+                });
+
+                twin[index] = seen.TryGetValue(signature, out var previous) ? previous : -1;
+                seen[signature] = index;
+            }
+            return twin;
         }
 
         /// <summary>
@@ -378,17 +532,21 @@ namespace SephPlanner.Core.Solver
         /// <summary>
         /// 아티팩트를 실제로 배정하지 않고 매기는 값. 빔을 좁히는 용도이므로 정확할 필요는 없고
         /// 유망한 배치를 위로 올리기만 하면 된다. 탐색의 최심부라 정렬·집합 할당을 두지 않는다 -
-        /// 레벨 분포를 세어 위에서부터 아티팩트 수만큼 거둔다.
+        /// 레벨 분포를 세어 위에서부터, 값어치 순으로 세워 둔 아티팩트와 짝지어 거둔다
+        /// (<see cref="EstimateModel"/>).
+        ///
+        /// 칸 하나가 더 켜지면 그 다음 순위의 값어치가 더해지고 그 값은 음수가 아니므로, 아티팩트를
+        /// 꺼진 채로 두는 배치가 이길 수 없다 - 예전에 상수 하나로 지키던 성질이 짝짓기 구조
+        /// 자체에서 나온다.
         /// </summary>
         private static double Estimate(
-            PlacementProblem problem, List<GridPos> cells, List<TabletPlacement> layout,
-            int scoring, int levelCap, bool anyMagic)
+            PlacementProblem problem, List<GridPos> cells, List<TabletPlacement> layout, EstimateModel model)
         {
-            var occupancy = new EstimateOccupancy(problem.Grid, anyMagic);
+            var occupancy = new EstimateOccupancy(problem.Grid, model.AnyMagic);
             foreach (var placement in layout) occupancy.Take(placement.Position);
             var result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid, problem.FixedEffects);
 
-            var counts = new int[levelCap + 1];
+            var counts = new int[model.LevelCap + 1];
             foreach (var cell in cells)
             {
                 if (!occupancy.HasCharm(cell)) continue;
@@ -396,22 +554,27 @@ namespace SephPlanner.Core.Solver
 
                 var level = result.EffectiveLevel(cell, 0);
                 if (level < 0) continue;
-                counts[Math.Min(level, levelCap)]++;
+                counts[Math.Min(level, model.LevelCap)]++;
             }
 
             var total = 0.0;
-            var remaining = scoring;
-            for (var level = levelCap; level >= 0 && remaining > 0; level--)
+            var rank = 0;
+            var ranks = model.ValueByRank.Length;
+            for (var level = model.LevelCap; level >= 0 && rank < ranks; level--)
             {
-                var take = Math.Min(counts[level], remaining);
-                total += take * (ActiveValue + level);
-                remaining -= take;
+                var take = Math.Min(counts[level], ranks - rank);
+                for (var taken = 0; taken < take; taken++) total += model.ValueByRank[rank++][level];
             }
-            return total;
+
+            // 동점인 배치가 많다. 무엇을 남길지 정렬이 우연히 정하게 두면, 아무것도 달라지지
+            // 않았는데 폴링마다 다른 배치가 살아남는다. 채점 때와 같은 잣대로 지금 자리·직전
+            // 제안을 지키는 쪽을 위에 올린다 - 실제 점수 차이를 뒤집을 수 없는 크기다.
+            return total + Familiarity(problem, layout);
         }
 
         private static Arrangement Evaluate(
-            PlacementProblem problem, List<GridPos> cells, List<TabletPlacement> layout, SolverOptions options)
+            PlacementProblem problem, List<GridPos> cells, List<TabletPlacement> layout, SolverOptions options,
+            bool polish = false)
         {
             var occupancy = OptimisticOccupancy(cells, layout, problem);
             var taken = new HashSet<GridPos>(layout.Select(p => p.Position));
@@ -452,7 +615,88 @@ namespace SephPlanner.Core.Solver
                 bestResult = result;
             }
 
+            if (polish)
+            {
+                Polish(problem, layout, free, bestPositions, ref bestOccupancy, ref bestResult, options);
+            }
             return Describe(problem, layout, bestPositions, bestOccupancy, bestResult);
+        }
+
+        /// <summary>
+        /// 수렴한 배정을 자리 맞바꾸기로 마지막까지 밀어 본다. <see cref="Assign"/>의 비용이 직전
+        /// 반복의 이웃을 보고 매겨지는 근사라, 이웃에 기대는 아티팩트가 섞이면 배정기 혼자서는
+        /// 못 넘는 언덕이 생긴다 - 북향의 침 두 개를 한 아티팩트 아래로 쌓는 것 같은 수는 두
+        /// 아티팩트가 동시에 움직여야 좋아지기 때문이다.
+        ///
+        /// 후보 하나를 재는 데는 다시 시뮬레이션하지 않는다. 받아들인 뒤에만 점유를 다시 짓고
+        /// 시뮬레이션해, 다음 패스가 참값을 보게 한다. 그래서 비용은 (아티팩트 x 칸) 번의 채점
+        /// 이고, 이긴 배치 하나에만 걸린다.
+        /// </summary>
+        private static void Polish(
+            PlacementProblem problem, List<TabletPlacement> layout, List<GridPos> free,
+            Dictionary<int, GridPos> positions, ref GridOccupancy occupancy, ref SimulationResult result,
+            SolverOptions options)
+        {
+            if (positions.Count == 0 || free.Count == 0) return;
+
+            var byCell = CharmsByCell(problem, positions);
+            var score = ScoreOf(problem, layout, positions, occupancy, result, byCell);
+
+            for (var pass = 0; pass < options.PolishPasses; pass++)
+            {
+                if (options.Cancellation.IsCancellationRequested) return;
+
+                var moved = false;
+                foreach (var charm in problem.Charms)
+                {
+                    if (!positions.TryGetValue(charm.InstanceId, out var from)) continue;
+
+                    foreach (var to in free)
+                    {
+                        if (to == from) continue;
+
+                        byCell.TryGetValue(to, out var occupant);
+                        Move(positions, byCell, charm, from, occupant, to);
+
+                        var trial = ScoreOf(problem, layout, positions, occupancy, result, byCell);
+                        if (trial > score + StabilityBonus)
+                        {
+                            score = trial;
+                            moved = true;
+                            from = to;
+                            continue;
+                        }
+                        Move(positions, byCell, charm, to, occupant, from);
+                    }
+                }
+                if (!moved) return;
+
+                // 받아들인 이동은 점유를 바꾼다. 조건 판정과 석판 조건이 그것을 보므로 다시
+                // 시뮬레이션해야 다음 패스와 마지막 Describe 가 실제 배치의 값을 본다.
+                occupancy = OccupancyFrom(layout, positions, problem);
+                result = TabletSimulator.Run(
+                    WithFixed(problem, layout), occupancy, problem.Grid, problem.FixedEffects);
+                score = ScoreOf(problem, layout, positions, occupancy, result, byCell);
+            }
+        }
+
+        /// <summary>
+        /// <paramref name="charm"/>을 <paramref name="to"/>로 옮기고, 거기 있던 것이 있으면 자리를
+        /// 맞바꾼다. 되돌리기도 같은 호출이라 후보마다 사전을 새로 만들지 않는다.
+        /// </summary>
+        private static void Move(
+            Dictionary<int, GridPos> positions, Dictionary<GridPos, CharmSlot> byCell,
+            CharmSlot charm, GridPos from, CharmSlot? occupant, GridPos to)
+        {
+            positions[charm.InstanceId] = to;
+            byCell[to] = charm;
+
+            if (occupant is null) byCell.Remove(from);
+            else
+            {
+                positions[occupant.InstanceId] = from;
+                byCell[from] = occupant;
+            }
         }
 
         /// <summary>
@@ -538,9 +782,13 @@ namespace SephPlanner.Core.Solver
             var level = result.EffectiveLevel(cell, charm.Enchant);
             var effective = Math.Min(charm.Definition.MaxLevel, level);
 
+            // 북향의 침은 강화할 대상이 있어야 제 몫을 한다. 대상 없이 선 침은 값어치가 0 이라,
+            // 이것이 없으면 솔버가 침을 아무 데나 세우고도 최적이라고 한다.
+            var factor = PositionalWorth.DependencyFactor(charm, cell, effective, neighbors);
+
             // 상한을 넘긴 레벨은 아무 값어치가 없다. 점수가 같은 배치라면 덜 흘리는 쪽을 고르도록
             // 아주 작은 차이만 준다. 실제 점수 차이를 뒤집을 만한 크기가 아니다.
-            var value = charm.Weight * charm.Worth.At(effective)
+            var value = charm.Weight * charm.Worth.At(effective) * factor
                         - WastePenalty * Math.Max(0, level - effective);
 
             if (charm.Definition.Behavior == "Charm_WhitePaper")
@@ -548,6 +796,12 @@ namespace SephPlanner.Core.Solver
 
             if (charm.Definition.Behavior == "Charm_NearLevelDamage")
                 value += NearLevelDamageWorth(charm, cell, effective, result, neighbors);
+
+            // 자리가 대상을 정하는 것들. 무엇이 걸리는지는 정의가 답한다.
+            value += PositionalWorth.InheritedComboWorth(problem, charm, cell, neighbors);
+            value += PositionalWorth.NeighborEnhanceWorth(charm, cell, neighbors);
+            value += PositionalWorth.RowCompanionWorth(charm, cell, problem.Grid, neighbors);
+            value += PositionalWorth.LineCategoryWorth(problem, charm, cell);
 
             return value + Anchors(problem, charm, cell);
         }

@@ -54,6 +54,19 @@ namespace SephPlanner.Core.Solver
         /// <summary>잰 값이 얼마나 믿을 만한지(0~1). 재지 않은 값에서는 0이다.</summary>
         public double Confidence { get; set; }
 
+        /// <summary>
+        /// 레벨 한 칸의 크기. 강화처럼 게임이 수치로 말해 주지 않는 이득을 이 아티팩트에 맞는
+        /// 크기로 옮길 때 쓴다. 지금 레벨과 무관한 값이라야 최고 레벨에서 0이 되지 않는다.
+        /// </summary>
+        public double LevelStep
+        {
+            get
+            {
+                var step = At(1) - At(0);
+                return step > 0 ? step : 0;
+            }
+        }
+
         public double At(int level)
         {
             if (level < 0) level = 0;

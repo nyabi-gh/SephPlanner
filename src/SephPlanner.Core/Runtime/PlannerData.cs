@@ -42,8 +42,11 @@ namespace SephPlanner.Core.Runtime
         ///     값어치를 가늠할 후보라, 쓸 만한지 재려면 먼저 덤프에 있어야 한다.
         /// v6: 자동 배치가 질의 검증 결과를 확인할 수 있는 상태 파일을 담는다.
         /// v7: 데이터와 검증 결과를 generation 묶음으로 원자적으로 게시한다.
+        /// v8: 자리에 따라 하는 일이 달라지는 아티팩트들(북향의 침, 거대한 망원경, 헌신의 휘장,
+        ///     캘세더니 열쇠)의 판정에 필요한 항목을 담는다. 없으면 그 넷은 평범한 아티팩트로만
+        ///     평가되어 아무 자리에나 놓인다.
         /// </summary>
-        public const int CatalogVersion = 7;
+        public const int CatalogVersion = 8;
 
         /// <summary>플러그인이 생성하고 진단 도구가 읽는 데이터 위치.</summary>
         public static string DataDirectory =>

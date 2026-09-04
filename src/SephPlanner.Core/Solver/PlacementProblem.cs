@@ -140,8 +140,25 @@ namespace SephPlanner.Core.Solver
         /// <summary>정확한 배정까지 돌려볼 최종 후보 수.</summary>
         public int ExactCandidates { get; set; } = 100;
 
+        /// <summary>
+        /// 한 부모가 다음 빔에서 가져갈 수 있는 최대 자리 수. 0이면 제한하지 않는다(점수 순 상위 N).
+        ///
+        /// 실효 폭을 지키는 값이다 - 자세한 것은 <see cref="PlacementSolver"/>의 Select 주석.
+        /// 실제로 쓰이는 몫은 이 값과 <c>BeamWidth / 부모 수</c> 중 큰 쪽이라, 부모가 적을 때
+        /// 빔이 비지 않는다.
+        /// </summary>
+        public int ParentQuota { get; set; } = 8;
+
         /// <summary>조건 판정과 배정이 서로를 참조하므로 몇 번 되풀이해 수렴시킬지.</summary>
         public int FixpointIterations { get; set; } = 3;
+
+        /// <summary>
+        /// 이긴 배치를 자리 맞바꾸기로 다듬을 횟수. 0이면 다듬지 않는다.
+        ///
+        /// 패스마다 (아티팩트 x 칸) 번을 채점하고, 좋아지는 것이 없으면 그 자리에서 멈춘다.
+        /// 대개 한두 패스에서 멈추므로 셋이면 넉넉하다.
+        /// </summary>
+        public int PolishPasses { get; set; } = 3;
 
         /// <summary>
         /// 이 풀이가 이미 쓸모없어졌는지. 폴링이 풀이보다 빠르면 답이 나오기도 전에 그 답을 버릴

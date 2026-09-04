@@ -44,6 +44,55 @@ namespace SephPlanner.Core.Model
         public List<double> NeighborLevelBonus { get; set; } = new List<double>();
 
         /// <summary>
+        /// 이 아티팩트가 강화할 대상을 찾는 칸의 오프셋. 게임 <c>Charm_UpCharmDamage</c>(북향의
+        /// 침)의 <c>xOffset</c>/<c>yOffset</c>이며 기본은 바로 위 칸이다. 사람이 대상을 고르는
+        /// 것이 아니라 <b>자리가 대상을 정한다</b> - 그 칸에 강화할 수 있는 아티팩트가 없으면
+        /// 침은 아무 일도 하지 않는다. 해당 없는 아티팩트에서는 둘 다 0이다.
+        /// </summary>
+        public int DependencyOffsetX { get; set; }
+        public int DependencyOffsetY { get; set; }
+
+        /// <summary>침이 대상에게 주는 레벨별 피해 증가(<c>damageBonusByLevel</c>). 비어 있으면 침이 아니다.</summary>
+        public List<double> DependencyBonusByLevel { get; set; } = new List<double>();
+
+        /// <summary>
+        /// 대상이 <see cref="DependencyMaxRarity"/> 이하일 때 얹히는 몫
+        /// (<c>dependencyDamageBonusByLevel</c>). <see cref="HasDependencyCondition"/>이 참일 때만 쓴다.
+        /// </summary>
+        public List<double> DependencyExtraByLevel { get; set; } = new List<double>();
+
+        public bool HasDependencyCondition { get; set; }
+        public Rarity DependencyMaxRarity { get; set; }
+
+        /// <summary>
+        /// 공격하는 아티팩트(게임 <c>IAttackableCharm</c>). 북향의 침은 이런 아티팩트나 다른 침만
+        /// 대상으로 삼는다.
+        ///
+        /// 정의 단계의 답이라 <c>Charm_Magic</c>은 낙관적으로 참이다 - 마법서가 실제로 공격
+        /// 마법을 품었는지는 인스턴스마다 다르고(<c>CheckMagicIsAttackable</c>), 정의만 보고는
+        /// 알 수 없다. 틀렸을 때의 대가는 침 하나가 헛자리에 서는 것뿐이다.
+        /// </summary>
+        public bool IsAttackable { get; set; }
+
+        /// <summary>동료 아티팩트(게임 <c>ICompanionCharm</c>). 헌신의 휘장이 같은 행에서 찾는다.</summary>
+        public bool IsCompanion { get; set; }
+
+        /// <summary>
+        /// 이웃 여덟 칸에서 강화할 아티팩트의 카테고리. 거대한 망원경
+        /// (<c>Charm_PlanetModule</c>)이 이웃의 <c>PLANET</c> 행성을 강화하는 것이 유일한 예다.
+        /// 카테고리 이름이 게임 코드에 글자로 박혀 있어 필드로 읽어 올 수 없고, 덤프가 동작
+        /// 클래스를 보고 채운다. 해당 없으면 빈 문자열.
+        /// </summary>
+        public string NeighborEnhanceCategory { get; set; } = "";
+
+        /// <summary>
+        /// 놓인 행에 따라 갈아입는 카테고리. 게임 <c>Charm_3Elemental_ByRow.lineCategory</c>
+        /// (캘세더니 열쇠)이고 <c>행 % 개수</c>로 고른다. 그래서 이 아티팩트는 어느 줄에 서느냐로
+        /// 어떤 콤보를 미느냐가 갈린다. 다른 아티팩트에서는 비어 있다.
+        /// </summary>
+        public List<string> LineCategories { get; set; } = new List<string>();
+
+        /// <summary>
         /// 게임이 매겨 둔 원가(<c>ItemEntity.cost</c>). 상점 표시가는 흥정 능력치로 조정되므로
         /// 이것과 다르다. 개발사가 아이템마다 직접 넣은 값이라, 능력치로 잴 수 없는 아티팩트의
         /// 값어치를 가늠할 후보다.
