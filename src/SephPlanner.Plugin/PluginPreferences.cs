@@ -32,6 +32,9 @@ namespace SephPlanner.Plugin
         /// </summary>
         public List<int> PinnedCharms { get; set; } = new List<int>();
 
+        /// <summary>제한 해제 칸 고정. 엔티티 번호 목록이다(<see cref="PlanPreferences.HeldCharms"/>).</summary>
+        public List<int> HeldCharms { get; set; } = new List<int>();
+
         /// <summary>
         /// 가져온 빌드 프리셋 코드 원문. 해석 결과가 아니라 원문을 남긴다 - 카탈로그나 게임이
         /// 바뀌어도 다시 읽으면 되고, 어떤 코드를 넣었는지 그대로 남는다.
@@ -63,6 +66,16 @@ namespace SephPlanner.Plugin
             entityId != 0 && PinnedLevels.TryGetValue(entityId, out var level) ? level : 0;
 
         public bool IsPinned(int entityId) => PinLevel(entityId) != 0;
+
+        public bool IsHeld(int entityId) => entityId != 0 && HeldCharms.Contains(entityId);
+
+        public void ToggleHold(int entityId)
+        {
+            if (entityId == 0) return;
+
+            if (!HeldCharms.Remove(entityId)) HeldCharms.Add(entityId);
+            Changed();
+        }
 
         public bool IsPriority(string categoryId) => PriorityCategories.Contains(categoryId);
 
@@ -143,6 +156,7 @@ namespace SephPlanner.Plugin
             Recommendations = recommendations,
             PriorityCategories = new HashSet<string>(PriorityCategories),
             PinnedCharms = new Dictionary<int, int>(PinnedLevels),
+            HeldCharms = new HashSet<int>(HeldCharms),
             CharmValues = CharmValueSource.Book,
             PresetCharms = recommendations && Preset() is BuildPreset preset
                 ? new HashSet<int>(preset.FavoriteCharms)
@@ -188,6 +202,7 @@ namespace SephPlanner.Plugin
                         loaded.PriorityCategories = loaded.PriorityCategories ?? new List<string>();
                         loaded.PinnedCharms = loaded.PinnedCharms ?? new List<int>();
                         loaded.PinnedLevels = loaded.PinnedLevels ?? new Dictionary<int, int>();
+                        loaded.HeldCharms = loaded.HeldCharms ?? new List<int>();
                         loaded.MigrateLegacyPins();
                         loaded.DropInvalidPins();
                         loaded._log = log;

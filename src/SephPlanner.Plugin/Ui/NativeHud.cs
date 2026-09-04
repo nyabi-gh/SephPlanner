@@ -634,6 +634,9 @@ namespace SephPlanner.Plugin.Ui
             if (plan.SkippedOffers > 0)
                 warnings.Add($"선택지가 많아 {plan.SkippedOffers}개는 평가하지 못했습니다.");
 
+            if (plan.Best.UnheldCharms.Count > 0)
+                warnings.Add($"배치 조건을 무시하는 칸이 모자라 고정 {plan.Best.UnheldCharms.Count}개를 지키지 못했습니다.");
+
             if (snapshot.IsMultiplayer)
             {
                 warnings.Add(multiplayerAutoPlace
@@ -736,6 +739,8 @@ namespace SephPlanner.Plugin.Ui
                         $"양보 {string.Concat(System.Linq.Enumerable.Repeat(_skin.YieldMark, -pinned))} - 가치를 " +
                         $"{PlanPreferences.WeightOf(pinned):0.##}배로 칩니다.");
                 }
+                if (frame.Prefs != null && frame.Prefs.IsHeld(charmId))
+                    lines.Add("고정 - 배치 조건을 무시하는 칸에만 앉힙니다.");
                 return Explain.Join(lines);
             });
         }

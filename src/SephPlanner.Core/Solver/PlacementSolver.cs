@@ -60,6 +60,13 @@ namespace SephPlanner.Core.Solver
         /// <summary>자리 맞바꾸기를 받아들이는 문턱. 부동소수 잡음을 이득으로 읽지 않기 위한 것이다.</summary>
         private const double Tie = 1e-9;
 
+        /// <summary>
+        /// 제한 해제 칸에 고정한 아티팩트가 보통 칸에 앉을 때 무는 값. 어떤 점수 차이보다 커야
+        /// 다른 아티팩트가 그 칸을 빼앗지 못한다. 그런 칸이 하나도 없으면 모든 칸이 같은 값을
+        /// 물어 배정이 흔들리지 않고, 고정만 지켜지지 않는다. 이사 비용처럼 선택 기준에만 들어간다.
+        /// </summary>
+        private const double HoldPenalty = 1000;
+
         public static Arrangement Solve(PlacementProblem problem, SolverOptions? options = null)
         {
             options ??= new SolverOptions();
@@ -727,7 +734,7 @@ namespace SephPlanner.Core.Solver
                 if (!positions.TryGetValue(charm.InstanceId, out var position)) continue;
 
                 score += Value(problem, charm, position, result, occupancy, neighbors)
-                         + Anchors(problem, charm, position);
+                         + Anchors(problem, charm, position) + Hold(charm, position, result);
             }
             return score;
         }
@@ -764,7 +771,8 @@ namespace SephPlanner.Core.Solver
                     // 뒤라, 이득이 없는데도 맞바꾸라는 제안이 나온다.
                     var charm = problem.Charms[charmIndex];
                     var value = -(Value(problem, charm, free[cellIndex], result, occupancy, neighbors)
-                                  + Anchors(problem, charm, free[cellIndex]));
+                                  + Anchors(problem, charm, free[cellIndex])
+                                  + Hold(charm, free[cellIndex], result));
                     if (charmsAreRows) cost[charmIndex, cellIndex] = value;
                     else cost[cellIndex, charmIndex] = value;
                 }
@@ -815,6 +823,10 @@ namespace SephPlanner.Core.Solver
 
             return value;
         }
+
+        /// <summary>제한 해제 칸에 고정한 아티팩트가 그런 칸이 아닌 곳에 앉으면 무는 값.</summary>
+        private static double Hold(CharmSlot charm, GridPos cell, SimulationResult result) =>
+            charm.Held && !charm.IsFiller && result.IgnoreCriteriaAt(cell) <= 0 ? -HoldPenalty : 0;
 
         /// <summary>
         /// 지금 자리를 지키는 몫(이사 비용의 반대 부호)과, 그다음 직전 제안의 자리를 지키는 몫.
@@ -985,7 +997,9 @@ namespace SephPlanner.Core.Solver
                 }
 
                 arrangement.CharmPositions[charm.InstanceId] = position;
-                arrangement.Preference += Anchors(problem, charm, position);
+                arrangement.Preference += Anchors(problem, charm, position) + Hold(charm, position, result);
+                if (charm.Held && !charm.IsFiller && result.IgnoreCriteriaAt(position) <= 0)
+                    arrangement.UnheldCharms.Add(charm.InstanceId);
 
                 var level = result.EffectiveLevel(position, charm.Enchant);
                 arrangement.Levels[position] = level;

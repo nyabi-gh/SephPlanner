@@ -45,6 +45,12 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         public bool IsDormant { get; set; }
 
+        /// <summary>
+        /// 배치 조건을 무시하는 칸에만 앉힌다(<see cref="Planning.PlanPreferences.HeldCharms"/>). 그런 칸이
+        /// 없으면 무시된다.
+        /// </summary>
+        public bool Held { get; set; }
+
         private CharmCriteriaKind? _criteria;
 
         /// <summary>
@@ -233,6 +239,12 @@ namespace SephPlanner.Core.Solver
 
         /// <summary>효과가 꺼진 아티팩트.</summary>
         public List<int> InactiveCharms { get; } = new List<int>();
+
+        /// <summary>
+        /// 제한 해제 칸에 고정했는데 그런 칸이 모자라 보통 칸에 앉은 아티팩트. 계획은 그대로 쓰고
+        /// 화면이 알린다.
+        /// </summary>
+        public List<int> UnheldCharms { get; } = new List<int>();
 
         /// <summary>효과가 꺼진 아티팩트가 놓인 칸과 그 이유.</summary>
         public Dictionary<GridPos, CharmInactiveReason> InactiveCells { get; } =

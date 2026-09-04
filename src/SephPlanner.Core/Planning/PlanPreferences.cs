@@ -57,6 +57,15 @@ namespace SephPlanner.Core.Planning
         }
 
         /// <summary>
+        /// 제한 해제 칸 고정. 여기 든 아티팩트(엔티티 번호)는 배치 조건을 무시하는 칸
+        /// (<c>IGNORECRITERIA</c> 효과가 걸린 칸)에만 앉힌다. 자물쇠처럼 조건이 까다로운 것은 빈 칸이
+        /// 많을 때 양옆을 비우는 공짜 자리로 갔다가 가방이 차면 옮겨 다니는데, 사용자는 석판이 계속
+        /// 제약을 풀어 주기를 원했다. 그런 칸이 모자라면 계획을 포기하지 않고 그 고정만 무시하며
+        /// <see cref="Arrangement.UnheldCharms"/>로 알린다.
+        /// </summary>
+        public HashSet<int> HeldCharms { get; set; } = new HashSet<int>();
+
+        /// <summary>
         /// 프리셋 코드가 알려 준, 그 빌드가 노리는 아티팩트(엔티티 번호). 손으로 지정하는
         /// <see cref="PinnedCharms"/>와 섞지 않는다 — 이쪽은 "무엇을 집을지"에 대한 조언이라
         /// 추천 끄기의 지배를 받고, 배치 가중치에는 관여하지 않는다.

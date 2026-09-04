@@ -130,6 +130,7 @@ namespace SephPlanner.Core.Planning
                              preferences.PinnedCharms.TryGetValue(item.DefinitionId, out var pin)
                         ? PlanPreferences.WeightOf(pin)
                         : 1,
+                    Held = definition is not null && preferences.HeldCharms.Contains(item.DefinitionId),
                 };
                 if (definition is not null) slot.Worth = CharmWorth.Resolve(definition, values.Of(definition));
                 problem.Charms.Add(slot);
