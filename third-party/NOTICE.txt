@@ -1,0 +1,42 @@
+SephPlanner 배포물에 함께 들어 있는 제3자 구성요소
+==================================================
+
+아래 파일들은 SephPlanner 가 만든 것이 아닙니다. 각자의 라이선스에 따라, 원본 배포물에 있던
+그대로(고치지 않고) 담았습니다.
+
+SephPlanner 자체의 사용 조건은 LICENSE.txt 에 있으며, 그 조건은 SephPlanner 가 만든 파일
+(SephPlanner.Plugin.dll, SephPlanner.Core.dll, 문서)에만 적용됩니다. 아래 구성요소는 각자의
+라이선스가 정한 대로 쓰고 다시 배포할 수 있습니다.
+
+
+BepInEx 5.4.23.5 (win_x64, Mono)
+--------------------------------
+담긴 것   BepInEx/core/ 의 파일들
+라이선스  MIT - BepInEx-LICENSE.txt
+원본      https://github.com/BepInEx/BepInEx/releases/tag/v5.4.23.5
+          받은 파일 BepInEx_win_x64_5.4.23.5.zip
+          SHA-256 82f9878551030f54657792c0740d9d51a09500eeae1fba21106b0c441e6732c4
+
+
+Unity Doorstop 4.5.0
+--------------------
+담긴 것   winhttp.dll, doorstop_config.ini, .doorstop_version
+라이선스  GNU LGPL v2.1 - Doorstop-LICENSE.txt
+원본      https://github.com/NeighTools/UnityDoorstop/tree/v4.5.0
+          바이너리는 위 BepInEx 배포물에 들어 있던 것이며 고치지 않았습니다. LGPL v2.1 제4조에
+          따라, 이 배포물을 받은 곳과 같은 곳(GitHub)의 위 주소에서 소스를 받을 수 있습니다.
+
+
+BepInEx 안에 들어 있는 것들
+---------------------------
+HarmonyX      BepInEx/core/0Harmony.dll, 0Harmony20.dll, HarmonyXInterop.dll,
+              BepInEx.Harmony.dll
+              MIT - HarmonyX-LICENSE.txt - https://github.com/BepInEx/HarmonyX
+MonoMod       BepInEx/core/MonoMod.RuntimeDetour.dll, MonoMod.Utils.dll
+              MIT - MonoMod-LICENSE.txt - https://github.com/MonoMod/MonoMod
+Mono.Cecil    BepInEx/core/Mono.Cecil.dll, Mono.Cecil.Mdb.dll, Mono.Cecil.Pdb.dll,
+              Mono.Cecil.Rocks.dll
+              MIT - Mono.Cecil-LICENSE.txt - https://github.com/jbevain/cecil
+
+
+세피리아(Sephiria)의 게임 파일은 이 배포물에 들어 있지 않습니다.

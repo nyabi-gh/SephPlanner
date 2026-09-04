@@ -17,18 +17,31 @@ SephPlanner 설치 안내
 ------
 
 - 세피리아 (Steam)
-- BepInEx 5.4.23.5 (win_x64, Mono 버전)
-  https://github.com/BepInEx/BepInEx/releases
+
+따로 받아야 할 것은 없습니다. 모드를 올려 주는 BepInEx 5.4.23.5(win_x64, Mono)가 이 zip 안에
+함께 들어 있습니다.
 
 
 설치
 ----
 
-1. BepInEx zip을 게임 폴더(...\steamapps\common\Sephiria)에 풀고 게임을 한 번 실행했다가
-   종료합니다. BepInEx\plugins 폴더가 생겼으면 준비된 것입니다.
-2. 이 zip의 BepInEx-plugins 안에 있는 SephPlanner.Plugin.dll과 SephPlanner.Core.dll을
-   게임 폴더의 BepInEx\plugins\에 복사합니다.
-3. 게임을 켜면 플러그인이 저절로 올라옵니다.
+1. 이 zip을 풉니다.
+2. "게임 폴더에 복사" 폴더를 열고, 그 안에 있는 것을 전부 게임 폴더로 복사합니다.
+   게임 폴더는 스팀에서 세피리아 오른쪽 클릭 - 관리 - 로컬 파일 보기 로 열 수 있습니다
+   (...\steamapps\common\Sephiria).
+   ※ "게임 폴더에 복사" 폴더째로 넣으면 안 됩니다. 그 안에 있는 것들을 넣어야 합니다.
+3. 게임 폴더에 Sephiria.exe 와 나란히 winhttp.dll 과 BepInEx 폴더가 보이면 된 것입니다.
+4. 게임을 켜면 화면 구석에 점수가 뜹니다. 따로 실행할 것은 없습니다.
+
+이미 BepInEx를 쓰고 계시다면
+   다른 모드가 올라가 있는 게임 폴더라면 BepInEx 폴더와 winhttp.dll은 덮어쓰지 마시고,
+   "게임 폴더에 복사\BepInEx\plugins\" 안의 SephPlanner.Plugin.dll과 SephPlanner.Core.dll
+   두 개만 게임 폴더의 BepInEx\plugins\에 복사하세요.
+
+백신이 winhttp.dll을 막을 때가 있습니다
+   차단된 파일을 복원하거나 게임 폴더를 예외로 등록해 주세요. 이 파일은 BepInEx가 게임에
+   붙기 위해 쓰는 것이며, 받은 그대로 고치지 않고 담았습니다. 무엇이 들어 있고 어느 라이선스인지는
+   "제3자-라이선스" 폴더의 NOTICE.txt에 적어 두었습니다.
 
 
 사용
@@ -94,6 +107,11 @@ BepInEx\plugins\에서 SephPlanner DLL 두 개를 지우고, %LOCALAPPDATA%\Seph
 지우면 흔적 없이 제거됩니다. 빌드 창에서 고른 것도 그 폴더의 plugin-settings.json에 있어
 함께 지워집니다.
 
+BepInEx까지 함께 지우려면 게임 폴더의 BepInEx 폴더와 winhttp.dll, doorstop_config.ini,
+.doorstop_version, changelog.txt를 지웁니다. 다른 모드를 쓰고 계시다면 BepInEx는 그대로 두세요.
+
 
 이 프로그램의 사용 조건은 함께 담긴 LICENSE.txt에 있습니다. 개인적·비상업적으로 자유롭게
-쓰실 수 있으며, 재배포와 수정은 허용하지 않습니다.
+쓰실 수 있으며, 재배포와 수정은 허용하지 않습니다. 함께 담긴 BepInEx와 winhttp.dll은 남이
+만든 것이고 각자의 라이선스(MIT, LGPL v2.1)를 따릅니다 - "제3자-라이선스" 폴더에 원문과
+소스 위치가 있습니다.

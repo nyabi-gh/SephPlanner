@@ -8,12 +8,39 @@ $stage = Join-Path $artifacts "stage"
 $zipRoot = Join-Path $stage "SephPlanner"
 $pluginProject = Join-Path $root "src/SephPlanner.Plugin/SephPlanner.Plugin.csproj"
 $testProject = Join-Path $root "tests/SephPlanner.Tests/SephPlanner.Tests.csproj"
+$thirdParty = Join-Path $root "third-party"
+$overlay = Join-Path $zipRoot "게임 폴더에 복사"
+
+# 로더를 함께 담는다. 사용자가 직접 받다가 엉뚱한 파일을 고르는 일이 잦았고(x86/x64, Mono/IL2CPP,
+# 6 베타), 그것이 설치 실패의 가장 흔한 이유였다. 라이선스는 third-party/NOTICE.txt 에
+# 적혀 있다 - BepInEx 는 MIT, 함께 든 winhttp.dll(Unity Doorstop 4.5.0)은 LGPL v2.1 이다.
+$bepinexVersion = "5.4.23.5"
+$bepinexAsset = "BepInEx_win_x64_$bepinexVersion.zip"
+$bepinexUrl = "https://github.com/BepInEx/BepInEx/releases/download/v$bepinexVersion/$bepinexAsset"
+$bepinexSha256 = "82f9878551030f54657792c0740d9d51a09500eeae1fba21106b0c441e6732c4"
 $version = ([xml](Get-Content (Join-Path $root "Directory.Build.props"))).Project.PropertyGroup.Version |
     Where-Object { $_ } | Select-Object -First 1
 
 function Invoke-DotNet([string[]]$Arguments, [string]$Failure) {
     & dotnet @Arguments
     if ($LASTEXITCODE -ne 0) { throw $Failure }
+}
+
+# 받아 둔 것이든 방금 받은 것이든 해시를 매번 확인한다. 남의 코드를 사용자 게임 폴더에 넣어
+# 주는 일이라 "예전에 맞았다"로는 부족하다.
+function Get-BepInEx {
+    $cache = Join-Path $artifacts "third-party"
+    New-Item -ItemType Directory -Force $cache | Out-Null
+    $path = Join-Path $cache $bepinexAsset
+    if (-not (Test-Path $path)) {
+        Write-Host "BepInEx $bepinexVersion 내려받는 중..."
+        Invoke-WebRequest -Uri $bepinexUrl -OutFile $path -UseBasicParsing
+    }
+    $hash = (Get-FileHash $path -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($hash -ne $bepinexSha256) {
+        throw "BepInEx zip 의 SHA-256 이 다릅니다: $hash (기대 $bepinexSha256). $path 를 지우고 다시 실행하세요."
+    }
+    return $path
 }
 
 if (-not $version) { throw "배포 버전을 읽지 못했습니다." }
@@ -37,7 +64,7 @@ if ((& git -C $root tag --points-at HEAD) -notcontains "v$version") {
 }
 
 if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
-New-Item -ItemType Directory -Force (Join-Path $zipRoot "BepInEx-plugins") | Out-Null
+New-Item -ItemType Directory -Force $overlay | Out-Null
 
 try {
     Invoke-DotNet @("restore", $solution, "--locked-mode") "복원 실패"
@@ -45,11 +72,21 @@ try {
     Invoke-DotNet @("test", $testProject, "-c", "Release", "--no-restore") "테스트 실패"
     Invoke-DotNet @("build", $pluginProject, "-c", "Release", "--no-restore", "-p:DeployToGame=false") "플러그인 빌드 실패"
 
+    # 게임 폴더에 그대로 부을 한 벌을 먼저 짓는다. 받는 사람이 할 일은 한 폴더의 내용을 옮기는 것뿐이다.
+    Expand-Archive (Get-BepInEx) $overlay
+    $plugins = Join-Path $overlay "BepInEx/plugins"
+    New-Item -ItemType Directory -Force $plugins | Out-Null
+
     $pluginOut = Join-Path $root "src/SephPlanner.Plugin/bin/Release"
-    Copy-Item (Join-Path $pluginOut "SephPlanner.Plugin.dll") (Join-Path $zipRoot "BepInEx-plugins")
-    Copy-Item (Join-Path $pluginOut "SephPlanner.Core.dll") (Join-Path $zipRoot "BepInEx-plugins")
+    Copy-Item (Join-Path $pluginOut "SephPlanner.Plugin.dll") $plugins
+    Copy-Item (Join-Path $pluginOut "SephPlanner.Core.dll") $plugins
     Copy-Item (Join-Path $root "docs/INSTALL.txt") (Join-Path $zipRoot "설치안내.txt")
     Copy-Item (Join-Path $root "LICENSE") (Join-Path $zipRoot "LICENSE.txt")
+
+    # 남의 것을 담았으므로 그쪽 라이선스 원문과 소스 위치도 함께 나간다.
+    $notices = Join-Path $zipRoot "제3자-라이선스"
+    New-Item -ItemType Directory -Force $notices | Out-Null
+    Copy-Item (Join-Path $thirdParty "*.txt") $notices
 
     $commit = (& git -C $root rev-parse HEAD).Trim()
     $managedDir = (& dotnet msbuild $pluginProject -nologo -getProperty:SephiriaManagedDir).Trim()
@@ -66,6 +103,13 @@ try {
         version = [string]$version
         commit = $commit
         createdUtc = [DateTime]::UtcNow.ToString("o")
+        bundled = [ordered]@{
+            bepinex = [ordered]@{
+                version = [string]$bepinexVersion
+                asset = [string]$bepinexAsset
+                sha256 = [string]$bepinexSha256
+            }
+        }
         gameAssembly = [ordered]@{
             fileVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($gameAssembly).FileVersion
             sha256 = (Get-FileHash $gameAssembly -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -83,10 +127,16 @@ try {
     $archive = [System.IO.Compression.ZipFile]::OpenRead($zip)
     try {
         $required = @(
-            "SephPlanner/BepInEx-plugins/SephPlanner.Plugin.dll",
-            "SephPlanner/BepInEx-plugins/SephPlanner.Core.dll",
+            "SephPlanner/게임 폴더에 복사/BepInEx/plugins/SephPlanner.Plugin.dll",
+            "SephPlanner/게임 폴더에 복사/BepInEx/plugins/SephPlanner.Core.dll",
+            "SephPlanner/게임 폴더에 복사/BepInEx/core/BepInEx.dll",
+            "SephPlanner/게임 폴더에 복사/winhttp.dll",
+            "SephPlanner/게임 폴더에 복사/doorstop_config.ini",
             "SephPlanner/설치안내.txt",
             "SephPlanner/LICENSE.txt",
+            "SephPlanner/제3자-라이선스/NOTICE.txt",
+            "SephPlanner/제3자-라이선스/BepInEx-LICENSE.txt",
+            "SephPlanner/제3자-라이선스/Doorstop-LICENSE.txt",
             "SephPlanner/manifest.json")
         foreach ($entry in $required) {
             if (-not ($archive.Entries | Where-Object { $_.FullName.Replace("\", "/") -eq $entry })) {

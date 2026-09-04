@@ -30,8 +30,13 @@ SephPlanner 최종 사용자 라이선스
 
 4. 제3자 구성요소
 
-   BepInEx, 게임 클라이언트, 그 밖에 이 소프트웨어가 동작하기 위해 필요한 제3자 구성요소는
-   이 배포물에 포함되지 않으며, 사용자가 각 배포처에서 직접 구해 각자의 약관에 따라 사용한다.
+   이 배포물에는 설치를 한 번에 끝내기 위해 BepInEx 와 Unity Doorstop 이 받은 그대로
+   함께 담겨 있다. 그 둘은 이 라이선스가 아니라 각자의 라이선스(차례로 MIT, GNU LGPL v2.1)를
+   따르며, 위 제2조의 제한은 그것들에 적용되지 않는다. 원문과 소스를 받을 수 있는 곳은
+   배포물의 "제3자-라이선스" 폴더에 적혀 있다.
+
+   게임 클라이언트를 비롯해 그 밖에 필요한 것은 포함되지 않으며, 사용자가 각 배포처에서
+   직접 구해 각자의 약관에 따라 사용한다.
 
 5. 게임과의 관계
 
@@ -68,9 +73,13 @@ Copyright (c) 2026 Nyabi. All rights reserved.
    for any damages arising from its use or inability to be used, including
    damage to saved data or any disadvantage to a game account.
 
-4. Third-party components. BepInEx, the game client and any other third-party
-   components needed to run this software are not included here; obtain them
-   from their own distributors under their own terms.
+4. Third-party components. This distribution bundles BepInEx and Unity Doorstop
+   unmodified, so that installing takes one step. They are covered by their own
+   licenses (MIT and GNU LGPL v2.1 respectively) rather than this one, and the
+   restrictions in section 2 do not apply to them; their texts and the places
+   their sources can be obtained are in the bundled "제3자-라이선스" folder. The
+   game client and anything else needed to run this software are not included;
+   obtain them from their own distributors under their own terms.
 
 5. Relationship to the game. SephPlanner is an unofficial, fan-made tool for
    Sephiria and is not affiliated with, sponsored by or endorsed by TEAM HORAY
