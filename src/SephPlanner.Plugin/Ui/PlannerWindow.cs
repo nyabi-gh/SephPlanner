@@ -23,6 +23,7 @@ namespace SephPlanner.Plugin.Ui
     {
         private PlannerPanel _panel;
         private TextMeshProUGUI _hint;
+        private Canvas _canvas;
 
         protected NativeSkin Skin { get; private set; }
 
@@ -47,6 +48,26 @@ namespace SephPlanner.Plugin.Ui
 
         /// <summary>컨트롤러로 열었을 때 초점을 줄 곳. 없으면 화살표를 누를 방법이 없다.</summary>
         protected virtual GameObject DefaultFocus => null;
+
+        /// <summary>
+        /// 오른쪽 단추가 눌렸다. 마우스는 게임의 EventSystem 을 거치지 않고 직접 읽어 넘어온다 -
+        /// 게임의 UI 입력 모듈이 오른쪽 단추를 넘겨주는지 확인할 길이 없고, 커서 좌표는 F6 이동
+        /// 모드가 이미 같은 길로 읽고 있어 확실하다. 무엇이 눌렸는지는 <see cref="Under"/>로 센다.
+        /// </summary>
+        public virtual void RightClick(Vector2 cursor)
+        {
+        }
+
+        /// <summary>커서가 그 사각형 위에 있는가. 창이 어느 캔버스에 붙었든 같은 답이 나온다.</summary>
+        protected bool Under(RectTransform rect, Vector2 cursor)
+        {
+            if (rect == null || !rect.gameObject.activeInHierarchy) return false;
+
+            var camera = _canvas == null || _canvas.renderMode == RenderMode.ScreenSpaceOverlay
+                ? null
+                : _canvas.worldCamera;
+            return RectTransformUtility.RectangleContainsScreenPoint(rect, cursor, camera);
+        }
 
         /// <summary>열려 있으면 닫고, 아니면 연다. 창이 아직 없으면 이때 만든다.</summary>
         public void Toggle(string hint)
@@ -101,6 +122,7 @@ namespace SephPlanner.Plugin.Ui
             }
 
             Blocker = "";
+            _canvas = root.Canvas;
             Skin = NativeSkin.Borrow(root);
             Base = Skin.BaseSize;
 

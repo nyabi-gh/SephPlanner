@@ -55,6 +55,8 @@ namespace SephPlanner.Plugin.Ui
         private TextMeshProUGUI _comboTab;
         private TextMeshProUGUI _charmTab;
         private TextMeshProUGUI _note;
+        private LayoutElement _noteSize;
+        private float _noteWidth;
         private TextMeshProUGUI _pageLabel;
         private RectTransform _pager;
 
@@ -75,12 +77,15 @@ namespace SephPlanner.Plugin.Ui
             Divider(content);
             BuildTabs(content);
 
-            _note = Widgets.Label("Note", content, Skin, S(0.75f), NativeSkin.TextDim);
-            Widgets.Fixed(_note.rectTransform, S(1.1f));
+            // 접히는 문단이다. 아티팩트 탭의 안내가 올리는 단계와 내리는 단계를 다 말하면 한 줄을
+            // 넘고, 한 줄짜리는 "…" 로 잘린다. 폭은 창 폭에서 테두리와 안쪽 여백을 뺀 것이다.
+            _note = Widgets.Paragraph("Note", content, Skin, S(0.75f), NativeSkin.TextDim);
+            _noteSize = Widgets.Fixed(_note.rectTransform, S(1.1f));
+            _noteWidth = S(WidthRatio) - 2f * S(0.25f) - 2f * S(0.7f);
 
             var list = Widgets.Rect("List", content);
             Widgets.Column(list, S(0.15f));
-            for (var i = 0; i < RowsPerPage; i++) _rows.Add(new Row(list, Skin, Base, Toggle));
+            for (var i = 0; i < RowsPerPage; i++) _rows.Add(new Row(list, Skin, Base, entry => Toggle(entry, 1)));
 
             BuildPager(content);
         }
@@ -180,6 +185,7 @@ namespace SephPlanner.Plugin.Ui
             RenderPreset();
             RenderTabs();
             RenderRows();
+            Widgets.FitHeight(_note, _noteSize, _noteWidth);
         }
 
         private void RenderPreset()
@@ -219,6 +225,20 @@ namespace SephPlanner.Plugin.Ui
             _note.color = NativeSkin.TextDim;
         }
 
+        /// <summary>우클릭은 단계를 내린다. 아티팩트 줄에서만 뜻이 있다.</summary>
+        public override void RightClick(Vector2 cursor)
+        {
+            if (!IsOpen || _tab != Tab.Charms) return;
+
+            foreach (var row in _rows)
+            {
+                if (row.Entry == null || !Under(row.Rect, cursor)) continue;
+
+                Toggle(row.Entry, -1);
+                return;
+            }
+        }
+
         private void RenderRows()
         {
             var start = _page * RowsPerPage;
@@ -243,12 +263,13 @@ namespace SephPlanner.Plugin.Ui
             _note.color = NativeSkin.TextDim;
         }
 
-        private void Toggle(Entry entry)
+        private void Toggle(Entry entry, int direction)
         {
             if (entry == null) return;
 
-            if (entry.EntityId != 0) _prefs.CyclePin(entry.EntityId);
-            else _prefs.TogglePriority(entry.Key);
+            if (entry.EntityId != 0) _prefs.StepPin(entry.EntityId, direction);
+            else if (direction > 0) _prefs.TogglePriority(entry.Key);
+            else return;
 
             Refresh();
         }
@@ -310,31 +331,39 @@ namespace SephPlanner.Plugin.Ui
         /// 여기 손으로 적어 두면 배수가 바뀌었을 때 이 줄만 옛말을 하게 된다. 실제로 단계가
         /// 셋으로 늘어난 뒤에도 "2배로 칩니다"가 남아 있었다.
         /// </summary>
-        private static string PinNote()
+        private string PinNote()
         {
-            var note = new StringBuilder("누를 때마다 ");
+            var note = new StringBuilder("누르면 ");
             for (var level = 1; level <= PlanPreferences.MaxPinLevel; level++)
             {
-                note.Append(new string('★', level)).Append(' ')
-                    .Append(PlanPreferences.WeightOf(level).ToString("0.#")).Append("배 → ");
+                note.Append(Marks(level)).Append(' ')
+                    .Append(PlanPreferences.WeightOf(level).ToString("0.##")).Append("배 → ");
             }
-            return note.Append("해제. 좋은 칸을 먼저 받습니다.").ToString();
+            note.Append("해제로 좋은 칸을 먼저 받고, 우클릭은 ");
+            for (var level = -1; level >= PlanPreferences.MinPinLevel; level--)
+            {
+                note.Append(Marks(level)).Append(' ')
+                    .Append(PlanPreferences.WeightOf(level).ToString("0.##")).Append("배 → ");
+            }
+            return note.Append("해제로 남에게 양보합니다.").ToString();
+        }
+
+        /// <summary>단계를 기호로. 양수는 ★, 음수는 양보 표시를 단계 수만큼.</summary>
+        private string Marks(int level) =>
+            level > 0 ? new string('★', level) : Repeat(Skin.YieldMark, -level);
+
+        private static string Repeat(string mark, int count)
+        {
+            var text = new StringBuilder(mark.Length * count);
+            for (var i = 0; i < count; i++) text.Append(mark);
+            return text.ToString();
         }
 
         /// <summary>
-        /// 줄 앞의 단계 표시. 폭이 흔들리지 않게 세 칸으로 맞춘다 - 누를 때마다 이름이 좌우로
+        /// 줄 앞의 단계 표시. 폭이 흔들리지 않게 네 칸으로 맞춘다 - 누를 때마다 이름이 좌우로
         /// 밀리면 연달아 누르기가 어렵다.
         /// </summary>
-        private static string PinMark(int level)
-        {
-            switch (level)
-            {
-                case 1: return "★   ";
-                case 2: return "★★  ";
-                case 3: return "★★★ ";
-                default: return "○   ";
-            }
-        }
+        private string PinMark(int level) => level == 0 ? "○   " : Marks(level).PadRight(4);
 
         private static int Count(Dictionary<string, int> counts, string id) =>
             counts != null && counts.TryGetValue(id, out var value) ? value : 0;
@@ -500,6 +529,9 @@ namespace SephPlanner.Plugin.Ui
                     "Detail", rect, skin, b * 0.8f, NativeSkin.TextDim, TextAlignmentOptions.MidlineRight);
                 Widgets.Fixed(_detail.rectTransform, b * 1.5f, b * 7f);
             }
+
+            public Entry Entry => _entry;
+            public RectTransform Rect => _background.rectTransform;
 
             public void Show(Entry entry)
             {

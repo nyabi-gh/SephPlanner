@@ -165,6 +165,7 @@ namespace SephPlanner.Plugin
                 if (_settings.OpacityKey.Value.IsDown()) _settings.CycleOpacity();
                 if (_settings.MoveKey.Value.IsDown()) ToggleMove();
                 if (_moving) _hud.DragTo(Cursor());
+                if (_build.IsOpen && RightClicked()) _build.RightClick(Cursor());
 
                 // 커서를 읽기만 한다. 그려 둔 사각형과 겹치는지 우리가 세므로 raycastTarget 을
                 // 켤 필요가 없고, HUD 가 게임 입력을 가져가지 않는다는 보장이 그대로 남는다.
@@ -874,6 +875,13 @@ namespace SephPlanner.Plugin
         {
             var mouse = UnityEngine.InputSystem.Mouse.current;
             return mouse != null ? mouse.position.ReadValue() : (Vector2)Input.mousePosition;
+        }
+
+        /// <summary>오른쪽 단추가 이 프레임에 눌렸는가. 커서와 같은 길로 읽는다.</summary>
+        private static bool RightClicked()
+        {
+            var mouse = UnityEngine.InputSystem.Mouse.current;
+            return mouse != null ? mouse.rightButton.wasPressedThisFrame : Input.GetMouseButtonDown(1);
         }
 
         /// <summary>

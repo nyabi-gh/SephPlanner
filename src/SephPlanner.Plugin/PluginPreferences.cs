@@ -21,7 +21,8 @@ namespace SephPlanner.Plugin
         public List<string> PriorityCategories { get; set; } = new List<string>();
 
         /// <summary>
-        /// 강화 우선 지정. 엔티티 번호 → 단계(1~<see cref="PlanPreferences.MaxPinLevel"/>).
+        /// 강화 우선 지정. 엔티티 번호 → 단계(<see cref="PlanPreferences.MinPinLevel"/>~
+        /// <see cref="PlanPreferences.MaxPinLevel"/>, 0 은 없음). 양수가 올리는 쪽, 음수가 양보다.
         /// </summary>
         public Dictionary<int, int> PinnedLevels { get; set; } = new Dictionary<int, int>();
 
@@ -61,20 +62,23 @@ namespace SephPlanner.Plugin
         public int PinLevel(int entityId) =>
             entityId != 0 && PinnedLevels.TryGetValue(entityId, out var level) ? level : 0;
 
-        public bool IsPinned(int entityId) => PinLevel(entityId) > 0;
+        public bool IsPinned(int entityId) => PinLevel(entityId) != 0;
 
         public bool IsPriority(string categoryId) => PriorityCategories.Contains(categoryId);
 
         /// <summary>
-        /// 다음 단계로 돌린다. 마지막 다음은 지정 없음이라 한 손가락으로 켜고 끌 수 있다.
+        /// 단계를 하나 올리거나(양수) 내린다(음수). 0 을 지나거나 끝을 넘으면 지정 없음이라,
+        /// 어느 쪽 단추 하나로도 켜고 끌 수 있고 반대쪽 끝까지 돌아가지 않는다.
         /// </summary>
-        public void CyclePin(int entityId)
+        public void StepPin(int entityId, int direction)
         {
-            if (entityId == 0) return;
+            if (entityId == 0 || direction == 0) return;
 
-            var next = PinLevel(entityId) + 1;
-            if (next > PlanPreferences.MaxPinLevel) PinnedLevels.Remove(entityId);
-            else PinnedLevels[entityId] = next;
+            var next = PinLevel(entityId) + Math.Sign(direction);
+            if (next == 0 || next > PlanPreferences.MaxPinLevel || next < PlanPreferences.MinPinLevel)
+                PinnedLevels.Remove(entityId);
+            else
+                PinnedLevels[entityId] = next;
             Changed();
         }
 
@@ -157,6 +161,19 @@ namespace SephPlanner.Plugin
             PinnedCharms.Clear();
         }
 
+        /// <summary>손으로 고친 파일이나 낡은 버전이 남긴 뜻 없는 단계는 버린다. 0 은 지정 없음과 같다.</summary>
+        private void DropInvalidPins()
+        {
+            var invalid = new List<int>();
+            foreach (var pair in PinnedLevels)
+            {
+                if (pair.Key == 0 || pair.Value == 0 ||
+                    pair.Value > PlanPreferences.MaxPinLevel || pair.Value < PlanPreferences.MinPinLevel)
+                    invalid.Add(pair.Key);
+            }
+            foreach (var entityId in invalid) PinnedLevels.Remove(entityId);
+        }
+
         private static string Path_ => Path.Combine(PlannerData.DataDirectory, FileName);
 
         public static PluginPreferences Load(Action<string> log)
@@ -172,6 +189,7 @@ namespace SephPlanner.Plugin
                         loaded.PinnedCharms = loaded.PinnedCharms ?? new List<int>();
                         loaded.PinnedLevels = loaded.PinnedLevels ?? new Dictionary<int, int>();
                         loaded.MigrateLegacyPins();
+                        loaded.DropInvalidPins();
                         loaded._log = log;
                         return loaded;
                     }

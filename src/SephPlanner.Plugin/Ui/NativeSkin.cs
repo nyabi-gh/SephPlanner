@@ -21,6 +21,12 @@ namespace SephPlanner.Plugin.Ui
         public TMP_FontAsset Font { get; private set; }
         public Material FontMaterial { get; private set; }
 
+        /// <summary>
+        /// 양보(강화 우선의 음수 단계) 표시. ★ 처럼 KS X 1001 기호라 게임 글꼴(Galmuri)에 있을
+        /// 것으로 보지만, 없으면 네모가 뜨므로 빌린 글꼴에 있는지 보고 정한다.
+        /// </summary>
+        public string YieldMark { get; private set; } = "▽";
+
         /// <summary>게임 HUD 글자 크기의 중앙값. 우리 크기는 전부 여기에 대한 비율이다.</summary>
         public float BaseSize { get; private set; } = 12f;
 
@@ -83,6 +89,8 @@ namespace SephPlanner.Plugin.Ui
                 sizes.Sort();
                 skin.BaseSize = sizes[sizes.Count / 2];
             }
+
+            if (skin.Font != null && !skin.Font.HasCharacter('▽', searchFallbacks: true)) skin.YieldMark = "v";
 
             skin.Origin =
                 "글꼴=" + (skin.Font != null ? skin.Font.name : "없음(기본)") +

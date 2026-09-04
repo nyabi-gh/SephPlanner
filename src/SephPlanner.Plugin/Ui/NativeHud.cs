@@ -728,7 +728,13 @@ namespace SephPlanner.Plugin.Ui
                 {
                     lines.Add(
                         $"강화 우선 {new string('★', pinned)} - 가치를 " +
-                        $"{PlanPreferences.WeightOf(pinned):0.#}배로 칩니다.");
+                        $"{PlanPreferences.WeightOf(pinned):0.##}배로 칩니다.");
+                }
+                else if (pinned < 0)
+                {
+                    lines.Add(
+                        $"양보 {string.Concat(System.Linq.Enumerable.Repeat(_skin.YieldMark, -pinned))} - 가치를 " +
+                        $"{PlanPreferences.WeightOf(pinned):0.##}배로 칩니다.");
                 }
                 return Explain.Join(lines);
             });
@@ -1026,10 +1032,12 @@ namespace SephPlanner.Plugin.Ui
             private readonly Image _icon;
             private readonly TextMeshProUGUI _name;
             private readonly TextMeshProUGUI _level;
+            private readonly string _yieldMark;
 
             public Cell(RectTransform parent, NativeSkin skin, float b)
             {
                 _edge = Mathf.Max(1f, b * 0.1f);
+                _yieldMark = skin.YieldMark;
 
                 _border = Widgets.Fill("Cell", parent, NativeSkin.SlotEdge);
                 _fill = Widgets.Fill("Fill", _border.rectTransform, NativeSkin.EmptyFill);
@@ -1095,12 +1103,13 @@ namespace SephPlanner.Plugin.Ui
             {
                 Paint(moved ? NativeSkin.GoldEdge : NativeSkin.SlotEdge, NativeSkin.SlotFill, moved);
                 SetIcon(icon);
-                _name.text = icon == null ? (pinned > 0 ? "★ " + name : name) : "";
+                var mark = pinned > 0 ? "★" : pinned < 0 ? _yieldMark : "";
+                _name.text = icon == null ? (mark.Length > 0 ? mark + " " + name : name) : "";
                 _name.color = NativeSkin.Text;
 
                 // 아이콘이 있으면 이름 줄이 비므로 강화 표시가 레벨 줄로 내려온다. 칸이 좁아
-                // 단계는 별 개수로 적지 않는다 - 몇 단계인지는 쪽지가 말한다.
-                var star = pinned > 0 && icon != null ? "★" : "";
+                // 단계는 기호 개수로 적지 않는다 - 몇 단계인지는 쪽지가 말한다.
+                var star = icon != null ? mark : "";
 
                 if (reason != CharmInactiveReason.None)
                 {
