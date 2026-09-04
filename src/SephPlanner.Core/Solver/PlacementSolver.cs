@@ -805,17 +805,13 @@ namespace SephPlanner.Core.Solver
             var value = charm.Weight * charm.Worth.At(effective) * factor
                         - WastePenalty * Math.Max(0, level - effective);
 
-            if (charm.Definition.Behavior == "Charm_WhitePaper")
-                value += WhitePaperWorth(problem, charm, cell, neighbors);
-
             if (charm.Definition.Behavior == "Charm_NearLevelDamage")
                 value += NearLevelDamageWorth(charm, cell, effective, result, neighbors);
 
             // 자리가 대상을 정하는 것들. 무엇이 걸리는지는 정의가 답한다.
-            value += PositionalWorth.InheritedComboWorth(problem, charm, cell, neighbors);
+            value += PositionalWorth.ComboWorth(problem, charm, cell, neighbors);
             value += PositionalWorth.NeighborEnhanceWorth(charm, cell, neighbors);
             value += PositionalWorth.RowCompanionWorth(charm, cell, problem.Grid, neighbors);
-            value += PositionalWorth.LineCategoryWorth(problem, charm, cell);
 
             return value;
         }
@@ -834,34 +830,6 @@ namespace SephPlanner.Core.Solver
             if (problem.PlannedCharms.TryGetValue(charm.InstanceId, out var planned) && planned == cell)
                 value += PlanBonus;
             return value;
-        }
-
-        /// <summary>
-        /// 하얀 종이는 양옆 아티팩트가 공유하는 카테고리를 물려받아 콤보 개수에 +1 을 보탠다
-        /// (게임 <c>Charm_WhitePaper</c>: 좌우 이웃의 카테고리 중 둘 다 가진 것을 자기 것으로).
-        /// 이웃은 직전 반복의 배정에서 오는 근사이고, 개수도 지금 배치 기준이라 정확히는 못 세지만
-        /// 같은 카테고리 쌍 사이에 끼우는 방향으로는 충분히 이끈다.
-        /// </summary>
-        private static double WhitePaperWorth(
-            PlacementProblem problem, CharmSlot charm, GridPos cell, Dictionary<GridPos, CharmSlot>? neighbors)
-        {
-            if (neighbors is null || problem.Combos is null) return 0;
-            if (!neighbors.TryGetValue(cell.Offset(-1, 0), out var left) || left == charm || left.IsFiller) return 0;
-            if (!neighbors.TryGetValue(cell.Offset(1, 0), out var right) || right == charm || right.IsFiller) return 0;
-
-            var worth = 0.0;
-            foreach (var category in left.Definition.Categories)
-            {
-                if (!right.Definition.Categories.Contains(category)) continue;
-
-                var combo = problem.Combos(category);
-                if (combo is null) continue;
-
-                var count = 0;
-                problem.ComboCounts?.TryGetValue(category, out count);
-                worth += Worth.OfComboStep(combo, count, out _, out _);
-            }
-            return worth;
         }
 
         /// <summary>이웃 여덟 칸. 게임 <c>Charm_NearLevelDamage.directions</c>와 같은 집합이다.</summary>

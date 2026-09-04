@@ -60,20 +60,47 @@ namespace SephPlanner.Core.Solver
         }
 
         /// <summary>
-        /// 침이 물려받는 카테고리로 나아가는 콤보 값어치. 게임 <c>SearchCategory</c>가 대상의
-        /// <c>GetItemCategory()</c>를 그대로 자기 것으로 삼고, 콤보를 세는
-        /// <c>SearchSetEffectInInventory</c>가 그 값을 읽는다. 그래서 <b>침에 한해서는 콤보 개수가
-        /// 배치에 달려 있다</b> - 다른 아티팩트에서는 그렇지 않다(docs/RESEARCH.md).
+        /// 자리 때문에 더 내보이는 카테고리로 나아가는 콤보 값어치. 침은 대상에게 물려받은 것(게임
+        /// <c>SearchCategory</c>가 대상의 <c>GetItemCategory()</c>를 자기 것으로 삼는다), 캘세더니
+        /// 열쇠는 행이 정한 것(<c>lineCategory[YIdx % 개수]</c>), 하얀 종이는 양옆이 공유하는 것들이다.
+        /// 콤보를 세는 <c>SearchSetEffectInInventory</c>가 그 값을 읽으므로 <b>이들에 한해서는 콤보
+        /// 개수가 배치에 달려 있다</b>(docs/RESEARCH.md). 출발 개수는 자기 몫을 뺀 것이어야 한다 -
+        /// <see cref="ComboCounting"/>.
         /// </summary>
-        public static double InheritedComboWorth(
+        public static double ComboWorth(
             PlacementProblem problem, CharmSlot charm, GridPos cell,
             IReadOnlyDictionary<GridPos, CharmSlot>? neighbors)
         {
-            if (!IsNeedle(charm.Definition) || neighbors is null || problem.Combos is null) return 0;
+            if (problem.Combos is null || !ComboCounting.IsPositional(charm.Definition)) return 0;
 
-            if (!DependencyTarget(charm, cell, neighbors, out var target, out var targetCell)) return 0;
+            // 열쇠는 이웃이 없어도 행만으로 정해진다. 침과 종이는 이웃이 있어야 한다.
+            if (neighbors is null && charm.Definition.LineCategories.Count == 0) return 0;
 
-            return ComboWorth(problem, CategoriesOf(target, targetCell));
+            var categories = new List<string>(2);
+            ComboCounting.PositionalCategories(
+                charm, cell, neighbors ?? EmptyNeighbors, categories);
+
+            var worth = 0.0;
+            foreach (var category in categories)
+            {
+                if (string.IsNullOrEmpty(category)) continue;
+
+                var combo = problem.Combos(category);
+                if (combo is null) continue;
+
+                worth += Worth.OfComboStep(combo, ComboCounting.CountFor(problem, charm, category, neighbors), out _, out _);
+            }
+            return worth;
+        }
+
+        private static readonly IReadOnlyDictionary<GridPos, CharmSlot> EmptyNeighbors =
+            new Dictionary<GridPos, CharmSlot>();
+
+        /// <summary>캘세더니 열쇠가 그 행에서 내보이는 카테고리. <c>lineCategory[YIdx % 개수]</c>.</summary>
+        internal static string LineCategory(CharmDefinition definition, GridPos cell)
+        {
+            var line = definition.LineCategories;
+            return line[((cell.Y % line.Count) + line.Count) % line.Count];
         }
 
         /// <summary>
@@ -120,51 +147,17 @@ namespace SephPlanner.Core.Solver
         }
 
         /// <summary>
-        /// 캘세더니 열쇠(<c>Charm_3Elemental_ByRow</c>). 놓인 행이 카테고리를 정하므로
-        /// (<c>lineCategory[YIdx % 개수]</c>), 어느 줄에 서느냐가 곧 어느 콤보를 미느냐다.
-        /// 능력치 몫은 어느 줄이든 같아 자리를 가르지 않는다 - 카테고리만 본다.
-        /// </summary>
-        public static double LineCategoryWorth(PlacementProblem problem, CharmSlot charm, GridPos cell)
-        {
-            var line = charm.Definition.LineCategories;
-            if (line.Count == 0 || problem.Combos is null) return 0;
-
-            return ComboWorth(problem, new[] { line[((cell.Y % line.Count) + line.Count) % line.Count] });
-        }
-
-        /// <summary>
         /// 이 아티팩트가 지금 자리에서 게임에 내보이는 카테고리. 대개는 정의 그대로지만, 캘세더니
         /// 열쇠는 <c>GetItemCategory()</c>를 덮어써 행이 정한 것 하나만 내놓는다.
         /// </summary>
-        private static IEnumerable<string> CategoriesOf(CharmSlot charm, GridPos cell)
+        internal static IEnumerable<string> CategoriesOf(CharmSlot charm, GridPos cell)
         {
-            var line = charm.Definition.LineCategories;
-            if (line.Count == 0) return charm.Definition.Categories;
+            if (charm.Definition.LineCategories.Count == 0) return charm.Definition.Categories;
 
-            return new[] { line[((cell.Y % line.Count) + line.Count) % line.Count] };
+            return new[] { LineCategory(charm.Definition, cell) };
         }
 
-        /// <summary>카테고리들을 한 걸음씩 나아갔을 때의 콤보 값어치 합.</summary>
-        private static double ComboWorth(PlacementProblem problem, IEnumerable<string> categories)
-        {
-            var worth = 0.0;
-            foreach (var category in categories)
-            {
-                if (string.IsNullOrEmpty(category)) continue;
-
-                var combo = problem.Combos!(category);
-                if (combo is null) continue;
-
-                // 하얀 종이와 같은 근사다 - 개수는 게임이 세어 둔 지금 배치 기준이라, 이 아티팩트가
-                // 이미 그 카테고리에 세어져 있으면 한 걸음을 겹쳐 센다. 줄 세우기에는 충분하다.
-                var count = 0;
-                problem.ComboCounts?.TryGetValue(category, out count);
-                worth += Worth.OfComboStep(combo, count, out _, out _);
-            }
-            return worth;
-        }
-
-        private static bool IsNeedle(CharmDefinition definition) =>
+        internal static bool IsNeedle(CharmDefinition definition) =>
             definition.DependencyBonusByLevel.Count > 0;
 
         /// <summary>
@@ -172,7 +165,7 @@ namespace SephPlanner.Core.Solver
         /// 침 위에 침이 있으면 그 침의 오프셋을 따라 계속 올라가고, 침이 아닌 아티팩트에서 멈춘다.
         /// 도중에 빈 칸을 만나거나 같은 칸을 두 번 밟으면(고리) 아무도 강화하지 못한다.
         /// </summary>
-        private static bool DependencyTarget(
+        internal static bool DependencyTarget(
             CharmSlot charm, GridPos cell, IReadOnlyDictionary<GridPos, CharmSlot> neighbors,
             out CharmSlot target, out GridPos targetCell)
         {

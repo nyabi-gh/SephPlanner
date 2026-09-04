@@ -105,6 +105,12 @@ namespace SephPlanner.Core.Solver
         public Func<string, ComboDefinition?>? Combos { get; set; }
 
         /// <summary>
+        /// <see cref="ComboCounts"/>에서 자리 의존 아티팩트의 지금 자리 몫을 뺀 것. <see cref="ComboCounting"/>이
+        /// 처음 읽을 때 짓는다. 개수나 지금 자리를 바꾼 뒤에는 null 로 되돌려야 다시 짓는다.
+        /// </summary>
+        public Dictionary<string, int>? BaseComboCounts { get; set; }
+
+        /// <summary>
         /// 지금 놓여 있는 자리. 여기서 벗어나는 자리마다 솔버가 이사 비용을 문다 - 점수는 끝 상태만
         /// 세므로, 이것이 없으면 아무것도 달라지지 않았는데도 제안이 이리저리 바뀌고 티끌만 한
         /// 이득에 판 전체를 뒤집으라고 한다.

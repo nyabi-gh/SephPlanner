@@ -57,6 +57,14 @@ scripts/check.ps1
 dotnet run --project src/SephPlanner.DataTool -- --check %LOCALAPPDATA%\SephPlanner\inventory-snapshot.json
 ```
 
+같은 스냅샷으로 `F8` 을 연달아 누르는 것을 흉내 낸다. 계획대로 옮기고, 게임이 다시 셀 레벨과
+콤보 개수를 우리 셈으로 채운 뒤 다시 푼다. 적용한 뒤에도 계획이 또 바뀌면 그 이유가 여기서
+드러난다 - 실제로 침 둘이 두 콤보 사이를 오가며 `F8` 마다 6~7수를 내던 판을 이것으로 잡았다.
+
+```powershell
+dotnet run --project src/SephPlanner.DataTool -- --churn %LOCALAPPDATA%\SephPlanner\inventory-snapshot.json
+```
+
 콤보 한 단계가 아티팩트 레벨 몇 개 값어치인지 잰다. `Worth`의 상수를 짐작으로 두지 않기 위한
 것이며, 게임을 한 번 켜서 카탈로그를 다시 덤프한 뒤에 돌아간다(방법은 docs/RESEARCH.md 참고).
 

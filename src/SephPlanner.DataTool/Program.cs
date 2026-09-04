@@ -32,6 +32,19 @@ if (replayIndex >= 0)
     return SnapshotReplay.Run(args[replayIndex + 1]);
 }
 
+// 스냅샷 한 장에서 F8 을 연달아 누르는 것을 흉내 내 계획이 수렴하는지 본다.
+var churnIndex = Array.IndexOf(args, "--churn");
+if (churnIndex >= 0)
+{
+    if (churnIndex + 1 >= args.Length)
+    {
+        Console.Error.WriteLine("사용법: --churn <스냅샷.json> [횟수]");
+        return 1;
+    }
+    var rounds = churnIndex + 2 < args.Length && int.TryParse(args[churnIndex + 2], out var parsed) ? parsed : 12;
+    return SnapshotChurn.Run(args[churnIndex + 1], rounds);
+}
+
 // 저장해 둔 스냅샷으로 우리 레벨 계산을 게임 값과 견준다. 게임을 다시 켜지 않고 확인할 수 있다.
 var checkIndex = Array.IndexOf(args, "--check");
 if (checkIndex >= 0)
