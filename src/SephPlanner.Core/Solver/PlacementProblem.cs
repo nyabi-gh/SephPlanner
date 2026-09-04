@@ -105,8 +105,9 @@ namespace SephPlanner.Core.Solver
         public Func<string, ComboDefinition?>? Combos { get; set; }
 
         /// <summary>
-        /// 지금 놓여 있는 자리. 점수가 같은 배치가 여럿일 때 이미 놓인 대로 두는 쪽을 고르는 데 쓴다.
-        /// 이것이 없으면 아무것도 달라지지 않았는데도 제안이 이리저리 바뀐다.
+        /// 지금 놓여 있는 자리. 여기서 벗어나는 자리마다 솔버가 이사 비용을 문다 - 점수는 끝 상태만
+        /// 세므로, 이것이 없으면 아무것도 달라지지 않았는데도 제안이 이리저리 바뀌고 티끌만 한
+        /// 이득에 판 전체를 뒤집으라고 한다.
         /// </summary>
         public Dictionary<int, TabletSpot> CurrentTablets { get; } = new Dictionary<int, TabletSpot>();
         public Dictionary<int, GridPos> CurrentCharms { get; } = new Dictionary<int, GridPos>();
@@ -193,6 +194,13 @@ namespace SephPlanner.Core.Solver
         public Dictionary<int, GridPos> CharmPositions { get; } = new Dictionary<int, GridPos>();
 
         public double Score { get; set; }
+
+        /// <summary>
+        /// 배치들 사이에서 고를 때 쓰는 값. <see cref="Score"/>에 지금 자리를 지키는 몫(이사 비용의
+        /// 반대 부호)과 직전 제안을 지키는 몫을 더한 것이다. 화면에 보이는 점수가 아니다 - 같은
+        /// 판의 배치들끼리만 견줄 수 있고 절대값에는 뜻이 없다.
+        /// </summary>
+        public double Preference { get; set; }
 
         /// <summary>
         /// 놓을 자리가 모자라 배치에서 빠진 석판 수. 0이 아니면 점수가 실제 인벤토리를 다

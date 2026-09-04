@@ -488,4 +488,100 @@ public class StabilityTests
         Assert.Equal(new GridPos(1, 0), arrangement.CharmPositions[10]);
         Assert.Equal(4, arrangement.Score, 2);
     }
+
+    [Fact]
+    public void AGainSmallerThanTheCostOfMovingIsNotProposed()
+    {
+        // 한 칸 옮기면 레벨이 하나 오르지만 그 레벨의 값어치가 0.2 뿐이다. 옮기는 수고(0.3)보다
+        // 적게 얻는 이동은 제안하지 않는다 - 점수는 끝 상태만 세므로 이 비용이 없으면 티끌만 한
+        // 이득에도 판을 뒤집으라고 한다.
+        var problem = OneStepProblem(perLevel: 0.2);
+
+        var arrangement = PlacementSolver.Solve(problem);
+
+        Assert.Equal(new GridPos(4, 0), arrangement.CharmPositions[10]);
+    }
+
+    [Fact]
+    public void AGainLargerThanTheCostOfMovingIsProposed()
+    {
+        var problem = OneStepProblem(perLevel: 0.5);
+
+        var arrangement = PlacementSolver.Solve(problem);
+
+        Assert.Equal(new GridPos(1, 0), arrangement.CharmPositions[10]);
+    }
+
+    [Fact]
+    public void TheReportedScoreLeavesOutTheCostOfStaying()
+    {
+        // 이사 비용은 배치를 고를 때만 쓴다. 점수에 섞이면 "현재 / 최선" 이 자리 수만큼 부풀어
+        // 레벨 단위라는 뜻을 잃는다.
+        var problem = OneStepProblem(perLevel: 0.2);
+        var layout = new List<TabletPlacement> { problem.Tablets[0].At(new GridPos(0, 0), 0) };
+
+        var current = PlacementSolver.Score(problem, layout, problem.CurrentCharms);
+
+        Assert.Equal(1.0, current.Score, 9);
+        Assert.True(current.Preference > current.Score, "자리를 지키는 몫이 선택 기준에는 들어가야 한다");
+    }
+
+    [Fact]
+    public void APlanThatDoesNotPayForItsMovesIsWithheld()
+    {
+        // 사용자에게 닿는 계약이다. 이득이 이사 비용에 못 미치면 화면에는 "변경 없음" 이 떠야 한다.
+        var catalog = new Catalog(
+            new[] { new TabletDefinition { Id = "T", EntityId = 100, Query = "RIGHT 1" } },
+            new[]
+            {
+                new CharmDefinition
+                {
+                    Id = "C", EntityId = 200, MaxLevel = 5, Behavior = "Charm_StatusInstance",
+                    StatWorthByLevel = new List<double> { 1.0, 1.2, 1.4, 1.6, 1.8, 2.0 },
+                },
+            });
+
+        var inventory = new InventoryState { Width = 6, Height = 7, Storage = 6 };
+        inventory.Tablets.Add(new PlacedTablet
+        {
+            DefinitionId = 100,
+            InstanceId = 1,
+            Position = new GridPos(0, 0),
+            IsApplied = true,
+        });
+        inventory.Items.Add(new PlacedItem
+        {
+            DefinitionId = 200,
+            InstanceId = 10,
+            Position = new GridPos(4, 0),
+            IsActive = true,
+        });
+
+        var plan = PlanBuilder.Build(
+            new GameSnapshot { Inventory = inventory, Run = new RunState() }, catalog)!;
+
+        Assert.Empty(plan.Moves);
+        Assert.Equal(0, plan.Gain, 9);
+        Assert.Equal(1.0, plan.Current.Score, 9);
+    }
+
+    /// <summary>석판 하나가 (1,0) 에 +1 을 주고, 아티팩트 하나가 (4,0) 에 있다. 한 수로 레벨 하나를 얻는 판.</summary>
+    private static PlacementProblem OneStepProblem(double perLevel)
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(6, 7, 6) };
+        problem.Tablets.Add(new TabletSlot
+        {
+            InstanceId = 1,
+            Definition = new TabletDefinition { Id = "T", Query = "RIGHT 1" },
+        });
+        problem.Charms.Add(new CharmSlot
+        {
+            InstanceId = 10,
+            Definition = new CharmDefinition { MaxLevel = 5 },
+            Worth = new CharmWorth { Base = 1, PerLevel = perLevel },
+        });
+        problem.CurrentTablets[1] = new TabletSpot(new GridPos(0, 0), 0);
+        problem.CurrentCharms[10] = new GridPos(4, 0);
+        return problem;
+    }
 }

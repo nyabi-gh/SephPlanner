@@ -37,15 +37,28 @@ namespace SephPlanner.Core.Solver
     {
         private const double WastePenalty = 1e-4;
 
-        /// <summary>낭비 판단보다도 작게 두어, 정말 우열이 없을 때만 현 상태를 유지하도록 한다.</summary>
-        private const double StabilityBonus = 1e-6;
+        /// <summary>
+        /// 자리 하나를 옮기는 비용. 점수는 배치의 끝 상태만 세므로, 이것이 없으면 한 수로 얻는
+        /// +3.35 와 열두 수로 얻는 +3.35 가 같은 값이 되어 빈 칸이 많은 판에서는 티끌만 한 이득에도
+        /// 판 전체가 뒤집힌다(실측: 아이템 하나에 목표 12개가 바뀌고 +3.35, 다른 판은 19수에 +1.2).
+        /// 잰 최적값이 아니라 그 두 사례는 막히고(12 x 0.3 &gt; 3.35) 한두 수짜리 좋은 제안은
+        /// 통과하는 크기로 잡은 추정치다.
+        ///
+        /// 지금 자리에 그대로 있는 것마다 이만큼을 더하는 식으로 매긴다. 이 몫은 배치들 사이에서
+        /// 고를 때만 쓰고(<see cref="Arrangement.Preference"/>) 보고되는 점수에는 넣지 않는다 -
+        /// 점수는 레벨 단위의 값어치라 거기에 섞이면 "현재 / 최선" 이 뜻을 잃는다.
+        /// </summary>
+        private const double MoveCost = 0.3;
 
         /// <summary>
-        /// 직전 제안과 같은 자리에 주는 몫. 지금 자리보다 약해야 한다 - 옮길 필요가 없어진 것은
-        /// 그대로 두는 쪽이 먼저고, 어차피 옮길 것이라면 저번에 말한 자리가 먼저다.
-        /// 격자 42칸이 다 맞아도 합이 StabilityBonus 하나를 넘지 않도록 잡았다(42 x 2e-8 &lt; 1e-6).
+        /// 직전 제안과 같은 자리에 주는 몫. 이사 비용보다 훨씬 약해야 한다 - 옮길 필요가 없어진
+        /// 것은 그대로 두는 쪽이 먼저고, 어차피 옮길 것이라면 저번에 말한 자리가 먼저다. 동점을
+        /// 가르는 크기라 격자 42칸이 다 맞아도 낭비 판단 하나를 넘지 않게 잡았다(42 x 2e-8 &lt; 1e-4).
         /// </summary>
         private const double PlanBonus = 2e-8;
+
+        /// <summary>자리 맞바꾸기를 받아들이는 문턱. 부동소수 잡음을 이득으로 읽지 않기 위한 것이다.</summary>
+        private const double Tie = 1e-9;
 
         public static Arrangement Solve(PlacementProblem problem, SolverOptions? options = null)
         {
@@ -117,7 +130,7 @@ namespace SephPlanner.Core.Solver
                 if (best != null && options.Cancellation.IsCancellationRequested) break;
 
                 var arrangement = Evaluate(problem, cells, layout, options);
-                if (best != null && arrangement.Score <= best.Score) continue;
+                if (best != null && arrangement.Preference <= best.Preference) continue;
 
                 best = arrangement;
                 bestLayout = layout;
@@ -129,7 +142,7 @@ namespace SephPlanner.Core.Solver
             if (options.PolishPasses <= 0 || options.Cancellation.IsCancellationRequested) return best;
 
             var polished = Evaluate(problem, cells, bestLayout!, options, polish: true);
-            return polished.Score > best.Score ? polished : best;
+            return polished.Preference > best.Preference ? polished : best;
         }
 
         private static List<GridPos> Cells(PlacementProblem problem) =>
@@ -566,9 +579,9 @@ namespace SephPlanner.Core.Solver
                 for (var taken = 0; taken < take; taken++) total += model.ValueByRank[rank++][level];
             }
 
-            // 동점인 배치가 많다. 무엇을 남길지 정렬이 우연히 정하게 두면, 아무것도 달라지지
-            // 않았는데 폴링마다 다른 배치가 살아남는다. 채점 때와 같은 잣대로 지금 자리·직전
-            // 제안을 지키는 쪽을 위에 올린다 - 실제 점수 차이를 뒤집을 수 없는 크기다.
+            // 채점 때와 같은 잣대로 이사 비용과 직전 제안을 여기서도 센다. 빔이 비용을 모르면
+            // 석판을 전부 옮기는 배치만 남기고, 채점 단계는 그중에서 고를 수밖에 없다 - 두 단계가
+            // 같은 것을 재야 한다.
             return total + Familiarity(problem, layout);
         }
 
@@ -659,7 +672,7 @@ namespace SephPlanner.Core.Solver
                         Move(positions, byCell, charm, from, occupant, to);
 
                         var trial = ScoreOf(problem, layout, positions, occupancy, result, byCell);
-                        if (trial > score + StabilityBonus)
+                        if (trial > score + Tie)
                         {
                             score = trial;
                             moved = true;
@@ -700,8 +713,9 @@ namespace SephPlanner.Core.Solver
         }
 
         /// <summary>
-        /// <see cref="Describe"/>가 매기는 것과 같은 점수. 반복마다 견주기만 하면 되므로 격자와
-        /// 목록까지 짓지 않는다 - 후보 배치마다 도는 자리라 그 할당이 그대로 GC 부담이 된다.
+        /// <see cref="Describe"/>가 매기는 <see cref="Arrangement.Preference"/>와 같은 값. 반복마다
+        /// 견주기만 하면 되므로 격자와 목록까지 짓지 않는다 - 후보 배치마다 도는 자리라 그 할당이
+        /// 그대로 GC 부담이 된다.
         /// </summary>
         private static double ScoreOf(
             PlacementProblem problem, List<TabletPlacement> layout, Dictionary<int, GridPos> positions,
@@ -710,11 +724,10 @@ namespace SephPlanner.Core.Solver
             var score = Familiarity(problem, layout);
             foreach (var charm in problem.Charms)
             {
-                if (charm.IsFiller) continue;
                 if (!positions.TryGetValue(charm.InstanceId, out var position)) continue;
-                if (Reason(charm, position, result, problem.Grid, occupancy) != CharmInactiveReason.None) continue;
 
-                score += Value(problem, charm, position, result, occupancy, neighbors);
+                score += Value(problem, charm, position, result, occupancy, neighbors)
+                         + Anchors(problem, charm, position);
             }
             return score;
         }
@@ -746,8 +759,12 @@ namespace SephPlanner.Core.Solver
             {
                 for (var cellIndex = 0; cellIndex < free.Count; cellIndex++)
                 {
-                    // 헝가리안은 비용을 최소화하므로 점수를 뒤집어 넣는다.
-                    var value = -Value(problem, problem.Charms[charmIndex], free[cellIndex], result, occupancy, neighbors);
+                    // 헝가리안은 비용을 최소화하므로 점수를 뒤집어 넣는다. 자리를 지키는 몫은
+                    // 여기서 더해야 뜻이 있다 - 채점할 때만 더하면 배정기가 이미 자리를 바꿔 놓은
+                    // 뒤라, 이득이 없는데도 맞바꾸라는 제안이 나온다.
+                    var charm = problem.Charms[charmIndex];
+                    var value = -(Value(problem, charm, free[cellIndex], result, occupancy, neighbors)
+                                  + Anchors(problem, charm, free[cellIndex]));
                     if (charmsAreRows) cost[charmIndex, cellIndex] = value;
                     else cost[cellIndex, charmIndex] = value;
                 }
@@ -765,19 +782,16 @@ namespace SephPlanner.Core.Solver
             return positions;
         }
 
+        /// <summary>
+        /// 이 아티팩트가 그 칸에서 갖는 값어치. 보고되는 점수는 이것의 합이다. 자리를 지키는 몫은
+        /// 여기 없고 <see cref="Anchors"/>가 따로 매긴다 - 점수에 섞으면 안 되기 때문이다.
+        /// </summary>
         private static double Value(
             PlacementProblem problem, CharmSlot charm, GridPos cell,
             SimulationResult result, GridOccupancy occupancy, Dictionary<GridPos, CharmSlot>? neighbors)
         {
-            // 필러도 자리 유지·계획 유지 몫은 받아야 한다. 없으면 전 칸이 0점 동률이라 배정
-            // 순서에 따라 필러끼리 자리를 맞바꾸는 제안이 나온다.
-            if (charm.IsFiller) return Anchors(problem, charm, cell);
-
-            // 꺼진 아티팩트도 마찬가지다. 0 만 돌려주면 전 칸이 동률이라 배정기가 풀 때마다
-            // 아무 데나 보내고, 그 자리가 바뀌면 이웃을 보는 조건과 이웃 의존 가치가 따라 흔들려
-            // 석판 배치의 점수까지 폴링마다 달라진다.
-            if (Reason(charm, cell, result, problem.Grid, occupancy) != CharmInactiveReason.None)
-                return Anchors(problem, charm, cell);
+            if (charm.IsFiller) return 0;
+            if (Reason(charm, cell, result, problem.Grid, occupancy) != CharmInactiveReason.None) return 0;
 
             var level = result.EffectiveLevel(cell, charm.Enchant);
             var effective = Math.Min(charm.Definition.MaxLevel, level);
@@ -803,18 +817,20 @@ namespace SephPlanner.Core.Solver
             value += PositionalWorth.RowCompanionWorth(charm, cell, problem.Grid, neighbors);
             value += PositionalWorth.LineCategoryWorth(problem, charm, cell);
 
-            return value + Anchors(problem, charm, cell);
+            return value;
         }
 
         /// <summary>
-        /// 점수가 같은 배치가 여럿일 때 지금 자리, 그다음 직전 제안의 자리를 지킨다. 채점할 때만
-        /// 더하면 배정기가 이미 자리를 바꿔 놓은 뒤라, 이득이 없는데도 맞바꾸라는 제안이 나온다.
+        /// 지금 자리를 지키는 몫(이사 비용의 반대 부호)과, 그다음 직전 제안의 자리를 지키는 몫.
+        /// 필러와 꺼진 아티팩트도 받는다 - 값어치가 0 이라 전 칸이 동률이면 배정기가 풀 때마다
+        /// 아무 데나 보내고, 그 자리가 바뀌면 이웃을 보는 조건과 이웃 의존 가치가 따라 흔들려
+        /// 석판 배치의 점수까지 폴링마다 달라진다.
         /// </summary>
         private static double Anchors(PlacementProblem problem, CharmSlot charm, GridPos cell)
         {
             var value = 0.0;
             if (problem.CurrentCharms.TryGetValue(charm.InstanceId, out var current) && current == cell)
-                value += StabilityBonus;
+                value += MoveCost;
             if (problem.PlannedCharms.TryGetValue(charm.InstanceId, out var planned) && planned == cell)
                 value += PlanBonus;
             return value;
@@ -940,9 +956,9 @@ namespace SephPlanner.Core.Solver
         }
 
         /// <summary>
-        /// 지금과 같은 자리에 있는 석판, 그다음 직전 제안과 같은 자리에 있는 석판마다 아주 작은
-        /// 값을 더한다. 아티팩트 몫은 배정 단계에서 반영해야 뜻이 있어 <see cref="Anchors"/>가
-        /// 따로 챙긴다.
+        /// 지금과 같은 자리·각도에 있는 석판마다 이사 비용만큼, 직전 제안과 같은 자리에 있는
+        /// 석판마다 아주 작은 값을 더한다. 회전만 바뀌는 것도 한 수다. 아티팩트 몫은 배정 단계에서
+        /// 반영해야 뜻이 있어 <see cref="Anchors"/>가 따로 챙긴다.
         /// </summary>
         private static double Familiarity(PlacementProblem problem, List<TabletPlacement> layout)
         {
@@ -954,7 +970,7 @@ namespace SephPlanner.Core.Solver
                 if (problem.CurrentTablets.TryGetValue(id, out var spot) &&
                     spot.Position == layout[i].Position && spot.Rotation == layout[i].Rotation)
                 {
-                    value += StabilityBonus;
+                    value += MoveCost;
                 }
                 if (problem.PlannedTablets.TryGetValue(id, out var planned) &&
                     planned.Position == layout[i].Position && planned.Rotation == layout[i].Rotation)
@@ -980,7 +996,7 @@ namespace SephPlanner.Core.Solver
             var arrangement = new Arrangement();
             arrangement.Tablets.AddRange(layout);
             arrangement.UnplacedTablets = problem.Tablets.Count - layout.Count;
-            arrangement.Score += Familiarity(problem, layout);
+            arrangement.Preference = Familiarity(problem, layout);
 
             for (var i = 0; i < problem.Tablets.Count && i < layout.Count && i < result.Applied.Length; i++)
             {
@@ -1001,6 +1017,7 @@ namespace SephPlanner.Core.Solver
                 }
 
                 arrangement.CharmPositions[charm.InstanceId] = position;
+                arrangement.Preference += Anchors(problem, charm, position);
 
                 var level = result.EffectiveLevel(position, charm.Enchant);
                 arrangement.Levels[position] = level;
@@ -1018,7 +1035,9 @@ namespace SephPlanner.Core.Solver
                 }
 
                 arrangement.EffectiveLevels[position] = Math.Max(0, Math.Min(charm.Definition.MaxLevel, level));
-                arrangement.Score += Value(problem, charm, position, result, occupancy, neighbors);
+                var value = Value(problem, charm, position, result, occupancy, neighbors);
+                arrangement.Score += value;
+                arrangement.Preference += value;
             }
 
             // 아티팩트가 놓인 칸은 인챈트가 더해진 위 값을, 나머지 칸은 시뮬레이션 값을 쓴다.

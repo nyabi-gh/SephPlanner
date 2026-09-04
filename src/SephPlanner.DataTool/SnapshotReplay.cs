@@ -92,9 +92,13 @@ public static class SnapshotReplay
             }
         }
 
+        // 자리가 바뀌는 항목 수. 이동 목록은 가방이 꽉 차면 비므로 그것만으로는 안 보인다.
+        var relocated = plan.Targets.Count(t =>
+            t.From != t.To || t.IsTablet && t.FromRotation != t.Rotation);
+
         Console.WriteLine(
             $"{index:00000} {stamp} 점수 {plan.Current.Score:0.##} -> {plan.Best.Score:0.##} " +
-            $"이동 {plan.Moves.Count}건 어긋난칸 {plan.LevelMismatches}" +
+            $"옮길 자리 {relocated}건 이동 {plan.Moves.Count}건 어긋난칸 {plan.LevelMismatches}" +
             (changed.Count > 0 ? $"  *** 목표 변경 {changed.Count}건: {string.Join(", ", changed)}" : ""));
 
         return targets;

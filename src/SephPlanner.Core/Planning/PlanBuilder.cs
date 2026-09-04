@@ -160,9 +160,10 @@ namespace SephPlanner.Core.Planning
             var best = PlacementSolver.Solve(problem, new SolverOptions { Cancellation = cancellation });
             if (cancellation.IsCancellationRequested) return null;
 
-            // 조건부 아티팩트는 배정과 조건이 서로 물려 수렴 반복이 소진될 수 있고, 그 결과가
-            // 지금 배치보다 나쁠 수 있다(실제로 재현됐다). 지금이 이기면 지금이 답이다.
-            if (best.Score < current.Score) best = current;
+            // 지금이 이기면 지금이 답이다. 조건부 아티팩트는 배정과 조건이 서로 물려 수렴 반복이
+            // 소진될 수 있고 그 결과가 지금 배치보다 나쁠 수 있다(실제로 재현됐다). 이사 비용까지
+            // 쳐서 견주므로, 옮기는 수고만큼도 못 얻는 배치도 여기서 걸러진다.
+            if (best.Preference < current.Preference) best = current;
 
             var offers = new List<OfferAdvice>();
             var mixes = new List<MixAdvice>();

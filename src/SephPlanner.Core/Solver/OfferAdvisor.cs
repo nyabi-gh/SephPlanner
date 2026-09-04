@@ -359,7 +359,7 @@ namespace SephPlanner.Core.Solver
                     ? outcome.Solved.CharmPositions.ContainsKey(candidateId)
                     : outcome.Solved.TabletPositions.ContainsKey(candidateId);
                 if (!placed) continue;
-                if (best is null || outcome.Solved.Score > best.Solved.Score) best = outcome;
+                if (best is null || outcome.Solved.Preference > best.Solved.Preference) best = outcome;
             }
             if (best is null) return null;
 

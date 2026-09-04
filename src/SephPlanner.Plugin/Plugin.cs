@@ -14,7 +14,7 @@ namespace SephPlanner.Plugin
     /// 세피리아 상태를 읽어 게임 HUD에 배치와 추천을 표시하고, 싱글플레이에서는 제안된 배치를
     /// 게임 자체의 이동 경로로 적용한다. 멀티 세션에서는 읽기만 한다.
     /// </summary>
-    [BepInPlugin(PluginGuid, "SephPlanner", "0.2.0")]
+    [BepInPlugin(PluginGuid, "SephPlanner", "0.2.1")]
     public sealed class SephPlannerPlugin : BaseUnityPlugin
     {
         public const string PluginGuid = "dev.nyabi.sephplanner.bridge";
