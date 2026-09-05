@@ -228,22 +228,29 @@ namespace SephPlanner.Plugin
         }
 
         /// <summary>
-        /// 고정 각인(신비 콤보 등)이 칸에 박아 둔 효과. 서버에만 있는 값이라 호스트(싱글 포함)에서만
-        /// 읽을 수 있고, 클라이언트로 접속한 세션에서는 빈 목록이 된다.
+        /// 호스트는 고정 각인 원본을 읽고, 참가자는 동기화된 신비 좌표와 실제 효과 정의로 복원한다.
         /// </summary>
         internal static List<FixedEffectCell> ReadFixedEffects(GridInventory inv)
         {
-            var cells = new Dictionary<GridPos, FixedEffectCell>();
-            if (NetworkServer.active)
+            if (!NetworkServer.active)
             {
-                foreach (var engraving in inv.fixedEngravingsOnServer)
-                {
-                    if (engraving == null) continue;
-                    foreach (var pair in engraving.fixedLevel) At(cells, pair.Key).Level += pair.Value;
-                    foreach (var pair in engraving.fixedDisable) At(cells, pair.Key).Disable += pair.Value;
-                    foreach (var pair in engraving.fixedIgnoreCriteria) At(cells, pair.Key).IgnoreCriteria += pair.Value;
-                    foreach (var pair in engraving.fixedMultiplyLevel) At(cells, pair.Key).Multiply += pair.Value;
-                }
+                if (!inv.currentSetEffectCount.TryGetValue("MYSTIC", out var count) || count <= 0)
+                    return new List<FixedEffectCell>();
+                var rule = ItemCatalog.LoadMysticRule();
+                if (rule == null) return new List<FixedEffectCell>();
+                var positions = new List<GridPos>();
+                foreach (var position in inv.mysticPositions)
+                    positions.Add(new GridPos(position.x, position.y));
+                return MysticEngravings.Resolve(rule, count, positions, GridOf(inv));
+            }
+            var cells = new Dictionary<GridPos, FixedEffectCell>();
+            foreach (var engraving in inv.fixedEngravingsOnServer)
+            {
+                if (engraving == null) continue;
+                foreach (var pair in engraving.fixedLevel) At(cells, pair.Key).Level += pair.Value;
+                foreach (var pair in engraving.fixedDisable) At(cells, pair.Key).Disable += pair.Value;
+                foreach (var pair in engraving.fixedIgnoreCriteria) At(cells, pair.Key).IgnoreCriteria += pair.Value;
+                foreach (var pair in engraving.fixedMultiplyLevel) At(cells, pair.Key).Multiply += pair.Value;
             }
             return new List<FixedEffectCell>(cells.Values);
         }

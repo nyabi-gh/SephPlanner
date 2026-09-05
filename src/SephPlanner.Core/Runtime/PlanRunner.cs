@@ -22,7 +22,7 @@ namespace SephPlanner.Core.Runtime
                                  PublishedGeneration == RequestedGeneration;
     }
 
-    public sealed class PlanRunner
+    public sealed class PlanRunner : IDisposable
     {
         private sealed class Request : IDisposable
         {
@@ -62,6 +62,7 @@ namespace SephPlanner.Core.Runtime
         private long _publishedGeneration;
         private string _requestedFingerprint = "";
         private DateTime _retryAfterUtc;
+        private bool _disposed;
 
         public PlanRunner(ICatalog catalog)
             : this(catalog, Build, TimeSpan.FromSeconds(1))
@@ -101,12 +102,13 @@ namespace SephPlanner.Core.Runtime
             if (snapshot is null) throw new ArgumentNullException(nameof(snapshot));
             if (preferences is null) throw new ArgumentNullException(nameof(preferences));
 
-            var fingerprint = PlanFingerprint.Full(snapshot, preferences, catalogGeneration);
-            var placementFingerprint = PlanFingerprint.Placement(snapshot, preferences, catalogGeneration);
             var contextFingerprint = PlanFingerprint.PlanningContext(preferences, catalogGeneration);
+            var placementFingerprint = PlanFingerprint.Placement(snapshot, contextFingerprint);
+            var fingerprint = PlanFingerprint.Full(snapshot, preferences, catalogGeneration, placementFingerprint);
 
             lock (_gate)
             {
+                if (_disposed) throw new ObjectDisposedException(nameof(PlanRunner));
                 var sameRequest = fingerprint == _requestedFingerprint;
                 if (sameRequest && (_running is not null || _pending is not null ||
                                     _error is null && _publishedGeneration == _requestedGeneration))
@@ -149,6 +151,20 @@ namespace SephPlanner.Core.Runtime
             GameSnapshot snapshot, ICatalog catalog, PlanPreferences preferences,
             out PlanBlocker blocker, Plan? previous, CancellationToken cancellation) =>
             PlanBuilder.Build(snapshot, catalog, preferences, out blocker, previous, cancellation);
+
+        public void Dispose()
+        {
+            lock (_gate)
+            {
+                if (_disposed) return;
+                _disposed = true;
+                _running?.Cancellation.Cancel();
+                _pending?.Dispose();
+                _pending = null;
+                _latest = null;
+                _publishedGeneration = 0;
+            }
+        }
 
         private void StartLocked(Request request)
         {

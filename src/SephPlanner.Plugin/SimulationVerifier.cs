@@ -15,8 +15,7 @@ namespace SephPlanner.Plugin
     /// Core 의 석판 시뮬레이터를 게임의 실제 적용 결과와 대조한다.
     /// 게임이 이미 계산해 둔 <c>IsApplied</c>와 <c>EffectRange</c>, 그리고 <c>levelMatrix</c>가 정답지다.
     ///
-    /// 석판 질의만 맞아도 최종 레벨은 어긋날 수 있다. 각인과 세트 효과, 배치 보너스가 레벨에
-    /// 더해지는데 우리는 그것들을 아직 모델에 넣지 않았기 때문이다. 그래서 마지막 레벨까지 대조한다.
+    /// 질의가 맞아도 고정 각인 누락이나 동기화 도중에는 최종 행렬이 다를 수 있어 함께 대조한다.
     /// </summary>
     internal static class SimulationVerifier
     {
@@ -92,6 +91,14 @@ namespace SephPlanner.Plugin
                 var theirs = LookupLevel(inv, (sbyte)position.X, (sbyte)position.Y);
                 if (ours != theirs)
                     return $"칸 {position} 레벨 {ours} != 게임 {theirs} (인챈트 {enchant})";
+
+                // 레벨 0인 칸도 배수·제한 해제가 맞아야 옮긴 뒤의 결과를 믿을 수 있다.
+                inv.multiplyLevelMatrix.TryGetValue(new ItemPosition((sbyte)position.X, (sbyte)position.Y), out var multiplier);
+                if (result.MultiplierAt(position) != multiplier)
+                    return $"칸 {position} 배수 {result.MultiplierAt(position)} != 게임 {multiplier}";
+                inv.ignoreCriteriaMatrix.TryGetValue(new ItemPosition((sbyte)position.X, (sbyte)position.Y), out var ignore);
+                if (result.IgnoreCriteriaAt(position) != ignore)
+                    return $"칸 {position} 제한 해제 {result.IgnoreCriteriaAt(position)} != 게임 {ignore}";
 
                 var disabled = LookupDisabled(inv, (sbyte)position.X, (sbyte)position.Y);
                 if (result.IsDisabled(position) != disabled)

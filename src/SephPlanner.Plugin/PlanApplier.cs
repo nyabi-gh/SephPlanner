@@ -31,6 +31,11 @@ namespace SephPlanner.Plugin
     {
         private static bool _running;
         private static ApplyPlanRoutine _routine;
+        private static GridInventory _uncertainInventory;
+
+        public static bool RecoveryRequired => _uncertainInventory != null;
+        public const string RecoveryMessage =
+            "이전 명령의 서버 반영이 불확실해 자동 배치를 잠갔습니다. 방에 재접속한 뒤 시도하세요.";
 
         /// <summary>
         /// 적용이 진행 중인가. 클라이언트에서는 여러 프레임에 걸치므로, 겹쳐 시작하면 두 적용기가
@@ -48,12 +53,17 @@ namespace SephPlanner.Plugin
 
         /// <summary>
         /// 배치를 적용하고 사람이 읽을 한 줄을 <paramref name="report"/> 로 돌려준다. 사전 검증에서
-        /// 물러서면 아무것도 바꾸지 않은 상태고, 적용 도중 실패하면 이미 실행한 걸음을 역순으로
-        /// 되돌린다. 되돌리기까지 실패한 경우에만 중간 상태가 남으며 그 사실이 결과에 그대로 적힌다.
+        /// 물러서면 아무것도 바꾸지 않은 상태다. 적용 도중 실패하면 확인된 걸음만 안전하게 되돌린다.
+        /// 미확정 쓰기나 외부 변경 때문에 복구하지 못하면 중간 상태를 알리고 필요한 경우 재접속을 안내한다.
         /// </summary>
         public static IEnumerator Apply(
             ApplyPlanCommand command, bool allowMultiplayer, Action<string> report)
         {
+            if (RecoveryRequired)
+            {
+                report(RecoveryMessage);
+                yield break;
+            }
             if (InProgress)
             {
                 report("이전 자동 배치가 아직 끝나지 않았습니다. 잠시 뒤 다시 누르세요.");
@@ -61,6 +71,7 @@ namespace SephPlanner.Plugin
             }
 
             _running = true;
+            GridInventory inventory = null;
             try
             {
                 var setup = Prepare(command, allowMultiplayer);
@@ -69,6 +80,7 @@ namespace SephPlanner.Plugin
                     report(setup.Failure);
                     yield break;
                 }
+                inventory = setup.Inventory;
 
                 // 안쪽 반복자는 유니티에 넘기지 않고 직접 돌린다. 넘기면 기다릴 것이 없어도
                 // 단계마다 프레임을 쓰는데, 호스트의 적용은 키를 누른 그 프레임에 통째로 끝나야
@@ -77,11 +89,18 @@ namespace SephPlanner.Plugin
                 _routine = new ApplyPlanRoutine(
                     command, new GridInventoryPort(setup.Inventory), () => Time.unscaledTime, allowMultiplayer);
                 var run = _routine.Run();
-                while (run.MoveNext()) yield return run.Current;
+                while (run.MoveNext())
+                {
+                    // 코루틴이 강제로 중단돼 finally가 실행되지 않아도 미확정 쓰기를 잊지 않는다.
+                    _uncertainInventory = _routine.RequiresResync ? inventory : null;
+                    yield return run.Current;
+                }
                 report(_routine.Result);
             }
             finally
             {
+                if (_routine != null)
+                    _uncertainInventory = _routine.RequiresResync ? inventory : null;
                 _running = false;
                 _routine = null;
             }

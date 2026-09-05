@@ -43,6 +43,9 @@ namespace SephPlanner.Core.Tablets
         public int IgnoreCriteriaAt(GridPos position) =>
             Contains(position) ? _ignore[_grid.ToIndex(position.X, position.Y)] : 0;
 
+        public int MultiplierAt(GridPos position) =>
+            Contains(position) ? _multiply[_grid.ToIndex(position.X, position.Y)] : 0;
+
         /// <summary>
         /// 그 칸에 놓인 아티팩트가 받는 레벨. 게임과 같은 순서로 석판 몫과 인챈트를 먼저 더하고
         /// 배수를 마지막에 곱한다(<c>GridInventory.ReleasePermission</c>). 순서를 바꾸면 값이 달라진다.

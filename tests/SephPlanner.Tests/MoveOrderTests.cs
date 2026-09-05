@@ -1,6 +1,7 @@
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
+using SephPlanner.Core.Tablets;
 
 namespace SephPlanner.Tests;
 
@@ -10,6 +11,69 @@ namespace SephPlanner.Tests;
 /// </summary>
 public class MoveOrderTests
 {
+    [Fact]
+    public void EverySixItemPermutationCanBeFollowedWithoutAnEmptyCell()
+    {
+        var target = Enumerable.Range(0, 6).ToArray();
+        CheckPermutations(0);
+
+        void CheckPermutations(int start)
+        {
+            if (start < target.Length)
+            {
+                for (var index = start; index < target.Length; index++)
+                {
+                    (target[start], target[index]) = (target[index], target[start]);
+                    CheckPermutations(start + 1);
+                    (target[start], target[index]) = (target[index], target[start]);
+                }
+                return;
+            }
+
+            var pending = Enumerable.Range(0, 6).Select(index => new Relocation
+            {
+                Name = "같은 이름",
+                From = new GridPos(index, 0),
+                To = new GridPos(target[index], 0),
+                FromRotation = 0,
+                ToRotation = index % 4,
+            }).ToList();
+            var moves = MoveOrder.Sequence(new GridSpec(6, 1, 6), pending, Array.Empty<GridPos>(), out var complete);
+            Assert.True(complete);
+            var occupants = Enumerable.Range(0, 6).ToArray();
+            var turns = new HashSet<int>();
+            foreach (var move in moves)
+            {
+                if (move.From == move.To)
+                {
+                    var instance = occupants[move.From.X];
+                    Assert.Equal(target[instance], move.From.X);
+                    Assert.NotEqual(0, instance % 4);
+                    Assert.True(turns.Add(instance));
+                }
+                else
+                    (occupants[move.From.X], occupants[move.To.X]) = (occupants[move.To.X], occupants[move.From.X]);
+            }
+            for (var index = 0; index < target.Length; index++) Assert.Equal(index, occupants[target[index]]);
+            Assert.Equal(4, turns.Count);
+            Assert.True(moves.Count(move => move.From != move.To) <= 5);
+        }
+    }
+
+    [Fact]
+    public void DuplicateOrBlockedTargetsDoNotProducePartialInstructions()
+    {
+        var pending = new List<Relocation>
+        {
+            new() { From = new GridPos(0, 0), To = new GridPos(1, 0) },
+            new() { From = new GridPos(1, 0), To = new GridPos(1, 0) },
+        };
+        Assert.Empty(MoveOrder.Sequence(new GridSpec(3, 1, 3), pending, Array.Empty<GridPos>(), out var complete));
+        Assert.False(complete);
+        pending.RemoveAt(1);
+        Assert.Empty(MoveOrder.Sequence(new GridSpec(3, 1, 3), pending, new[] { new GridPos(1, 0) }, out complete));
+        Assert.False(complete);
+    }
     private const int TabletEntity = 100;
     private const int SmallCharm = 200;
     private const int BigCharm = 201;
@@ -65,37 +129,36 @@ public class MoveOrderTests
     }
 
     [Fact]
-    public void EveryStepLandsOnACellThatIsFreeByThen()
+    public void FollowingSwapsReachesTheTargetInstances()
     {
         var plan = PlanBuilder.Build(Swap(storage: 6), Catalog());
         Assert.NotNull(plan);
 
         // 첫 배치를 그대로 재현한 뒤, 목록을 한 줄씩 실행해 본다.
-        var occupied = new HashSet<GridPos>
+        var occupied = new Dictionary<GridPos, int>
         {
-            new(1, 0), // 석판
-            new(0, 0),
-            new(2, 0),
+            [new(1, 0)] = 1,
+            [new(0, 0)] = 10,
+            [new(2, 0)] = 11,
         };
 
         foreach (var move in plan!.Moves)
         {
-            Assert.True(occupied.Contains(move.From), $"{move.Label}: 출발 칸 {move.From} 이 비어 있다");
-            Assert.False(occupied.Contains(move.To), $"{move.Label}: 도착 칸 {move.To} 이 이미 차 있다");
-
+            Assert.True(occupied.TryGetValue(move.From, out var moving));
+            occupied.TryGetValue(move.To, out var displaced);
             occupied.Remove(move.From);
-            occupied.Add(move.To);
+            occupied[move.To] = moving;
+            if (displaced != 0) occupied[move.From] = displaced;
         }
+        foreach (var target in plan.Targets) Assert.Equal(target.InstanceId, occupied[target.To]);
     }
 
     [Fact]
-    public void ASwapIsBrokenUpWithAParkingStep()
+    public void ASwapNeedsOnlyOneInstruction()
     {
         var plan = PlanBuilder.Build(Swap(storage: 6), Catalog());
 
-        // 맞바꾸기는 두 걸음으로 끝나지 않는다. 한쪽을 잠시 빼두는 걸음이 끼어야 한다.
-        Assert.True(plan!.Moves.Count >= 3);
-        Assert.Contains(plan.Moves, move => move.Detail.Contains("잠시 비켜두기"));
+        Assert.Contains("교환", Assert.Single(plan!.Moves).Detail);
     }
 
     private const int SpinTablet = 101;
@@ -141,14 +204,14 @@ public class MoveOrderTests
     }
 
     [Fact]
-    public void ImpossibleManualInstructionsAreNotShownWhenThereIsNowhereToPark()
+    public void AFullBagStillSupportsManualSwaps()
     {
         var plan = PlanBuilder.Build(Swap(storage: 3), Catalog());
 
         Assert.NotNull(plan);
-        Assert.False(plan!.ManualMoveInstructionsAvailable);
+        Assert.True(plan!.ManualMoveInstructionsAvailable);
         Assert.True(plan.HasPlacementChanges);
-        Assert.Empty(plan.Moves);
+        Assert.Contains("교환", Assert.Single(plan.Moves).Detail);
         Assert.NotEmpty(plan.Targets);
     }
 }

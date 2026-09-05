@@ -8,6 +8,29 @@ namespace SephPlanner.Tests;
 public class PlanFingerprintTests
 {
     [Fact]
+    public void DisabledRecommendationsIgnoreOffersMixerAndBuildPriorities()
+    {
+        var snapshot = Snapshot();
+        var prefs = new PlanPreferences { Recommendations = false };
+        var before = PlanFingerprint.Full(snapshot, prefs, "catalog");
+        snapshot.Offers.Clear();
+        snapshot.Mixer = new MixerState { Cost = 100, Used = true };
+        prefs.PriorityCategories.Add("NEW");
+        prefs.PresetCharms.Add(999);
+        Assert.Equal(before, PlanFingerprint.Full(snapshot, prefs, "catalog"));
+    }
+
+    [Fact]
+    public void ReusingPlacementFingerprintPreservesTheFullFingerprint()
+    {
+        var snapshot = Snapshot();
+        var prefs = new PlanPreferences();
+        var placement = PlanFingerprint.Placement(snapshot, prefs, "catalog");
+        Assert.Equal(PlanFingerprint.Full(snapshot, prefs, "catalog"),
+            PlanFingerprint.Full(snapshot, prefs, "catalog", placement));
+    }
+
+    [Fact]
     public void CollectionOrderDoesNotChangeTheFingerprint()
     {
         var left = Snapshot();

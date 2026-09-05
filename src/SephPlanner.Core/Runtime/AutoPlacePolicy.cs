@@ -21,6 +21,8 @@ namespace SephPlanner.Core.Runtime
         /// 걸린다. 그동안 안내 줄이 계속 키를 광고하면 눌러야만 진행 중인 줄 알게 된다.
         /// </summary>
         public bool Applying { get; set; }
+        public bool RecoveryRequired { get; set; }
+        public bool Previewing { get; set; }
     }
 
     public sealed class AutoPlaceDecision
@@ -44,18 +46,22 @@ namespace SephPlanner.Core.Runtime
         public static AutoPlaceDecision Evaluate(AutoPlaceContext context)
         {
             if (context.Applying) return AutoPlaceDecision.Deny("자동 배치가 아직 진행 중입니다.");
+            if (context.RecoveryRequired)
+                return AutoPlaceDecision.Deny("이전 명령의 서버 반영이 불확실해 자동 배치를 잠갔습니다. 방에 재접속한 뒤 시도하세요.");
+            if (context.Previewing)
+                return AutoPlaceDecision.Deny("후보 미리보기 중입니다. 현재 가방 배치로 돌아온 뒤 자동 배치를 실행하세요.");
 
             var state = context.Runner;
             if (state is null) return AutoPlaceDecision.Deny("계획 데이터가 아직 준비되지 않았습니다.");
             if (state.Error is not null) return AutoPlaceDecision.Deny("계산 실패 - " + state.Error);
             // 무엇을 해야 하는지까지 말한다. 이 거절은 잠깐 뒤면 저절로 풀리는 것이라, 이유만
             // 적어 두면 눌러도 아무 일이 없는 것으로 읽힌다.
-            if (state.IsBusy || state.HasPending || !state.IsCurrent)
+            if (state.Latest is null && (state.IsBusy || state.HasPending || !state.IsCurrent))
                 return AutoPlaceDecision.Deny("최신 게임 상태의 계획을 계산 중입니다. 잠시 뒤 다시 누르세요.");
 
             var plan = state.Latest;
             if (plan is null) return AutoPlaceDecision.Deny("옮길 것이 없습니다.");
-            if (plan.RequestGeneration != state.RequestedGeneration)
+            if (plan.RequestGeneration <= 0 || plan.RequestGeneration != state.PublishedGeneration)
                 return AutoPlaceDecision.Deny("최신 요청과 계획의 generation이 달라 자동 배치를 잠갔습니다.");
             if (!context.CatalogVerified || plan.CatalogGeneration != context.CatalogGeneration)
                 return AutoPlaceDecision.Deny(

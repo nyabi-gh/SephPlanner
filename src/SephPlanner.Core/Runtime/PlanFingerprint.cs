@@ -12,11 +12,13 @@ namespace SephPlanner.Core.Runtime
     public static class PlanFingerprint
     {
         public static string Full(
-            GameSnapshot snapshot, PlanPreferences preferences, string catalogGeneration)
+            GameSnapshot snapshot, PlanPreferences preferences, string catalogGeneration,
+            string? placementFingerprint = null)
         {
             var builder = new StringBuilder();
-            Add(builder, "placement", Placement(snapshot, preferences, catalogGeneration));
+            Add(builder, "placement", placementFingerprint ?? Placement(snapshot, preferences, catalogGeneration));
             Add(builder, "recommendations", preferences.Recommendations);
+            if (!preferences.Recommendations) return Hash(builder);
 
             // 소지금 자체는 넣지 않는다. 계획이 소지금을 보는 곳은 "지금 살 수 있는가" 하나뿐인데,
             // 값을 그대로 넣으면 동전 한 닢을 주울 때마다 판 전체가 다시 풀린다. 살 수 있는지가

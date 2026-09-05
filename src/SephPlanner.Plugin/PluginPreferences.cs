@@ -1,3 +1,4 @@
+#nullable disable
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -19,6 +20,7 @@ namespace SephPlanner.Plugin
         private const string FileName = "plugin-settings.json";
 
         public List<string> PriorityCategories { get; set; } = new List<string>();
+        public List<string> SuppressedPresetCategories { get; set; } = new List<string>();
 
         /// <summary>
         /// 강화 우선 지정. 엔티티 번호 → 단계(<see cref="PlanPreferences.MinPinLevel"/>~
@@ -45,6 +47,9 @@ namespace SephPlanner.Plugin
         [JsonIgnore] private BuildPreset _decoded;
         [JsonIgnore] private Action<string> _log;
         [JsonIgnore] private bool _saveFailureReported;
+        [JsonIgnore] public string StorageMessage { get; private set; } = "";
+        [JsonIgnore] private bool _preserveUnreadableFile;
+        [JsonIgnore] private string _path = DefaultPath;
 
         /// <summary>바뀔 때마다 오른다. 스냅샷이 그대로여도 다시 풀어야 하는지를 이걸로 안다.</summary>
         [JsonIgnore] public int Revision { get; private set; }
@@ -77,7 +82,17 @@ namespace SephPlanner.Plugin
             Changed();
         }
 
-        public bool IsPriority(string categoryId) => PriorityCategories.Contains(categoryId);
+        public bool IsPriority(string categoryId) => EffectivePriorityCategories().Contains(categoryId);
+
+        public HashSet<string> EffectivePriorityCategories()
+        {
+            var result = new HashSet<string>(PriorityCategories);
+            var preset = Preset();
+            if (preset != null)
+                foreach (var pair in preset.CategoryBias)
+                    if (pair.Value > 0 && !SuppressedPresetCategories.Contains(pair.Key)) result.Add(pair.Key);
+            return result;
+        }
 
         /// <summary>
         /// 단계를 하나 올리거나(양수) 내린다(음수). 0 을 지나거나 끝을 넘으면 지정 없음이라,
@@ -99,27 +114,32 @@ namespace SephPlanner.Plugin
         {
             if (string.IsNullOrEmpty(categoryId)) return;
 
-            if (!PriorityCategories.Remove(categoryId)) PriorityCategories.Add(categoryId);
+            if (IsPriority(categoryId))
+            {
+                PriorityCategories.RemoveAll(id => id == categoryId);
+                var preset = Preset();
+                if (preset != null && preset.CategoryBias.TryGetValue(categoryId, out var bias) && bias > 0 &&
+                    !SuppressedPresetCategories.Contains(categoryId)) SuppressedPresetCategories.Add(categoryId);
+            }
+            else
+            {
+                SuppressedPresetCategories.RemoveAll(id => id == categoryId);
+                PriorityCategories.Add(categoryId);
+            }
             Changed();
         }
 
         /// <summary>
         /// 프리셋 코드를 받아들인다. 실패하면 무엇이 잘못인지 돌려주고 지금 것을 그대로 둔다.
         ///
-        /// 프리셋이 노리는 콤보는 칩을 대신 눌러 주는 것으로 잇는다. 그래야 가져온 뒤에도 손으로
-        /// 켠 것과 똑같이 끄고 켤 수 있다. 음수(피하는 카테고리)는 켜지 않는다 - 점수를 깎는
-        /// 방향이 맞는지 아직 확인되지 않았다(docs/ROADMAP.md).
+        /// 프리셋의 콤보는 수동 지정과 분리하여 교체·삭제할 때 이전 빌드가 남지 않게 한다.
         /// </summary>
         public bool TryImport(string code, out string message)
         {
             if (!Core.Planning.PresetCode.TryParse(code, out var preset, out message)) return false;
 
             PresetCode = code.Trim();
-            foreach (var pair in preset.CategoryBias)
-            {
-                if (pair.Value <= 0) continue;
-                if (!PriorityCategories.Contains(pair.Key)) PriorityCategories.Add(pair.Key);
-            }
+            SuppressedPresetCategories.Clear();
 
             message = Summary(preset);
             Changed();
@@ -129,6 +149,7 @@ namespace SephPlanner.Plugin
         public void ClearPreset()
         {
             PresetCode = null;
+            SuppressedPresetCategories.Clear();
             Changed();
         }
 
@@ -142,7 +163,7 @@ namespace SephPlanner.Plugin
             {
                 if (pair.Value < 0) avoided++;
             }
-            if (avoided > 0) text += " · 피하는 콤보 " + avoided + "개";
+            if (avoided > 0) text += " · 회피 콤보 " + avoided + "개는 추천에 미반영";
             return text;
         }
 
@@ -154,7 +175,7 @@ namespace SephPlanner.Plugin
         public PlanPreferences ToPreferences(bool recommendations) => new PlanPreferences
         {
             Recommendations = recommendations,
-            PriorityCategories = new HashSet<string>(PriorityCategories),
+            PriorityCategories = EffectivePriorityCategories(),
             PinnedCharms = new Dictionary<int, int>(PinnedLevels),
             HeldCharms = new HashSet<int>(HeldCharms),
             CharmValues = CharmValueSource.Book,
@@ -188,35 +209,44 @@ namespace SephPlanner.Plugin
             foreach (var entityId in invalid) PinnedLevels.Remove(entityId);
         }
 
-        private static string Path_ => Path.Combine(PlannerData.DataDirectory, FileName);
+        private static string DefaultPath => Path.Combine(PlannerData.DataDirectory, FileName);
 
-        public static PluginPreferences Load(Action<string> log)
+        public static PluginPreferences Load(Action<string> log, string path = null)
         {
+            path = path ?? DefaultPath;
             try
             {
-                if (File.Exists(Path_))
+                if (File.Exists(path))
                 {
-                    var loaded = JsonConvert.DeserializeObject<PluginPreferences>(File.ReadAllText(Path_));
+                    var loaded = JsonConvert.DeserializeObject<PluginPreferences>(File.ReadAllText(path));
+                    if (loaded == null) throw new JsonSerializationException("설정 내용이 비어 있습니다.");
                     if (loaded != null)
                     {
                         loaded.PriorityCategories = loaded.PriorityCategories ?? new List<string>();
+                        loaded.SuppressedPresetCategories = loaded.SuppressedPresetCategories ?? new List<string>();
                         loaded.PinnedCharms = loaded.PinnedCharms ?? new List<int>();
                         loaded.PinnedLevels = loaded.PinnedLevels ?? new Dictionary<int, int>();
                         loaded.HeldCharms = loaded.HeldCharms ?? new List<int>();
                         loaded.MigrateLegacyPins();
                         loaded.DropInvalidPins();
                         loaded._log = log;
+                        loaded._path = path;
                         return loaded;
                     }
                 }
             }
             catch (Exception ex)
             {
-                // 빌드 지정이 깨졌다고 플러그인이 안 뜨면 안 된다. 기본값으로 시작하되 조용히
-                // 넘어가지는 않는다 - 다음 저장에서 덮어써지므로 여기가 알릴 마지막 기회다.
                 log("빌드 설정을 읽지 못해 처음부터 시작합니다: " + ex.Message);
+                return new PluginPreferences
+                {
+                    _log = log,
+                    _path = path,
+                    _preserveUnreadableFile = true,
+                    StorageMessage = "빌드 설정을 읽지 못했습니다. 기본값으로 시작하며 원본은 다음 저장 전에 백업합니다.",
+                };
             }
-            return new PluginPreferences { _log = log };
+            return new PluginPreferences { _log = log, _path = path };
         }
 
         private void Changed()
@@ -229,18 +259,23 @@ namespace SephPlanner.Plugin
         {
             try
             {
-                Directory.CreateDirectory(PlannerData.DataDirectory);
+                Directory.CreateDirectory(Path.GetDirectoryName(_path));
+                if (_preserveUnreadableFile && File.Exists(_path))
+                {
+                    File.Copy(_path, _path + ".damaged-" + Guid.NewGuid().ToString("N") + ".bak");
+                    _preserveUnreadableFile = false;
+                }
 
                 // 바로 덮어쓰면 쓰는 도중 게임이 죽었을 때 잘린 JSON 이 남아 지정이 통째로 날아간다.
                 // Delete 뒤 Move 도 그 사이에 죽으면 파일이 없어지므로, 카탈로그와 같은 원자적
                 // 교체를 쓴다.
-                CatalogBundleStore.WriteAtomic(Path_, JsonConvert.SerializeObject(this));
+                CatalogBundleStore.WriteAtomic(_path, JsonConvert.SerializeObject(this));
+                StorageMessage = "";
+                _saveFailureReported = false;
             }
             catch (Exception ex)
             {
-                // 저장에 실패해도 이번 판에서는 지정이 살아 있고 다음 조작 때 다시 시도된다.
-                // 다만 조용히 넘어가면 다음 실행에서 Load 가 "읽지 못했다"고 말하게 되어, 원인이
-                // 저장이었다는 것을 알 길이 없다. 세션에 한 번만 남긴다 - 조작마다 부르는 자리다.
+                StorageMessage = "빌드 설정 저장 실패 · 이번 판에만 유지됩니다. 다음 설정 변경 때 저장을 다시 시도합니다.";
                 if (_saveFailureReported) return;
 
                 _saveFailureReported = true;

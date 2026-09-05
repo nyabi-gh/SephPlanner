@@ -6,6 +6,13 @@ namespace SephPlanner.Tests;
 public class AutoPlacePolicyTests
 {
     [Fact]
+    public void AnUnconfirmedWriteBlocksEvenWithoutANewPlan()
+    {
+        var decision = AutoPlacePolicy.Evaluate(new AutoPlaceContext { RecoveryRequired = true });
+        Assert.False(decision.Allowed);
+        Assert.Contains("재접속", decision.Reason);
+    }
+    [Fact]
     public void AVerifiedCurrentPlanIsAllowed()
     {
         Assert.True(AutoPlacePolicy.Evaluate(Context()).Allowed);
@@ -16,11 +23,42 @@ public class AutoPlacePolicyTests
     {
         var context = Context();
         context.Runner!.RequestedGeneration++;
+        context.CurrentPlacementFingerprint = "changed-placement";
 
         var decision = AutoPlacePolicy.Evaluate(context);
 
         Assert.False(decision.Allowed);
         Assert.Contains("최신", decision.Reason);
+    }
+
+    [Fact]
+    public void RecommendationRefreshDoesNotBlockAnUnchangedVerifiedPlacement()
+    {
+        var context = Context();
+        context.Runner!.RequestedGeneration++;
+        context.Runner.IsBusy = true;
+        context.Runner.HasPending = true;
+        Assert.True(AutoPlacePolicy.Evaluate(context).Allowed);
+        context.CurrentPlacementFingerprint = "changed-placement";
+        Assert.False(AutoPlacePolicy.Evaluate(context).Allowed);
+    }
+
+    [Fact]
+    public void PreviewCannotApplyTheUnderlyingInventoryPlan()
+    {
+        var context = Context();
+        context.Previewing = true;
+        var decision = AutoPlacePolicy.Evaluate(context);
+        Assert.False(decision.Allowed);
+        Assert.Contains("미리보기", decision.Reason);
+    }
+
+    [Fact]
+    public void UnpublishedPlanIsRejectedEvenWithMatchingPlacement()
+    {
+        var context = Context();
+        context.Runner!.Latest!.RequestGeneration++;
+        Assert.False(AutoPlacePolicy.Evaluate(context).Allowed);
     }
 
     [Fact]

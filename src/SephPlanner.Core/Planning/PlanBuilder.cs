@@ -448,7 +448,7 @@ namespace SephPlanner.Core.Planning
                 TabletMismatches = tabletMismatches,
                 Reason = total == 0
                     ? "게임 상태와 계획 시뮬레이션이 일치합니다."
-                    : $"게임 상태와 계산 결과가 {total}곳에서 달라 자동 배치를 잠갔습니다.",
+                    : $"게임 상태와 계산 결과의 검증 항목 {total}개가 달라 자동 배치를 잠갔습니다.",
             };
         }
 

@@ -19,6 +19,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\SephPlanner.Core\SephPlanner.Core.csproj" />
+    <Compile Include="..\..\src\SephPlanner.Plugin\PluginPreferences.cs" Link="Plugin\PluginPreferences.cs" />
+    <Compile Include="..\..\src\SephPlanner.Plugin\CharmValueSource.cs" Link="Plugin\CharmValueSource.cs" />
   </ItemGroup>
 
 </Project>

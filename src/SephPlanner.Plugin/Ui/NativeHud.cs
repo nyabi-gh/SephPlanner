@@ -511,10 +511,14 @@ namespace SephPlanner.Plugin.Ui
             _hover.Clear();
             _hoverable = expanded;
 
-            var improved = plan.Gain > 0.001;
-            _score.text = $"{plan.Current.Score:0.#} / {plan.Best.Score:0.#}";
-            _gain.text = improved ? $"+{plan.Gain:0.#}" : "변경 없음";
-            _gain.color = improved ? NativeSkin.Good : NativeSkin.TextDim;
+            var previewed = Previewed(plan, frame.PreviewKey);
+            var score = previewed?.Preview.Score ?? plan.Best.Score;
+            var gain = score - plan.Current.Score;
+            _score.text = previewed != null
+                ? $"미리보기 {plan.Current.Score:0.#} / {score:0.#}"
+                : $"{plan.Current.Score:0.#} / {score:0.#}";
+            _gain.text = gain > 0.001 ? $"+{gain:0.#}" : gain < -0.001 ? $"{gain:0.#}" : "변경 없음";
+            _gain.color = gain > 0.001 ? NativeSkin.Good : gain < -0.001 ? NativeSkin.Bad : NativeSkin.TextDim;
 
             var warning = Warning(
                 snapshot, plan, frame.MultiplayerAutoPlace, frame.QueryVerified,
@@ -524,7 +528,7 @@ namespace SephPlanner.Plugin.Ui
             Widgets.SetActive(_notice, warning.Length > 0);
 
             // 접었을 때는 지금 옮길 것 하나만. 펼치면 아래 목록이 그 일을 하므로 겹치지 않게 접는다.
-            var next = plan.Moves.Count > 0 ? plan.Moves[0] : null;
+            var next = previewed == null && plan.Moves.Count > 0 ? plan.Moves[0] : null;
             _nextMove.text = next == null ? "" : $"{next.Label}  {next.Detail}";
             Widgets.SetActive(_nextMove, !expanded && next != null);
 
@@ -536,11 +540,15 @@ namespace SephPlanner.Plugin.Ui
                 return;
             }
 
-            // 고른 후보가 새 계획에도 남아 있는지 먼저 본다. 사라졌으면 미리보기를 접는다.
-            var previewed = Previewed(plan, frame.PreviewKey);
-
             RenderGrid(snapshot, plan, previewed?.Preview, frame);
-            RenderMoves(plan);
+            if (previewed == null) RenderMoves(plan);
+            else
+            {
+                _moves.Begin();
+                _moves.Add("획득 후 예상 배치", previewed.Candidate.Name, NativeSkin.Mint);
+                _moves.Add("자동 배치", "미리보기를 종료한 뒤 실행하세요.", NativeSkin.TextDim);
+                _moves.End();
+            }
             RenderOffers(plan, frame, previewed);
             RenderMixes(plan, snapshot.Mixer);
             RenderChips(snapshot, frame);
@@ -629,7 +637,7 @@ namespace SephPlanner.Plugin.Ui
                 warnings.Add(runtimeVerificationReason);
 
             if (!plan.ManualMoveInstructionsAvailable)
-                warnings.Add("빈 칸이 없어 수동 이동 순서를 만들 수 없습니다. 자동 배치를 이용하세요.");
+                warnings.Add("목표 배치가 유효하지 않아 수동 이동 순서를 만들 수 없습니다.");
 
             if (plan.SkippedOffers > 0)
                 warnings.Add($"선택지가 많아 {plan.SkippedOffers}개는 평가하지 못했습니다.");
@@ -761,7 +769,7 @@ namespace SephPlanner.Plugin.Ui
             _moves.Begin();
             if (!plan.ManualMoveInstructionsAvailable)
             {
-                _moves.Add("수동 이동 불가", "빈 칸이 없어 순서를 만들 수 없습니다.", NativeSkin.Amber);
+                _moves.Add("수동 이동 불가", "목표 배치를 다시 계산해야 합니다.", NativeSkin.Amber);
                 _moves.End();
                 return;
             }

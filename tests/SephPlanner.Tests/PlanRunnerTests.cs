@@ -11,6 +11,40 @@ public class PlanRunnerTests
         Array.Empty<TabletDefinition>(), Array.Empty<CharmDefinition>());
 
     [Fact]
+    public void DisposingCancelsRunningWorkAndDropsPendingWork()
+    {
+        using var started = new ManualResetEventSlim();
+        using var finish = new ManualResetEventSlim();
+        var calls = 0;
+        var cancelled = false;
+        PlanBuildOperation build = (
+            GameSnapshot _, ICatalog _, PlanPreferences _,
+            out PlanBlocker blocker, Plan? _, CancellationToken cancellation) =>
+        {
+            blocker = PlanBlocker.None;
+            Interlocked.Increment(ref calls);
+            started.Set();
+            finish.Wait(TimeSpan.FromSeconds(5), CancellationToken.None);
+            cancelled = cancellation.IsCancellationRequested;
+            return new Plan();
+        };
+        var runner = new PlanRunner(EmptyCatalog, build);
+        runner.Submit(Snapshot(1), PlanPreferences.None, "catalog");
+        Assert.True(started.Wait(TimeSpan.FromSeconds(5)));
+        runner.Submit(Snapshot(2), PlanPreferences.None, "catalog");
+        runner.Dispose();
+        runner.Dispose();
+        finish.Set();
+        Assert.True(SpinWait.SpinUntil(() => !runner.State.IsBusy, TimeSpan.FromSeconds(5)));
+        Assert.True(cancelled);
+        Assert.Equal(1, calls);
+        Assert.False(runner.State.HasPending);
+        Assert.False(runner.State.IsCurrent);
+        Assert.Null(runner.State.Latest);
+        Assert.Throws<ObjectDisposedException>(() => runner.Submit(Snapshot(3), PlanPreferences.None, "catalog"));
+    }
+
+    [Fact]
     public void BusyRunnerKeepsOnlyTheLatestPendingRequest()
     {
         using var releaseFirst = new ManualResetEventSlim();

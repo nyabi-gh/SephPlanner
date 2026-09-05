@@ -15,6 +15,7 @@ function Invoke-DotNet([string[]]$Arguments, [string]$Failure) {
 Invoke-DotNet @("restore", $solution, "--locked-mode") "복원 실패"
 Invoke-DotNet @("format", $solution, "--verify-no-changes", "--no-restore") "포맷 검사 실패"
 Invoke-DotNet @("test", $testProject, "-c", "Release", "--no-restore") "테스트 실패"
+Invoke-DotNet @("build", (Join-Path $root "src/SephPlanner.DataTool/SephPlanner.DataTool.csproj"), "-c", "Release", "--no-restore") "진단 도구 빌드 실패"
 
 # 여기가 CI 의 사각지대다. 플러그인은 게임 어셈블리를 참조하는데 그것을 CI 에 둘 수 없어서
 # (docs/LEGAL.md - 게임 저작물 미배포), 플러그인만 깨지는 변경은 CI 를 초록으로 통과한다.

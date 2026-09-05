@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Solver;
+using SephPlanner.Core.Tablets;
 using UnityEngine;
 
 namespace SephPlanner.Plugin
@@ -32,6 +33,30 @@ namespace SephPlanner.Plugin
 
         private static ItemCategoryEntity[] Categories() =>
             _categories ?? (_categories = Resources.LoadAll<ItemCategoryEntity>("ItemCategory"));
+
+        public static MysticRule LoadMysticRule()
+        {
+            foreach (var category in Categories())
+            {
+                if (category.id != "MYSTIC" || !category.isEnabled || category.comboEffectPrefab == null) continue;
+                var effect = category.comboEffectPrefab.GetComponent<ComboEffect_Mystic>();
+                if (effect == null) continue;
+                var entity = ItemDatabase.FindItemById(effect.stoneTabletEntityID);
+                var tablet = entity != null && entity.resourcePrefab != null
+                    ? entity.resourcePrefab.GetComponent<StoneTablet>() : null;
+                if (tablet == null || tablet.isCustomTablet) return null;
+                return new MysticRule
+                {
+                    FirstThreshold = effect.first,
+                    FirstCount = effect.firstEngravingCount,
+                    SecondThreshold = effect.second,
+                    SecondCount = effect.secondEngravingCount,
+                    Query = tablet.query ?? "",
+                    ConditionQuery = tablet.conditionQuery ?? "",
+                };
+            }
+            return null;
+        }
 
         /// <summary>
         /// 다 짓고 나면 놓아준다. 계속 들고 있으면 게임이 쓰지 않는 에셋을 정리하지 못한다.

@@ -28,6 +28,9 @@ public class ApplyPlanRoutineTests
 
         /// <summary>참가자 모드에서 쓰기가 반영되기까지 걸리는 시간(초).</summary>
         public double Latency { get; set; }
+        public int PressIncrement { get; set; } = 1;
+        public bool IgnoreHostRotation { get; set; }
+        public Action<int>? BeforeSwap { get; set; }
 
         /// <summary>몇 번째 맞바꿈(0부터)을 게임이 조용히 거부하는지. 오류 없이 돌아오고 아무것도 안 바뀐다.</summary>
         public HashSet<int> RejectedSwaps { get; } = new();
@@ -66,6 +69,7 @@ public class ApplyPlanRoutineTests
         public string? Swap(GridPos from, GridPos to)
         {
             var index = _swaps++;
+            BeforeSwap?.Invoke(index);
             Log.Add($"swap {from}->{to}");
             if (FailingSwaps.Contains(index)) return "권한 없음";
             if (RejectedSwaps.Contains(index)) return null;
@@ -111,7 +115,7 @@ public class ApplyPlanRoutineTests
             {
                 var id = InstanceAt(cell);
                 if (!Tablets.TryGetValue(id, out var tablet)) return;
-                Tablets[id] = ((tablet.Rotation + 1) % 4, tablet.Rotatable);
+                Tablets[id] = ((tablet.Rotation + PressIncrement) % 4, tablet.Rotatable);
             });
             return null;
         }
@@ -120,6 +124,7 @@ public class ApplyPlanRoutineTests
         {
             Log.Add($"rotate {turns.Count}");
             if (RotateError != null) return RotateError;
+            if (IgnoreHostRotation) return null;
             foreach (var turn in turns)
                 Tablets[turn.InstanceId] = (turn.Rotation, Tablets[turn.InstanceId].Rotatable);
             return null;
@@ -226,6 +231,115 @@ public class ApplyPlanRoutineTests
         new(command, inventory, () => clock.Now, allowMultiplayer);
 
     [Fact]
+    public void ADelayedWriteKeepsRecoveryRequiredEvenAfterItEventuallyLands()
+    {
+        var (inventory, clock) = Guest(latency: 4);
+        inventory.Cells[At(0, 0)] = 10;
+        var routine = Routine(Command(Charm(10, At(0, 0), At(1, 0))), inventory, clock);
+        Drive(routine, inventory, clock);
+        Assert.True(routine.RequiresResync);
+        Assert.Equal(10, inventory.InstanceAt(At(0, 0)));
+        clock.Now = 5;
+        inventory.Settle();
+        Assert.Equal(10, inventory.InstanceAt(At(1, 0)));
+        Assert.True(routine.RequiresResync);
+        Assert.Equal(1, inventory.SwapCount);
+        AssertContains("늦게 적용될 수 있어", routine.Result);
+    }
+
+    [Fact]
+    public void AGuestNeverTreatsAnUnexpectedAngleAsSuccess()
+    {
+        var (inventory, clock) = Guest();
+        inventory.Cells[At(0, 0)] = 1;
+        inventory.Tablets[1] = (0, true);
+        inventory.PressIncrement = 2;
+        var routine = Routine(Command(Tablet(1, At(0, 0), At(0, 0), 0, 1)), inventory, clock);
+        Drive(routine, inventory, clock);
+        Assert.Equal(2, inventory.Tablets[1].Rotation);
+        Assert.True(routine.RequiresResync);
+        Assert.Equal(1, inventory.PressCount);
+        Assert.DoesNotContain("자동 배치 완료", routine.Result);
+    }
+
+    [Fact]
+    public void AHostMustAlsoReachTheTargetAngle()
+    {
+        var (inventory, clock) = Host();
+        inventory.Cells[At(0, 0)] = 1;
+        inventory.Tablets[1] = (0, true);
+        inventory.IgnoreHostRotation = true;
+        var routine = Routine(Command(Tablet(1, At(0, 0), At(0, 0), 0, 1)), inventory, clock);
+        Drive(routine, inventory, clock);
+        AssertContains("최종 각도가 목표와 다릅니다", routine.Result);
+        Assert.DoesNotContain("자동 배치 완료", routine.Result);
+    }
+
+    [Fact]
+    public void TheNextSwapDoesNotTouchAnExternallyReplacedItem()
+    {
+        var (inventory, clock) = Guest();
+        inventory.Cells[At(0, 0)] = 10;
+        inventory.Cells[At(1, 0)] = 11;
+        var routine = Routine(Command(Charm(10, At(0, 0), At(2, 0)), Charm(11, At(1, 0), At(3, 0))), inventory, clock);
+        var run = routine.Run();
+        Assert.True(run.MoveNext());
+        inventory.Cells[At(1, 0)] = 99;
+        inventory.Cells[At(4, 0)] = 11;
+        while (run.MoveNext()) { clock.Now += 0.1; inventory.Settle(); }
+        Assert.Equal(99, inventory.InstanceAt(At(1, 0)));
+        Assert.Equal(11, inventory.InstanceAt(At(4, 0)));
+        Assert.DoesNotContain("swap (1,0)->(3,0)", inventory.Log);
+        AssertContains("이동할 칸의 아이템이 바뀌어", routine.Result);
+        Assert.DoesNotContain("원래 배치로 되돌렸습니다", routine.Result);
+    }
+
+    [Fact]
+    public void RollbackDoesNotSwapAnExternallyChangedCell()
+    {
+        var (inventory, clock) = Host();
+        inventory.Cells[At(0, 0)] = 10;
+        inventory.Cells[At(1, 0)] = 11;
+        inventory.FailingSwaps.Add(1);
+        inventory.BeforeSwap = index => { if (index == 1) inventory.Cells[At(2, 0)] = 99; };
+        var routine = Routine(Command(Charm(10, At(0, 0), At(2, 0)), Charm(11, At(1, 0), At(3, 0))), inventory, clock);
+        Drive(routine, inventory, clock);
+        Assert.Equal(99, inventory.InstanceAt(At(2, 0)));
+        Assert.Equal(2, inventory.SwapCount);
+        AssertContains("되돌릴 칸의 아이템이 바뀌어", routine.Result);
+    }
+
+    [Fact]
+    public void FinalPositionsAreCheckedAgainAfterLevelSynchronization()
+    {
+        var (inventory, clock) = Guest();
+        inventory.Cells[At(0, 0)] = 10;
+        var command = Command(Charm(10, At(0, 0), At(1, 0)));
+        command.ExpectedCellLevels[At(1, 0)] = 1;
+        var routine = Routine(command, inventory, clock);
+        var run = routine.Run();
+        while (run.MoveNext())
+        {
+            clock.Now += 0.1;
+            inventory.Settle();
+            if (routine.Progress == "자동 배치 - 레벨 확인 중") inventory.Cells[At(1, 0)] = 99;
+        }
+        AssertContains("목표 배치와 다릅니다", routine.Result);
+        Assert.DoesNotContain("자동 배치 완료", routine.Result);
+    }
+
+    [Fact]
+    public void TheFirstPendingWriteAlreadyHasProgress()
+    {
+        var (inventory, clock) = Guest();
+        inventory.Cells[At(0, 0)] = 10;
+        var routine = Routine(Command(Charm(10, At(0, 0), At(1, 0))), inventory, clock);
+        var run = routine.Run();
+        Assert.True(run.MoveNext());
+        AssertContains("반영 대기", routine.Progress);
+    }
+
+    [Fact]
     public void AHostApplyFinishesInsideOneFrame()
     {
         // 호스트의 쓰기는 그 자리에서 끝난다. 프레임이 끼면 그 사이에 게임 상태가 바뀔 수 있어
@@ -269,11 +383,9 @@ public class ApplyPlanRoutineTests
     }
 
     [Fact]
-    public void ASilentlyRejectedStepIsNotCountedAndTheRestIsRolledBack()
+    public void AGuestCannotDistinguishARejectedStepFromADelayedOne()
     {
-        // 게임의 LocalSwap 은 권한이 없으면 예외 없이 로그만 남기고 돌아온다. 그 걸음을 성공으로
-        // 세면 되돌리기가 원래와 다른 순열을 만든다. 3초를 기다린 뒤 실패로 보고, 이미 옮긴 것을
-        // 역순으로 되돌린다.
+        // 참가자는 무응답의 원인을 알 수 없다. 지연된 명령과 되돌리기를 교차시키지 않는다.
         var (inventory, clock) = Guest();
         inventory.Cells[At(0, 0)] = 10;
         inventory.Cells[At(1, 0)] = 11;
@@ -283,12 +395,13 @@ public class ApplyPlanRoutineTests
         var routine = Routine(command, inventory, clock);
         Drive(routine, inventory, clock);
 
-        Assert.Equal(10, inventory.Cells[At(0, 0)]);
+        Assert.Equal(10, inventory.Cells[At(2, 0)]);
         Assert.Equal(11, inventory.Cells[At(1, 0)]);
         Assert.Equal(2, inventory.Cells.Count);
         AssertContains("(1,0) → (3,0) 이동이 게임에 반영되지 않아", routine.Result);
-        AssertContains("원래 배치로 되돌렸습니다.", routine.Result);
-        Assert.Equal(3, inventory.SwapCount);
+        AssertContains("방에 재접속", routine.Result);
+        Assert.True(routine.RequiresResync);
+        Assert.Equal(2, inventory.SwapCount);
     }
 
     [Fact]
@@ -296,7 +409,7 @@ public class ApplyPlanRoutineTests
     {
         // 되돌리기도 거부될 수 있다. 확인하지 않으면 "원래 배치로 되돌렸습니다"라고 하면서
         // 반쯤 적용된 배치를 남긴다.
-        var (inventory, clock) = Guest();
+        var (inventory, clock) = Host();
         inventory.Cells[At(0, 0)] = 10;
         inventory.Cells[At(1, 0)] = 11;
         inventory.RejectedSwaps.Add(1);
@@ -330,15 +443,15 @@ public class ApplyPlanRoutineTests
     }
 
     [Fact]
-    public void ARaisedExceptionMidwayIsCaughtAndRolledBack()
+    public void AReadFailureAfterSendingDoesNotGuessWhetherTheWriteLanded()
     {
         // 참가자 세션에서는 걸음 사이가 수 초라 그동안 인벤토리가 파괴될 수 있다. 읽기가 던지는
         // 예외를 놓치면 이미 옮긴 걸음이 되돌려지지 않은 채 아무 말도 없다.
         var (inventory, clock) = Guest();
         inventory.Cells[At(0, 0)] = 10;
         inventory.Cells[At(1, 0)] = 11;
-        // 두 번째 걸음은 서버가 받지 않는다. 확인 중에 터진 걸음이 뒤늦게 반영되는 경우는 저널
-        // 밖이라 되돌리기가 어차피 못 본다 - 여기서 재는 것은 예외가 잡혀 되돌리기가 도는가다.
+        // 두 번째 걸음은 서버가 받지 않는다. 적용기는 이를 알 수 없으므로 읽기 실패 뒤에도
+        // 미확정 쓰기를 잊지 않고 추가 이동을 막아야 한다.
         inventory.RejectedSwaps.Add(1);
         var command = Command(Charm(10, At(0, 0), At(2, 0)), Charm(11, At(1, 0), At(3, 0)));
 
@@ -354,8 +467,9 @@ public class ApplyPlanRoutineTests
         }
 
         AssertContains("적용 도중 오류가 나 자동 배치를 중단했습니다(destroyed)", routine.Result);
-        AssertContains("원래 배치로 되돌렸습니다.", routine.Result);
-        Assert.Equal(10, inventory.Cells[At(0, 0)]);
+        AssertContains("방에 재접속", routine.Result);
+        Assert.True(routine.RequiresResync);
+        Assert.Equal(10, inventory.Cells[At(2, 0)]);
         Assert.Equal(11, inventory.Cells[At(1, 0)]);
     }
 
@@ -457,9 +571,9 @@ public class ApplyPlanRoutineTests
     }
 
     [Fact]
-    public void AGuestPressThatNeverLandsIsPressedBackAroundAndTheMovesUndone()
+    public void AnUnconfirmedPressStopsWithoutSendingCompensatingPresses()
     {
-        // 두 번째 누르기가 무시되면 눌러 둔 한 걸음을 세 번 더 눌러 한 바퀴를 채우고, 이동도 되돌린다.
+        // 무시된 것인지 늦게 도착할 것인지 모르는 누르기 뒤에는 추가 회전을 보내지 않는다.
         var (inventory, clock) = Guest();
         inventory.Cells[At(0, 0)] = 1;
         inventory.Cells[At(2, 0)] = 10;
@@ -472,11 +586,12 @@ public class ApplyPlanRoutineTests
         var routine = Routine(command, inventory, clock);
         Drive(routine, inventory, clock);
 
-        Assert.Equal(0, inventory.Tablets[1].Rotation);
-        Assert.Equal(10, inventory.Cells[At(2, 0)]);
-        Assert.Equal(5, inventory.PressCount);
+        Assert.Equal(1, inventory.Tablets[1].Rotation);
+        Assert.Equal(10, inventory.Cells[At(3, 0)]);
+        Assert.Equal(2, inventory.PressCount);
         AssertContains("회전이 시간 안에 반영되지 않았습니다", routine.Result);
-        AssertContains("원래 배치로 되돌렸습니다.", routine.Result);
+        Assert.True(routine.RequiresResync);
+        AssertContains("방에 재접속", routine.Result);
     }
 
     [Fact]

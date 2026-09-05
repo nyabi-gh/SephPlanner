@@ -28,7 +28,7 @@ namespace SephPlanner.Core.Runtime
         int InstanceAt(GridPos cell);
 
         /// <summary>두 칸을 맞바꾼다. 실패하면 이유, 아니면 null. 거부됐는지는 돌려주는 값으로 알 수 없다.</summary>
-        string? Swap(GridPos from, GridPos to);
+        string? Swap(GridPos from, GridPos destination);
 
         /// <summary>석판의 자리·각도·회전 가능 여부. 그런 석판이 없으면 거짓.</summary>
         bool TryFindTablet(int instanceId, out GridPos cell, out int rotation, out bool rotatable);

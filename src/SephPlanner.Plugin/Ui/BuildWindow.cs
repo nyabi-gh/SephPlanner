@@ -196,6 +196,13 @@ namespace SephPlanner.Plugin.Ui
             _presetButton.text = preset == null ? "빌드 코드 붙여넣기" : "다른 빌드 코드";
             Widgets.SetActive(_presetClear, preset != null);
 
+            if (_prefs.StorageMessage.Length > 0)
+            {
+                _presetStatus.text = _prefs.StorageMessage;
+                _presetStatus.color = NativeSkin.Amber;
+                return;
+            }
+
             if (_presetMessage.Length > 0)
             {
                 _presetStatus.text = _presetMessage;
@@ -309,7 +316,7 @@ namespace SephPlanner.Plugin.Ui
                     if (pair.Value > 0 && seen.Add(pair.Key)) ids.Add(pair.Key);
                 }
             }
-            foreach (var category in _prefs.PriorityCategories)
+            foreach (var category in _prefs.EffectivePriorityCategories())
             {
                 if (seen.Add(category)) ids.Add(category);
             }

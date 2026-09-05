@@ -15,6 +15,7 @@ namespace SephPlanner.Plugin
     /// 게임 자체의 이동 경로로 적용한다. 멀티 세션에서는 읽기만 한다.
     /// </summary>
     [BepInPlugin(PluginGuid, "SephPlanner", "0.2.1")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001", Justification = "Unity의 OnDestroy에서 계산 작업을 정리합니다.")]
     public sealed class SephPlannerPlugin : BaseUnityPlugin
     {
         public const string PluginGuid = "dev.nyabi.sephplanner.bridge";
@@ -150,6 +151,7 @@ namespace SephPlanner.Plugin
             // 화면 스위치 밖이어야 한다. 화면을 끈 뒤 이 키까지 죽으면 되켤 길이 없다.
             if (_settings.SettingsKey.Value.IsDown()) ToggleWindow(_window, _settings.SettingsKey, "설정 창");
             if (_settings.BuildKey.Value.IsDown()) ToggleWindow(_build, _settings.BuildKey, "빌드 창");
+            if (_build.IsOpen && !_window.IsOpen && RightClicked()) _build.RightClick(Cursor());
             if (_settings.Panel.Value)
             {
                 if (_settings.PreviewKey.Value.IsDown()) CyclePreview();
@@ -165,7 +167,6 @@ namespace SephPlanner.Plugin
                 if (_settings.OpacityKey.Value.IsDown()) _settings.CycleOpacity();
                 if (_settings.MoveKey.Value.IsDown()) ToggleMove();
                 if (_moving) _hud.DragTo(Cursor());
-                if (_build.IsOpen && RightClicked()) _build.RightClick(Cursor());
 
                 // 커서를 읽기만 한다. 그려 둔 사각형과 겹치는지 우리가 세므로 raycastTarget 을
                 // 켤 필요가 없고, HUD 가 게임 입력을 가져가지 않는다는 보장이 그대로 남는다.
@@ -230,6 +231,7 @@ namespace SephPlanner.Plugin
 
             // 정의가 바뀌었을 수 있으므로 인게임 풀이가 쓰던 카탈로그를 버리고 다시 짓게 한다.
             CatalogSource.Invalidate();
+            _runner?.Dispose();
             _runner = null;
 
             var readyDeadline = Time.realtimeSinceStartup + 30f;
@@ -303,7 +305,7 @@ namespace SephPlanner.Plugin
             try
             {
                 var step = FrameCost.Now;
-                var snapshot = GameReader.Read(_settings.OfferRadius.Value);
+                var snapshot = GameReader.Read(_settings.OfferRadius.Value, _settings.Recommendations.Value);
                 FrameCost.Read.Add(step);
 
                 step = FrameCost.Now;
@@ -694,6 +696,7 @@ namespace SephPlanner.Plugin
             // 참가자 세션의 적용은 걸음마다 서버 왕복을 기다려 수 초가 걸린다. 그동안 아무 말이
             // 없으면 인벤토리가 저 혼자 움직이는 것으로만 보인다.
             if (PlanApplier.InProgress) return PlanApplier.Progress;
+            if (PlanApplier.RecoveryRequired) return PlanApplier.RecoveryMessage;
 
             // 이동 중에는 커서 좌표를 그대로 보여준다. 화면이 따라오지 않을 때 커서를 못 읽는
             // 것인지 자리가 안 먹는 것인지, 로그를 뒤지지 않고 화면에서 바로 갈린다.
@@ -803,7 +806,15 @@ namespace SephPlanner.Plugin
                     return;
                 }
 
-                var snapshot = GameReader.Read(_settings.OfferRadius.Value);
+                if (_previewKey.Length > 0)
+                {
+                    _previewKey = "";
+                    Report("현재 가방의 배치로 돌아왔습니다. 배치를 확인한 뒤 " +
+                           Describe(_settings.AutoPlaceKey) + " 를 다시 누르세요.");
+                    return;
+                }
+
+                var snapshot = GameReader.Read(_settings.OfferRadius.Value, _settings.Recommendations.Value);
                 VerifySimulation(GameReader.CheckSimulation());
                 FeedNativePanel(snapshot);
 
@@ -864,6 +875,8 @@ namespace SephPlanner.Plugin
                 AllowMultiplayer = _settings.MultiplayerAutoPlace.Value,
                 SessionActive = NetworkServer.active || NetworkClient.active,
                 Applying = PlanApplier.InProgress,
+                RecoveryRequired = PlanApplier.RecoveryRequired,
+                Previewing = _previewKey.Length > 0,
             });
 
         /// <summary>
@@ -924,6 +937,7 @@ namespace SephPlanner.Plugin
 
         private void OnDestroy()
         {
+            _runner?.Dispose();
             if (_moving && _settings != null && _hud.IsAlive)
             {
                 var margin = _hud.Margin;
