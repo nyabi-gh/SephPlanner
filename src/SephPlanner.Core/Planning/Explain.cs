@@ -35,6 +35,9 @@ namespace SephPlanner.Core.Planning
             if (worth.Source == CharmWorthSource.Rarity)
                 lines.Add("값어치는 레어도로 어림잡은 것입니다. 효과의 세기는 아직 점수에 없습니다.");
 
+            if (worth.Source == CharmWorthSource.MeasuredFloor)
+                lines.Add("효과의 일부만 측정되어 레어도 어림값을 함께 사용합니다. 실제 전투 효과와 다를 수 있습니다.");
+
             return lines;
         }
 

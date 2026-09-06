@@ -95,8 +95,9 @@ scripts/make-release.ps1
 # -> artifacts/SephPlanner-v{버전}.zip
 ```
 
-배포물에는 플러그인 DLL 두 개만 들어간다. 릴리스 전에 포맷, 테스트, 빌드를 검증하고 커밋과
-파일 해시가 적힌 `manifest.json`을 만든다. BepInEx와 게임 파일은 넣지 않는다.
+배포물에는 플러그인 DLL 두 개와 BepInEx 5.4.23.5(win_x64, Mono), 설치 안내와 라이선스가
+들어간다. 릴리스 전에 포맷, 테스트, 빌드를 검증하고 커밋과 파일 해시가 적힌 `manifest.json`을
+만든다. 게임 파일은 넣지 않는다.
 
 zip은 릴리스 전용 공개 저장소 [nyattic/SephPlanner-Release](https://github.com/nyattic/SephPlanner-Release)의
 Releases에 올린다. 이 저장소는 비공개라 여기 Releases는 링크가 공개되지 않는다. 그쪽에는 소스
@@ -115,6 +116,7 @@ CHANGELOG의 해당 절도 함께 확인한다.
 - [docs/LEGAL.md](docs/LEGAL.md) — 약관·저작권 검토와 그에 따른 설계 제약
 - [docs/ROADMAP.md](docs/ROADMAP.md) — 남은 작업과 백로그, 측정 기준선, 고치지 않기로 한 것
 - [CHANGELOG.md](CHANGELOG.md) — 버전별 사용자 영향 변경 사항
+- [docs/VALUE-AUDIT-2026-09-06.md](docs/VALUE-AUDIT-2026-09-06.md) — 299종 가치 평가 점검과 부분 측정 처리
 - [LICENSE](LICENSE) — 배포 조건. 독점 라이선스이고 소스는 공개하지 않는다
 
 ## 인게임 화면
@@ -210,6 +212,10 @@ CHANGELOG의 해당 절도 함께 확인한다.
 때문이다. 능력치를 주는 아티팩트는 레벨별 능력치 표에서 값어치를 재고, 고유 효과에만 값어치가
 있는 아티팩트는 레어도로 어림잡는다. 지금 보이는 후보 중 몇 개가 어림값인지 함께 적고, 어느
 쪽인지는 후보에 커서를 올리면 나온다. 남은 몫은 [docs/ROADMAP.md](docs/ROADMAP.md) 참고.
+
+능력치 표가 있어도 전환·해금 같은 효과를 환산하지 못했다면 전체 가치로 취급하지 않는다.
+이때는 측정값과 레어도 어림값 중 큰 쪽을 사용하고 툴팁에 일부만 측정됐다고 표시한다.
+이는 누락된 효과를 0점으로 단정하지 않기 위한 추정이며, 실제 전투 효율을 측정한 값은 아니다.
 
 **후보는 화면에 보일 때만 뜬다.** 상자는 연 뒤에, 상점은 상점 창을 연 뒤에 후보가 된다.
 가까이 가기만 해도 재고가 보이면 손으로는 할 수 없는 일이 되기 때문이다

@@ -473,6 +473,7 @@ public class OfferAdvisorTests
                 {
                     MaxLevel = 5, Behavior = "Charm_StatusInstance",
                     StatWorthByLevel = new List<double> { 10, 20, 30, 40, 50, 60 },
+                    StatWorthCoverageKnown = true,
                 },
             },
             new()

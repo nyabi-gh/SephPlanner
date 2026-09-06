@@ -538,6 +538,7 @@ public class StabilityTests
                 {
                     Id = "C", EntityId = 200, MaxLevel = 5, Behavior = "Charm_StatusInstance",
                     StatWorthByLevel = new List<double> { 1.0, 1.2, 1.4, 1.6, 1.8, 2.0 },
+                    StatWorthCoverageKnown = true,
                 },
             });
 

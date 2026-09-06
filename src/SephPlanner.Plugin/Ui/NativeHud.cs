@@ -806,9 +806,12 @@ namespace SephPlanner.Plugin.Ui
 
                 // 손으로 채운 가치를 함께 넘긴다. 빠뜨리면 채워 넣은 아티팩트까지 "레어도로
                 // 어림잡았다"고 세어, 화면이 실제보다 못 미더운 말을 하게 된다.
-                if (charm != null &&
-                    CharmWorth.Resolve(charm, frame.Values.Of(charm)).Source == CharmWorthSource.Rarity)
-                    guessed++;
+                if (charm != null)
+                {
+                    var source = CharmWorth.Resolve(charm, frame.Values.Of(charm)).Source;
+                    if (source == CharmWorthSource.Rarity || source == CharmWorthSource.MeasuredFloor)
+                        guessed++;
+                }
 
                 var picked = previewed != null && previewed.Key == advice.Key;
                 var row = _offers.Add(

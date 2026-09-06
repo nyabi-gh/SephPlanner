@@ -115,6 +115,12 @@ namespace SephPlanner.Core.Model
         /// </summary>
         public double StatWorthConfidence { get; set; }
 
+        /// <summary>환산 누락 여부까지 검사한 표인지. 구버전 카탈로그는 확인되지 않은 상태로 읽는다.</summary>
+        public bool StatWorthCoverageKnown { get; set; }
+
+        /// <summary>값어치로 환산하지 못한 능력치. 표본 신뢰도와 별개로 측정의 누락을 나타낸다.</summary>
+        public List<string> StatWorthUnconverted { get; set; } = new List<string>();
+
         public List<string> Categories { get; set; } = new List<string>();
         public Dictionary<string, string> Names { get; set; } = new Dictionary<string, string>();
     }

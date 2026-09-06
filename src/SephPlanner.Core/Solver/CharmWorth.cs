@@ -12,7 +12,7 @@ namespace SephPlanner.Core.Solver
         /// <summary>게임의 레벨별 능력치 표에서 잰 값.</summary>
         Measured,
 
-        /// <summary>잰 값을 아래 한계로만 쓴 것. 능력치 밖에 고유 효과가 더 있는 아티팩트다.</summary>
+        /// <summary>누락되거나 별도인 효과가 있어 측정값과 레어도 어림값 중 큰 쪽을 쓴 것.</summary>
         MeasuredFloor,
 
         /// <summary>손으로 채운 값.</summary>
@@ -118,9 +118,11 @@ namespace SephPlanner.Core.Solver
 
             if (definition.StatWorthByLevel.Count > 0)
             {
-                // 능력치만 주는 아티팩트는 표가 값어치를 다 담는다. 파생 클래스는 그 위에 고유
-                // 효과가 더 있으므로 표를 아래 한계로만 쓴다.
-                var statsAreEverything = definition.Behavior == "Charm_StatusInstance";
+                // 능력치형이라도 전환·해금 같은 고정 효과는 환산되지 않을 수 있다.
+                // 누락된 효과를 0점으로 단정하지 않고 기존 레어도 어림값을 함께 쓴다.
+                var statsAreEverything = definition.Behavior == "Charm_StatusInstance" &&
+                                         definition.StatWorthCoverageKnown &&
+                                         definition.StatWorthUnconverted.Count == 0;
                 return new CharmWorth
                 {
                     ByLevel = definition.StatWorthByLevel,

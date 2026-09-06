@@ -20,7 +20,7 @@ public static class PriceProxy
     public static void Report(IReadOnlyList<CharmDefinition> charms)
     {
         var samples = charms
-            .Where(c => c.Behavior == "Charm_StatusInstance" && c.StatWorthByLevel.Count > 0)
+            .Where(c => CharmWorth.Resolve(c).Source == CharmWorthSource.Measured)
             .Select(c => new Sample(
                 c.Names.TryGetValue("current", out var name) ? name : c.Id,
                 c.StatWorthByLevel[^1], c.Cost, c.SapphirePrice, c.Rarity))

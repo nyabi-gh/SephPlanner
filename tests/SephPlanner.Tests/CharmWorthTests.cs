@@ -79,6 +79,7 @@ public class CharmWorthTests
             EntityId = 5,
             Behavior = "Charm_StatusInstance",
             StatWorthByLevel = { 1, 2, 3 },
+            StatWorthCoverageKnown = true,
         };
 
         var measured = CharmWorth.Resolve(definition);
@@ -181,6 +182,7 @@ public class CharmWorthTests
                 MaxLevel = 3,
                 Behavior = "Charm_StatusInstance",
                 StatWorthByLevel = { 3, 2, 1, 0 },
+                StatWorthCoverageKnown = true,
             },
         });
         problem.Charms.Add(new CharmSlot
@@ -192,6 +194,7 @@ public class CharmWorthTests
                 MaxLevel = 3,
                 Behavior = "Charm_StatusInstance",
                 StatWorthByLevel = { 1, 2, 3, 4 },
+                StatWorthCoverageKnown = true,
             },
         });
         return problem;

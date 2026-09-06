@@ -70,11 +70,13 @@ public static class CharmValueDraft
 
         Console.WriteLine($"  손으로 채운 것       {handWritten,4}종");
         Console.WriteLine($"  잰 값이 값어치 전부  {measured.Count,4}종  (능력치만 주는 아티팩트)");
-        Console.WriteLine($"  잰 값이 아래 한계    {floors.Count,4}종  (능력치 밖에 고유 효과가 더 있다)");
+        Console.WriteLine($"  측정과 어림값 병용   {floors.Count,4}종  (미환산 능력치 또는 고유 효과가 있다)");
         Console.WriteLine($"  레어도 어림값뿐      {blank.Count,4}종  <- 손으로 채울 몫");
         Console.WriteLine();
 
         Quantiles(measured);
+        foreach (var charm in charms.Where(c => c.StatWorthUnconverted.Count > 0).OrderBy(c => c.EntityId))
+            Console.WriteLine($"  미환산 {charm.EntityId} {Name(charm)}: {string.Join(", ", charm.StatWorthUnconverted)}");
         PriceProxy.Report(charms);
 
         var lowConfidence = measured.Where(c => c.StatWorthConfidence < 0.5).ToList();

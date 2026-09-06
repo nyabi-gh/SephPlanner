@@ -54,10 +54,15 @@ namespace SephPlanner.Core.Solver
 
             foreach (var charm in charms)
             {
+                charm.StatWorthByLevel.Clear();
+                charm.StatWorthConfidence = 0;
+                charm.StatWorthCoverageKnown = true;
+                charm.StatWorthUnconverted.Clear();
                 if (!report.ByEntity.TryGetValue(charm.EntityId, out var worth)) continue;
 
                 charm.StatWorthByLevel = worth.ByLevel;
                 charm.StatWorthConfidence = worth.Confidence;
+                charm.StatWorthUnconverted.AddRange(worth.Unconverted);
             }
             return report;
         }
@@ -102,7 +107,7 @@ namespace SephPlanner.Core.Solver
                         var value = table.ValuesByLevel[Math.Min(level, table.ValuesByLevel.Count - 1)];
                         if (!exchange.TryConvert(table.StatusId, value, out var levels))
                         {
-                            if (level == 0 && !worth.Unconverted.Contains(table.StatusId))
+                            if (value != 0 && !worth.Unconverted.Contains(table.StatusId))
                                 worth.Unconverted.Add(table.StatusId);
                             continue;
                         }
