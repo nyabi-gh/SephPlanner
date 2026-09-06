@@ -276,6 +276,7 @@ namespace SephPlanner.Core.Solver
                 FixedEffects = problem.FixedEffects,
                 ComboCounts = problem.ComboCounts,
                 Combos = problem.Combos,
+                PriorityCategories = problem.PriorityCategories,
             };
 
             foreach (var pair in problem.CurrentTablets)

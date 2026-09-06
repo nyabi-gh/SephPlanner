@@ -224,8 +224,8 @@ namespace SephPlanner.Plugin.Ui
             if (_tab == Tab.Combos)
             {
                 _note.text = _context.Recommendations
-                    ? "누르면 그 콤보를 밀고 있는 빌드로 지정합니다. 후보 추천에서 크게 칩니다."
-                    : "후보 추천이 꺼져 있어 지금은 점수에 쓰이지 않습니다. 지정은 남습니다.";
+                    ? "선택한 콤보를 추천과 열쇠·종이 배치에 우선 반영합니다. 여러 개면 진행과 배치 가치를 비교합니다."
+                    : "추천은 꺼져 있지만 선택한 콤보는 열쇠·종이 배치에 우선 반영합니다.";
                 _note.color = _context.Recommendations ? NativeSkin.TextDim : NativeSkin.Amber;
                 return;
             }
@@ -319,6 +319,18 @@ namespace SephPlanner.Plugin.Ui
             foreach (var category in _prefs.EffectivePriorityCategories())
             {
                 if (seen.Add(category)) ids.Add(category);
+            }
+
+            var items = _context.Snapshot?.Inventory?.Items;
+            if (items != null)
+            {
+                foreach (var item in items)
+                {
+                    var definition = _context.Catalog?.Charm(item.DefinitionId);
+                    if (definition == null) continue;
+                    foreach (var category in definition.LineCategories)
+                        if (seen.Add(category)) ids.Add(category);
+                }
             }
 
             ids.Sort((a, b) =>

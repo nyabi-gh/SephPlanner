@@ -93,6 +93,7 @@ namespace SephPlanner.Core.Planning
             problem.FixedEffects.AddRange(inventory.FixedEffects);
             problem.ComboCounts = inventory.ComboCounts;
             problem.Combos = catalog.Combo;
+            problem.PriorityCategories = new System.Collections.Generic.HashSet<string>(preferences.PriorityCategories);
 
             foreach (var engraving in inventory.Engravings)
             {
@@ -164,7 +165,7 @@ namespace SephPlanner.Core.Planning
             // 지금이 이기면 지금이 답이다. 조건부 아티팩트는 배정과 조건이 서로 물려 수렴 반복이
             // 소진될 수 있고 그 결과가 지금 배치보다 나쁠 수 있다(실제로 재현됐다). 이사 비용까지
             // 쳐서 견주므로, 옮기는 수고만큼도 못 얻는 배치도 여기서 걸러진다.
-            if (best.Preference < current.Preference) best = current;
+            if (PriorityComboPlacement.Compare(best, current) < 0) best = current;
 
             var offers = new List<OfferAdvice>();
             var mixes = new List<MixAdvice>();
@@ -211,6 +212,7 @@ namespace SephPlanner.Core.Planning
                 Current = current,
                 Best = best,
                 Moves = moves,
+                ComboPlacementWarnings = ComboPlacementWarnings(problem, best),
                 ManualMoveInstructionsAvailable = manualMovesAvailable,
                 HasPlacementChanges = hasPlacementChanges,
                 InventoryWidth = inventory.Width,
@@ -224,6 +226,18 @@ namespace SephPlanner.Core.Planning
                 Charms = CharmsByCell(problem, best),
                 Targets = targets,
             };
+        }
+
+        private static List<string> ComboPlacementWarnings(PlacementProblem problem, Arrangement best)
+        {
+            var warnings = new List<string>();
+            foreach (var charm in problem.Charms)
+            {
+                if (!best.UnmatchedComboCharms.Contains(charm.InstanceId)) continue;
+                var name = Naming.Of(charm.Definition.Names, charm.Definition.Id, "아티팩트");
+                warnings.Add(name + ": " + PriorityComboPlacement.FailureReason(problem, charm));
+            }
+            return warnings;
         }
 
         /// <summary>

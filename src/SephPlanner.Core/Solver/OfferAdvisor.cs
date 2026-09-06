@@ -354,7 +354,7 @@ namespace SephPlanner.Core.Solver
                     ? outcome.Solved.CharmPositions.ContainsKey(candidateId)
                     : outcome.Solved.TabletPositions.ContainsKey(candidateId);
                 if (!placed) continue;
-                if (best is null || outcome.Solved.Preference > best.Solved.Preference) best = outcome;
+                if (best is null || PriorityComboPlacement.Compare(outcome.Solved, best.Solved) > 0) best = outcome;
             }
             if (best is null) return null;
 
@@ -487,6 +487,7 @@ namespace SephPlanner.Core.Solver
                 FixedEffects = problem.FixedEffects,
                 ComboCounts = problem.ComboCounts,
                 Combos = problem.Combos,
+                PriorityCategories = problem.PriorityCategories,
             };
 
             // 현재 위치와 직전 제안을 빼먹으면 후보 쪽 풀이만 앵커를 잃어, 기준과 후보가

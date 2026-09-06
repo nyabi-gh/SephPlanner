@@ -109,6 +109,7 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         public IReadOnlyDictionary<string, int>? ComboCounts { get; set; }
         public Func<string, ComboDefinition?>? Combos { get; set; }
+        public HashSet<string> PriorityCategories { get; set; } = new HashSet<string>();
 
         /// <summary>
         /// <see cref="ComboCounts"/>에서 자리 의존 아티팩트의 지금 자리 몫을 뺀 것. <see cref="ComboCounting"/>이
@@ -173,6 +174,9 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         public int PolishPasses { get; set; } = 3;
 
+        /// <summary>열쇠·종이 지정 배치의 추가 채점 상한. 실측 최적값이 아닌 탐색 예산이다.</summary>
+        public int PriorityComboTrials { get; set; } = 2048;
+
         /// <summary>
         /// 이 풀이가 이미 쓸모없어졌는지. 폴링이 풀이보다 빠르면 답이 나오기도 전에 그 답을 버릴
         /// 것이 정해지는데, 그런 계산을 끝까지 돌리면 CPU 와 할당을 고스란히 버린다.
@@ -189,11 +193,15 @@ namespace SephPlanner.Core.Solver
         /// 후보와 합성이 서로 다른 배치 위에서 겨루게 된다. 그래서 값을 여기 한 곳에만 둔다.
         /// </summary>
         public static SolverOptions ForAdvice(CancellationToken cancellation) =>
-            new SolverOptions { BeamWidth = 150, ExactCandidates = 40, Cancellation = cancellation };
+            new SolverOptions { BeamWidth = 150, ExactCandidates = 40, PriorityComboTrials = 192, Cancellation = cancellation };
     }
 
     public sealed class Arrangement
     {
+        public int PriorityComboMatches { get; set; }
+        public double PriorityComboProgress { get; set; }
+        public List<int> UnmatchedComboCharms { get; } = new List<int>();
+
         public List<TabletPlacement> Tablets { get; } = new List<TabletPlacement>();
 
         /// <summary>석판 인스턴스 번호별 시뮬레이션 적용 여부.</summary>

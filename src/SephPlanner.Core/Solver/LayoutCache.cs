@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using SephPlanner.Core.Tablets;
 
@@ -118,7 +119,8 @@ namespace SephPlanner.Core.Solver
                    .Append('/').Append(options.BeamWidth)
                    .Append('/').Append(options.ExactCandidates)
                    .Append('/').Append(options.FixpointIterations)
-                   .Append('/').Append(options.PolishPasses).Append(';');
+                   .Append('/').Append(options.PolishPasses)
+                   .Append('/').Append(options.PriorityComboTrials).Append(';');
 
             foreach (var slot in problem.Tablets)
             {
@@ -128,6 +130,8 @@ namespace SephPlanner.Core.Solver
                        .Append(slot.InstanceQuery ?? "").Append(':')
                        .Append(slot.InstanceConditionQuery ?? "").Append(';');
             }
+            foreach (var category in problem.PriorityCategories.OrderBy(value => value, System.StringComparer.Ordinal))
+                builder.Append("priority:").Append(category.Length).Append(':').Append(category).Append(';');
             return builder.ToString();
         }
     }

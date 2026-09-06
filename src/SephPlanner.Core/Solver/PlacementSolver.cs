@@ -137,19 +137,21 @@ namespace SephPlanner.Core.Solver
                 if (best != null && options.Cancellation.IsCancellationRequested) break;
 
                 var arrangement = Evaluate(problem, cells, layout, options);
-                if (best != null && arrangement.Preference <= best.Preference) continue;
+                if (best != null && PriorityComboPlacement.Compare(arrangement, best) <= 0) continue;
 
                 best = arrangement;
                 bestLayout = layout;
             }
-            if (best is null) return Evaluate(problem, cells, new List<TabletPlacement>(), options, polish: true);
+            if (best is null) best = Evaluate(problem, cells, new List<TabletPlacement>(), options, polish: true);
 
             // 다듬기는 이긴 배치에만 건다. 후보마다 걸면 O(아티팩트^3)가 후보 수만큼 곱해져
             // 실시간 폴링이 못 따라온다 - 재어 보면 풀이 시간이 두 자릿수 배로 뛴다.
-            if (options.PolishPasses <= 0 || options.Cancellation.IsCancellationRequested) return best;
-
-            var polished = Evaluate(problem, cells, bestLayout!, options, polish: true);
-            return polished.Preference > best.Preference ? polished : best;
+            if (bestLayout != null && options.PolishPasses > 0 && !options.Cancellation.IsCancellationRequested)
+            {
+                var polished = Evaluate(problem, cells, bestLayout, options, polish: true);
+                if (PriorityComboPlacement.Compare(polished, best) > 0) best = polished;
+            }
+            return PriorityComboPlacement.Improve(problem, best, options);
         }
 
         private static List<GridPos> Cells(PlacementProblem problem) =>
@@ -1031,6 +1033,7 @@ namespace SephPlanner.Core.Solver
                     : result.EffectiveLevel(cell, 0);
                 if (result.IsDisabled(cell)) arrangement.DisabledCells.Add(cell);
             }
+            PriorityComboPlacement.Describe(problem, arrangement, neighbors);
             return arrangement;
         }
     }

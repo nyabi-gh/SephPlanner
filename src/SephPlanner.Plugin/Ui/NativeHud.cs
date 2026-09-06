@@ -519,6 +519,13 @@ namespace SephPlanner.Plugin.Ui
                 : $"{plan.Current.Score:0.#} / {score:0.#}";
             _gain.text = gain > 0.001 ? $"+{gain:0.#}" : gain < -0.001 ? $"{gain:0.#}" : "변경 없음";
             _gain.color = gain > 0.001 ? NativeSkin.Good : gain < -0.001 ? NativeSkin.Bad : NativeSkin.TextDim;
+            if (previewed == null && plan.HasPlacementChanges &&
+                (plan.Best.PriorityComboMatches > plan.Current.PriorityComboMatches ||
+                 plan.Best.PriorityComboProgress > plan.Current.PriorityComboProgress))
+            {
+                _gain.text = $"지정 콤보 우선 ({gain:+0.#;-0.#;0})";
+                _gain.color = NativeSkin.Mint;
+            }
 
             var warning = Warning(
                 snapshot, plan, frame.MultiplayerAutoPlace, frame.QueryVerified,
@@ -644,6 +651,8 @@ namespace SephPlanner.Plugin.Ui
 
             if (plan.Best.UnheldCharms.Count > 0)
                 warnings.Add($"배치 조건을 무시하는 칸이 모자라 고정 {plan.Best.UnheldCharms.Count}개를 지키지 못했습니다.");
+
+            warnings.AddRange(plan.ComboPlacementWarnings);
 
             if (snapshot.IsMultiplayer)
             {

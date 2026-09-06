@@ -12,7 +12,7 @@ namespace SephPlanner.Core.Planning
 
         /// <summary>
         /// 밀고 있는 콤보 카테고리. 후보 추천에서 이 카테고리의 콤보 진행을 훨씬 크게 치고,
-        /// 카테고리가 맞는 아티팩트를 위로 올린다. 배치 점수는 건드리지 않는다.
+        /// 카테고리가 맞는 아티팩트를 위로 올린다. 열쇠·종이는 지정 콤보 배치를 먼저 만족시킨다.
         /// </summary>
         public HashSet<string> PriorityCategories { get; set; } = new HashSet<string>();
 
