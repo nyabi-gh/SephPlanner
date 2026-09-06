@@ -69,6 +69,7 @@ namespace SephPlanner.Core.Planning
         public int InventoryHeight { get; set; }
         public int InventoryStorage { get; set; }
         public List<OfferAdvice> Offers { get; set; } = new List<OfferAdvice>();
+        public List<DiscardAdvice> Discards { get; set; } = new List<DiscardAdvice>();
 
         /// <summary>
         /// 가진 석판 중 합치면 좋은 쌍. 합성기가 이 층에 있고 아직 쓰지 않았을 때만 채워진다.

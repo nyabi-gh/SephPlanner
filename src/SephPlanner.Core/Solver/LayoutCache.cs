@@ -120,7 +120,8 @@ namespace SephPlanner.Core.Solver
                    .Append('/').Append(options.ExactCandidates)
                    .Append('/').Append(options.FixpointIterations)
                    .Append('/').Append(options.PolishPasses)
-                   .Append('/').Append(options.PriorityComboTrials).Append(';');
+                   .Append('/').Append(options.PriorityComboTrials)
+                   .Append('/').Append(options.EmptySideTrials).Append(';');
 
             foreach (var slot in problem.Tablets)
             {

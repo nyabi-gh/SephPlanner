@@ -187,6 +187,7 @@ namespace SephPlanner.Plugin.Ui
         private Section _moves;
         private Section _offers;
         private Section _mixes;
+        private Section _discards;
         private TextMeshProUGUI _offerNotice;
         private TextMeshProUGUI _chips;
 
@@ -309,6 +310,7 @@ namespace SephPlanner.Plugin.Ui
             _moves = new Section(_detail, _skin, _base, "옮길 것", NativeSkin.TextDim, MoveRows, detail);
             BuildOffers(_detail, detail);
             _mixes = new Section(_detail, _skin, _base, "석판 합성기", NativeSkin.Mint, MixRows, detail);
+            _discards = new Section(_detail, _skin, _base, "하나 빼기 검토 · 자동 제거 안 함", NativeSkin.Mint, 3, detail);
             _chips = Widgets.Paragraph("Chips", _detail, _skin, S(0.8f), NativeSkin.TextDim);
             _chips.richText = true;
             _chipSize = Widgets.Fixed(_chips.rectTransform, S(1.1f));
@@ -558,6 +560,7 @@ namespace SephPlanner.Plugin.Ui
             }
             RenderOffers(plan, frame, previewed);
             RenderMixes(plan, snapshot.Mixer);
+            RenderDiscards(plan, previewed == null);
             RenderChips(snapshot, frame);
         }
 
@@ -869,6 +872,23 @@ namespace SephPlanner.Plugin.Ui
             parts.Append(Tint(
                 text, gain > 0.001 ? NativeSkin.Good : gain < -0.001 ? NativeSkin.Bad : NativeSkin.TextDim));
             return parts.ToString();
+        }
+
+        private void RenderDiscards(Plan plan, bool visible)
+        {
+            _discards.Begin();
+            foreach (var advice in plan.Discards)
+            {
+                var row = _discards.Add(advice.Name, $"제외 후 재배치 +{advice.Gain:0.#}", NativeSkin.Text);
+                Hover(row, advice.Name, () =>
+                    $"현재 위치: {advice.Position.X + 1}열 {advice.Position.Y + 1}행\n" +
+                    "이 항목 하나를 가방에서 빼고 다시 배치했을 때의 추정 이득입니다. F8은 아이템을 제거하지 않습니다.\n" +
+                    "콤보 단계가 유지되는 후보만 표시합니다. 실제 전투 효과와 다를 수 있습니다." +
+                    (advice.ReducesComboCount ? "\n콤보 개수는 줄어 다음 단계가 멀어질 수 있습니다." : "") +
+                    (advice.Activated.Count > 0 ? "\n켜지는 아티팩트: " + string.Join(", ", advice.Activated) : ""));
+            }
+            _discards.End();
+            Widgets.SetActive(_discards.Root, visible && plan.Discards.Count > 0);
         }
 
         private void RenderMixes(Plan plan, MixerState mixer)

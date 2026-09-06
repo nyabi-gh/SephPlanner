@@ -476,7 +476,7 @@ namespace SephPlanner.Core.Solver
             return true;
         }
 
-        private static PlacementProblem Clone(PlacementProblem problem)
+        internal static PlacementProblem Clone(PlacementProblem problem)
         {
             var clone = new PlacementProblem
             {

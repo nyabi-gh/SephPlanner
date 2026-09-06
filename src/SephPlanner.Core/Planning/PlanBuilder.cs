@@ -159,6 +159,7 @@ namespace SephPlanner.Core.Planning
             }
 
             var current = PlacementSolver.Score(problem, layout, positions);
+            var verification = Verify(inventory, current, grid);
             var best = PlacementSolver.Solve(problem, new SolverOptions { Cancellation = cancellation });
             if (cancellation.IsCancellationRequested) return null;
 
@@ -170,6 +171,7 @@ namespace SephPlanner.Core.Planning
             var offers = new List<OfferAdvice>();
             var mixes = new List<MixAdvice>();
             var skippedOffers = 0;
+            var discards = new List<DiscardAdvice>();
             if (preferences.Recommendations)
             {
                 // 두 조언이 같은 기준 배치를 쓴다. 따로 풀면 같은 탐색을 두 번 돌리는 셈이고,
@@ -196,9 +198,10 @@ namespace SephPlanner.Core.Planning
                 // 기준 배치는 조언이 이미 푼 것을 그대로 받는다 - 여기서 다시 풀지 않는다.
                 if (offers.Count > 0)
                     FillPreviews(offers, problem, layouts.Baseline(problem, SolverOptions.ForAdvice(cancellation)));
+                if (verification.Passed) discards = DiscardAdvisor.Rank(problem, best, cancellation);
+                if (cancellation.IsCancellationRequested) return null;
             }
 
-            var verification = Verify(inventory, current, grid);
             var moves = Moves(problem, current, best, out var manualMovesAvailable);
             var targets = Targets(problem, best);
             var hasPlacementChanges = targets.Any(target =>
@@ -221,6 +224,7 @@ namespace SephPlanner.Core.Planning
                 ExpectedWeaponId = weapon,
                 Offers = offers,
                 Mixes = mixes,
+                Discards = discards,
                 SkippedOffers = skippedOffers,
                 Names = NamesByCell(problem, best),
                 Charms = CharmsByCell(problem, best),

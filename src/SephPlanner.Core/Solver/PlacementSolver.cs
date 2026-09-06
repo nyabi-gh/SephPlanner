@@ -132,11 +132,13 @@ namespace SephPlanner.Core.Solver
             var cells = Cells(problem);
             Arrangement? best = null;
             List<TabletPlacement>? bestLayout = null;
+            var evaluated = new List<(List<TabletPlacement> Layout, Arrangement Result)>();
             foreach (var layout in layouts)
             {
                 if (best != null && options.Cancellation.IsCancellationRequested) break;
 
                 var arrangement = Evaluate(problem, cells, layout, options);
+                evaluated.Add((layout, arrangement));
                 if (best != null && PriorityComboPlacement.Compare(arrangement, best) <= 0) continue;
 
                 best = arrangement;
@@ -151,7 +153,35 @@ namespace SephPlanner.Core.Solver
                 var polished = Evaluate(problem, cells, bestLayout, options, polish: true);
                 if (PriorityComboPlacement.Compare(polished, best) > 0) best = polished;
             }
+            best = ImproveEmptySides(problem, cells, evaluated, best, options);
             return PriorityComboPlacement.Improve(problem, best, options);
+        }
+
+        private static Arrangement ImproveEmptySides(
+            PlacementProblem problem, List<GridPos> cells,
+            List<(List<TabletPlacement> Layout, Arrangement Result)> evaluated, Arrangement best, SolverOptions options)
+        {
+            if (problem.Grid.Storage - problem.Tablets.Count - problem.Charms.Count < 2) return best;
+            var budget = options.EmptySideTrials;
+            foreach (var candidate in evaluated.OrderByDescending(pair => pair.Result.Preference))
+            {
+                var occupied = new HashSet<GridPos>(candidate.Layout.Select(tablet => tablet.Position));
+                foreach (var charm in problem.Charms.Where(c => !c.IsDormant && !c.IsFiller &&
+                             c.Criteria == CharmCriteriaKind.BothSidesAreEmpty).OrderBy(c => c.InstanceId))
+                {
+                    foreach (var cell in cells.OrderByDescending(c => candidate.Result.CellLevels.TryGetValue(c, out var level) ? level : 0))
+                    {
+                        var empty = new HashSet<GridPos> { cell.Offset(-1, 0), cell.Offset(1, 0) };
+                        if (cell.X <= 0 || cell.X >= problem.Grid.Width - 1 || occupied.Contains(cell) ||
+                            empty.Any(c => !problem.Grid.Contains(c) || occupied.Contains(c))) continue;
+                        if (budget-- <= 0 || options.Cancellation.IsCancellationRequested) return best;
+                        var trial = Evaluate(problem, cells, candidate.Layout, options,
+                            reservedEmpty: empty, forcedCharm: charm.InstanceId, forcedCell: cell);
+                        if (PriorityComboPlacement.Compare(trial, best) > 0) best = trial;
+                    }
+                }
+            }
+            return best;
         }
 
         private static List<GridPos> Cells(PlacementProblem problem) =>
@@ -596,11 +626,12 @@ namespace SephPlanner.Core.Solver
 
         private static Arrangement Evaluate(
             PlacementProblem problem, List<GridPos> cells, List<TabletPlacement> layout, SolverOptions options,
-            bool polish = false)
+            bool polish = false, HashSet<GridPos>? reservedEmpty = null, int? forcedCharm = null, GridPos forcedCell = default)
         {
-            var occupancy = OptimisticOccupancy(cells, layout, problem);
+            var usable = reservedEmpty is null ? cells : cells.Where(cell => !reservedEmpty.Contains(cell)).ToList();
+            var occupancy = OptimisticOccupancy(usable, layout, problem);
             var taken = new HashSet<GridPos>(layout.Select(p => p.Position));
-            var free = cells.Where(cell => !taken.Contains(cell)).ToList();
+            var free = usable.Where(cell => !taken.Contains(cell)).ToList();
 
             Dictionary<int, GridPos> positions = new Dictionary<int, GridPos>();
             Dictionary<GridPos, CharmSlot>? neighbors = null;
@@ -613,7 +644,7 @@ namespace SephPlanner.Core.Solver
 
             for (var iteration = 0; iteration < options.FixpointIterations; iteration++)
             {
-                var next = Assign(problem, free, result, occupancy, neighbors);
+                var next = Assign(problem, free, result, occupancy, neighbors, forcedCharm, forcedCell);
                 if (SamePositions(positions, next)) break;
 
                 positions = next;
@@ -754,7 +785,7 @@ namespace SephPlanner.Core.Solver
 
         private static Dictionary<int, GridPos> Assign(
             PlacementProblem problem, List<GridPos> free, SimulationResult result, GridOccupancy occupancy,
-            Dictionary<GridPos, CharmSlot>? neighbors)
+            Dictionary<GridPos, CharmSlot>? neighbors, int? forcedCharm = null, GridPos forcedCell = default)
         {
             var positions = new Dictionary<int, GridPos>();
             if (problem.Charms.Count == 0 || free.Count == 0) return positions;
@@ -775,6 +806,9 @@ namespace SephPlanner.Core.Solver
                     var value = -(Value(problem, charm, free[cellIndex], result, occupancy, neighbors)
                                   + Anchors(problem, charm, free[cellIndex])
                                   + Hold(charm, free[cellIndex], result));
+                    if (forcedCharm.HasValue &&
+                        ((charm.InstanceId == forcedCharm.Value) != (free[cellIndex] == forcedCell)))
+                        value = 1e12;
                     if (charmsAreRows) cost[charmIndex, cellIndex] = value;
                     else cost[cellIndex, charmIndex] = value;
                 }
