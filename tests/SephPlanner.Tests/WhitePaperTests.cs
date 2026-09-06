@@ -6,6 +6,70 @@ namespace SephPlanner.Tests;
 
 public class WhitePaperTests
 {
+    [Theory]
+    [InlineData(0, false, "STURDY")]
+    [InlineData(1, true, "EMBER")]
+    [InlineData(2, false, "GLACIER")]
+    [InlineData(2, true, "GLACIER")]
+    [InlineData(3, false, "MAGITECH")]
+    [InlineData(6, true, "GLACIER")]
+    public void PaperInheritsTheKeysCurrentRowAndDoesNotDoubleCountItself(int row, bool keyOnRight, string category)
+    {
+        var key = new CharmSlot
+        {
+            InstanceId = 1,
+            Definition = new CharmDefinition
+            {
+                Categories = { "IGNORED" },
+                LineCategories = { "STURDY", "EMBER", "GLACIER", "MAGITECH" },
+            },
+        };
+        var other = new CharmSlot
+        {
+            InstanceId = 2,
+            Definition = new CharmDefinition { Categories = { category, "IGNORED" } },
+        };
+        var paper = new CharmSlot
+        {
+            InstanceId = 3,
+            Definition = new CharmDefinition { Behavior = "Charm_WhitePaper" },
+        };
+        var cell = new GridPos(1, row);
+        var neighbors = new Dictionary<GridPos, CharmSlot>
+        {
+            [new GridPos(0, row)] = keyOnRight ? other : key,
+            [cell] = paper,
+            [new GridPos(2, row)] = keyOnRight ? key : other,
+        };
+        var categories = new List<string>();
+        ComboCounting.PositionalCategories(paper, cell, neighbors, categories);
+
+        Assert.Equal(new[] { category }, categories);
+        var counts = ComboCounting.CountAll(neighbors);
+        Assert.Equal(3, counts[category]);
+        Assert.Equal(1, counts["IGNORED"]);
+
+        var problem = new PlacementProblem
+        {
+            Grid = new GridSpec(3, row + 1, 3 * (row + 1)),
+            ComboCounts = counts,
+            Combos = id => new ComboDefinition { Id = id, Thresholds = { 3 } },
+        };
+        foreach (var pair in neighbors)
+        {
+            problem.Charms.Add(pair.Value);
+            problem.CurrentCharms[pair.Value.InstanceId] = pair.Key;
+        }
+        Assert.Equal(2, ComboCounting.CountFor(problem, paper, category, neighbors));
+        Assert.Equal(Worth.ComboThreshold, PositionalWorth.ComboWorth(problem, paper, cell, neighbors));
+
+        // 같은 열쇠라도 다음 행으로 옮기면 원래 콤보를 더 이상 물려주지 않는다.
+        var moved = neighbors.ToDictionary(pair => pair.Key.Offset(0, 1), pair => pair.Value);
+        categories.Clear();
+        ComboCounting.PositionalCategories(paper, cell.Offset(0, 1), moved, categories);
+        Assert.Empty(categories);
+    }
+
     /// <summary>1x3 격자. 잉걸불 둘이 양끝에 있고 하얀 종이가 남는다.</summary>
     private static PlacementProblem Sandwich(bool withCombos)
     {

@@ -232,6 +232,22 @@ namespace SephPlanner.Plugin
         /// </summary>
         internal static List<FixedEffectCell> ReadFixedEffects(GridInventory inv)
         {
+            var effects = ReadFixedEngravings(inv);
+            // 친타마니가 사라진 뒤에도 좌표에 남으며, 참가자에게도 동기화되는 보너스다.
+            foreach (var pair in inv.dungeonTempLevels)
+            {
+                if (pair.Value == 0) continue;
+                effects.Add(new FixedEffectCell
+                {
+                    Position = new GridPos(pair.Key.x, pair.Key.y),
+                    Level = pair.Value,
+                });
+            }
+            return effects;
+        }
+
+        private static List<FixedEffectCell> ReadFixedEngravings(GridInventory inv)
+        {
             if (!NetworkServer.active)
             {
                 if (!inv.currentSetEffectCount.TryGetValue("MYSTIC", out var count) || count <= 0)

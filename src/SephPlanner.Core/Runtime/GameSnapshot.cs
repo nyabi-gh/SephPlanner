@@ -75,7 +75,7 @@ namespace SephPlanner.Core.Runtime
         public Dictionary<string, int> ComboCounts { get; set; } = new Dictionary<string, int>();
 
         /// <summary>
-        /// 고정 각인(신비 콤보 등)이 칸에 박아 둔 효과. 참가자는 공개된 신비 좌표로 복원한다.
+        /// 고정 각인과 친타마니가 칸에 남긴 효과. 참가자는 신비 각인만 공개된 좌표로 복원한다.
         /// </summary>
         public List<FixedEffectCell> FixedEffects { get; set; } = new List<FixedEffectCell>();
     }
