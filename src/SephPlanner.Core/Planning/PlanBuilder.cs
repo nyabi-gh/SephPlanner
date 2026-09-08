@@ -224,6 +224,9 @@ namespace SephPlanner.Core.Planning
                 ComboPlacementWarnings = ComboPlacementWarnings(problem, best),
                 RetentionWarnings = problem.Charms.Where(charm => best.UnretainedCharms.Contains(charm.InstanceId))
                     .Select(charm => RetentionWarning(charm, best)).ToList(),
+                SupportWarnings = problem.Charms.Where(charm => best.UnlinkedCharms.Contains(charm.InstanceId) && !charm.Retained)
+                    .Select(charm => Naming.Of(charm.Definition.Names, charm.Definition.Id, "아티팩트") + ": " +
+                        Explain.SupportMissing(charm.Definition)).ToList(),
                 ManualMoveInstructionsAvailable = manualMovesAvailable,
                 HasPlacementChanges = hasPlacementChanges,
                 InventoryWidth = inventory.Width,
@@ -245,6 +248,7 @@ namespace SephPlanner.Core.Planning
             var reason = best.CharmPositions.TryGetValue(charm.InstanceId, out var cell)
                 ? best.InactiveCells.TryGetValue(cell, out var inactive) ? Explain.InactiveReason(inactive) : ""
                 : "놓을 자리를 확보하지 못했습니다.";
+            if (best.UnlinkedCharms.Contains(charm.InstanceId)) reason = Explain.SupportMissing(charm.Definition);
             return Naming.Of(charm.Definition.Names, charm.Definition.Id, "아티팩트") +
                 ": 사용 유지 배치를 찾지 못했습니다. " + reason;
         }

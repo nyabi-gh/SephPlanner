@@ -381,7 +381,7 @@ namespace SephPlanner.Plugin.Ui
                 note.Append(Marks(level)).Append(' ')
                     .Append(PlanPreferences.WeightOf(level).ToString("0.##")).Append("배 → ");
             }
-            return note.Append("해제로 남에게 양보합니다. 배수는 이득에만 적용하고 패널티는 유지합니다. 사용 유지는 활성 상태를 요구하며 빼기·교체 추천에서 보호합니다. 고정은 배치 조건을 무시하는 칸을 요구합니다.").ToString();
+            return note.Append("해제로 남에게 양보합니다. 배수는 이득에만 적용하고 패널티는 유지합니다. 사용 유지는 활성 상태와 모래시계의 마법 연결을 요구하며 빼기·교체 추천에서 보호합니다. 고정은 배치 조건을 무시하는 칸을 요구합니다.").ToString();
         }
 
         /// <summary>단계를 기호로. 양수는 ★, 음수는 양보 표시를 단계 수만큼.</summary>

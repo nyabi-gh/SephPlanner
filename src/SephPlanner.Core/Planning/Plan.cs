@@ -64,6 +64,7 @@ namespace SephPlanner.Core.Planning
         public List<Move> Moves { get; set; } = new List<Move>();
         public List<string> ComboPlacementWarnings { get; set; } = new List<string>();
         public List<string> RetentionWarnings { get; set; } = new List<string>();
+        public List<string> SupportWarnings { get; set; } = new List<string>();
         public bool ManualMoveInstructionsAvailable { get; set; } = true;
         public bool HasPlacementChanges { get; set; }
         public int InventoryWidth { get; set; }

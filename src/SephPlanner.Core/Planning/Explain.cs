@@ -32,6 +32,15 @@ namespace SephPlanner.Core.Planning
 
             if (worth.Source == CharmWorthSource.Curated && entry is { Note.Length: > 0 }) lines.Add(entry.Note);
 
+            if (definition.MagicCooldownSupport is not null)
+            {
+                lines.Add(SupportDirection(definition.MagicCooldownSupport) + "의 사용 가능한 마법과 연결돼야 효과를 냅니다.");
+                lines.Add(worth.Source == CharmWorthSource.Curated
+                    ? "연결된 상태에서 직접 지정한 값어치를 사용합니다."
+                    : "보너스의 가치는 대상 마법과 회복 속도로 추정합니다. 추가 버프·마나·실제 시전 빈도는 반영하지 않습니다.");
+                return lines;
+            }
+
             if (worth.Source == CharmWorthSource.Rarity)
                 lines.Add("값어치는 레어도로 어림잡은 것입니다. 효과의 세기는 아직 점수에 없습니다.");
 
@@ -62,6 +71,19 @@ namespace SephPlanner.Core.Planning
                 lines.Add($"칸 레벨 {level}, 이 아티팩트는 {effective}까지만 반영됩니다");
 
             return lines;
+        }
+
+        public static string SupportMissing(CharmDefinition definition) =>
+            definition.MagicCooldownSupport is { } support
+                ? SupportDirection(support) + "에 사용 가능한 마법이 없어 강화 효과를 받지 못합니다."
+                : "강화 대상과 연결되지 않았습니다.";
+
+        private static string SupportDirection(DirectedMagicCooldown support)
+        {
+            var parts = new List<string>();
+            if (support.OffsetX != 0) parts.Add((support.OffsetX > 0 ? "오른쪽 " : "왼쪽 ") + Math.Abs(support.OffsetX) + "칸");
+            if (support.OffsetY != 0) parts.Add((support.OffsetY > 0 ? "아래 " : "위 ") + Math.Abs(support.OffsetY) + "칸");
+            return parts.Count == 0 ? "같은 칸" : string.Join("·", parts);
         }
 
         public static string InactiveReason(CharmInactiveReason reason) => reason switch

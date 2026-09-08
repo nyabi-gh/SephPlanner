@@ -130,6 +130,12 @@ namespace SephPlanner.Plugin
                     Categories = entity.categories ?? new List<string>(),
                     Names = DisplayName(entity),
                 };
+                if (charm is Charm_RightSpellCooldownHelper helper)
+                    definition.MagicCooldownSupport = new DirectedMagicCooldown
+                    {
+                        OffsetX = 1,
+                        RecoveryByLevel = Doubles(helper.cooldownRecoveryByLevel),
+                    };
                 Dependency(charm, definition);
                 result.Add(definition);
             }

@@ -299,8 +299,10 @@ namespace SephPlanner.Core.Solver
         /// 한 아티팩트가 그 레벨의 칸에서 갖는 값어치. <see cref="Value"/>가 매기는 것과 같은
         /// 잣대이되, 자리에 달린 몫(조건·이웃·안정)은 뺀 것이다 - 아직 어느 칸인지 모르기 때문이다.
         /// </summary>
-        private static double RankValue(CharmSlot charm, int level) =>
-            charm.Worth.WeightedAt(Math.Min(charm.Definition.MaxLevel, level), charm.Weight);
+        private static double RankValue(PlacementProblem problem, CharmSlot charm, int level) =>
+            charm.Definition.MagicCooldownSupport is not null
+                ? DirectedCharmSupport.Estimate(problem, charm, level)
+                : charm.Worth.WeightedAt(Math.Min(charm.Definition.MaxLevel, level), charm.Weight);
 
         private static EstimateModel BuildEstimateModel(PlacementProblem problem)
         {
@@ -320,13 +322,13 @@ namespace SephPlanner.Core.Solver
 
             // 상한에서의 값어치로 줄 세운다. 레벨마다 순서가 뒤바뀔 수는 있지만(상한이 낮은
             // 아티팩트는 낮은 레벨에서만 앞선다) 빔을 좁히는 잣대에는 한 줄이면 넉넉하다.
-            scoring.Sort((a, b) => RankValue(b, levelCap).CompareTo(RankValue(a, levelCap)));
+            scoring.Sort((a, b) => RankValue(problem, b, levelCap).CompareTo(RankValue(problem, a, levelCap)));
 
             var table = new double[scoring.Count][];
             for (var rank = 0; rank < scoring.Count; rank++)
             {
                 var row = new double[levelCap + 1];
-                for (var level = 0; level <= levelCap; level++) row[level] = RankValue(scoring[rank], level);
+                for (var level = 0; level <= levelCap; level++) row[level] = RankValue(problem, scoring[rank], level);
                 table[rank] = row;
             }
 
@@ -688,6 +690,18 @@ namespace SephPlanner.Core.Solver
             {
                 Polish(problem, layout, free, bestPositions, ref bestOccupancy, ref bestResult, options);
             }
+            else if (problem.Charms.Any(charm => charm.Retained && charm.Definition.MagicCooldownSupport is not null))
+            {
+                for (var pass = 0; pass < options.PolishPasses; pass++)
+                {
+                    var bestNeighbors = CharmsByCell(problem, bestPositions);
+                    if (!problem.Charms.Any(charm => charm.Retained && charm.Definition.MagicCooldownSupport is not null &&
+                        (!bestPositions.TryGetValue(charm.InstanceId, out var position) ||
+                         !CanUse(problem, charm, position, bestResult, bestOccupancy, bestNeighbors)))) break;
+                    if (!PolishSupportPairs(problem, layout, free, bestPositions, ref bestOccupancy,
+                        ref bestResult, options, forcedCharm, forcedCell)) break;
+                }
+            }
             return Describe(problem, layout, bestPositions, bestOccupancy, bestResult);
         }
 
@@ -741,10 +755,65 @@ namespace SephPlanner.Core.Solver
                         Move(positions, byCell, charm, to, occupant, from);
                     }
                 }
+                if (PolishSupportPairs(problem, layout, free, positions, ref occupancy, ref result, options))
+                {
+                    moved = true;
+                    byCell = CharmsByCell(problem, positions);
+                    score = ScoreOf(problem, layout, positions, occupancy, result, byCell);
+                }
                 if (!moved) return;
-
-
             }
+        }
+
+        private static bool PolishSupportPairs(
+            PlacementProblem problem, List<TabletPlacement> layout, List<GridPos> free,
+            Dictionary<int, GridPos> positions, ref GridOccupancy occupancy, ref SimulationResult result,
+            SolverOptions options, int? forcedCharm = null, GridPos forcedCell = default)
+        {
+            var helpers = problem.Charms.Where(charm => !charm.IsFiller && !charm.IsDormant &&
+                charm.Definition.MagicCooldownSupport is not null && positions.ContainsKey(charm.InstanceId)).ToList();
+            if (helpers.Count == 0) return false;
+            var targets = problem.Charms.Where(charm => DirectedCharmSupport.IsTarget(charm) &&
+                positions.ContainsKey(charm.InstanceId)).ToList();
+            if (targets.Count == 0) return false;
+            var available = new HashSet<GridPos>(free);
+            var score = ScoreOf(problem, layout, positions, occupancy, result, CharmsByCell(problem, positions));
+            var moved = false;
+            foreach (var helper in helpers)
+            {
+                var support = helper.Definition.MagicCooldownSupport!;
+                foreach (var target in targets)
+                {
+                    if (helper == target) continue;
+                    foreach (var cell in free)
+                    {
+                        if (options.Cancellation.IsCancellationRequested) return moved;
+                        var targetCell = cell.Offset(support.OffsetX, support.OffsetY);
+                        if (cell == targetCell || !available.Contains(targetCell)) continue;
+                        if (positions[helper.InstanceId] == cell && positions[target.InstanceId] == targetCell) continue;
+                        // 두 자리를 함께 바꿔야만 연결이 생기는 경우를 평가한다. 밀려난 아이템도 교환으로 보존한다.
+                        var trial = new Dictionary<int, GridPos>(positions);
+                        var neighbors = CharmsByCell(problem, trial);
+                        neighbors.TryGetValue(cell, out var first);
+                        Move(trial, neighbors, helper, trial[helper.InstanceId], first, cell);
+                        neighbors.TryGetValue(targetCell, out var second);
+                        Move(trial, neighbors, target, trial[target.InstanceId], second, targetCell);
+                        if (forcedCharm.HasValue && trial[forcedCharm.Value] != forcedCell) continue;
+                        var trialOccupancy = OccupancyFrom(layout, trial, problem);
+                        var trialResult = TabletSimulator.Run(WithFixed(problem, layout), trialOccupancy, problem.Grid, problem.FixedEffects);
+                        if (!CanUse(problem, helper, cell, trialResult, trialOccupancy, neighbors)) continue;
+                        var quality = ScoreOf(problem, layout, trial, trialOccupancy, trialResult, neighbors);
+                        if (quality.CompareTo(score) <= 0) continue;
+                        positions.Clear();
+                        foreach (var pair in trial) positions.Add(pair.Key, pair.Value);
+                        occupancy = trialOccupancy;
+                        result = trialResult;
+                        score = quality;
+                        moved = true;
+                    }
+                }
+            }
+            return moved;
         }
 
         /// <summary>
@@ -785,7 +854,7 @@ namespace SephPlanner.Core.Solver
                     continue;
                 }
                 if (charm.Retained && !charm.IsFiller &&
-                    Reason(charm, position, result, problem.Grid, occupancy) != CharmInactiveReason.None) missing++;
+                    !CanUse(problem, charm, position, result, occupancy, neighbors)) missing++;
 
                 score += Value(problem, charm, position, result, occupancy, neighbors)
                          + Anchors(problem, charm, position) + Hold(charm, position, result);
@@ -847,7 +916,7 @@ namespace SephPlanner.Core.Solver
                     var column = charmsAreRows ? cellIndex : charmIndex;
                     cost[row, column] = value;
                     if (charm.Retained && !charm.IsFiller &&
-                        Reason(charm, free[cellIndex], result, problem.Grid, occupancy) == CharmInactiveReason.None)
+                        CanUse(problem, charm, free[cellIndex], result, occupancy, neighbors))
                         priority[row, column] = -1;
                     if (forcedCharm.HasValue &&
                         ((charm.InstanceId == forcedCharm.Value) != (free[cellIndex] == forcedCell)))
@@ -882,6 +951,9 @@ namespace SephPlanner.Core.Solver
 
             var level = result.EffectiveLevel(cell, charm.Enchant);
             var effective = Math.Min(charm.Definition.MaxLevel, level);
+            if (charm.Definition.MagicCooldownSupport is not null)
+                return DirectedCharmSupport.Value(problem, charm, cell, effective, result, occupancy, neighbors)
+                    - WastePenalty * Math.Max(0, level - effective);
 
             // 북향의 침은 강화할 대상이 있어야 제 몫을 한다. 대상 없이 선 침은 값어치가 0 이라,
             // 이것이 없으면 솔버가 침을 아무 데나 세우고도 최적이라고 한다.
@@ -967,11 +1039,18 @@ namespace SephPlanner.Core.Solver
             return Math.Floor(perLevel * sum) * Worth.DamageBonus;
         }
 
+        private static bool CanUse(
+            PlacementProblem problem, CharmSlot charm, GridPos cell, SimulationResult result,
+            GridOccupancy occupancy, IReadOnlyDictionary<GridPos, CharmSlot>? neighbors) =>
+            Reason(charm, cell, result, problem.Grid, occupancy) == CharmInactiveReason.None &&
+            (charm.Definition.MagicCooldownSupport is null ||
+             DirectedCharmSupport.TryTarget(charm, cell, result, problem.Grid, occupancy, neighbors, out _, out _));
+
         /// <summary>
         /// 효과가 꺼졌다면 그 이유. 게임의 <c>Charm_Basic.RefreshCharm</c>이 보는 조건과 같고,
         /// 자리를 옮겨서는 풀 수 없는 무기 불일치를 먼저 본다.
         /// </summary>
-        private static CharmInactiveReason Reason(
+        internal static CharmInactiveReason Reason(
             CharmSlot charm, GridPos cell, SimulationResult result, GridSpec grid, GridOccupancy occupancy)
         {
             if (charm.IsDormant) return CharmInactiveReason.Weapon;
@@ -1111,8 +1190,15 @@ namespace SephPlanner.Core.Solver
                 if (result.IsDisabled(cell)) arrangement.DisabledCells.Add(cell);
             }
             foreach (var charm in problem.Charms)
-                if (charm.Retained && !charm.IsFiller && arrangement.InactiveCharms.Contains(charm.InstanceId))
-                    arrangement.UnretainedCharms.Add(charm.InstanceId);
+            {
+                if (charm.IsFiller) continue;
+                var inactive = arrangement.InactiveCharms.Contains(charm.InstanceId);
+                var unlinked = !inactive && charm.Definition.MagicCooldownSupport is not null &&
+                    !DirectedCharmSupport.TryTarget(charm, positions[charm.InstanceId], result, problem.Grid,
+                        occupancy, neighbors, out _, out _);
+                if (unlinked) arrangement.UnlinkedCharms.Add(charm.InstanceId);
+                if (charm.Retained && (inactive || unlinked)) arrangement.UnretainedCharms.Add(charm.InstanceId);
+            }
             PriorityComboPlacement.Describe(problem, arrangement, neighbors);
             return arrangement;
         }

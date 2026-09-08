@@ -18,6 +18,8 @@ namespace SephPlanner.Core.Model
         /// <summary>Charm_Magic 계열이면 참. 다른 아티팩트의 조건 판정에 쓰인다.</summary>
         public bool IsMagic { get; set; }
 
+        public DirectedMagicCooldown? MagicCooldownSupport { get; set; }
+
         /// <summary>참이면 특정 무기를 들어야 발동한다.</summary>
         public bool IsWeaponRelated { get; set; }
 

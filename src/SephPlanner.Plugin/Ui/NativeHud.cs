@@ -664,6 +664,7 @@ namespace SephPlanner.Plugin.Ui
 
             warnings.AddRange(plan.ComboPlacementWarnings);
             warnings.AddRange(plan.RetentionWarnings);
+            warnings.AddRange(plan.SupportWarnings);
 
             if (snapshot.IsMultiplayer)
             {
@@ -768,7 +769,7 @@ namespace SephPlanner.Plugin.Ui
                         $"{PlanPreferences.WeightOf(pinned):0.##}배로 칩니다. 패널티는 그대로 반영합니다.");
                 }
                 if (frame.Prefs != null && frame.Prefs.IsRetained(charmId))
-                    lines.Add("사용 유지: 활성 상태를 우선하며 빼기·교체 추천에서 보호합니다.");
+                    lines.Add("사용 유지: 활성 상태와 모래시계의 마법 연결을 우선하며 빼기·교체 추천에서 보호합니다.");
                 if (frame.Prefs != null && frame.Prefs.IsHeld(charmId))
                     lines.Add("고정 - 배치 조건을 무시하는 칸에만 앉힙니다.");
                 return Explain.Join(lines);

@@ -259,6 +259,9 @@ namespace SephPlanner.Core.Solver
         public List<int> UnheldCharms { get; } = new List<int>();
         public List<int> UnretainedCharms { get; } = new List<int>();
 
+        /// <summary>자체 활성 상태지만 강화할 대상과 유효하게 연결되지 않은 아티팩트.</summary>
+        public List<int> UnlinkedCharms { get; } = new List<int>();
+
         /// <summary>효과가 꺼진 아티팩트가 놓인 칸과 그 이유.</summary>
         public Dictionary<GridPos, CharmInactiveReason> InactiveCells { get; } =
             new Dictionary<GridPos, CharmInactiveReason>();
