@@ -4,7 +4,7 @@
 
 TEAM HORAY와 제휴·후원·공식 승인 관계가 없는 무료 팬 제작 도구입니다. 이 저장소는 다운로드와 오류 제보를 위한 공개 저장소이며, 소스 코드는 공개하지 않습니다.
 
-**[다운로드](https://github.com/nyattic/SephPlanner-Release/releases) · [0.2.1 변경 사항](https://github.com/nyattic/SephPlanner-Release/releases/tag/v0.2.1) · [오류 제보](https://github.com/nyattic/SephPlanner-Release/issues)**
+**[다운로드](https://github.com/nyabi-gh/SephPlanner-Release/releases) · [0.2.1 변경 사항](https://github.com/nyabi-gh/SephPlanner-Release/releases/tag/v0.2.1) · [오류 제보](https://github.com/nyabi-gh/SephPlanner-Release/issues)**
 
 이 안내는 0.2.1 기준입니다. Windows용 Steam 세피리아에 설치하며, 게임은 별도로 필요합니다. 배포 ZIP에는 BepInEx 5.4.23.5(win_x64, Mono)가 포함되어 있습니다.
 
@@ -13,7 +13,7 @@ TEAM HORAY와 제휴·후원·공식 승인 관계가 없는 무료 팬 제작 �
 ### 처음 설치하는 경우
 
 1. 게임을 종료합니다.
-2. [Releases](https://github.com/nyattic/SephPlanner-Release/releases)에서 `SephPlanner-v버전.zip`을 받습니다. GitHub가 표시하는 `Source code (zip)`은 설치 파일이 아닙니다.
+2. [Releases](https://github.com/nyabi-gh/SephPlanner-Release/releases)에서 `SephPlanner-v버전.zip`을 받습니다. GitHub가 표시하는 `Source code (zip)`은 설치 파일이 아닙니다.
 3. 압축을 풀고 `SephPlanner` 안의 **`게임 폴더에 복사` 폴더를 엽니다.**
 4. Steam에서 세피리아 우클릭 → **관리 → 로컬 파일 보기**로 게임 폴더를 엽니다.
 5. `게임 폴더에 복사` **안의 내용물**을 게임 폴더에 복사합니다. 폴더 자체를 통째로 넣지 마세요.
@@ -104,7 +104,7 @@ ZIP에는 `설치안내.txt`, 사용 조건인 `LICENSE.txt`, 제3자 라이선�
 
 ### 제보에 필요한 정보
 
-게임 안에서 문제가 발생한 상태로 `F10`을 누른 뒤 [Issues](https://github.com/nyattic/SephPlanner-Release/issues)에 다음을 함께 올려 주세요.
+게임 안에서 문제가 발생한 상태로 `F10`을 누른 뒤 [Issues](https://github.com/nyabi-gh/SephPlanner-Release/issues)에 다음을 함께 올려 주세요.
 
 - SephPlanner 버전과 게임 버전
 - 싱글/멀티 여부, 멀티라면 호스트/참가자 여부
