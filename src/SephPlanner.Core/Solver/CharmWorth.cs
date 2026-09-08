@@ -41,6 +41,8 @@ namespace SephPlanner.Core.Solver
 
         /// <summary>잰 값의 레벨별 표. 있으면 <see cref="Base"/>·<see cref="PerLevel"/>보다 우선한다.</summary>
         public IReadOnlyList<double>? ByLevel { get; set; }
+        public IReadOnlyList<double>? BenefitByLevel { get; set; }
+        public IReadOnlyList<double>? PenaltyByLevel { get; set; }
 
         /// <summary>
         /// 표를 아래 한계로만 쓸지. 능력치 밖에 고유 효과가 더 있는 아티팩트는 표가 값어치의
@@ -65,6 +67,22 @@ namespace SephPlanner.Core.Solver
                 var step = At(1) - At(0);
                 return step > 0 ? step : 0;
             }
+        }
+
+        public static double ApplyWeight(double value, double weight) =>
+            Math.Max(0, value) * weight + Math.Min(0, value);
+
+        public double WeightedAt(int level, double weight)
+        {
+            var net = At(level);
+            if (ByLevel is null || BenefitByLevel is null || PenaltyByLevel is null ||
+                ByLevel.Count == 0 || BenefitByLevel.Count != ByLevel.Count || PenaltyByLevel.Count != ByLevel.Count)
+                return ApplyWeight(net, weight);
+
+            var index = Math.Min(Math.Max(0, level), ByLevel.Count - 1);
+            // 누락 효과의 추정 하한은 이득에 보충하고, 측정한 패널티는 그대로 남긴다.
+            var benefit = BenefitByLevel[index] + Math.Max(0, net - ByLevel[index]);
+            return benefit * weight + PenaltyByLevel[index];
         }
 
         public double At(int level)
@@ -126,6 +144,8 @@ namespace SephPlanner.Core.Solver
                 return new CharmWorth
                 {
                     ByLevel = definition.StatWorthByLevel,
+                    BenefitByLevel = definition.StatBenefitByLevel,
+                    PenaltyByLevel = definition.StatPenaltyByLevel,
                     ByLevelIsFloor = !statsAreEverything,
                     Base = fallback,
                     PerLevel = fallback,

@@ -78,7 +78,7 @@ namespace SephPlanner.Core.Planning
         {
             var lines = Charm(advice.Candidate.Charm, values);
 
-            if (!advice.Available) lines.Add("가방에서 교체할 수 있는 항목이 없어 이 후보를 집을 수 없습니다.");
+            if (!advice.Available) lines.Add("가방의 공간과 사용 유지 조건을 만족하는 후보 배치를 찾지 못했습니다.");
             if (!advice.Affordable) lines.Add($"소지금 {gold}골드로는 살 수 없습니다.");
 
             if (advice.MatchesPreset) lines.Add("가져온 빌드가 즐겨찾기로 찍어 둔 아티팩트입니다.");

@@ -58,7 +58,7 @@ namespace SephPlanner.Core.Solver
                 else
                 {
                     var charm = trial.Charms.First(c => c.InstanceId == candidate.InstanceId);
-                    if (charm.IsFiller || charm.Held) continue;
+                    if (charm.IsFiller || charm.Held || charm.Retained) continue;
                     name = Naming.Of(charm.Definition.Names, charm.Definition.Id, "아티팩트");
                     trial.Charms.Remove(charm);
                     trial.CurrentCharms.Remove(candidate.InstanceId);
@@ -69,7 +69,7 @@ namespace SephPlanner.Core.Solver
                 trial.ComboCounts = Adjust(problem.ComboCounts, currentCounts, remainingCounts);
                 var solved = PlacementSolver.EvaluateLayouts(trial, yardstick, options);
                 if (cancellation.IsCancellationRequested) return new List<DiscardAdvice>();
-                if (solved.UnplacedTablets > 0 || solved.CharmPositions.Count != trial.Charms.Count ||
+                if (solved.UnretainedCharms.Count > 0 || solved.UnplacedTablets > 0 || solved.CharmPositions.Count != trial.Charms.Count ||
                     solved.Score <= baseline.Score + 0.001 || PriorityComboPlacement.Compare(solved, baseline) <= 0)
                     continue;
 

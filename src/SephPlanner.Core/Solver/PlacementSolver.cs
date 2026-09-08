@@ -300,7 +300,7 @@ namespace SephPlanner.Core.Solver
         /// 잣대이되, 자리에 달린 몫(조건·이웃·안정)은 뺀 것이다 - 아직 어느 칸인지 모르기 때문이다.
         /// </summary>
         private static double RankValue(CharmSlot charm, int level) =>
-            charm.Weight * charm.Worth.At(Math.Min(charm.Definition.MaxLevel, level));
+            charm.Worth.WeightedAt(Math.Min(charm.Definition.MaxLevel, level), charm.Weight);
 
         private static EstimateModel BuildEstimateModel(PlacementProblem problem)
         {
@@ -640,7 +640,7 @@ namespace SephPlanner.Core.Solver
             var bestPositions = positions;
             var bestOccupancy = occupancy;
             var bestResult = result;
-            var bestScore = double.NegativeInfinity;
+            var bestScore = new PlacementQuality(int.MaxValue, double.NegativeInfinity);
 
             for (var iteration = 0; iteration < options.FixpointIterations; iteration++)
             {
@@ -660,7 +660,7 @@ namespace SephPlanner.Core.Solver
                 // 쪽 위상에서 끝날 수 있다. 마지막을 그대로 돌려주면 같은 판의 점수가 폴링마다
                 // 달라져 이긴 석판 배치가 뒤바뀐다. 그래서 지나온 것 중 최선을 들고 있는다.
                 var score = ScoreOf(problem, layout, positions, occupancy, result, neighbors);
-                if (score <= bestScore) continue;
+                if (score.CompareTo(bestScore) <= 0) continue;
 
                 bestScore = score;
                 bestPositions = positions;
@@ -668,6 +668,22 @@ namespace SephPlanner.Core.Solver
                 bestResult = result;
             }
 
+            var current = problem.CurrentCharms;
+            if (problem.Charms.All(charm => current.ContainsKey(charm.InstanceId)) &&
+                current.Count == problem.Charms.Count && current.Values.Distinct().Count() == current.Count &&
+                current.Values.All(free.Contains) &&
+                (!forcedCharm.HasValue || current[forcedCharm.Value] == forcedCell))
+            {
+                var currentOccupancy = OccupancyFrom(layout, current, problem);
+                var currentResult = TabletSimulator.Run(WithFixed(problem, layout), currentOccupancy, problem.Grid, problem.FixedEffects);
+                var currentScore = ScoreOf(problem, layout, current, currentOccupancy, currentResult, CharmsByCell(problem, current));
+                if (currentScore.CompareTo(bestScore) > 0)
+                {
+                    bestPositions = new Dictionary<int, GridPos>(current);
+                    bestOccupancy = currentOccupancy;
+                    bestResult = currentResult;
+                }
+            }
             if (polish)
             {
                 Polish(problem, layout, free, bestPositions, ref bestOccupancy, ref bestResult, options);
@@ -681,9 +697,8 @@ namespace SephPlanner.Core.Solver
         /// 못 넘는 언덕이 생긴다 - 북향의 침 두 개를 한 아티팩트 아래로 쌓는 것 같은 수는 두
         /// 아티팩트가 동시에 움직여야 좋아지기 때문이다.
         ///
-        /// 후보 하나를 재는 데는 다시 시뮬레이션하지 않는다. 받아들인 뒤에만 점유를 다시 짓고
-        /// 시뮬레이션해, 다음 패스가 참값을 보게 한다. 그래서 비용은 (아티팩트 x 칸) 번의 채점
-        /// 이고, 이긴 배치 하나에만 걸린다.
+        /// 교환 후보의 점유와 석판 효과를 다시 계산한 뒤 받아들인다. 이전 배치의 조건으로
+        /// 채점하면 조건부 석판·아티팩트의 활성 상태와 사용 유지 조건을 잘못 판단한다.
         /// </summary>
         private static void Polish(
             PlacementProblem problem, List<TabletPlacement> layout, List<GridPos> free,
@@ -711,9 +726,13 @@ namespace SephPlanner.Core.Solver
                         byCell.TryGetValue(to, out var occupant);
                         Move(positions, byCell, charm, from, occupant, to);
 
-                        var trial = ScoreOf(problem, layout, positions, occupancy, result, byCell);
-                        if (trial > score + Tie)
+                        var trialOccupancy = OccupancyFrom(layout, positions, problem);
+                        var trialResult = TabletSimulator.Run(WithFixed(problem, layout), trialOccupancy, problem.Grid, problem.FixedEffects);
+                        var trial = ScoreOf(problem, layout, positions, trialOccupancy, trialResult, byCell);
+                        if (trial.CompareTo(score) > 0)
                         {
+                            occupancy = trialOccupancy;
+                            result = trialResult;
                             score = trial;
                             moved = true;
                             from = to;
@@ -724,12 +743,7 @@ namespace SephPlanner.Core.Solver
                 }
                 if (!moved) return;
 
-                // 받아들인 이동은 점유를 바꾼다. 조건 판정과 석판 조건이 그것을 보므로 다시
-                // 시뮬레이션해야 다음 패스와 마지막 Describe 가 실제 배치의 값을 본다.
-                occupancy = OccupancyFrom(layout, positions, problem);
-                result = TabletSimulator.Run(
-                    WithFixed(problem, layout), occupancy, problem.Grid, problem.FixedEffects);
-                score = ScoreOf(problem, layout, positions, occupancy, result, byCell);
+
             }
         }
 
@@ -757,19 +771,40 @@ namespace SephPlanner.Core.Solver
         /// 견주기만 하면 되므로 격자와 목록까지 짓지 않는다 - 후보 배치마다 도는 자리라 그 할당이
         /// 그대로 GC 부담이 된다.
         /// </summary>
-        private static double ScoreOf(
+        private static PlacementQuality ScoreOf(
             PlacementProblem problem, List<TabletPlacement> layout, Dictionary<int, GridPos> positions,
             GridOccupancy occupancy, SimulationResult result, Dictionary<GridPos, CharmSlot>? neighbors)
         {
             var score = Familiarity(problem, layout);
+            var missing = 0;
             foreach (var charm in problem.Charms)
             {
-                if (!positions.TryGetValue(charm.InstanceId, out var position)) continue;
+                if (!positions.TryGetValue(charm.InstanceId, out var position))
+                {
+                    if (charm.Retained && !charm.IsFiller) missing++;
+                    continue;
+                }
+                if (charm.Retained && !charm.IsFiller &&
+                    Reason(charm, position, result, problem.Grid, occupancy) != CharmInactiveReason.None) missing++;
 
                 score += Value(problem, charm, position, result, occupancy, neighbors)
                          + Anchors(problem, charm, position) + Hold(charm, position, result);
             }
-            return score;
+            return new PlacementQuality(missing, score);
+        }
+
+        private readonly struct PlacementQuality
+        {
+            private readonly int _missing;
+            private readonly double _value;
+            public PlacementQuality(int missing, double value) { _missing = missing; _value = value; }
+            public int CompareTo(PlacementQuality other)
+            {
+                var missing = other._missing.CompareTo(_missing);
+                if (missing != 0) return missing;
+                var delta = _value - other._value;
+                return Math.Abs(delta) > Tie ? Math.Sign(delta) : 0;
+            }
         }
 
         private static Dictionary<GridPos, CharmSlot> CharmsByCell(
@@ -794,6 +829,8 @@ namespace SephPlanner.Core.Solver
             var rows = charmsAreRows ? problem.Charms.Count : free.Count;
             var columns = charmsAreRows ? free.Count : problem.Charms.Count;
             var cost = new double[rows, columns];
+            var priority = new int[rows, columns];
+            var prioritized = forcedCharm.HasValue || problem.Charms.Any(charm => charm.Retained);
 
             for (var charmIndex = 0; charmIndex < problem.Charms.Count; charmIndex++)
             {
@@ -806,15 +843,21 @@ namespace SephPlanner.Core.Solver
                     var value = -(Value(problem, charm, free[cellIndex], result, occupancy, neighbors)
                                   + Anchors(problem, charm, free[cellIndex])
                                   + Hold(charm, free[cellIndex], result));
+                    var row = charmsAreRows ? charmIndex : cellIndex;
+                    var column = charmsAreRows ? cellIndex : charmIndex;
+                    cost[row, column] = value;
+                    if (charm.Retained && !charm.IsFiller &&
+                        Reason(charm, free[cellIndex], result, problem.Grid, occupancy) == CharmInactiveReason.None)
+                        priority[row, column] = -1;
                     if (forcedCharm.HasValue &&
                         ((charm.InstanceId == forcedCharm.Value) != (free[cellIndex] == forcedCell)))
-                        value = 1e12;
-                    if (charmsAreRows) cost[charmIndex, cellIndex] = value;
-                    else cost[cellIndex, charmIndex] = value;
+                        priority[row, column] += rows + 1;
                 }
             }
 
-            var assignment = HungarianAssignment.Solve(cost, out _);
+            var assignment = prioritized
+                ? HungarianAssignment.SolvePrioritized(cost, priority)
+                : HungarianAssignment.Solve(cost, out _);
             for (var row = 0; row < assignment.Length; row++)
             {
                 if (assignment[row] < 0) continue;
@@ -846,16 +889,16 @@ namespace SephPlanner.Core.Solver
 
             // 상한을 넘긴 레벨은 아무 값어치가 없다. 점수가 같은 배치라면 덜 흘리는 쪽을 고르도록
             // 아주 작은 차이만 준다. 실제 점수 차이를 뒤집을 만한 크기가 아니다.
-            var value = charm.Weight * charm.Worth.At(effective) * factor
+            var value = charm.Worth.WeightedAt(effective, charm.Weight) * factor
                         - WastePenalty * Math.Max(0, level - effective);
 
             if (charm.Definition.Behavior == "Charm_NearLevelDamage")
-                value += NearLevelDamageWorth(charm, cell, effective, result, neighbors);
+                value += CharmWorth.ApplyWeight(NearLevelDamageWorth(charm, cell, effective, result, neighbors), charm.Weight);
 
             // 자리가 대상을 정하는 것들. 무엇이 걸리는지는 정의가 답한다.
-            value += PositionalWorth.ComboWorth(problem, charm, cell, neighbors);
-            value += PositionalWorth.NeighborEnhanceWorth(charm, cell, neighbors);
-            value += PositionalWorth.RowCompanionWorth(charm, cell, problem.Grid, neighbors);
+            value += CharmWorth.ApplyWeight(PositionalWorth.ComboWorth(problem, charm, cell, neighbors), charm.Weight);
+            value += CharmWorth.ApplyWeight(PositionalWorth.NeighborEnhanceWorth(charm, cell, neighbors), charm.Weight);
+            value += CharmWorth.ApplyWeight(PositionalWorth.RowCompanionWorth(charm, cell, problem.Grid, neighbors), charm.Weight);
 
             return value;
         }
@@ -921,7 +964,7 @@ namespace SephPlanner.Core.Solver
                 sum += Math.Min(
                     result.EffectiveLevel(spot, neighbor.Enchant), neighbor.Definition.MaxLevel);
             }
-            return perLevel * sum * Worth.DamageBonus;
+            return Math.Floor(perLevel * sum) * Worth.DamageBonus;
         }
 
         /// <summary>
@@ -1067,6 +1110,9 @@ namespace SephPlanner.Core.Solver
                     : result.EffectiveLevel(cell, 0);
                 if (result.IsDisabled(cell)) arrangement.DisabledCells.Add(cell);
             }
+            foreach (var charm in problem.Charms)
+                if (charm.Retained && !charm.IsFiller && arrangement.InactiveCharms.Contains(charm.InstanceId))
+                    arrangement.UnretainedCharms.Add(charm.InstanceId);
             PriorityComboPlacement.Describe(problem, arrangement, neighbors);
             return arrangement;
         }

@@ -132,6 +132,7 @@ namespace SephPlanner.Core.Planning
                         ? PlanPreferences.WeightOf(pin)
                         : 1,
                     Held = definition is not null && preferences.HeldCharms.Contains(item.DefinitionId),
+                    Retained = definition is not null && preferences.RetainedCharms.Contains(item.DefinitionId),
                 };
                 if (definition is not null) slot.Worth = CharmWorth.Resolve(definition, values.Of(definition));
                 problem.Charms.Add(slot);
@@ -207,7 +208,12 @@ namespace SephPlanner.Core.Planning
             var hasPlacementChanges = targets.Any(target =>
                 target.From != target.To || target.IsTablet && target.FromRotation != target.Rotation);
 
-            if (best.UnplacedTablets > 0 || !verification.Passed) targets.Clear();
+            if (best.UnplacedTablets > 0 || !verification.Passed || best.UnretainedCharms.Count > 0) targets.Clear();
+            if (best.UnretainedCharms.Count > 0)
+            {
+                moves.Clear();
+                manualMovesAvailable = false;
+            }
 
             return new Plan
             {
@@ -216,6 +222,8 @@ namespace SephPlanner.Core.Planning
                 Best = best,
                 Moves = moves,
                 ComboPlacementWarnings = ComboPlacementWarnings(problem, best),
+                RetentionWarnings = problem.Charms.Where(charm => best.UnretainedCharms.Contains(charm.InstanceId))
+                    .Select(charm => RetentionWarning(charm, best)).ToList(),
                 ManualMoveInstructionsAvailable = manualMovesAvailable,
                 HasPlacementChanges = hasPlacementChanges,
                 InventoryWidth = inventory.Width,
@@ -230,6 +238,15 @@ namespace SephPlanner.Core.Planning
                 Charms = CharmsByCell(problem, best),
                 Targets = targets,
             };
+        }
+
+        private static string RetentionWarning(CharmSlot charm, Arrangement best)
+        {
+            var reason = best.CharmPositions.TryGetValue(charm.InstanceId, out var cell)
+                ? best.InactiveCells.TryGetValue(cell, out var inactive) ? Explain.InactiveReason(inactive) : ""
+                : "놓을 자리를 확보하지 못했습니다.";
+            return Naming.Of(charm.Definition.Names, charm.Definition.Id, "아티팩트") +
+                ": 사용 유지 배치를 찾지 못했습니다. " + reason;
         }
 
         private static List<string> ComboPlacementWarnings(PlacementProblem problem, Arrangement best)

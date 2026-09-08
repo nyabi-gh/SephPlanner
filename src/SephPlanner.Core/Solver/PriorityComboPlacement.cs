@@ -38,6 +38,8 @@ namespace SephPlanner.Core.Solver
 
         public static int Compare(Arrangement left, Arrangement right)
         {
+            var retained = right.UnretainedCharms.Count.CompareTo(left.UnretainedCharms.Count);
+            if (retained != 0) return retained;
             var requested = left.PriorityComboMatches + left.UnmatchedComboCharms.Count +
                             right.PriorityComboMatches + right.UnmatchedComboCharms.Count;
             if (requested > 0)

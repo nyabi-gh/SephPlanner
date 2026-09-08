@@ -87,7 +87,7 @@ namespace SephPlanner.Plugin.Ui
             var list = Widgets.Rect("List", content);
             Widgets.Column(list, S(0.15f));
             for (var i = 0; i < RowsPerPage; i++)
-                _rows.Add(new Row(list, Skin, Base, entry => Toggle(entry, 1), ToggleHold));
+                _rows.Add(new Row(list, Skin, Base, entry => Toggle(entry, 1), ToggleHold, ToggleRetain));
 
             BuildPager(content);
         }
@@ -272,6 +272,13 @@ namespace SephPlanner.Plugin.Ui
             _note.color = NativeSkin.TextDim;
         }
 
+        private void ToggleRetain(Entry entry)
+        {
+            if (entry == null || entry.EntityId == 0) return;
+            _prefs.ToggleRetain(entry.EntityId);
+            Refresh();
+        }
+
         private void ToggleHold(Entry entry)
         {
             if (entry == null || entry.EntityId == 0) return;
@@ -374,7 +381,7 @@ namespace SephPlanner.Plugin.Ui
                 note.Append(Marks(level)).Append(' ')
                     .Append(PlanPreferences.WeightOf(level).ToString("0.##")).Append("배 → ");
             }
-            return note.Append("해제로 남에게 양보합니다. 고정은 배치 조건을 무시하는 칸에만 앉힙니다.").ToString();
+            return note.Append("해제로 남에게 양보합니다. 배수는 이득에만 적용하고 패널티는 유지합니다. 사용 유지는 활성 상태를 요구하며 빼기·교체 추천에서 보호합니다. 고정은 배치 조건을 무시하는 칸을 요구합니다.").ToString();
         }
 
         /// <summary>단계를 기호로. 양수는 ★, 음수는 양보 표시를 단계 수만큼.</summary>
@@ -443,6 +450,7 @@ namespace SephPlanner.Plugin.Ui
                         Selected = _prefs.IsPinned(entityId),
                         Mark = PinMark(_prefs.PinLevel(entityId)),
                         Held = _prefs.IsHeld(entityId),
+                        Retained = _prefs.IsRetained(entityId),
                     };
                     found[entityId] = entry;
                     order.Add(entityId);
@@ -452,7 +460,7 @@ namespace SephPlanner.Plugin.Ui
             // 가방에 없는데 지정돼 있는 것도 보여야 푼다. 다른 판에서 지정한 것이 남아 있는 경우다.
             // 가져온 빌드의 아티팩트도 같이 보인다 - 무엇을 아직 못 모았는지가 곧 살 목록이다.
             var favorites = new HashSet<int>(_prefs.Preset()?.FavoriteCharms ?? new List<int>());
-            var listed = _prefs.PinnedLevels.Keys.Concat(_prefs.HeldCharms).Concat(favorites).Distinct().ToList();
+            var listed = _prefs.PinnedLevels.Keys.Concat(_prefs.HeldCharms).Concat(_prefs.RetainedCharms).Concat(favorites).Distinct().ToList();
             foreach (var entityId in listed)
             {
                 if (found.ContainsKey(entityId)) continue;
@@ -468,6 +476,7 @@ namespace SephPlanner.Plugin.Ui
                     Selected = _prefs.IsPinned(entityId),
                     Mark = PinMark(_prefs.PinLevel(entityId)),
                     Held = _prefs.IsHeld(entityId),
+                    Retained = _prefs.IsRetained(entityId),
                 };
                 order.Add(entityId);
             }
@@ -541,6 +550,7 @@ namespace SephPlanner.Plugin.Ui
 
             /// <summary>제한 해제 칸에 고정돼 있는가. 아티팩트 줄에만 뜻이 있다.</summary>
             public bool Held;
+            public bool Retained;
         }
 
         /// <summary>목록 한 줄. 줄 전체가 눌린다.</summary>
@@ -549,11 +559,12 @@ namespace SephPlanner.Plugin.Ui
             private readonly TextMeshProUGUI _name;
             private readonly TextMeshProUGUI _detail;
             private readonly TextMeshProUGUI _hold;
+            private readonly TextMeshProUGUI _retain;
             private readonly Image _background;
             private Entry _entry;
 
             public Row(
-                RectTransform parent, NativeSkin skin, float b, Action<Entry> onClick, Action<Entry> onHold)
+                RectTransform parent, NativeSkin skin, float b, Action<Entry> onClick, Action<Entry> onHold, Action<Entry> onRetain)
             {
                 _background = Widgets.ClickableRow(
                     "Entry", parent, NativeSkin.SlotFill, () => onClick(_entry));
@@ -571,6 +582,9 @@ namespace SephPlanner.Plugin.Ui
 
                 // 줄 안의 작은 단추. 줄 자체도 눌리지만 레이캐스트는 맨 앞의 것이 받으므로 여기를
                 // 누르면 줄의 강화 우선은 움직이지 않는다.
+                _retain = Widgets.Clickable("Retain", rect, skin, b * 0.8f, NativeSkin.TextDim, () => onRetain(_entry));
+                _retain.text = "사용 유지";
+                Widgets.Fixed(_retain.rectTransform, b * 1.5f, b * 4.2f);
                 _hold = Widgets.Clickable("Hold", rect, skin, b * 0.8f, NativeSkin.TextDim, () => onHold(_entry));
                 _hold.text = "고정";
                 _hold.alignment = TextAlignmentOptions.MidlineRight;
@@ -586,6 +600,8 @@ namespace SephPlanner.Plugin.Ui
                 _name.text = (entry.Mark ?? (entry.Selected ? "● " : "○ ")) + entry.Name;
                 _name.color = entry.Selected ? NativeSkin.Mint : NativeSkin.Text;
                 _detail.text = entry.Detail;
+                _retain.color = entry.Retained ? NativeSkin.Mint : NativeSkin.TextDim;
+                Widgets.SetActive(_retain, entry.EntityId != 0);
                 _hold.color = entry.Held ? NativeSkin.Mint : NativeSkin.TextDim;
                 Widgets.SetActive(_hold, entry.EntityId != 0);
                 Widgets.SetActive(_background, true);

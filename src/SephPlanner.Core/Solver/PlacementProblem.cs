@@ -50,6 +50,7 @@ namespace SephPlanner.Core.Solver
         /// 없으면 무시된다.
         /// </summary>
         public bool Held { get; set; }
+        public bool Retained { get; set; }
 
         private CharmCriteriaKind? _criteria;
 
@@ -256,6 +257,7 @@ namespace SephPlanner.Core.Solver
         /// 화면이 알린다.
         /// </summary>
         public List<int> UnheldCharms { get; } = new List<int>();
+        public List<int> UnretainedCharms { get; } = new List<int>();
 
         /// <summary>효과가 꺼진 아티팩트가 놓인 칸과 그 이유.</summary>
         public Dictionary<GridPos, CharmInactiveReason> InactiveCells { get; } =

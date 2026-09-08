@@ -11,6 +11,8 @@ namespace SephPlanner.Core.Solver
 
         /// <summary>색인이 곧 레벨이다. 게임의 <c>LevelToIdx</c>와 같게 상한에서 자른다.</summary>
         public List<double> ByLevel { get; set; } = new List<double>();
+        public List<double> BenefitByLevel { get; set; } = new List<double>();
+        public List<double> PenaltyByLevel { get; set; } = new List<double>();
 
         /// <summary>
         /// 환산에 쓴 능력치 중 표본이 넉넉했던 것의 비율(0~1). 낮으면 그 아티팩트만 그 능력치를
@@ -55,12 +57,16 @@ namespace SephPlanner.Core.Solver
             foreach (var charm in charms)
             {
                 charm.StatWorthByLevel.Clear();
+                charm.StatBenefitByLevel.Clear();
+                charm.StatPenaltyByLevel.Clear();
                 charm.StatWorthConfidence = 0;
                 charm.StatWorthCoverageKnown = true;
                 charm.StatWorthUnconverted.Clear();
                 if (!report.ByEntity.TryGetValue(charm.EntityId, out var worth)) continue;
 
                 charm.StatWorthByLevel = worth.ByLevel;
+                charm.StatBenefitByLevel = worth.BenefitByLevel;
+                charm.StatPenaltyByLevel = worth.PenaltyByLevel;
                 charm.StatWorthConfidence = worth.Confidence;
                 charm.StatWorthUnconverted.AddRange(worth.Unconverted);
             }
@@ -99,7 +105,7 @@ namespace SephPlanner.Core.Solver
 
                 for (var level = 0; level <= top; level++)
                 {
-                    double sum = 0;
+                    double sum = 0, benefit = 0, penalty = 0;
                     foreach (var table in tables)
                     {
                         if (table.ValuesByLevel.Count == 0) continue;
@@ -113,6 +119,8 @@ namespace SephPlanner.Core.Solver
                         }
 
                         sum += levels;
+                        benefit += Math.Max(0, levels);
+                        penalty += Math.Min(0, levels);
 
                         // 값어치가 어디서 왔는지를 크기로 잰다. 부호는 상관없다 - 깎는 능력치도
                         // 그 환산율을 믿을 수 있어야 깎는 만큼을 믿을 수 있다.
@@ -120,6 +128,8 @@ namespace SephPlanner.Core.Solver
                         if (exchange.IsReliable(table.StatusId)) reliable += Math.Abs(levels);
                     }
                     worth.ByLevel.Add(sum);
+                    worth.BenefitByLevel.Add(benefit);
+                    worth.PenaltyByLevel.Add(penalty);
                 }
 
                 worth.Confidence = total > 0 ? reliable / total : 0;

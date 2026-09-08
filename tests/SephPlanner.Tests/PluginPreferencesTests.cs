@@ -12,6 +12,19 @@ public sealed class PluginPreferencesTests : IDisposable
     private static string Code(string categories) => PresetCode.Encode("AAP1\nW:503\nC:PinkRabbit\nS:\nR:" + categories + "\n");
 
     [Fact]
+    public void RetentionPersistsAndInvalidatesPlanningContext()
+    {
+        var prefs = Load();
+        var before = SephPlanner.Core.Runtime.PlanFingerprint.PlanningContext(prefs.ToPreferences(false), "catalog");
+        prefs.ToggleRetain(1157);
+        Assert.True(Load().IsRetained(1157));
+        var after = SephPlanner.Core.Runtime.PlanFingerprint.PlanningContext(prefs.ToPreferences(false), "catalog");
+        Assert.NotEqual(before, after);
+        prefs.ToggleRetain(1157);
+        Assert.False(Load().IsRetained(1157));
+    }
+
+    [Fact]
     public void ReplacingAndClearingPresetPreservesOnlyManualPriorities()
     {
         var prefs = Load();

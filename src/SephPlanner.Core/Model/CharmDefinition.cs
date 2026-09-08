@@ -108,6 +108,8 @@ namespace SephPlanner.Core.Model
         /// 계산은 <c>CharmStatWorth</c>가 하고 덤프가 결과만 실어 온다.
         /// </summary>
         public List<double> StatWorthByLevel { get; set; } = new List<double>();
+        public List<double> StatBenefitByLevel { get; set; } = new List<double>();
+        public List<double> StatPenaltyByLevel { get; set; } = new List<double>();
 
         /// <summary>
         /// 위 표를 얼마나 믿을 만한지(0~1). 그 아티팩트만 주는 능력치는 환산율이 자기 자신에서

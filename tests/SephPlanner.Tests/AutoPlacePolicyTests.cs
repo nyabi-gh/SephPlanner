@@ -6,6 +6,16 @@ namespace SephPlanner.Tests;
 public class AutoPlacePolicyTests
 {
     [Fact]
+    public void UnsatisfiedRetentionBlocksAutoPlacement()
+    {
+        var context = Context();
+        context.Runner!.Latest!.Best.UnretainedCharms.Add(1);
+        var decision = AutoPlacePolicy.Evaluate(context);
+        Assert.False(decision.Allowed);
+        Assert.Contains("사용 유지", decision.Reason);
+    }
+
+    [Fact]
     public void AnUnconfirmedWriteBlocksEvenWithoutANewPlan()
     {
         var decision = AutoPlacePolicy.Evaluate(new AutoPlaceContext { RecoveryRequired = true });

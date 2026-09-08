@@ -529,6 +529,13 @@ namespace SephPlanner.Plugin.Ui
                 _gain.color = NativeSkin.Mint;
             }
 
+            if (previewed == null && plan.HasPlacementChanges &&
+                plan.Best.UnretainedCharms.Count < plan.Current.UnretainedCharms.Count)
+            {
+                _gain.text = $"사용 유지 우선 ({gain:+0.#;-0.#;0})";
+                _gain.color = NativeSkin.Mint;
+            }
+
             var warning = Warning(
                 snapshot, plan, frame.MultiplayerAutoPlace, frame.QueryVerified,
                 frame.RuntimeVerification, frame.RuntimeVerificationReason);
@@ -656,6 +663,7 @@ namespace SephPlanner.Plugin.Ui
                 warnings.Add($"배치 조건을 무시하는 칸이 모자라 고정 {plan.Best.UnheldCharms.Count}개를 지키지 못했습니다.");
 
             warnings.AddRange(plan.ComboPlacementWarnings);
+            warnings.AddRange(plan.RetentionWarnings);
 
             if (snapshot.IsMultiplayer)
             {
@@ -750,15 +758,17 @@ namespace SephPlanner.Plugin.Ui
                 if (pinned > 0)
                 {
                     lines.Add(
-                        $"강화 우선 {new string('★', pinned)} - 가치를 " +
-                        $"{PlanPreferences.WeightOf(pinned):0.##}배로 칩니다.");
+                        $"강화 우선 {new string('★', pinned)} - 이득을 " +
+                        $"{PlanPreferences.WeightOf(pinned):0.##}배로 칩니다. 패널티는 그대로 반영합니다.");
                 }
                 else if (pinned < 0)
                 {
                     lines.Add(
-                        $"양보 {string.Concat(System.Linq.Enumerable.Repeat(_skin.YieldMark, -pinned))} - 가치를 " +
-                        $"{PlanPreferences.WeightOf(pinned):0.##}배로 칩니다.");
+                        $"양보 {string.Concat(System.Linq.Enumerable.Repeat(_skin.YieldMark, -pinned))} - 이득을 " +
+                        $"{PlanPreferences.WeightOf(pinned):0.##}배로 칩니다. 패널티는 그대로 반영합니다.");
                 }
+                if (frame.Prefs != null && frame.Prefs.IsRetained(charmId))
+                    lines.Add("사용 유지: 활성 상태를 우선하며 빼기·교체 추천에서 보호합니다.");
                 if (frame.Prefs != null && frame.Prefs.IsHeld(charmId))
                     lines.Add("고정 - 배치 조건을 무시하는 칸에만 앉힙니다.");
                 return Explain.Join(lines);

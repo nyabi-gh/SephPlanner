@@ -10,6 +10,24 @@ namespace SephPlanner.Core.Solver
     /// </summary>
     public static class HungarianAssignment
     {
+        /// <summary>정수 우선 비용을 먼저 최소화하고, 동률에서만 원래 비용을 비교한다.</summary>
+        public static int[] SolvePrioritized(double[,] cost, int[,] priority)
+        {
+            var rows = cost.GetLength(0);
+            var columns = cost.GetLength(1);
+            if (priority.GetLength(0) != rows || priority.GetLength(1) != columns)
+                throw new ArgumentException("우선 비용 행렬의 크기가 다릅니다.", nameof(priority));
+            var scale = 0.0;
+            foreach (var value in cost) scale = Math.Max(scale, Math.Abs(value));
+            var combined = new double[rows, columns];
+            // 배정 전체의 원래 비용 차이를 1 미만으로 제한해 정수 우선순위를 뒤집지 못하게 한다.
+            for (var row = 0; row < rows; row++)
+                for (var column = 0; column < columns; column++)
+                    combined[row, column] = priority[row, column] +
+                        (scale == 0 ? 0 : cost[row, column] / scale / (2.0 * rows + 1));
+            return Solve(combined, out _);
+        }
+
         private const double Infinity = double.MaxValue / 4;
 
         /// <summary>

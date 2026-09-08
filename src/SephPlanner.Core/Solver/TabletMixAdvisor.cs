@@ -102,7 +102,7 @@ namespace SephPlanner.Core.Solver
                 .Take(limit)
                 .ToList();
 
-            foreach (var entry in shown) Confirm(entry, baseScore, layouts, faster);
+            shown.RemoveAll(entry => !Confirm(entry, baseScore, layouts, faster));
 
             // 다시 푼 값으로 순서가 뒤집힐 수 있다. 보여주는 것은 다시 푼 값이므로 줄도 그것으로 세운다.
             return shown
@@ -119,15 +119,17 @@ namespace SephPlanner.Core.Solver
         /// 회전도 여기서 확정된다. 효과가 같은 회전이 여럿일 때 짐작 단계가 고른 것이 그대로
         /// 오는데, 어느 쪽이든 결과 질의가 같으므로 따라 해도 같은 석판이 나온다.
         /// </summary>
-        private static void Confirm(
+        private static bool Confirm(
             MixAdvice advice, double baseScore, LayoutCache layouts, SolverOptions faster)
         {
             var trial = advice.Trial;
-            if (trial is null) return;
+            if (trial is null) return false;
 
             var solved = PlacementSolver.EvaluateLayouts(trial, layouts.Of(trial, faster), faster);
+            if (solved.UnretainedCharms.Count > 0) return false;
             advice.Gain = solved.Score - baseScore;
             advice.Effect = EffectOf(trial, solved);
+            return true;
         }
 
         /// <summary>한 쌍에서 가장 좋은 회전 조합. 회전마다 결과 질의가 달라 값도 달라진다.</summary>
@@ -166,6 +168,7 @@ namespace SephPlanner.Core.Solver
                     var guesses = Guesses(baseLayout, indexA, indexB, mixedSlot);
                     var solved = PlacementSolver.EvaluateLayouts(
                         trial, guesses ?? layouts.Of(trial, faster), faster);
+                    if (solved.UnretainedCharms.Count > 0) continue;
                     var gain = solved.Score - baseScore;
                     if (best is not null && gain <= best.Gain) continue;
 

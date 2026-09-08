@@ -46,8 +46,9 @@ namespace SephPlanner.Core.Runtime
         ///     캘세더니 열쇠)의 판정에 필요한 항목을 담는다. 없으면 그 넷은 평범한 아티팩트로만
         ///     평가되어 아무 자리에나 놓인다.
         /// v9: 값어치 표의 환산 누락 여부와 미환산 능력치를 담는다.
+        /// v10: 가중치가 패널티를 키우지 않도록 능력치 이득과 손해를 따로 담는다.
         /// </summary>
-        public const int CatalogVersion = 9;
+        public const int CatalogVersion = 10;
 
         /// <summary>플러그인이 생성하고 진단 도구가 읽는 데이터 위치.</summary>
         public static string DataDirectory =>

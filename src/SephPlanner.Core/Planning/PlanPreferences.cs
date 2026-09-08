@@ -18,9 +18,9 @@ namespace SephPlanner.Core.Planning
 
         /// <summary>
         /// 강화 우선으로 지정한 아티팩트. 엔티티 번호 → 단계(<see cref="MinPinLevel"/>~
-        /// <see cref="MaxPinLevel"/>, 0 은 없음)이고, 배치에서 가치를 <see cref="WeightOf"/>배로
+        /// <see cref="MaxPinLevel"/>, 0 은 없음)이고, 배치에서 이득을 <see cref="WeightOf"/>배로
         /// 쳐서 양수면 좋은 칸을 먼저 받고 음수면 남에게 양보한다. 점수도 그 기준으로 계산되므로
-        /// 지정을 바꾸면 화면의 점수가 달라진다.
+        /// 지정을 바꾸면 화면의 점수가 달라진다. 패널티에는 배수를 적용하지 않는다.
         ///
         /// 석판 배치까지 함께 끌려간다 - 솔버는 총점이 가장 큰 배치를 고르므로, 무거운 아티팩트가
         /// 있으면 그 칸의 레벨을 올려 주는 석판 배치를 선호하게 된다.
@@ -64,6 +64,9 @@ namespace SephPlanner.Core.Planning
         /// <see cref="Arrangement.UnheldCharms"/>로 알린다.
         /// </summary>
         public HashSet<int> HeldCharms { get; set; } = new HashSet<int>();
+
+        /// <summary>소유한 해당 종류의 아티팩트 전부를 활성 상태로 유지한다.</summary>
+        public HashSet<int> RetainedCharms { get; set; } = new HashSet<int>();
 
         /// <summary>
         /// 프리셋 코드가 알려 준, 그 빌드가 노리는 아티팩트(엔티티 번호). 손으로 지정하는

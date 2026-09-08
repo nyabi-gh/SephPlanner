@@ -353,7 +353,7 @@ namespace SephPlanner.Core.Solver
                 var placed = candidate.Charm is not null
                     ? outcome.Solved.CharmPositions.ContainsKey(candidateId)
                     : outcome.Solved.TabletPositions.ContainsKey(candidateId);
-                if (!placed) continue;
+                if (!placed || outcome.Solved.UnretainedCharms.Count > 0) continue;
                 if (best is null || PriorityComboPlacement.Compare(outcome.Solved, best.Solved) > 0) best = outcome;
             }
             if (best is null) return null;
@@ -362,7 +362,7 @@ namespace SephPlanner.Core.Solver
             // 잣대에서 나와야 하고, 미리보기도 이 결과를 그대로 쓴다.
             best.Solved = PlacementSolver.EvaluateLayouts(
                 best.Trial, layouts.Of(best.Trial, faster), faster);
-            return best;
+            return best.Solved.UnretainedCharms.Count == 0 ? best : null;
         }
 
         private static IEnumerable<TrialOutcome> Trials(
@@ -379,6 +379,7 @@ namespace SephPlanner.Core.Solver
 
             foreach (var charm in problem.Charms.OrderBy(value => value.InstanceId))
             {
+                if (charm.Retained) continue;
                 var trial = Clone(problem);
                 trial.Charms.RemoveAll(value => value.InstanceId == charm.InstanceId);
                 trial.CurrentCharms.Remove(charm.InstanceId);

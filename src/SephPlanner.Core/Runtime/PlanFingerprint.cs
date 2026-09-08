@@ -139,6 +139,8 @@ namespace SephPlanner.Core.Runtime
                 Add(builder, "pinned", pin.Key);
                 Add(builder, "pinLevel", pin.Value);
             }
+            foreach (var retained in preferences.RetainedCharms.OrderBy(value => value))
+                Add(builder, "retained", retained);
             foreach (var held in preferences.HeldCharms.OrderBy(value => value))
                 Add(builder, "held", held);
             foreach (var pair in preferences.CharmValues.EntityValues.OrderBy(value => value.Key))
