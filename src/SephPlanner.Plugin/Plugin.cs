@@ -146,6 +146,7 @@ namespace SephPlanner.Plugin
 
         private void HandleInput()
         {
+            if (_window.PollShortcutCapture()) return;
             if (_settings.DumpKey.Value.IsDown()) StartDump();
             if (_settings.InventoryDumpKey.Value.IsDown()) DumpInventory();
             // 화면 스위치 밖이어야 한다. 화면을 끈 뒤 이 키까지 죽으면 되켤 길이 없다.

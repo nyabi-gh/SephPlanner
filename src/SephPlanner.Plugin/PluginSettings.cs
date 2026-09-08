@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using BepInEx.Configuration;
 using SephPlanner.Plugin.Ui;
 using UnityEngine;
@@ -204,8 +205,16 @@ namespace SephPlanner.Plugin
             _shortcuts.Add(DumpKey);
             _shortcuts.Add(InventoryDumpKey);
 
-            Retire(ExpandKey, new KeyboardShortcut(KeyCode.P, KeyCode.LeftControl, KeyCode.LeftAlt));
-            Retire(AutoPlaceKey, new KeyboardShortcut(KeyCode.Return, KeyCode.LeftControl, KeyCode.LeftAlt));
+            var migrated = config.Bind("General", "LegacyShortcutsMigrated", false,
+                "이전 기본 단축키의 일회성 이전 완료 여부.");
+            if (!migrated.Value)
+            {
+                Retire(ExpandKey, new KeyboardShortcut(KeyCode.P, KeyCode.LeftControl, KeyCode.LeftAlt));
+                Retire(AutoPlaceKey, new KeyboardShortcut(KeyCode.Return, KeyCode.LeftControl, KeyCode.LeftAlt));
+                migrated.Value = true;
+            }
+            foreach (var shortcut in _shortcuts)
+                shortcut.SettingChanged += (_, _) => _shortcutRevision++;
             foreach (var shortcut in _shortcuts) WarnIfGameKey(shortcut);
         }
 
@@ -224,7 +233,7 @@ namespace SephPlanner.Plugin
         /// <summary>
         /// 단축키 배선이 바뀔 때마다 오른다. 안내 줄이 단축키 이름을 여덟 개 짓는데 그것을
         /// 프레임마다 다시 지을 이유가 없어, 다시 지어야 할 때를 이 값으로 가른다.
-        /// 값을 쓰는 곳은 <see cref="Rebind"/>와 <see cref="Retire"/> 둘뿐이다.
+        /// 설정 파일을 다시 읽어 값이 바뀌는 경우도 포함한다.
         /// </summary>
         public int ShortcutRevision => _shortcutRevision;
 
@@ -240,16 +249,14 @@ namespace SephPlanner.Plugin
         }
 
         /// <summary>
-        /// 게임 설정 창의 우리 탭이 그릴 줄들. 값은 여기서 읽고 여기로 쓴다 - 탭은 무엇을 고를
+        /// 설정 창이 그릴 줄들. 값은 여기서 읽고 여기로 쓴다 - 탭은 무엇을 고를
         /// 수 있는지만 알고, 그 값이 무슨 뜻인지는 알지 못한다.
         /// </summary>
+        private List<OptionRow> _rows;
+
         public List<OptionRow> Rows()
         {
-            var keys = KeyChoices();
-            var keyNames = new string[keys.Count];
-            for (var i = 0; i < keys.Count; i++) keyNames[i] = keys[i].ToString();
-
-            return new List<OptionRow>
+            return _rows ??= new List<OptionRow>
             {
                 Switch("인게임 화면", Panel),
                 new OptionRow
@@ -269,14 +276,16 @@ namespace SephPlanner.Plugin
                 Switch("멀티 자동 배치(실험)", MultiplayerAutoPlace),
                 Steps("갱신 주기", PollInterval, PollSteps,
                     new[] { "0.15초", "0.25초", "0.5초", "1초" }),
-                Key("접기/펼치기", ExpandKey, keys, keyNames, divider: true),
-                Key("자동 배치", AutoPlaceKey, keys, keyNames),
-                Key("후보 미리보기", PreviewKey, keys, keyNames),
-                Key("빌드 창", BuildKey, keys, keyNames),
-                Key("불투명도 바꾸기", OpacityKey, keys, keyNames),
-                Key("이동 모드", MoveKey, keys, keyNames),
-                Key("숨기기", HideKey, keys, keyNames),
-                Key("이 창 열기", SettingsKey, keys, keyNames),
+                Key("접기/펼치기", ExpandKey),
+                Key("자동 배치", AutoPlaceKey),
+                Key("후보 미리보기", PreviewKey),
+                Key("빌드 창", BuildKey),
+                Key("불투명도 바꾸기", OpacityKey),
+                Key("이동 모드", MoveKey),
+                Key("숨기기", HideKey),
+                Key("이 창 열기", SettingsKey),
+                Key("데이터 다시 만들기", DumpKey),
+                Key("진단 덤프", InventoryDumpKey),
             };
         }
 
@@ -314,60 +323,32 @@ namespace SephPlanner.Plugin
                 Write = i => entry.Value = steps[i],
             };
 
-        private OptionRow Key(
-            string label, ConfigEntry<KeyboardShortcut> entry, List<KeyCode> keys, string[] names,
-            bool divider = false)
-            => new OptionRow
-            {
-                Label = label,
-                Choices = names,
-                Read = () => Mathf.Max(0, keys.IndexOf(entry.Value.MainKey)),
-                Write = i => Rebind(entry, keys[i]),
-                Divider = divider,
-            };
-
-        /// <summary>
-        /// 고를 수 있는 단축키. F 키만 두는 것은 게임이 F 를 하나도 쓰지 않기 때문이다
-        /// (docs/RESEARCH.md 의 "게임 단축키"). 덤프 키가 이미 쓰고 있는 것은 빼서, 탭에서
-        /// 고르는 것만으로는 겹칠 수 없게 한다.
-        /// </summary>
-        private List<KeyCode> KeyChoices()
+        private OptionRow Key(string label, ConfigEntry<KeyboardShortcut> entry) => new OptionRow
         {
-            var taken = new HashSet<KeyCode> { DumpKey.Value.MainKey, InventoryDumpKey.Value.MainKey };
-            var keys = new List<KeyCode>();
-            for (var key = KeyCode.F1; key <= KeyCode.F12; key++)
-            {
-                if (!taken.Contains(key)) keys.Add(key);
-            }
+            Label = label,
+            ShortcutEntry = entry,
+            Shortcut = () => entry.Value,
+            Bind = value => entry.Value = value,
+            Reset = () => entry.Value = (KeyboardShortcut)entry.DefaultValue,
+            Warning = () => ShortcutWarning(entry),
+        };
 
-            // 설정 파일에 F 키가 아닌 것이 들어 있으면 목록에 없어 엉뚱한 값이 골라진 것처럼
-            // 보인다. 지금 쓰는 키는 언제나 목록에 있어야 한다.
-            foreach (var shortcut in _shortcuts)
-            {
-                if (shortcut == DumpKey || shortcut == InventoryDumpKey) continue;
-
-                if (!keys.Contains(shortcut.Value.MainKey)) keys.Add(shortcut.Value.MainKey);
-            }
-            return keys;
-        }
-
-        /// <summary>
-        /// 이미 다른 기능이 쓰는 키를 고르면 그 기능이 지금 키를 물려받는다. 그냥 두면 한 번
-        /// 눌러서 둘이 함께 발동하는데, 화면에는 둘 다 제 키를 가진 것처럼 보여 원인을 알 수 없다.
-        /// </summary>
-        private void Rebind(ConfigEntry<KeyboardShortcut> entry, KeyCode key)
+        private string ShortcutWarning(ConfigEntry<KeyboardShortcut> entry)
         {
-            _shortcutRevision++;
-            var previous = entry.Value.MainKey;
-            foreach (var other in _shortcuts)
-            {
-                if (other == entry || other.Value.MainKey != key) continue;
-
-                other.Value = new KeyboardShortcut(previous);
-                _log($"{other.Definition.Key} 가 {key} 를 내주고 {previous} 로 옮겼습니다.");
-            }
-
-            entry.Value = new KeyboardShortcut(key);
+            var value = entry.Value;
+            if (value.MainKey == KeyCode.None)
+                return entry == SettingsKey
+                    ? "설정 창 단축키가 해제됐습니다. 닫기 전에 다시 지정하거나 BepInEx 설정 파일에서 복원하세요."
+                    : "";
+            var warnings = new List<string>();
+            if (GameKeys.Contains(value.MainKey) || value.Modifiers.Any(GameKeys.Contains))
+                warnings.Add("게임 기본 조작과 겹칠 수 있습니다. 조합키도 게임 입력을 막지 않습니다.");
+            var duplicates = Rows().Where(row => row.Shortcut != null &&
+                row.ShortcutEntry != entry && row.Shortcut().Equals(value))
+                .Select(row => row.Label).ToArray();
+            if (duplicates.Length > 0)
+                warnings.Add("같은 단축키: " + string.Join(", ", duplicates) + ". 함께 실행될 수 있습니다.");
+            return string.Join("\n", warnings);
         }
 
         private static int Nearest(float[] steps, float value)
@@ -421,6 +402,7 @@ namespace SephPlanner.Plugin
 
         public static string Describe(KeyboardShortcut shortcut)
         {
+            if (shortcut.MainKey == KeyCode.None) return "미지정";
             var text = "";
             foreach (var modifier in shortcut.Modifiers) text += Short(modifier) + "+";
             return text + Short(shortcut.MainKey);
@@ -430,12 +412,12 @@ namespace SephPlanner.Plugin
         {
             switch (key)
             {
-                case KeyCode.LeftControl:
-                case KeyCode.RightControl: return "Ctrl";
-                case KeyCode.LeftAlt:
-                case KeyCode.RightAlt: return "Alt";
-                case KeyCode.LeftShift:
-                case KeyCode.RightShift: return "Shift";
+                case KeyCode.LeftControl: return "왼Ctrl";
+                case KeyCode.RightControl: return "오른Ctrl";
+                case KeyCode.LeftAlt: return "왼Alt";
+                case KeyCode.RightAlt: return "오른Alt";
+                case KeyCode.LeftShift: return "왼Shift";
+                case KeyCode.RightShift: return "오른Shift";
                 case KeyCode.Return: return "Enter";
                 default: return key.ToString();
             }

@@ -31,6 +31,7 @@ namespace SephPlanner.Plugin.Ui
         protected float Base { get; private set; }
 
         public bool IsOpen => _panel != null && _panel.IsOpened;
+        protected bool HasControl => IsOpen && _panel.IsControlEnabled;
         public string Blocker { get; private set; } = "";
         public string Origin { get; protected set; } = "";
 
@@ -48,6 +49,12 @@ namespace SephPlanner.Plugin.Ui
 
         /// <summary>컨트롤러로 열었을 때 초점을 줄 곳. 없으면 화살표를 누를 방법이 없다.</summary>
         protected virtual GameObject DefaultFocus => null;
+        protected virtual bool HandleEscape() => false;
+        protected virtual void Closed() { }
+        protected void SetHint(string hint)
+        {
+            if (_hint != null) _hint.text = hint;
+        }
 
         /// <summary>
         /// 오른쪽 단추가 눌렸다. 마우스는 게임의 EventSystem 을 거치지 않고 직접 읽어 넘어온다 -
@@ -149,6 +156,8 @@ namespace SephPlanner.Plugin.Ui
             Widgets.Layer(go, Layers.Window, clickable: true);
 
             _panel = go.AddComponent<PlannerPanel>();
+            _panel.EscapeHandler = HandleEscape;
+            _panel.Closed = Closed;
             _panel.hasControl = true;
             _panel.canCloseControlWithESC = true;
 
@@ -203,6 +212,13 @@ namespace SephPlanner.Plugin.Ui
     internal sealed class PlannerPanel : UIBase
     {
         private bool _paused;
+        public System.Func<bool> EscapeHandler;
+        public System.Action Closed;
+
+        public override void CloseFromEsc()
+        {
+            if (EscapeHandler?.Invoke() != true) base.CloseFromEsc();
+        }
 
         // 도감처럼 타입 이름으로 찾는 게임 UI 목록에 우리 것을 끼워 넣을 이유가 없다.
         public override bool CanBeSearchedByTypeHash => false;
@@ -230,6 +246,7 @@ namespace SephPlanner.Plugin.Ui
         public override void OnClosed()
         {
             base.OnClosed();
+            Closed?.Invoke();
             Resume();
         }
 
