@@ -99,7 +99,7 @@ scripts/make-release.ps1
 들어간다. 릴리스 전에 포맷, 테스트, 빌드를 검증하고 커밋과 파일 해시가 적힌 `manifest.json`을
 만든다. 게임 파일은 넣지 않는다.
 
-zip은 릴리스 전용 공개 저장소 [nyattic/SephPlanner-Release](https://github.com/nyattic/SephPlanner-Release)의
+zip은 릴리스 전용 공개 저장소 [nyabi-gh/SephPlanner-Release](https://github.com/nyabi-gh/SephPlanner-Release)의
 Releases에 올린다. 이 저장소는 비공개라 여기 Releases는 링크가 공개되지 않는다. 그쪽에는 소스
 없이 zip과 Issues(제보 창구)만 둔다. 변경 기록은 이 저장소의 CHANGELOG.md가 정본이고 릴리스 노트에 옮겨 적는다. 커뮤니티 글에는 그 링크를 걸고 zip을 직접
 첨부하지 않는다 - 첨부하면 옛 버전이 돌아다닌다.
