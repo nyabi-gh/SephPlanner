@@ -1,0 +1,5 @@
+**
+!publish/
+!publish/*.dll
+!publish/*.json
+!Dockerfile

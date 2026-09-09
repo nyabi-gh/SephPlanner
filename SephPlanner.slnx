@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/SephPlanner.Core/SephPlanner.Core.csproj" />
     <Project Path="src/SephPlanner.DataTool/SephPlanner.DataTool.csproj" />
+    <Project Path="src/SephPlanner.Diagnostics/SephPlanner.Diagnostics.csproj" />
     <Project Path="src/SephPlanner.Plugin/SephPlanner.Plugin.csproj" />
   </Folder>
   <Folder Name="/tests/">

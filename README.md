@@ -129,6 +129,7 @@ CHANGELOG의 해당 절도 함께 확인한다.
 
 - [docs/STATUS.md](docs/STATUS.md) — 현재 구현·추정·실기 미검증 범위와 다음 작업
 - [docs/REPRODUCTION.md](docs/REPRODUCTION.md) — F10 계획 재현 자료와 진단 도구 사용법
+- [docs/DIAGNOSTIC-UPLOAD.md](docs/DIAGNOSTIC-UPLOAD.md) — 미출시 F10 비공개 진단 전송과 서버 배포 인계
 
 - [docs/INSTALL.txt](docs/INSTALL.txt) — 사용자용 설치 안내. 메모장에서 그대로 읽히도록 마크다운 없이 평문으로 쓰고, 배포 zip에 `설치안내.txt`로 들어간다
 - [docs/RESEARCH.md](docs/RESEARCH.md) — 게임 내부 구조 조사 결과

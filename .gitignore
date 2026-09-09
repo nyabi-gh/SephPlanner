@@ -1,6 +1,8 @@
 bin/
 obj/
 artifacts/
+deploy/diagnostics/secrets/
+deploy/diagnostics/publish/
 *.user
 .vs/
 data/generated/

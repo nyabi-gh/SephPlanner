@@ -22,10 +22,11 @@ namespace SephPlanner.Plugin
         /// 스냅샷에는 <see cref="OfferReader"/> 가 지금 보인다고 판정한 것만 들어 있으므로,
         /// 이것을 함께 남긴다고 덤프가 아는 것이 늘지는 않는다.
         /// </summary>
-        public static string WriteSnapshot(GameSnapshot snapshot)
+        public static string WriteSnapshot(GameSnapshot snapshot, string directory = null)
         {
-            Directory.CreateDirectory(PlannerData.DataDirectory);
-            var path = Path.Combine(PlannerData.DataDirectory, SnapshotFileName);
+            directory ??= PlannerData.DataDirectory;
+            Directory.CreateDirectory(directory);
+            var path = Path.Combine(directory, SnapshotFileName);
             File.WriteAllText(path, JsonConvert.SerializeObject(snapshot, Formatting.Indented));
             return path;
         }
@@ -89,7 +90,7 @@ namespace SephPlanner.Plugin
             return count;
         }
 
-        public static string Write(GridInventory inv, PlayerAvatar player, float offerRadius)
+        public static string Write(GridInventory inv, PlayerAvatar player, float offerRadius, string directory = null)
         {
             var text = new StringBuilder();
             text.AppendLine(PluginIdentity.Describe());
@@ -150,8 +151,9 @@ namespace SephPlanner.Plugin
             UiDiagnostics.Write(text);
             FrameCost.Write(text);
 
-            Directory.CreateDirectory(PlannerData.DataDirectory);
-            var path = Path.Combine(PlannerData.DataDirectory, FileName);
+            directory ??= PlannerData.DataDirectory;
+            Directory.CreateDirectory(directory);
+            var path = Path.Combine(directory, FileName);
             File.WriteAllText(path, text.ToString());
             return path;
         }

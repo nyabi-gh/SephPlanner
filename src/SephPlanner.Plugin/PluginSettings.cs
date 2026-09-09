@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using BepInEx.Configuration;
+using SephPlanner.Core.Runtime;
 using SephPlanner.Plugin.Ui;
 using UnityEngine;
 
@@ -70,6 +71,12 @@ namespace SephPlanner.Plugin
         public ConfigEntry<float> Opacity { get; }
         public ConfigEntry<bool> Recommendations { get; }
         public ConfigEntry<bool> MultiplayerAutoPlace { get; }
+        public ConfigEntry<string> DiagnosticConsent { get; }
+        public ConfigEntry<bool> DiagnosticChoiceMade { get; }
+        private readonly Action _reviewDiagnostics;
+
+        public bool DiagnosticUploadAllowed => DiagnosticConsent.Value ==
+            DiagnosticUploadClient.ConsentKey(new Uri(DiagnosticUploadClient.DefaultEndpoint));
 
         public ConfigEntry<KeyboardShortcut> ExpandKey { get; }
         public ConfigEntry<KeyboardShortcut> AutoPlaceKey { get; }
@@ -108,10 +115,15 @@ namespace SephPlanner.Plugin
         private static ConfigDescription Ranged(string description, float min, float max) =>
             new ConfigDescription(description, new AcceptableValueRange<float>(min, max));
 
-        public PluginSettings(ConfigFile config, Action<string> log)
+        public PluginSettings(ConfigFile config, Action<string> log, Action reviewDiagnostics)
         {
             _config = config;
             _log = log;
+            _reviewDiagnostics = reviewDiagnostics;
+            DiagnosticConsent = config.Bind("Diagnostics", "UploadConsent", "",
+                "F10 진단을 비공개 서버로 전송하는 데 동의한 대상과 항목 버전. F3에서 변경합니다.");
+            DiagnosticChoiceMade = config.Bind("Diagnostics", "UploadChoiceMade", false,
+                "F10 진단 전송 여부를 사용자가 선택했는지 기록합니다.");
 
             PollInterval = config.Bind(
                 "General", "PollIntervalSeconds", 0.25f, Ranged(
@@ -274,6 +286,13 @@ namespace SephPlanner.Plugin
                 Steps("추천 범위", OfferRadius, RadiusSteps,
                     new[] { "좁게", "보통", "넓게", "아주 넓게" }),
                 Switch("멀티 자동 배치(실험)", MultiplayerAutoPlace),
+                new OptionRow
+                {
+                    Label = "F10 진단 전송",
+                    Choices = new[] { "꺼짐", "켜짐" },
+                    Read = () => DiagnosticUploadAllowed ? 1 : 0,
+                    Write = i => { if (i == 0) SetDiagnosticConsent(false); else _reviewDiagnostics(); },
+                },
                 Steps("갱신 주기", PollInterval, PollSteps,
                     new[] { "0.15초", "0.25초", "0.5초", "1초" }),
                 Key("접기/펼치기", ExpandKey),
@@ -296,6 +315,13 @@ namespace SephPlanner.Plugin
             Corner.Value = corner;
             MarginX.Value = DefaultPanelMargin;
             MarginY.Value = DefaultPanelMargin;
+            _config.Save();
+        }
+
+        public void SetDiagnosticConsent(bool allowed)
+        {
+            DiagnosticConsent.Value = allowed ? DiagnosticUploadClient.ConsentKey(new Uri(DiagnosticUploadClient.DefaultEndpoint)) : "";
+            DiagnosticChoiceMade.Value = true;
             _config.Save();
         }
 

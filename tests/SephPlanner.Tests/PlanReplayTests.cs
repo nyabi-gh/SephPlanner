@@ -14,6 +14,30 @@ public sealed class PlanReplayTests : IDisposable
     private string PathOf(string name) => Path.Combine(_directory, name);
 
     [Fact]
+    public void DiagnosticArchiveAndErrorRedactionPreserveReplayFingerprintsAndResults()
+    {
+        var (catalog, snapshot, preferences) = Inputs();
+        using var runner = new PlanRunner(catalog);
+        runner.Submit(snapshot, preferences, "saved-catalog");
+        Await(runner);
+        var capture = runner.CaptureReplay()!;
+        var fingerprint = capture.RequestFingerprint;
+        capture.LatestError = @"C:\Users\PrivateUser\error.log";
+        capture.LatestError = new DiagnosticText().Redact(capture.LatestError);
+        var path = PathOf("outbound.replay");
+        PlanReplayFile.Write(path, JsonConvert.SerializeObject(capture, Formatting.Indented));
+        var bytes = DiagnosticArchive.Create(new Dictionary<string, string>
+        { ["report.json"] = "{}", ["plan.replay"] = File.ReadAllText(path) });
+        using var archive = new MemoryStream(bytes);
+        File.WriteAllText(path, DiagnosticArchive.Read(archive)["plan.replay"]);
+        var restored = System.Text.Json.JsonSerializer.Deserialize<PlanReplay>(PlanReplayFile.Read(path))!;
+        Assert.DoesNotContain("PrivateUser", restored.LatestError, StringComparison.Ordinal);
+        Assert.Equal(fingerprint, restored.RequestFingerprint);
+        Assert.Empty(restored.Expected!.Differences(ReplayResult.From(restored.Rebuild())));
+        Assert.Equal(0, PlanReproduce.Run(path));
+    }
+
+    [Fact]
     public void PluginJsonReplaysPublishedInputsIncludingPreferencesCatalogAndAnchor()
     {
         var (catalog, snapshot, preferences) = Inputs();

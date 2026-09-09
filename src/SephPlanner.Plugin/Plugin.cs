@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using BepInEx;
 using BepInEx.Configuration;
 using Mirror;
@@ -36,6 +39,14 @@ namespace SephPlanner.Plugin
         private PluginPreferences _prefs;
         private PlanRunner _runner;
         private GameSnapshot _lastSnapshot;
+        private DiagnosticConsentWindow _diagnosticWindow;
+        private DiagnosticCapture _pendingDiagnostic;
+        private DiagnosticText _diagnosticLog;
+        private DiagnosticUploadClient _diagnosticClient;
+        private CancellationTokenSource _diagnosticCancellation;
+        private Task<string> _diagnosticTask;
+        private string _diagnosticNotice;
+        private float _diagnosticNoticeUntil;
         private string _lastPanelOrigin;
         private string _lastPanelBlocker;
         private readonly Dictionary<string, string> _lastErrors = new Dictionary<string, string>();
@@ -61,10 +72,18 @@ namespace SephPlanner.Plugin
 
         private void Awake()
         {
-            _settings = new PluginSettings(Config, Logger.LogInfo);
+            _settings = new PluginSettings(Config, Logger.LogInfo, () => OpenDiagnosticConsent(null));
             _prefs = PluginPreferences.Load(Logger.LogWarning);
             _window = new SettingsWindow(_settings.Rows);
             _build = new BuildWindow(_prefs, CurrentBuild);
+            _diagnosticWindow = new DiagnosticConsentWindow(ChooseDiagnosticConsent);
+            _diagnosticLog = new DiagnosticText(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Paths.GameRootPath);
+            _diagnosticClient = new DiagnosticUploadClient();
+            _settings.DiagnosticConsent.SettingChanged += (_, _) =>
+            {
+                if (!_settings.DiagnosticUploadAllowed) _diagnosticCancellation?.Cancel();
+            };
+            Logger.LogEvent += CaptureOwnLog;
             Logger.LogInfo(PluginIdentity.Describe());
         }
 
@@ -79,6 +98,7 @@ namespace SephPlanner.Plugin
             // 단축키·화면 쪽에서 난 예외가 폴링까지 굶기면 안 된다. Update 안의 예외는 유니티가
             // Player.log 에만 쌓고 우리 로그는 조용하므로, 여기서 잡아 같은 것 한 번씩 남긴다.
             Guarded(HandleInput, "입력 처리");
+            Guarded(CheckDiagnosticUpload, "진단 전송 상태");
 
             var panelStarted = FrameCost.Now;
             Guarded(UpdateNativePanel, "화면 갱신");
@@ -171,7 +191,7 @@ namespace SephPlanner.Plugin
 
                 // 커서를 읽기만 한다. 그려 둔 사각형과 겹치는지 우리가 세므로 raycastTarget 을
                 // 켤 필요가 없고, HUD 가 게임 입력을 가져가지 않는다는 보장이 그대로 남는다.
-                _hud.UpdateHover(Cursor(), !_hidden && !_moving && !_window.IsOpen && !_build.IsOpen);
+                _hud.UpdateHover(Cursor(), !_hidden && !_moving && !_window.IsOpen && !_build.IsOpen && !_diagnosticWindow.IsOpen);
             }
 
             // 리소스는 부팅 직후 준비되므로 첫 프레임에 확인한다.
@@ -289,31 +309,136 @@ namespace SephPlanner.Plugin
 
         private void DumpInventory()
         {
+            if (_diagnosticTask != null || _diagnosticWindow.IsOpen)
+            {
+                Report("진단을 처리 중입니다. 전송 또는 선택이 끝난 뒤 다시 눌러 주세요.");
+                return;
+            }
             try
             {
-                var path = GameReader.DumpInventory(_settings.OfferRadius.Value);
-                Logger.LogInfo(path == null ? "읽을 인벤토리가 없습니다." : "인벤토리 덤프: " + path);
-                var replay = _runner?.CaptureReplay();
-                if (replay == null)
+                var capture = new DiagnosticCapture(_diagnosticLog, Logger.LogWarning);
+                var avatar = GameReader.FindLocalPlayer();
+                capture.Collect("inventory-dump.txt", () => avatar?.Inventory == null ? null :
+                    InventoryDiagnostics.Write(avatar.Inventory, avatar, _settings.OfferRadius.Value, capture.DirectoryPath), legacy: true);
+                capture.Collect("inventory-snapshot.json", () => avatar?.Inventory == null ? null :
+                    InventoryDiagnostics.WriteSnapshot(GameReader.Read(_settings.OfferRadius.Value), capture.DirectoryPath), legacy: true);
+                capture.Collect("plan.replay", () =>
                 {
-                    Report(path == null ? "읽을 인벤토리와 게시된 계획이 없습니다." :
-                        "진단을 저장했습니다. 아직 게시된 계획이 없어 재현 자료는 만들지 못했습니다.");
-                    return;
-                }
-                replay.Producer = PluginIdentity.Describe();
-                var directory = System.IO.Path.Combine(PlannerData.DataDirectory, "reproductions");
-                System.IO.Directory.CreateDirectory(directory);
-                var replayPath = System.IO.Path.Combine(directory, CatalogBundleStore.NewGeneration() + ".replay");
-                PlanReplayFile.Write(replayPath, Newtonsoft.Json.JsonConvert.SerializeObject(replay, Newtonsoft.Json.Formatting.Indented));
-                Logger.LogInfo("계획 재현 자료: " + replayPath);
-                Report(path == null ? "현재 인벤토리는 없습니다. 마지막 게시 계획의 재현 자료를 저장했습니다." :
-                    "진단과 마지막 게시 계획의 재현 자료를 저장했습니다.");
+                    var replay = _runner?.CaptureReplay();
+                    if (replay == null) return null;
+                    replay.Producer = PluginIdentity.Describe();
+                    var directory = Path.Combine(PlannerData.DataDirectory, "reproductions");
+                    Directory.CreateDirectory(directory);
+                    var original = Path.Combine(directory, CatalogBundleStore.NewGeneration() + ".replay");
+                    PlanReplayFile.Write(original, Newtonsoft.Json.JsonConvert.SerializeObject(replay, Newtonsoft.Json.Formatting.Indented));
+                    replay.LatestError = _diagnosticLog.Redact(replay.LatestError);
+                    var path = Path.Combine(capture.DirectoryPath, "plan.replay");
+                    PlanReplayFile.Write(path, Newtonsoft.Json.JsonConvert.SerializeObject(replay, Newtonsoft.Json.Formatting.Indented));
+                    return path;
+                });
+                capture.Finish(PluginIdentity.Describe(), ReplayPreferences.From(_prefs.ToPreferences(_settings.Recommendations.Value)));
+                Logger.LogInfo("이번 진단 보관 위치: " + capture.DirectoryPath);
+                if (_settings.DiagnosticUploadAllowed) StartDiagnosticUpload(capture);
+                else if (!_settings.DiagnosticChoiceMade.Value || _settings.DiagnosticConsent.Value.Length > 0) OpenDiagnosticConsent(capture);
+                else ReportDiagnostic(capture.HasFailures
+                    ? "진단 일부 저장에 실패했습니다. 저장한 자료와 실패 기록은 로컬에 보관했습니다."
+                    : "진단을 로컬에 저장했습니다. F3에서 진단 전송을 켤 수 있습니다.");
             }
             catch (Exception ex)
             {
                 Logger.LogError("인벤토리 덤프 실패: " + ex);
-                Report("진단 또는 재현 자료 저장에 실패했습니다. BepInEx 로그를 확인하세요.");
+                ReportDiagnostic("진단 또는 재현 자료 저장에 실패했습니다. BepInEx 로그를 확인하세요.");
             }
+        }
+
+        private void CaptureOwnLog(object sender, BepInEx.Logging.LogEventArgs args) =>
+            _diagnosticLog.Append(DateTime.UtcNow.ToString("O") + " [" + args.Level + "] " + args.Data);
+
+        private void OpenDiagnosticConsent(DiagnosticCapture capture)
+        {
+            _pendingDiagnostic = capture;
+            if (!_diagnosticWindow.IsOpen) _diagnosticWindow.Toggle("ESC: 이번에는 전송하지 않기");
+            if (_diagnosticWindow.Blocker.Length > 0)
+            {
+                Logger.LogWarning("진단 전송 안내를 열지 못했습니다: " + _diagnosticWindow.Blocker);
+                ReportDiagnostic("전송 안내를 열지 못했습니다. 수집한 진단은 로컬에 보관합니다.");
+            }
+        }
+
+        private void ChooseDiagnosticConsent(bool allowed)
+        {
+            try { _settings.SetDiagnosticConsent(allowed); }
+            catch (Exception ex)
+            {
+                Logger.LogError("진단 전송 설정 저장 실패: " + ex);
+                ReportDiagnostic("전송 설정을 저장하지 못했습니다. 이번 진단은 로컬에 보관합니다.");
+                return;
+            }
+            var capture = _pendingDiagnostic;
+            _pendingDiagnostic = null;
+            if (allowed && capture != null) StartDiagnosticUpload(capture);
+            else ReportDiagnostic(allowed ? "이후 F10 진단을 비공개 서버로 전송합니다." :
+                capture?.HasFailures == true ? "진단 일부 저장에 실패했습니다. 실패 기록은 로컬에 보관합니다." : "진단은 로컬에만 저장합니다.");
+            _window.Refresh();
+        }
+
+        private void StartDiagnosticUpload(DiagnosticCapture capture)
+        {
+            if (!_settings.DiagnosticUploadAllowed || _diagnosticTask != null) return;
+            _diagnosticCancellation = new CancellationTokenSource();
+            // 초기 운영 제한값이다. 느린 연결이 게임 종료나 다음 조작을 붙잡지 않도록 한다.
+            _diagnosticCancellation.CancelAfter(TimeSpan.FromSeconds(60));
+            var cancellation = _diagnosticCancellation.Token;
+            var consent = _settings.DiagnosticConsent.Value;
+            _diagnosticTask = Task.Run(async () =>
+            {
+                try
+                {
+                    cancellation.ThrowIfCancellationRequested();
+                    var archive = DiagnosticArchive.Create(capture.Files);
+                    File.WriteAllBytes(Path.Combine(capture.DirectoryPath, "report.zip"), archive);
+                    var receipt = await _diagnosticClient.SendAsync(new Uri(DiagnosticUploadClient.DefaultEndpoint), consent,
+                        capture.Id, archive, cancellation).ConfigureAwait(false);
+                    var message = "진단 접수 완료 · 제보 번호 " + receipt;
+                    if (capture.HasFailures) message += " · 일부 자료 수집 실패 포함";
+                    try { File.WriteAllText(Path.Combine(capture.DirectoryPath, "upload-result.txt"), message); }
+                    catch (Exception saveError)
+                    {
+                        Logger.LogWarning("진단은 접수됐지만 로컬 접수 기록 저장에 실패했습니다: " + saveError);
+                        message += " · 로컬 접수 기록 저장 실패";
+                    }
+                    return message;
+                }
+                catch (Exception ex)
+                {
+                    var message = "진단 전송 실패: " + _diagnosticLog.Redact(ex.Message) + " · 로컬 보관: " + capture.DirectoryPath;
+                    Logger.LogWarning(message);
+                    try { File.WriteAllText(Path.Combine(capture.DirectoryPath, "upload-result.txt"), message); }
+                    catch (Exception saveError) { Logger.LogWarning("진단 전송 실패 기록도 저장하지 못했습니다: " + saveError); }
+                    return message;
+                }
+            });
+            ReportDiagnostic("진단을 비공개 서버로 전송 중입니다. 게임을 계속할 수 있습니다.");
+        }
+
+        private void CheckDiagnosticUpload()
+        {
+            if (!_settings.DiagnosticUploadAllowed) _diagnosticCancellation?.Cancel();
+            if (_diagnosticTask == null || !_diagnosticTask.IsCompleted) return;
+            var completed = _diagnosticTask;
+            _diagnosticTask = null;
+            _diagnosticCancellation.Dispose();
+            _diagnosticCancellation = null;
+            var message = completed.GetAwaiter().GetResult();
+            Logger.LogInfo(message);
+            ReportDiagnostic(message);
+        }
+
+        private void ReportDiagnostic(string message)
+        {
+            _diagnosticNotice = message;
+            _diagnosticNoticeUntil = Time.unscaledTime + AutoPlaceNoticeSeconds;
+            Report(message, AutoPlaceNoticeSeconds);
         }
 
         private void PollGameState()
@@ -496,6 +621,12 @@ namespace SephPlanner.Plugin
                 _hud.SetOpacity(_appliedOpacity);
             }
             _hud.SetVisible(true);
+
+            if (Time.unscaledTime < _diagnosticNoticeUntil)
+            {
+                _hud.RenderNotice(_diagnosticNotice);
+                return;
+            }
 
             // 런 밖이나 죽은 뒤에는 보여 줄 배치가 없다. 직전 런의 점수를 남겨 두면 거짓말이 된다.
             // "탐험"은 게임 자체가 쓰는 말이다.
@@ -955,6 +1086,10 @@ namespace SephPlanner.Plugin
         private void OnDestroy()
         {
             _runner?.Dispose();
+            _diagnosticCancellation?.Cancel();
+            _diagnosticCancellation?.Dispose();
+            _diagnosticClient?.Dispose();
+            Logger.LogEvent -= CaptureOwnLog;
             if (_moving && _settings != null && _hud.IsAlive)
             {
                 var margin = _hud.Margin;
@@ -963,6 +1098,7 @@ namespace SephPlanner.Plugin
             _hud.Destroy();
             _window.Destroy();
             _build.Destroy();
+            _diagnosticWindow.Destroy();
         }
     }
 }

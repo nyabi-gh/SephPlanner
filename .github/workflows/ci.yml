@@ -22,6 +22,7 @@ jobs:
       - run: dotnet restore tests/SephPlanner.Tests/SephPlanner.Tests.csproj --locked-mode
       - run: dotnet restore src/SephPlanner.DataTool/SephPlanner.DataTool.csproj --locked-mode
       - run: dotnet format src/SephPlanner.Core/SephPlanner.Core.csproj --verify-no-changes --no-restore
+      - run: dotnet format src/SephPlanner.Diagnostics/SephPlanner.Diagnostics.csproj --verify-no-changes --no-restore
       - run: dotnet format tests/SephPlanner.Tests/SephPlanner.Tests.csproj --verify-no-changes --no-restore
       - run: dotnet test tests/SephPlanner.Tests/SephPlanner.Tests.csproj -c Release --no-restore
       - run: dotnet format src/SephPlanner.DataTool/SephPlanner.DataTool.csproj --verify-no-changes --no-restore

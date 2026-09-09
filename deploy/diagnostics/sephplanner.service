@@ -1,0 +1,19 @@
+[Unit]
+Description=SephPlanner 비공개 진단 수집
+Requires=docker.service wg-quick@wg-edge.service
+After=docker.service wg-quick@wg-edge.service
+RequiresMountsFor=/srv/nyas/sephplanner/reports
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/sephplanner
+ExecStart=/usr/bin/docker compose up -d --no-build --wait --wait-timeout 90
+ExecStop=/usr/bin/docker compose down
+TimeoutStartSec=120
+TimeoutStopSec=60
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
