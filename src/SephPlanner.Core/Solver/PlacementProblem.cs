@@ -118,6 +118,8 @@ namespace SephPlanner.Core.Solver
         public Dictionary<int, int> PinnedCharms { get; set; } = new Dictionary<int, int>();
         public HashSet<int> RetainedCharms { get; set; } = new HashSet<int>();
         internal HashSet<int> ProtectedActive { get; set; } = new HashSet<int>();
+        // 획득·제거·합성 가상 배치는 바뀐 가방이 아니라 원래 가방의 활성 보호를 따른다.
+        internal bool InheritsActivationBaseline { get; set; }
 
         /// <summary>
         /// <see cref="ComboCounts"/>에서 자리 의존 아티팩트의 지금 자리 몫을 뺀 것. <see cref="ComboCounting"/>이

@@ -484,6 +484,7 @@ namespace SephPlanner.Core.Solver
 
         internal static PlacementProblem Clone(PlacementProblem problem)
         {
+            PlacementSolver.CaptureProtectedActivation(problem);
             var clone = new PlacementProblem
             {
                 Grid = problem.Grid,
@@ -498,6 +499,7 @@ namespace SephPlanner.Core.Solver
                 PinnedCharms = problem.PinnedCharms,
                 RetainedCharms = problem.RetainedCharms,
                 ProtectedActive = new HashSet<int>(problem.ProtectedActive),
+                InheritsActivationBaseline = true,
             };
 
             // 현재 위치와 직전 제안을 빼먹으면 후보 쪽 풀이만 앵커를 잃어, 기준과 후보가

@@ -87,7 +87,8 @@ namespace SephPlanner.Core.Solver
                 {
                     var best = Best(
                         problem, materials[i], materials[j], mixedDefinition, baseScore,
-                        layouts, baseLayout, i, j, faster);
+                        layouts, baseLayout, problem.Tablets.IndexOf(materials[i].Slot),
+                        problem.Tablets.IndexOf(materials[j].Slot), faster);
                     if (best is not null) advice.Add(best);
                 }
             }
@@ -271,34 +272,12 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         private static PlacementProblem Without(PlacementProblem problem, int first, int second)
         {
-            var clone = new PlacementProblem
-            {
-                Grid = problem.Grid,
-                Charms = new List<CharmSlot>(problem.Charms),
-                Tablets = problem.Tablets.Where(t => t.InstanceId != first && t.InstanceId != second).ToList(),
-                FixedTablets = problem.FixedTablets,
-                FixedEffects = problem.FixedEffects,
-                ComboCounts = problem.ComboCounts,
-                Combos = problem.Combos,
-                PriorityCategories = problem.PriorityCategories,
-                DeactivationAllowed = problem.DeactivationAllowed,
-                PinnedCharms = problem.PinnedCharms,
-                RetainedCharms = problem.RetainedCharms,
-                ProtectedActive = new HashSet<int>(problem.ProtectedActive),
-            };
-
-            foreach (var pair in problem.CurrentTablets)
-            {
-                if (pair.Key == first || pair.Key == second) continue;
-                clone.CurrentTablets[pair.Key] = pair.Value;
-            }
-            foreach (var pair in problem.CurrentCharms) clone.CurrentCharms[pair.Key] = pair.Value;
-            foreach (var pair in problem.PlannedTablets)
-            {
-                if (pair.Key == first || pair.Key == second) continue;
-                clone.PlannedTablets[pair.Key] = pair.Value;
-            }
-            foreach (var pair in problem.PlannedCharms) clone.PlannedCharms[pair.Key] = pair.Value;
+            var clone = OfferAdvisor.Clone(problem);
+            clone.Tablets.RemoveAll(tablet => tablet.InstanceId == first || tablet.InstanceId == second);
+            clone.CurrentTablets.Remove(first);
+            clone.CurrentTablets.Remove(second);
+            clone.PlannedTablets.Remove(first);
+            clone.PlannedTablets.Remove(second);
             return clone;
         }
     }

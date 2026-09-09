@@ -631,7 +631,7 @@ namespace SephPlanner.Plugin.Ui
                 _detail.text = entry.Detail;
                 _retain.color = entry.Retained ? NativeSkin.Mint : NativeSkin.TextDim;
                 Widgets.SetActive(_retain, entry.EntityId != 0);
-                _deactivation.color = entry.AllowDeactivation && !entry.Retained ? NativeSkin.Mint : NativeSkin.TextDim;
+                _deactivation.color = entry.AllowDeactivation ? NativeSkin.Mint : NativeSkin.TextDim;
                 Widgets.SetActive(_deactivation, entry.EntityId != 0);
                 _hold.color = entry.Held ? NativeSkin.Mint : NativeSkin.TextDim;
                 Widgets.SetActive(_hold, entry.EntityId != 0);

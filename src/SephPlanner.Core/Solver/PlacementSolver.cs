@@ -14,12 +14,12 @@ namespace SephPlanner.Core.Solver
         public static Arrangement Solve(PlacementProblem problem, SolverOptions? options = null)
         {
             options ??= new SolverOptions();
-            CaptureProtectedActivation(problem);
             return ImproveTablets(problem, EvaluateLayouts(problem, SearchLayouts(problem, options), options), options);
         }
 
-        private static void CaptureProtectedActivation(PlacementProblem problem)
+        internal static void CaptureProtectedActivation(PlacementProblem problem)
         {
+            if (problem.InheritsActivationBaseline) return;
             problem.ProtectedActive.Clear();
             if (problem.CurrentCharms.Count != problem.Charms.Count ||
                 !problem.Charms.All(charm => problem.CurrentCharms.ContainsKey(charm.InstanceId))) return;
@@ -79,6 +79,7 @@ namespace SephPlanner.Core.Solver
             PlacementProblem problem, SolverOptions? options = null)
         {
             options ??= new SolverOptions();
+            CaptureProtectedActivation(problem);
 
             var cells = Cells(problem);
             var model = BuildEstimateModel(problem);
@@ -122,6 +123,7 @@ namespace SephPlanner.Core.Solver
             SolverOptions? options = null)
         {
             options ??= new SolverOptions();
+            CaptureProtectedActivation(problem);
 
             var cells = Cells(problem);
             Arrangement? best = null;

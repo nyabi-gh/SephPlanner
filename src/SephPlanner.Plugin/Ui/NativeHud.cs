@@ -519,7 +519,8 @@ namespace SephPlanner.Plugin.Ui
             _score.text = previewed != null
                 ? $"미리보기 {plan.Current.Score:0.#} / {score:0.#}"
                 : $"{plan.Current.Score:0.#} / {score:0.#}";
-            _gain.text = gain > 0.001 ? $"+{gain:0.#}" : gain < -0.001 ? $"{gain:0.#}" : "변경 없음";
+            _gain.text = gain > 0.001 ? $"+{gain:0.#}" : gain < -0.001 ? $"{gain:0.#}" :
+                previewed == null && plan.HasPlacementChanges ? "배치 정리" : "변경 없음";
             _gain.color = gain > 0.001 ? NativeSkin.Good : gain < -0.001 ? NativeSkin.Bad : NativeSkin.TextDim;
             if (previewed == null && plan.HasPlacementChanges)
             {
