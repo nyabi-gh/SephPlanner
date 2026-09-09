@@ -8,6 +8,17 @@ namespace SephPlanner.Tests;
 public class PlanFingerprintTests
 {
     [Fact]
+    public void AttackabilityChangesInvalidatePlacementEvenWithoutMovingTheItem()
+    {
+        var snapshot = Snapshot();
+        var before = PlanFingerprint.Placement(snapshot, PlanPreferences.None, "catalog");
+        snapshot.Inventory!.Items[0].IsAttackable = false;
+        var nonAttack = PlanFingerprint.Placement(snapshot, PlanPreferences.None, "catalog");
+        Assert.NotEqual(before, nonAttack);
+        snapshot.Inventory.Items[0].IsAttackable = true;
+        Assert.NotEqual(nonAttack, PlanFingerprint.Placement(snapshot, PlanPreferences.None, "catalog"));
+    }
+    [Fact]
     public void DisabledRecommendationsIgnoreOffersMixerAndBuildPriorities()
     {
         var snapshot = Snapshot();

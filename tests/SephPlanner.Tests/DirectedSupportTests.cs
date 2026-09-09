@@ -8,6 +8,104 @@ namespace SephPlanner.Tests;
 
 public class DirectedSupportTests
 {
+    private static PlacementProblem ManaBoard(bool retained = false)
+    {
+        var p = Board(retained);
+        p.FixedEffects.Clear();
+        p.Charms[0].Definition.Behavior = "Charm_ReduceMPCost";
+        p.Charms[0].Definition.EntityId = 1069;
+        p.Charms[0].Definition.MagicSupport = new DirectedMagicSupport
+        {
+            Effect = MagicSupportEffect.ManaCostReduction,
+            OffsetX = -1,
+            AmountByLevel = { 25, 50, 100 },
+        };
+        p.Charms[1].Definition.MagicCostByLevel.AddRange(new double[] { 20, 12 });
+        p.CurrentCharms[1] = new GridPos(1, 0);
+        p.CurrentCharms[2] = new GridPos(0, 0);
+        return p;
+    }
+
+    [Fact]
+    public void OppositeSupportsCanMoveTogetherWithTheirSharedMagic()
+    {
+        var p = Board(true);
+        p.Grid = new GridSpec(6, 2, 12);
+        p.FixedEffects.Clear();
+        var reducer = ManaBoard(true).Charms[0];
+        reducer.InstanceId = 3;
+        p.Charms.Add(reducer);
+        p.Charms[1].Definition.MagicCostByLevel.AddRange(new double[] { 20, 12 });
+        p.CurrentCharms[3] = new GridPos(2, 0);
+        p.FixedEffects.Add(new FixedEffectCell { Position = new GridPos(3, 1), Level = 2 });
+        p.FixedEffects.Add(new FixedEffectCell { Position = new GridPos(5, 1), Level = 2 });
+        var solved = PlacementSolver.Solve(p);
+        Assert.Empty(solved.UnretainedCharms);
+        Assert.Empty(solved.UnlinkedCharms);
+        Assert.Equal(new GridPos(3, 1), solved.CharmPositions[1]);
+        Assert.Equal(new GridPos(4, 1), solved.CharmPositions[2]);
+        Assert.Equal(new GridPos(5, 1), solved.CharmPositions[3]);
+        foreach (var pair in solved.CharmPositions) p.CurrentCharms[pair.Key] = pair.Value;
+        Assert.Equal(solved.CharmPositions.OrderBy(pair => pair.Key),
+            PlacementSolver.Solve(p).CharmPositions.OrderBy(pair => pair.Key));
+    }
+
+    [Theory]
+    [InlineData(12, 25, 0.25)]
+    [InlineData(3, 50, 1.0 / 3)]
+    [InlineData(12, 100, 1)]
+    [InlineData(12, 150, 1)]
+    [InlineData(0, 25, 0)]
+    [InlineData(12, -25, -0.25)]
+    public void ManaSupportUsesRoundedSavingsWithoutInfiniteValue(double cost, double reduction, double ratio)
+    {
+        var p = ManaBoard();
+        p.Charms[0].Definition.MagicSupport!.AmountByLevel[0] = reduction;
+        p.Charms[1].Definition.MagicCostByLevel[1] = cost;
+        var solved = PlacementSolver.Score(p, new List<TabletPlacement>(), p.CurrentCharms);
+        var targetWorth = p.Charms[1].Worth.At(1);
+        Assert.Equal(targetWorth * (1 + ratio), solved.Score, 8);
+    }
+
+    [Fact]
+    public void RetainedManaSupportProtectsTheLeftTargetAndCanMoveWithIt()
+    {
+        var p = ManaBoard(true);
+        p.FixedEffects.Add(new FixedEffectCell { Position = new GridPos(4, 0), Level = 2 });
+        var solved = PlacementSolver.Solve(p);
+        Assert.Equal(new GridPos(4, 0), solved.CharmPositions[1]);
+        Assert.Equal(new GridPos(3, 0), solved.CharmPositions[2]);
+        Assert.Empty(solved.UnretainedCharms);
+        Assert.Empty(solved.UnlinkedCharms);
+
+        p.FixedEffects.Clear();
+        p.Grid = new GridSpec(6, 1, 2);
+        Assert.Empty(DiscardAdvisor.Rank(p, PlacementSolver.Solve(p)));
+        var ordinary = new OfferCandidate { Charm = new CharmDefinition { EntityId = 9 } };
+        Assert.False(OfferAdvisor.Rank(p, new[] { ordinary }, 100)[0].Available);
+    }
+
+    [Theory]
+    [InlineData("wrongSide")]
+    [InlineData("disabled")]
+    [InlineData("negative")]
+    [InlineData("ordinary")]
+    public void ManaSupportDoesNotCountAnUnusableConnection(string failure)
+    {
+        var p = ManaBoard(true);
+        if (failure == "wrongSide")
+        {
+            p.CurrentCharms[1] = new GridPos(0, 0);
+            p.CurrentCharms[2] = new GridPos(1, 0);
+        }
+        if (failure == "disabled") p.FixedEffects.Add(new FixedEffectCell { Position = new GridPos(0, 0), Disable = 1 });
+        if (failure == "negative") p.Charms[1].Enchant = -1;
+        if (failure == "ordinary") p.Charms[1].Definition.IsMagic = false;
+        var solved = PlacementSolver.Score(p, new List<TabletPlacement>(), p.CurrentCharms);
+        Assert.Contains(1, solved.UnlinkedCharms);
+        Assert.Contains(1, solved.UnretainedCharms);
+    }
+
     private static CharmSlot Helper(int id = 1) => new()
     {
         InstanceId = id,
@@ -16,7 +114,7 @@ public class DirectedSupportTests
             EntityId = 1168,
             MaxLevel = 2,
             Behavior = "Charm_RightSpellCooldownHelper",
-            MagicCooldownSupport = new DirectedMagicCooldown { OffsetX = 1, RecoveryByLevel = { 60, 100, 140 } },
+            MagicSupport = new DirectedMagicSupport { OffsetX = 1, AmountByLevel = { 60, 100, 140 } },
         },
     };
 

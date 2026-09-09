@@ -30,6 +30,27 @@ public class ComboCountingTests
     private static CharmSlot Slot(int id, CharmDefinition definition) => new() { InstanceId = id, Definition = definition };
 
     [Theory]
+    [InlineData(null, true)]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    public void NeedleUsesInstanceAttackabilityWhenAvailable(bool? attackable, bool connected)
+    {
+        var needle = Slot(1, Needle("N"));
+        var target = Slot(2, Attackable("M", "EMBER"));
+        target.Definition.IsMagic = true;
+        target.IsAttackable = attackable;
+        var neighbors = new Dictionary<GridPos, CharmSlot>
+        {
+            [new GridPos(0, 1)] = needle,
+            [new GridPos(0, 0)] = target,
+        };
+        var inherited = new List<string>();
+        ComboCounting.PositionalCategories(needle, new GridPos(0, 1), neighbors, inherited);
+        Assert.Equal(connected ? 1 : 0, inherited.Count);
+        Assert.Equal(connected ? 1 : 0, PositionalWorth.DependencyFactor(needle, new GridPos(0, 1), 0, neighbors));
+    }
+
+    [Theory]
     [InlineData(false, false)]
     [InlineData(true, false)]
     [InlineData(false, true)]

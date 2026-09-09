@@ -82,6 +82,7 @@ namespace SephPlanner.Core.Runtime
 
     public sealed class PlacedItem
     {
+        public bool? IsAttackable { get; set; }
         public int DefinitionId { get; set; }
         public int InstanceId { get; set; }
         public GridPos Position { get; set; }

@@ -124,6 +124,7 @@ namespace SephPlanner.Core.Planning
                 {
                     Definition = definition ?? new CharmDefinition(),
                     InstanceId = item.InstanceId,
+                    IsAttackable = item.IsAttackable,
                     Enchant = definition is null ? 0 : item.Enchant,
                     IsFiller = definition is null,
                     IsDormant = definition is not null && WeaponMatch.IsDormant(definition, weapon),

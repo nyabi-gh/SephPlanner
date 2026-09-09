@@ -18,7 +18,8 @@ namespace SephPlanner.Core.Model
         /// <summary>Charm_Magic 계열이면 참. 다른 아티팩트의 조건 판정에 쓰인다.</summary>
         public bool IsMagic { get; set; }
 
-        public DirectedMagicCooldown? MagicCooldownSupport { get; set; }
+        public DirectedMagicSupport? MagicSupport { get; set; }
+        public List<double> MagicCostByLevel { get; set; } = new List<double>();
 
         /// <summary>참이면 특정 무기를 들어야 발동한다.</summary>
         public bool IsWeaponRelated { get; set; }
@@ -70,9 +71,8 @@ namespace SephPlanner.Core.Model
         /// 공격하는 아티팩트(게임 <c>IAttackableCharm</c>). 북향의 침은 이런 아티팩트나 다른 침만
         /// 대상으로 삼는다.
         ///
-        /// 정의 단계의 답이라 <c>Charm_Magic</c>은 낙관적으로 참이다 - 마법서가 실제로 공격
-        /// 마법을 품었는지는 인스턴스마다 다르고(<c>CheckMagicIsAttackable</c>), 정의만 보고는
-        /// 알 수 없다. 틀렸을 때의 대가는 침 하나가 헛자리에 서는 것뿐이다.
+        /// 마법은 담긴 기술의 공격 가능 여부까지 확인한다. 인스턴스에서 읽은 판정이 있으면
+        /// 솔버는 그 값을 우선한다.
         /// </summary>
         public bool IsAttackable { get; set; }
 

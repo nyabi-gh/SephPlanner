@@ -11,9 +11,9 @@ namespace SephPlanner.Core.Solver
         internal static bool IsTarget(CharmSlot target) =>
             target.Definition.IsMagic && !target.IsFiller && !target.IsDormant;
 
-        internal static double Recovery(CharmSlot helper, int level)
+        internal static double Amount(CharmSlot helper, int level)
         {
-            var table = helper.Definition.MagicCooldownSupport?.RecoveryByLevel;
+            var table = helper.Definition.MagicSupport?.AmountByLevel;
             return table is null || table.Count == 0 ? 0 :
                 table[Math.Min(Math.Max(0, Math.Min(helper.Definition.MaxLevel, level)), table.Count - 1)];
         }
@@ -24,8 +24,8 @@ namespace SephPlanner.Core.Solver
         {
             target = helper;
             targetCell = cell;
-            var support = helper.Definition.MagicCooldownSupport;
-            if (support is null || support.RecoveryByLevel.Count == 0 || neighbors is null) return false;
+            var support = helper.Definition.MagicSupport;
+            if (support is null || support.AmountByLevel.Count == 0 || neighbors is null) return false;
             targetCell = cell.Offset(support.OffsetX, support.OffsetY);
             if (!grid.Contains(targetCell) || !neighbors.TryGetValue(targetCell, out var found)) return false;
             // 배정 중에는 이전 자리에 선 자신 대신 교환될 아티팩트를 본다. 최종 채점은 실제 점유를 쓴다.
@@ -43,30 +43,42 @@ namespace SephPlanner.Core.Solver
             if (neighbors is null) return Estimate(problem, helper, level);
             if (!TryTarget(helper, cell, result, problem.Grid, occupancy, neighbors, out var target, out var targetCell)) return 0;
             var targetLevel = Math.Min(target.Definition.MaxLevel, result.EffectiveLevel(targetCell, target.Enchant));
-            return Benefit(helper, level, target.Worth.At(targetLevel));
+            return Benefit(helper, level, target, targetLevel);
         }
 
         internal static double Estimate(PlacementProblem problem, CharmSlot helper, int level)
         {
-            var best = 0.0;
+            var best = double.NegativeInfinity;
             var found = false;
             foreach (var target in problem.Charms)
             {
                 if (target == helper || !IsTarget(target)) continue;
                 found = true;
                 for (var targetLevel = 0; targetLevel <= target.Definition.MaxLevel; targetLevel++)
-                    best = Math.Max(best, target.Worth.At(targetLevel));
+                    best = Math.Max(best, Benefit(helper, level, target, targetLevel));
             }
-            return found ? Benefit(helper, level, best) : 0;
+            return found ? best : 0;
         }
 
-        private static double Benefit(CharmSlot helper, int level, double targetWorth)
+        private static double Benefit(CharmSlot helper, int level, CharmSlot target, int targetLevel)
         {
             if (helper.Worth.Source == CharmWorthSource.Curated)
                 return helper.Worth.WeightedAt(Math.Min(helper.Definition.MaxLevel, level), helper.Weight);
-            // 게임은 기본 쿨다운을 (100 + 회복 속도)/100으로 나눈다. 여기서는 추가 버프·마나·시전
-            // 빈도를 모르는 상태의 환산 추정치로, 기본 속도에서 증가하는 사용 횟수 비율을 쓴다.
-            return CharmWorth.ApplyWeight(Math.Max(0, targetWorth) * Recovery(helper, level) / 100, helper.Weight);
+            var amount = Amount(helper, level);
+            var ratio = amount / 100;
+            if (helper.Definition.MagicSupport!.Effect == MagicSupportEffect.ManaCostReduction)
+            {
+                var costs = target.Definition.MagicCostByLevel;
+                if (costs.Count == 0) return 0;
+                var cost = costs[Math.Min(Math.Max(0, targetLevel), costs.Count - 1)];
+                if (cost <= 0) return 0;
+                var adjusted = (float)cost + (float)cost * (-(float)amount / 100f);
+                var reduced = amount >= 100 ? 0 : Math.Round(adjusted, MidpointRounding.ToEven);
+                ratio = (cost - reduced) / cost;
+            }
+            // 회복은 기본 속도 대비 사용 횟수 증가, 비용 감소는 기본 마나 비용 대비 절약률로 환산한
+            // 추정이다. 추가 버프·비용 변경·실제 시전 빈도를 포함한 전투 효율은 아니다.
+            return CharmWorth.ApplyWeight(Math.Max(0, target.Worth.At(targetLevel)) * ratio, helper.Weight);
         }
     }
 }

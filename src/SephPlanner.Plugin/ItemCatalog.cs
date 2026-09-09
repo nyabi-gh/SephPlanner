@@ -124,7 +124,8 @@ namespace SephPlanner.Plugin
                     Behavior = charm != null ? charm.GetType().Name : "",
                     EffectLines = EffectLines(charm),
                     NeighborLevelBonus = NeighborLevelBonus(charm),
-                    IsAttackable = charm is IAttackableCharm,
+                    IsAttackable = charm is IAttackableCharm &&
+                                   (!(charm is Charm_Magic attackMagic) || attackMagic.IsAttackableCharm()),
                     IsCompanion = charm is ICompanionCharm,
                     NeighborEnhanceCategory = NeighborEnhanceCategory(charm),
                     LineCategories = LineCategories(charm),
@@ -132,11 +133,20 @@ namespace SephPlanner.Plugin
                     Names = DisplayName(entity),
                 };
                 if (charm is Charm_RightSpellCooldownHelper helper)
-                    definition.MagicCooldownSupport = new DirectedMagicCooldown
+                    definition.MagicSupport = new DirectedMagicSupport
                     {
                         OffsetX = 1,
-                        RecoveryByLevel = Doubles(helper.cooldownRecoveryByLevel),
+                        AmountByLevel = Doubles(helper.cooldownRecoveryByLevel),
                     };
+                if (charm is Charm_ReduceMPCost reducer)
+                    definition.MagicSupport = new DirectedMagicSupport
+                    {
+                        Effect = MagicSupportEffect.ManaCostReduction,
+                        OffsetX = -1,
+                        AmountByLevel = Doubles(reducer.reducePercentByLevel),
+                    };
+                if (charm is Charm_Magic magic && magic.ContainedMagic != null)
+                    definition.MagicCostByLevel = Doubles(magic.ContainedMagic.mpCostsByLevel);
                 Dependency(charm, definition);
                 result.Add(definition);
             }

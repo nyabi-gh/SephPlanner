@@ -226,7 +226,7 @@ namespace SephPlanner.Core.Solver
             if (IsNeedle(target.Definition)) return true;
             if (target.IsFiller || target.IsDormant) return false;
 
-            return target.Definition.IsAttackable;
+            return target.IsAttackable ?? target.Definition.IsAttackable;
         }
 
         private static double At(List<double> table, int level)

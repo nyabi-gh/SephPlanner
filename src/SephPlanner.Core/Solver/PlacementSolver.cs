@@ -300,7 +300,7 @@ namespace SephPlanner.Core.Solver
         /// 잣대이되, 자리에 달린 몫(조건·이웃·안정)은 뺀 것이다 - 아직 어느 칸인지 모르기 때문이다.
         /// </summary>
         private static double RankValue(PlacementProblem problem, CharmSlot charm, int level) =>
-            charm.Definition.MagicCooldownSupport is not null
+            charm.Definition.MagicSupport is not null
                 ? DirectedCharmSupport.Estimate(problem, charm, level)
                 : charm.Worth.WeightedAt(Math.Min(charm.Definition.MaxLevel, level), charm.Weight);
 
@@ -690,12 +690,12 @@ namespace SephPlanner.Core.Solver
             {
                 Polish(problem, layout, free, bestPositions, ref bestOccupancy, ref bestResult, options);
             }
-            else if (problem.Charms.Any(charm => charm.Retained && charm.Definition.MagicCooldownSupport is not null))
+            else if (problem.Charms.Any(charm => charm.Retained && charm.Definition.MagicSupport is not null))
             {
                 for (var pass = 0; pass < options.PolishPasses; pass++)
                 {
                     var bestNeighbors = CharmsByCell(problem, bestPositions);
-                    if (!problem.Charms.Any(charm => charm.Retained && charm.Definition.MagicCooldownSupport is not null &&
+                    if (!problem.Charms.Any(charm => charm.Retained && charm.Definition.MagicSupport is not null &&
                         (!bestPositions.TryGetValue(charm.InstanceId, out var position) ||
                          !CanUse(problem, charm, position, bestResult, bestOccupancy, bestNeighbors)))) break;
                     if (!PolishSupportPairs(problem, layout, free, bestPositions, ref bestOccupancy,
@@ -771,7 +771,7 @@ namespace SephPlanner.Core.Solver
             SolverOptions options, int? forcedCharm = null, GridPos forcedCell = default)
         {
             var helpers = problem.Charms.Where(charm => !charm.IsFiller && !charm.IsDormant &&
-                charm.Definition.MagicCooldownSupport is not null && positions.ContainsKey(charm.InstanceId)).ToList();
+                charm.Definition.MagicSupport is not null && positions.ContainsKey(charm.InstanceId)).ToList();
             if (helpers.Count == 0) return false;
             var targets = problem.Charms.Where(charm => DirectedCharmSupport.IsTarget(charm) &&
                 positions.ContainsKey(charm.InstanceId)).ToList();
@@ -781,7 +781,7 @@ namespace SephPlanner.Core.Solver
             var moved = false;
             foreach (var helper in helpers)
             {
-                var support = helper.Definition.MagicCooldownSupport!;
+                var support = helper.Definition.MagicSupport!;
                 foreach (var target in targets)
                 {
                     if (helper == target) continue;
@@ -791,17 +791,36 @@ namespace SephPlanner.Core.Solver
                         var targetCell = cell.Offset(support.OffsetX, support.OffsetY);
                         if (cell == targetCell || !available.Contains(targetCell)) continue;
                         if (positions[helper.InstanceId] == cell && positions[target.InstanceId] == targetCell) continue;
-                        // 두 자리를 함께 바꿔야만 연결이 생기는 경우를 평가한다. 밀려난 아이템도 교환으로 보존한다.
+                        var currentNeighbors = CharmsByCell(problem, positions);
+                        var connected = new List<CharmSlot>();
+                        foreach (var other in helpers)
+                            if (other == helper || DirectedCharmSupport.TryTarget(other, positions[other.InstanceId],
+                                result, problem.Grid, occupancy, currentNeighbors, out var existingTarget, out _) && existingTarget == target)
+                                connected.Add(other);
+                        var destinations = new Dictionary<int, GridPos> { [target.InstanceId] = targetCell };
+                        foreach (var other in connected)
+                        {
+                            var direction = other.Definition.MagicSupport!;
+                            destinations[other.InstanceId] = targetCell.Offset(-direction.OffsetX, -direction.OffsetY);
+                        }
+                        if (destinations.Values.Any(destination => !available.Contains(destination)) ||
+                            destinations.Values.Distinct().Count() != destinations.Count) continue;
+                        // 같은 마법을 지원하는 연결을 함께 옮긴다. 밀려난 아이템도 교환으로 보존한다.
                         var trial = new Dictionary<int, GridPos>(positions);
                         var neighbors = CharmsByCell(problem, trial);
-                        neighbors.TryGetValue(cell, out var first);
-                        Move(trial, neighbors, helper, trial[helper.InstanceId], first, cell);
+                        foreach (var other in connected)
+                        {
+                            var destination = destinations[other.InstanceId];
+                            neighbors.TryGetValue(destination, out var displaced);
+                            Move(trial, neighbors, other, trial[other.InstanceId], displaced, destination);
+                        }
                         neighbors.TryGetValue(targetCell, out var second);
                         Move(trial, neighbors, target, trial[target.InstanceId], second, targetCell);
                         if (forcedCharm.HasValue && trial[forcedCharm.Value] != forcedCell) continue;
                         var trialOccupancy = OccupancyFrom(layout, trial, problem);
                         var trialResult = TabletSimulator.Run(WithFixed(problem, layout), trialOccupancy, problem.Grid, problem.FixedEffects);
-                        if (!CanUse(problem, helper, cell, trialResult, trialOccupancy, neighbors)) continue;
+                        if (connected.Any(other => !CanUse(problem, other, trial[other.InstanceId],
+                            trialResult, trialOccupancy, neighbors))) continue;
                         var quality = ScoreOf(problem, layout, trial, trialOccupancy, trialResult, neighbors);
                         if (quality.CompareTo(score) <= 0) continue;
                         positions.Clear();
@@ -951,7 +970,7 @@ namespace SephPlanner.Core.Solver
 
             var level = result.EffectiveLevel(cell, charm.Enchant);
             var effective = Math.Min(charm.Definition.MaxLevel, level);
-            if (charm.Definition.MagicCooldownSupport is not null)
+            if (charm.Definition.MagicSupport is not null)
                 return DirectedCharmSupport.Value(problem, charm, cell, effective, result, occupancy, neighbors)
                     - WastePenalty * Math.Max(0, level - effective);
 
@@ -1043,7 +1062,7 @@ namespace SephPlanner.Core.Solver
             PlacementProblem problem, CharmSlot charm, GridPos cell, SimulationResult result,
             GridOccupancy occupancy, IReadOnlyDictionary<GridPos, CharmSlot>? neighbors) =>
             Reason(charm, cell, result, problem.Grid, occupancy) == CharmInactiveReason.None &&
-            (charm.Definition.MagicCooldownSupport is null ||
+            (charm.Definition.MagicSupport is null ||
              DirectedCharmSupport.TryTarget(charm, cell, result, problem.Grid, occupancy, neighbors, out _, out _));
 
         /// <summary>
@@ -1193,7 +1212,7 @@ namespace SephPlanner.Core.Solver
             {
                 if (charm.IsFiller) continue;
                 var inactive = arrangement.InactiveCharms.Contains(charm.InstanceId);
-                var unlinked = !inactive && charm.Definition.MagicCooldownSupport is not null &&
+                var unlinked = !inactive && charm.Definition.MagicSupport is not null &&
                     !DirectedCharmSupport.TryTarget(charm, positions[charm.InstanceId], result, problem.Grid,
                         occupancy, neighbors, out _, out _);
                 if (unlinked) arrangement.UnlinkedCharms.Add(charm.InstanceId);

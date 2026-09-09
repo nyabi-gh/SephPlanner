@@ -81,6 +81,7 @@ namespace SephPlanner.Core.Runtime
                 Add(builder, "itemLevel", item.EffectiveLevel);
                 Add(builder, "itemActive", item.IsActive);
                 Add(builder, "itemEnchant", item.Enchant);
+                Add(builder, "itemAttackable", item.IsAttackable.HasValue ? (item.IsAttackable.Value ? "1" : "0") : "unknown");
             }
 
             foreach (var tablet in inventory.Tablets
