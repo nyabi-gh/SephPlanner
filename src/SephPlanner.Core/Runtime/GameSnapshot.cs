@@ -82,6 +82,7 @@ namespace SephPlanner.Core.Runtime
 
     public sealed class PlacedItem
     {
+        public List<string>? ObservedCategories { get; set; }
         public bool? IsAttackable { get; set; }
         public int DefinitionId { get; set; }
         public int InstanceId { get; set; }

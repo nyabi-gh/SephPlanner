@@ -30,6 +30,56 @@ public class ComboCountingTests
     private static CharmSlot Slot(int id, CharmDefinition definition) => new() { InstanceId = id, Definition = definition };
 
     [Theory]
+    [InlineData(1, true)]
+    [InlineData(2, false)]
+    [InlineData(3, false)]
+    public void PaperUsesItsPrefabMatchCount(int match, bool inherits)
+    {
+        var paper = Slot(1, new CharmDefinition { Behavior = "Charm_WhitePaper", PaperMatch = match, Categories = { "IGNORED" } });
+        var neighbors = new Dictionary<GridPos, CharmSlot>
+        {
+            [new GridPos(0, 0)] = paper,
+            [new GridPos(1, 0)] = Slot(2, Attackable("A", "EMBER")),
+        };
+        var counts = ComboCounting.CountAll(neighbors);
+        Assert.False(counts.ContainsKey("IGNORED"));
+        Assert.Equal(inherits ? 2 : 1, counts["EMBER"]);
+    }
+
+    [Fact]
+    public void PaperReadsObservedNeighborPaperCategoriesWithoutInventingARecursiveFixedPoint()
+    {
+        var first = Slot(1, new CharmDefinition { Behavior = "Charm_WhitePaper", Categories = { "WRONG" } });
+        var second = Slot(2, new CharmDefinition { Behavior = "Charm_WhitePaper", Categories = { "WRONG" } });
+        second.ObservedCategories = new List<string> { "EMBER" };
+        var neighbors = new Dictionary<GridPos, CharmSlot>
+        {
+            [new GridPos(0, 0)] = Slot(3, Attackable("A", "EMBER")),
+            [new GridPos(1, 0)] = first,
+            [new GridPos(2, 0)] = second,
+            [new GridPos(3, 0)] = Slot(4, Attackable("B", "EMBER")),
+        };
+        var categories = new List<string>();
+        ComboCounting.PositionalCategories(first, new GridPos(1, 0), neighbors, categories);
+        Assert.Equal(new[] { "EMBER" }, categories);
+        second.ObservedCategories.Clear();
+        categories.Clear();
+        ComboCounting.PositionalCategories(first, new GridPos(1, 0), neighbors, categories);
+        Assert.Empty(categories);
+    }
+
+    [Fact]
+    public void CurrentPaperShareIsRemovedUsingTheObservedState()
+    {
+        var paper = Slot(1, new CharmDefinition { Behavior = "Charm_WhitePaper" });
+        paper.ObservedCategories = new List<string> { "EMBER" };
+        var problem = new PlacementProblem { ComboCounts = new Dictionary<string, int> { ["EMBER"] = 1 } };
+        problem.Charms.Add(paper);
+        problem.CurrentCharms[1] = new GridPos(0, 0);
+        Assert.Equal(0, ComboCounting.CountFor(problem, paper, "EMBER", new Dictionary<GridPos, CharmSlot>()));
+    }
+
+    [Theory]
     [InlineData(null, true)]
     [InlineData(false, false)]
     [InlineData(true, true)]

@@ -82,6 +82,9 @@ namespace SephPlanner.Core.Runtime
                 Add(builder, "itemActive", item.IsActive);
                 Add(builder, "itemEnchant", item.Enchant);
                 Add(builder, "itemAttackable", item.IsAttackable.HasValue ? (item.IsAttackable.Value ? "1" : "0") : "unknown");
+                Add(builder, "categoriesKnown", item.ObservedCategories is not null);
+                foreach (var category in item.ObservedCategories?.OrderBy(value => value, StringComparer.Ordinal) ?? Enumerable.Empty<string>())
+                    Add(builder, "observedCategory", category);
             }
 
             foreach (var tablet in inventory.Tablets

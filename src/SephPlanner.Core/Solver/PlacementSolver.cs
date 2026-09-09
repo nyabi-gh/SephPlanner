@@ -300,6 +300,8 @@ namespace SephPlanner.Core.Solver
         /// 잣대이되, 자리에 달린 몫(조건·이웃·안정)은 뺀 것이다 - 아직 어느 칸인지 모르기 때문이다.
         /// </summary>
         private static double RankValue(PlacementProblem problem, CharmSlot charm, int level) =>
+            charm.Definition.ContextStats.Count > 0
+                ? ContextStatWorth.Value(problem, charm, default, Math.Min(charm.Definition.MaxLevel, level), null, true) :
             charm.Definition.MagicSupport is not null
                 ? DirectedCharmSupport.Estimate(problem, charm, level)
                 : charm.Worth.WeightedAt(Math.Min(charm.Definition.MaxLevel, level), charm.Weight);
@@ -1001,6 +1003,9 @@ namespace SephPlanner.Core.Solver
             // 상한을 넘긴 레벨은 아무 값어치가 없다. 점수가 같은 배치라면 덜 흘리는 쪽을 고르도록
             // 아주 작은 차이만 준다. 실제 점수 차이를 뒤집을 만한 크기가 아니다.
             var value = charm.Worth.WeightedAt(effective, charm.Weight) * factor
+                        - WastePenalty * Math.Max(0, level - effective);
+            if (charm.Definition.ContextStats.Count > 0)
+                value = ContextStatWorth.Value(problem, charm, cell, effective, neighbors)
                         - WastePenalty * Math.Max(0, level - effective);
 
             if (charm.Definition.Behavior == "Charm_NearLevelDamage")

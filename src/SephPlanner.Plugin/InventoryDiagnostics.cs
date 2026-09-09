@@ -146,6 +146,7 @@ namespace SephPlanner.Plugin
                 text.AppendLine($"  ({pair.Key.x},{pair.Key.y}) = {pair.Value}");
 
             WriteOffers(text, inv, player, offerRadius);
+            EffectStateDiagnostics.Append(text, inv, player);
             UiDiagnostics.Write(text);
             FrameCost.Write(text);
 

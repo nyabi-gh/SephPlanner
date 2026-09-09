@@ -29,8 +29,18 @@ namespace SephPlanner.Core.Planning
             var entry = (values ?? CharmValueBook.Empty).Of(definition);
             var lines = new List<string>(definition.EffectLines);
             var worth = CharmWorth.Resolve(definition, entry);
+            if (definition.Behavior == "Charm_WhitePaper")
+                lines.Add("종이끼리 연결되면 최근 관측한 카테고리로 추정합니다. 갱신 순서에 따라 이동 후 결과가 달라질 수 있습니다.");
 
             if (worth.Source == CharmWorthSource.Curated && entry is { Note.Length: > 0 }) lines.Add(entry.Note);
+
+            if (definition.ContextStats.Count > 0 && worth.Source != CharmWorthSource.Curated)
+            {
+                lines.Add("배치의 아이템 수량·행에 따른 능력치를 함께 평가합니다. 점수는 능력치 환산값이며 실제 DPS가 아닙니다.");
+                if (definition.ContextStats.Exists(bonus => !bonus.WorthPerUnit.HasValue))
+                    lines.Add("환산하지 못한 능력치가 있어 기존 어림값을 함께 사용합니다.");
+                return lines;
+            }
 
             if (definition.MagicSupport is not null)
             {

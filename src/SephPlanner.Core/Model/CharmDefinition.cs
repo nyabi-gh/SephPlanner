@@ -20,6 +20,8 @@ namespace SephPlanner.Core.Model
 
         public DirectedMagicSupport? MagicSupport { get; set; }
         public List<double> MagicCostByLevel { get; set; } = new List<double>();
+        public List<ContextStatBonus> ContextStats { get; set; } = new List<ContextStatBonus>();
+        public int PaperMatch { get; set; } = 2;
 
         /// <summary>참이면 특정 무기를 들어야 발동한다.</summary>
         public bool IsWeaponRelated { get; set; }

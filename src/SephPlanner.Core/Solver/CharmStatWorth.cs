@@ -56,6 +56,8 @@ namespace SephPlanner.Core.Solver
 
             foreach (var charm in charms)
             {
+                foreach (var bonus in charm.ContextStats)
+                    bonus.WorthPerUnit = report.Exchange.TryConvert(bonus.StatusId, 1, out var unit) ? unit : (double?)null;
                 charm.StatWorthByLevel.Clear();
                 charm.StatBenefitByLevel.Clear();
                 charm.StatPenaltyByLevel.Clear();

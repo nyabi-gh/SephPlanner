@@ -153,6 +153,9 @@ namespace SephPlanner.Core.Solver
         internal static IEnumerable<string> CategoriesOf(
             CharmSlot charm, GridPos cell, IReadOnlyDictionary<GridPos, CharmSlot>? neighbors = null)
         {
+            // 종이끼리는 갱신 순서와 이전 상태에 의존하므로 정적 정의 대신 최근 관측을 쓴다.
+            if (charm.Definition.Behavior == "Charm_WhitePaper")
+                return charm.ObservedCategories ?? (IEnumerable<string>)System.Array.Empty<string>();
             if (neighbors is not null && IsNeedle(charm.Definition))
                 return DependencyTarget(charm, cell, neighbors, out var target, out var targetCell)
                     ? CategoriesOf(target, targetCell, neighbors)

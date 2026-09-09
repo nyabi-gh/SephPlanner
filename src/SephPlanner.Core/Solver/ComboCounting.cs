@@ -42,15 +42,15 @@ namespace SephPlanner.Core.Solver
             }
 
             if (definition.Behavior != "Charm_WhitePaper") return;
-            if (!neighbors.TryGetValue(cell.Offset(-1, 0), out var left) || left == charm || left.IsFiller) return;
-            if (!neighbors.TryGetValue(cell.Offset(1, 0), out var right) || right == charm || right.IsFiller) return;
-
-            // 열쇠의 카테고리는 정의가 아니라 현재 행에서 결정된다.
-            var rightCategories = new HashSet<string>(PositionalWorth.CategoriesOf(right, cell.Offset(1, 0), neighbors));
-            foreach (var category in PositionalWorth.CategoriesOf(left, cell.Offset(-1, 0), neighbors))
+            var matches = new Dictionary<string, int>();
+            foreach (var offset in new[] { 1, -1 })
             {
-                if (rightCategories.Remove(category)) into.Add(category);
+                var at = cell.Offset(offset, 0);
+                if (!neighbors.TryGetValue(at, out var neighbor) || neighbor == charm || neighbor.IsFiller) continue;
+                foreach (var category in PositionalWorth.CategoriesOf(neighbor, at, neighbors)) Add(matches, category, 1);
             }
+            foreach (var match in matches)
+                if (match.Value >= definition.PaperMatch) into.Add(match.Key);
         }
 
         /// <summary>자리에 따라 카테고리가 달라지는 아티팩트인가. 아니면 개수 셈에서 볼 것이 없다.</summary>
@@ -72,7 +72,7 @@ namespace SephPlanner.Core.Solver
                 var charm = pair.Value;
                 if (charm.IsFiller) continue;
 
-                if (charm.Definition.LineCategories.Count == 0)
+                if (!IsPositional(charm.Definition))
                 {
                     foreach (var category in charm.Definition.Categories) Add(counts, category, 1);
                 }
@@ -138,7 +138,9 @@ namespace SephPlanner.Core.Solver
                 if (pair.Value.IsFiller || !IsPositional(pair.Value.Definition)) continue;
 
                 positional.Clear();
-                PositionalCategories(pair.Value, pair.Key, byCell, positional);
+                if (pair.Value.Definition.Behavior == "Charm_WhitePaper" && pair.Value.ObservedCategories is not null)
+                    positional.AddRange(pair.Value.ObservedCategories);
+                else PositionalCategories(pair.Value, pair.Key, byCell, positional);
                 foreach (var category in positional) Add(counts, category, -1);
             }
 

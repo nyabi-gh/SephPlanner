@@ -9,6 +9,7 @@ namespace SephPlanner.Core.Solver
 {
     public sealed class CharmSlot
     {
+        public List<string>? ObservedCategories { get; set; }
         public bool? IsAttackable { get; set; }
         public CharmDefinition Definition { get; set; } = new CharmDefinition();
         public int InstanceId { get; set; }

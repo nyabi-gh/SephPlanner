@@ -8,6 +8,20 @@ namespace SephPlanner.Tests;
 public class PlanFingerprintTests
 {
     [Fact]
+    public void PaperObservationChangesInvalidatePlacementButCategoryOrderDoesNot()
+    {
+        var snapshot = Snapshot();
+        var item = snapshot.Inventory!.Items[0];
+        var unknown = PlanFingerprint.Placement(snapshot, PlanPreferences.None, "catalog");
+        item.ObservedCategories = new List<string> { "EMBER", "GLACIER" };
+        var known = PlanFingerprint.Placement(snapshot, PlanPreferences.None, "catalog");
+        Assert.NotEqual(unknown, known);
+        item.ObservedCategories.Reverse();
+        Assert.Equal(known, PlanFingerprint.Placement(snapshot, PlanPreferences.None, "catalog"));
+        item.ObservedCategories.Clear();
+        Assert.NotEqual(known, PlanFingerprint.Placement(snapshot, PlanPreferences.None, "catalog"));
+    }
+    [Fact]
     public void AttackabilityChangesInvalidatePlacementEvenWithoutMovingTheItem()
     {
         var snapshot = Snapshot();

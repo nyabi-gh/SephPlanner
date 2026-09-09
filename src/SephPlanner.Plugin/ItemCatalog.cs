@@ -148,6 +148,8 @@ namespace SephPlanner.Plugin
                 if (charm is Charm_Magic magic && magic.ContainedMagic != null)
                     definition.MagicCostByLevel = Doubles(magic.ContainedMagic.mpCostsByLevel);
                 Dependency(charm, definition);
+                ContextStats(charm, definition);
+                if (charm is Charm_WhitePaper paper) definition.PaperMatch = paper.match;
                 result.Add(definition);
             }
             return result;
@@ -293,10 +295,48 @@ namespace SephPlanner.Plugin
             {
                 foreach (var category in byRow.lineCategory)
                 {
-                    if (!string.IsNullOrEmpty(category)) result.Add(category);
+                    result.Add(category ?? "");
                 }
             }
             return result;
+        }
+
+        private static void ContextStats(Charm_Basic charm, CharmDefinition definition)
+        {
+            if (charm is Charm_WoodenBox belt)
+                foreach (var stat in new[] { "FIRE_DAMAGE", "ICE_DAMAGE", "LIGHTNING_DAMAGE" })
+                    definition.ContextStats.Add(new ContextStatBonus
+                    {
+                        Source = StatCountSource.QuickSlotCharms,
+                        SlotCount = 6, // Charm_WoodenBox.CheckQuickSlot의 인벤토리 인덱스 범위.
+                        StatusId = stat,
+                        AmountByLevel = Doubles(belt.apPerQuickSlotCharmByLevel),
+                    });
+            if (charm is Charm_CriticalChanceIncreaseWithTablets scale)
+                definition.ContextStats.Add(new ContextStatBonus
+                {
+                    Source = StatCountSource.StoneTablets,
+                    StatusId = "CRITICAL",
+                    AmountByLevel = Doubles(scale.criticalBonusByLevel),
+                });
+            if (charm is Charm_3Elemental_ByRow key)
+            {
+                var stats = new Dictionary<string, string>
+                {
+                    ["EMBER"] = "FIRE_DAMAGE",
+                    ["GLACIER"] = "ICE_DAMAGE",
+                    ["MAGITECH"] = "LIGHTNING_DAMAGE",
+                    ["STURDY"] = "PHYSICAL_DAMAGE",
+                };
+                foreach (var pair in stats)
+                    definition.ContextStats.Add(new ContextStatBonus
+                    {
+                        Source = StatCountSource.RowCategory,
+                        Category = pair.Key,
+                        StatusId = pair.Value,
+                        AmountByLevel = Doubles(key.addElementalStatByLevel),
+                    });
+            }
         }
 
         private static List<double> Doubles(int[] values)

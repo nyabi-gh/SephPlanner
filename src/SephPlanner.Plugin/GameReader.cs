@@ -189,6 +189,8 @@ namespace SephPlanner.Plugin
                 {
                     DefinitionId = instance.EntityID,
                     InstanceId = instance.InstanceID,
+                    ObservedCategories = instance.Charm is Charm_WhitePaper paper
+                        ? new List<string>(paper.GetItemCategory()) : null,
                     Position = new GridPos(instance.XIdx, instance.YIdx),
                     EffectiveLevel = LookupMatrix(inv.levelMatrix, instance.XIdx, instance.YIdx),
                     IsActive = LookupMatrix(inv.disableMatrix, instance.XIdx, instance.YIdx) <= 0,
