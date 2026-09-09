@@ -5,6 +5,8 @@ namespace SephPlanner.Core.Tablets
     /// <summary>격자 위의 석판 하나.</summary>
     public sealed class TabletPlacement
     {
+        private volatile PreparedTablet? _prepared;
+
         public TabletDefinition Definition { get; set; } = new TabletDefinition();
         public GridPos Position { get; set; }
         public int Rotation { get; set; }
@@ -18,5 +20,14 @@ namespace SephPlanner.Core.Tablets
 
         public string Query => InstanceQuery ?? Definition.Query;
         public string ConditionQuery => InstanceConditionQuery ?? Definition.ConditionQuery;
+
+        internal PreparedTablet Prepare(GridSpec grid)
+        {
+            var prepared = _prepared;
+            if (prepared is not null && prepared.Matches(this, grid)) return prepared;
+            prepared = new PreparedTablet(this, grid);
+            _prepared = prepared;
+            return prepared;
+        }
     }
 }

@@ -28,7 +28,18 @@ namespace SephPlanner.Core.Tablets
         }
 
         /// <summary>입력 순서에 대응하는 적용 여부. 조건을 만족하지 못한 석판은 효과가 없다.</summary>
-        public bool[] Applied { get; }
+        public bool[] Applied { get; private set; }
+        internal GridSpec Grid => _grid;
+
+        internal void Clear(int placements)
+        {
+            System.Array.Clear(_level, 0, _level.Length);
+            System.Array.Clear(_disable, 0, _disable.Length);
+            System.Array.Clear(_ignore, 0, _ignore.Length);
+            System.Array.Clear(_multiply, 0, _multiply.Length);
+            if (Applied.Length == placements) System.Array.Clear(Applied, 0, Applied.Length);
+            else Applied = new bool[placements];
+        }
 
         private bool Contains(GridPos position) =>
             position.X >= 0 && position.X < _grid.Width &&
@@ -88,7 +99,22 @@ namespace SephPlanner.Core.Tablets
             IReadOnlyList<FixedEffectCell>? fixedEffects = null)
         {
             var result = new SimulationResult(grid, placements.Count);
+            Fill(placements, occupancy, grid, result, fixedEffects);
+            return result;
+        }
 
+        internal static void RunInto(
+            IReadOnlyList<TabletPlacement> placements, GridOccupancy occupancy,
+            SimulationResult result, IReadOnlyList<FixedEffectCell>? fixedEffects = null)
+        {
+            result.Clear(placements.Count);
+            Fill(placements, occupancy, result.Grid, result, fixedEffects);
+        }
+
+        private static void Fill(
+            IReadOnlyList<TabletPlacement> placements, GridOccupancy occupancy, GridSpec grid,
+            SimulationResult result, IReadOnlyList<FixedEffectCell>? fixedEffects)
+        {
             // 고정 각인 몫. 게임은 석판보다 먼저 더하지만(ReleasePermission) 덧셈이라 순서는 무관하고,
             // 배수도 같은 행렬에 쌓인다.
             foreach (var cell in fixedEffects ?? System.Array.Empty<FixedEffectCell>())
@@ -101,19 +127,21 @@ namespace SephPlanner.Core.Tablets
 
             for (var i = 0; i < placements.Count; i++)
             {
-                var placement = placements[i];
-                if (!MeetsCriteria(placement, occupancy, grid)) continue;
+                var placement = placements[i].Prepare(grid);
+                if (!MeetsCriteria(placement, occupancy)) continue;
 
                 result.Applied[i] = true;
-                ApplyEffects(placement, grid, result);
+                ApplyEffects(placement, result);
             }
-            return result;
         }
 
-        public static bool MeetsCriteria(TabletPlacement placement, GridOccupancy occupancy, GridSpec grid)
+        public static bool MeetsCriteria(TabletPlacement placement, GridOccupancy occupancy, GridSpec grid) =>
+            MeetsCriteria(placement.Prepare(grid), occupancy);
+
+        private static bool MeetsCriteria(PreparedTablet placement, GridOccupancy occupancy)
         {
-            var cells = TabletQuery.Parse(placement.ConditionQuery, grid, placement.Position, placement.Rotation);
-            if (cells.Count == 0) return true;
+            var cells = placement.Criteria;
+            if (cells.Length == 0) return true;
 
             var allHit = true;
             var sawPlaced = false;
@@ -123,7 +151,7 @@ namespace SephPlanner.Core.Tablets
             {
                 bool hit;
                 bool placed;
-                switch (QueryValue.ReadCriteria(cell.Value))
+                switch (cell.Kind)
                 {
                     case TabletCriteriaKind.AnyItem:
                         hit = occupancy.HasItem(cell.Position);
@@ -152,15 +180,14 @@ namespace SephPlanner.Core.Tablets
             return allHit && (anyPlaced || !sawPlaced);
         }
 
-        private static void ApplyEffects(TabletPlacement placement, GridSpec grid, SimulationResult result)
+        private static void ApplyEffects(PreparedTablet placement, SimulationResult result)
         {
-            foreach (var cell in TabletQuery.Parse(placement.Query, grid, placement.Position, placement.Rotation))
+            foreach (var cell in placement.Effects)
             {
-                var (kind, levelParam) = QueryValue.ReadEffect(cell.Value);
-                switch (kind)
+                switch (cell.Kind)
                 {
                     case TabletEffectKind.IncreaseConstLevel:
-                        result.AddLevel(cell.Position, levelParam);
+                        result.AddLevel(cell.Position, cell.Amount);
                         break;
                     case TabletEffectKind.Disable:
                         result.AddDisable(cell.Position, 1);
@@ -169,7 +196,7 @@ namespace SephPlanner.Core.Tablets
                         result.AddIgnoreCriteria(cell.Position, 1);
                         break;
                     case TabletEffectKind.MultiplyConstLevel:
-                        result.AddMultiply(cell.Position, levelParam);
+                        result.AddMultiply(cell.Position, cell.Amount);
                         break;
                 }
             }

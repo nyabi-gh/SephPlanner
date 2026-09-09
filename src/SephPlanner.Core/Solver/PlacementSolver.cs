@@ -45,10 +45,11 @@ namespace SephPlanner.Core.Solver
                 {
                     var slot = problem.Tablets[index];
                     var origin = best.Tablets[index];
+                    var rotations = DistinctRotations(slot, CurrentRotation(problem, slot));
                     foreach (var cell in cells)
                     {
                         if (options.Cancellation.IsCancellationRequested) return best;
-                        foreach (var rotation in DistinctRotations(slot, CurrentRotation(problem, slot)))
+                        foreach (var rotation in rotations)
                         {
                             if (cell == origin.Position && rotation == origin.Rotation) continue;
                             var trial = new List<TabletPlacement>(best.Tablets);
@@ -255,6 +256,8 @@ namespace SephPlanner.Core.Solver
                 if (Open(position)) _taken[_grid.ToIndex(position.X, position.Y)] = true;
             }
 
+            public void Clear() => Array.Clear(_taken, 0, _taken.Length);
+
             private bool Open(GridPos position) =>
                 position.X >= 0 && position.X < _grid.Width &&
                 position.Y >= 0 && position.Y < _grid.Height &&
@@ -274,7 +277,15 @@ namespace SephPlanner.Core.Solver
         private sealed class EstimateModel
         {
             public int LevelCap;
-            public bool AnyMagic;
+            // 추정 후보 밖으로 반환하지 않는 작업 공간이며, 동시 실행하는 풀이는 각자 소유한다.
+            public readonly EstimateOccupancy Occupancy;
+            public readonly SimulationResult Simulation;
+
+            public EstimateModel(GridSpec grid, bool anyMagic)
+            {
+                Occupancy = new EstimateOccupancy(grid, anyMagic);
+                Simulation = new SimulationResult(grid, 0);
+            }
 
             /// <summary>값어치 순위별, 레벨별 값어치. <c>[순위][레벨]</c>. 풀이마다 한 번만 짓는다.</summary>
             public double[][] ValueByRank = Array.Empty<double[]>();
@@ -330,10 +341,9 @@ namespace SephPlanner.Core.Solver
             var ordered = rows.OrderByDescending(row => RequiresUse(problem, row.Charm))
                 .ThenByDescending(row => row.Charm.Held).ThenByDescending(row => Preserve(row.Charm))
                 .ThenByDescending(row => row.Values.Max()).ThenBy(row => row.Charm.InstanceId).ToList();
-            return new EstimateModel
+            return new EstimateModel(problem.Grid, anyMagic)
             {
                 LevelCap = levelCap,
-                AnyMagic = anyMagic,
                 Items = ordered.Select(row => row.Charm).ToArray(),
                 ValueByRank = ordered.Select(row => row.Values).ToArray(),
                 Required = ordered.Select(row => RequiresUse(problem, row.Charm)).ToArray(),
@@ -438,6 +448,8 @@ namespace SephPlanner.Core.Solver
                 // 돌릴 수 없는 석판은 지금 돌아가 있는 각도 그대로만 쓴다. 0으로 고정하면
                 // 이미 돌아간 채로 잠긴 석판(저주 등)에 불가능한 회전을 제안하게 된다.
                 var rotations = DistinctRotations(slot, CurrentRotation(problem, slot));
+                // 같은 자리·회전의 석판은 탐색 중 읽기만 하므로 부모 후보들이 공유한다.
+                var placements = cells.Select(cell => rotations.Select(rotation => slot.At(cell, rotation)).ToArray()).ToArray();
 
                 var expanded = new List<(List<TabletPlacement> Layout, PlacementQuality Score, int Parent)>();
 
@@ -452,17 +464,17 @@ namespace SephPlanner.Core.Solver
                         ? problem.Grid.ToIndex(layout[twin[index]].Position.X, layout[twin[index]].Position.Y)
                         : -1;
 
-                    foreach (var cell in cells)
+                    for (var cellIndex = 0; cellIndex < cells.Count; cellIndex++)
                     {
+                        var cell = cells[cellIndex];
                         if (taken.Contains(cell)) continue;
                         if (floor >= 0 && problem.Grid.ToIndex(cell.X, cell.Y) <= floor) continue;
 
-                        foreach (var rotation in rotations)
+                        foreach (var placement in placements[cellIndex])
                         {
-                            var next = new List<TabletPlacement>(layout)
-                            {
-                                slot.At(cell, rotation),
-                            };
+                            var next = new List<TabletPlacement>(layout.Count + 1);
+                            next.AddRange(layout);
+                            next.Add(placement);
                             expanded.Add((next, Estimate(problem, cells, next, model), parent));
                         }
                     }
@@ -606,9 +618,11 @@ namespace SephPlanner.Core.Solver
         private static PlacementQuality Estimate(
             PlacementProblem problem, List<GridPos> cells, List<TabletPlacement> layout, EstimateModel model)
         {
-            var occupancy = new EstimateOccupancy(problem.Grid, model.AnyMagic);
+            var occupancy = model.Occupancy;
+            occupancy.Clear();
             foreach (var placement in layout) occupancy.Take(placement.Position);
-            var result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid, problem.FixedEffects);
+            var result = model.Simulation;
+            TabletSimulator.RunInto(WithFixed(problem, layout), occupancy, result, problem.FixedEffects);
 
             var used = model.Used;
             var groups = model.Groups;
