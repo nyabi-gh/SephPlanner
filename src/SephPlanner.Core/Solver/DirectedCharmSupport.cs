@@ -8,6 +8,32 @@ namespace SephPlanner.Core.Solver
 {
     internal static class DirectedCharmSupport
     {
+        internal static bool HasConnection(CharmSlot charm) =>
+            charm.Definition.MagicSupport is not null || PositionalWorth.IsNeedle(charm.Definition);
+
+        internal static (int X, int Y) Offset(CharmSlot charm) =>
+            charm.Definition.MagicSupport is { } support
+                ? (support.OffsetX, support.OffsetY)
+                : (charm.Definition.DependencyOffsetX, charm.Definition.DependencyOffsetY);
+
+        internal static bool Accepts(CharmSlot helper, CharmSlot target) =>
+            helper != target && (PositionalWorth.IsNeedle(helper.Definition)
+                ? PositionalWorth.IsNeedle(target.Definition) ||
+                  !target.IsFiller && !target.IsDormant && (target.IsAttackable ?? target.Definition.IsAttackable)
+                : IsTarget(target));
+
+        internal static bool IsConnected(
+            CharmSlot helper, GridPos cell, SimulationResult result, GridSpec grid, GridOccupancy occupancy,
+            IReadOnlyDictionary<GridPos, CharmSlot>? neighbors)
+        {
+            if (!PositionalWorth.IsNeedle(helper.Definition))
+                return TryTarget(helper, cell, result, grid, occupancy, neighbors, out _, out _);
+            // 게임의 피해 보너스 탐색은 중간 침의 활성 여부로 사슬을 끊지 않는다.
+            return neighbors is not null &&
+                   PositionalWorth.DependencyTarget(helper, cell, neighbors, out var target, out var targetCell) &&
+                   PlacementSolver.Reason(target, targetCell, result, grid, occupancy) == CharmInactiveReason.None;
+        }
+
         internal static bool IsTarget(CharmSlot target) =>
             target.Definition.IsMagic && !target.IsFiller && !target.IsDormant;
 

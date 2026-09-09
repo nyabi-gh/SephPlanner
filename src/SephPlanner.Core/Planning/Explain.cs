@@ -66,6 +66,8 @@ namespace SephPlanner.Core.Planning
             if (reason != CharmInactiveReason.None)
             {
                 lines.Add(InactiveReason(reason));
+                if (definition is not null && PositionalWorth.IsNeedle(definition))
+                    lines.Add("침은 비활성 상태에서도 공격 대상과 연결되면 0레벨 피해 보너스가 남습니다. 사용 유지는 활성 상태까지 요구합니다.");
                 return lines;
             }
 
@@ -78,7 +80,9 @@ namespace SephPlanner.Core.Planning
         public static string SupportMissing(CharmDefinition definition) =>
             definition.MagicSupport is { } support
                 ? SupportDirection(support) + "에 사용 가능한 마법이 없어 강화 효과를 받지 못합니다."
-                : "강화 대상과 연결되지 않았습니다.";
+                : PositionalWorth.IsNeedle(definition)
+                    ? "침의 연결 끝에 사용 가능한 공격 아티팩트가 없습니다."
+                    : "강화 대상과 연결되지 않았습니다.";
 
         private static string SupportDirection(DirectedMagicSupport support)
         {
