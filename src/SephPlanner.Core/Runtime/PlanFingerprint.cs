@@ -138,6 +138,8 @@ namespace SephPlanner.Core.Runtime
         {
             var builder = new StringBuilder();
             Add(builder, "catalog", catalogGeneration);
+            foreach (var category in preferences.PriorityCategories.OrderBy(value => value, StringComparer.Ordinal))
+                Add(builder, "priority", category);
             foreach (var pin in preferences.PinnedCharms.OrderBy(pair => pair.Key))
             {
                 Add(builder, "pinned", pin.Key);

@@ -293,10 +293,26 @@ namespace SephPlanner.Plugin
             {
                 var path = GameReader.DumpInventory(_settings.OfferRadius.Value);
                 Logger.LogInfo(path == null ? "읽을 인벤토리가 없습니다." : "인벤토리 덤프: " + path);
+                var replay = _runner?.CaptureReplay();
+                if (replay == null)
+                {
+                    Report(path == null ? "읽을 인벤토리와 게시된 계획이 없습니다." :
+                        "진단을 저장했습니다. 아직 게시된 계획이 없어 재현 자료는 만들지 못했습니다.");
+                    return;
+                }
+                replay.Producer = PluginIdentity.Describe();
+                var directory = System.IO.Path.Combine(PlannerData.DataDirectory, "reproductions");
+                System.IO.Directory.CreateDirectory(directory);
+                var replayPath = System.IO.Path.Combine(directory, CatalogBundleStore.NewGeneration() + ".replay");
+                PlanReplayFile.Write(replayPath, Newtonsoft.Json.JsonConvert.SerializeObject(replay, Newtonsoft.Json.Formatting.Indented));
+                Logger.LogInfo("계획 재현 자료: " + replayPath);
+                Report(path == null ? "현재 인벤토리는 없습니다. 마지막 게시 계획의 재현 자료를 저장했습니다." :
+                    "진단과 마지막 게시 계획의 재현 자료를 저장했습니다.");
             }
             catch (Exception ex)
             {
                 Logger.LogError("인벤토리 덤프 실패: " + ex);
+                Report("진단 또는 재현 자료 저장에 실패했습니다. BepInEx 로그를 확인하세요.");
             }
         }
 

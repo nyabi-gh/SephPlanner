@@ -3,6 +3,20 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using SephPlanner.DataTool;
 
+var commandError = CommandLine.Error(args);
+if (commandError is not null)
+{
+    Console.Error.WriteLine(commandError);
+    return 1;
+}
+if (args.Length == 1 && args[0] is "--help" or "-h")
+{
+    Console.WriteLine(CommandLine.Help);
+    return 0;
+}
+if (args.Length >= 2 && args[0] == "--reproduce")
+    return PlanReproduce.Run(args[1], args.Length == 3);
+
 // 게임의 StreamingAssets/Localization 에서 석판·아티팩트의 이름과 설명을 뽑아
 // data/generated/text.json 으로 정리한다.
 //

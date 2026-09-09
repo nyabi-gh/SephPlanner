@@ -56,6 +56,9 @@ namespace SephPlanner.Core.Runtime
         private Request? _running;
         private Request? _pending;
         private Plan? _latest;
+        private GameSnapshot? _replaySnapshot;
+        private PlanPreferences? _replayPreferences;
+        private System.Collections.Generic.List<PlanTarget>? _replayPreviousTargets;
         private string? _error;
         private PlanBlocker _blocker;
         private long _requestedGeneration;
@@ -152,6 +155,34 @@ namespace SephPlanner.Core.Runtime
             out PlanBlocker blocker, Plan? previous, CancellationToken cancellation) =>
             PlanBuilder.Build(snapshot, catalog, preferences, out blocker, previous, cancellation);
 
+        public PlanReplay? CaptureReplay()
+        {
+            lock (_gate)
+            {
+                if (_latest is null || _replaySnapshot is null || _replayPreferences is null) return null;
+                if (!(_catalog is Catalog catalog))
+                    throw new InvalidOperationException("재현 자료로 내보낼 수 없는 카탈로그입니다.");
+                return new PlanReplay
+                {
+                    Version = PlanReplay.CurrentVersion,
+                    CatalogVersion = PlannerData.CatalogVersion,
+                    CoreBuild = PlanReplay.CurrentCoreBuild,
+                    CapturedUtc = DateTime.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
+                    RequestedGeneration = _requestedGeneration,
+                    PublishedGeneration = _latest.RequestGeneration,
+                    LatestError = _error ?? "",
+                    CatalogGeneration = _latest.CatalogGeneration,
+                    RequestFingerprint = _latest.RequestFingerprint,
+                    Snapshot = _replaySnapshot,
+                    Preferences = ReplayPreferences.From(_replayPreferences),
+                    Catalog = catalog.Export(),
+                    PreviousTargets = new System.Collections.Generic.List<PlanTarget>(
+                        _replayPreviousTargets ?? new System.Collections.Generic.List<PlanTarget>()),
+                    Expected = ReplayResult.From(_latest),
+                };
+            }
+        }
+
         public void Dispose()
         {
             lock (_gate)
@@ -162,6 +193,9 @@ namespace SephPlanner.Core.Runtime
                 _pending?.Dispose();
                 _pending = null;
                 _latest = null;
+                _replaySnapshot = null;
+                _replayPreferences = null;
+                _replayPreviousTargets = null;
                 _publishedGeneration = 0;
             }
         }
@@ -207,6 +241,10 @@ namespace SephPlanner.Core.Runtime
                     if (failure is null)
                     {
                         _latest = plan;
+                        _replaySnapshot = request.Snapshot;
+                        _replayPreferences = request.Preferences;
+                        _replayPreviousTargets = new System.Collections.Generic.List<PlanTarget>(
+                            request.Previous?.Targets ?? new System.Collections.Generic.List<PlanTarget>());
                         _blocker = blocker;
                         _error = null;
                     }

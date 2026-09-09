@@ -51,7 +51,23 @@ scripts/check.ps1
 게임 안에서 F10을 누르면 그 순간의 상태가 `%LOCALAPPDATA%\SephPlanner\inventory-snapshot.json`
 으로 남는다. 그 스냅샷으로 우리 레벨 계산이 게임 값과 맞는지 게임 없이 다시 볼 수 있다. 어긋나는
 칸이 있으면 아직 읽지 않는 효과(각인, 세트 효과, 배치 보너스)가 걸려 있다는 뜻이다. 제보를 받을
-때 이 파일을 함께 받으면 그 상황을 그대로 재생할 수 있다.
+때 이 파일로 레벨을 대조할 수 있다. 당시 설정과 카탈로그까지 필요한 계획 재현에는 아래 재현 자료를 쓴다.
+
+F10은 마지막으로 게시된 계획의 입력·빌드 설정·직전 목표·당시 카탈로그를
+같은 데이터 폴더의 `reproductions/<시각>-<식별자>.replay`에 함께 저장한다.
+계산 중이라면 마지막 게시 계획이므로 F10 순간의 새 스냅샷과 다를 수 있다.
+아직 게시된 계획이 없으면 재현 자료는 만들지 않고 안내한다.
+
+```powershell
+dotnet run --project src/SephPlanner.DataTool -c Release -- --reproduce "<파일.replay>"
+# 계산 코드를 바꾼 뒤 같은 입력으로 비교할 때
+dotnet run --project src/SephPlanner.DataTool -c Release -- --reproduce "<파일.replay>" --allow-model-change
+```
+
+재현은 파일에 포함된 카탈로그만 사용하며 파일 손상·지원하지 않는 형식·빠진 설정은 실패로 알린다.
+계산 빌드가 다르면 명시적인 비교 옵션이 필요하다. 종료 코드는 일치 0, 입력·실행 실패 1, 결과 차이 2다.
+게임 데이터가 포함된 로컬 진단 자료이므로 저장소·릴리스·공개 제보에 첨부하지 않는다.
+자세한 비교 범위는 [계획 재현](docs/REPRODUCTION.md), 현재 개발 상태는 [현재 상태](docs/STATUS.md)에 있다.
 
 ```powershell
 dotnet run --project src/SephPlanner.DataTool -- --check %LOCALAPPDATA%\SephPlanner\inventory-snapshot.json
@@ -110,6 +126,9 @@ Releases에 올린다. 이 저장소는 비공개라 여기 Releases는 링크�
 CHANGELOG의 해당 절도 함께 확인한다.
 
 ## 문서
+
+- [docs/STATUS.md](docs/STATUS.md) — 현재 구현·추정·실기 미검증 범위와 다음 작업
+- [docs/REPRODUCTION.md](docs/REPRODUCTION.md) — F10 계획 재현 자료와 진단 도구 사용법
 
 - [docs/INSTALL.txt](docs/INSTALL.txt) — 사용자용 설치 안내. 메모장에서 그대로 읽히도록 마크다운 없이 평문으로 쓰고, 배포 zip에 `설치안내.txt`로 들어간다
 - [docs/RESEARCH.md](docs/RESEARCH.md) — 게임 내부 구조 조사 결과

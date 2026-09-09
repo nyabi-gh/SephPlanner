@@ -33,16 +33,29 @@ public class PlanFingerprintTests
         Assert.NotEqual(nonAttack, PlanFingerprint.Placement(snapshot, PlanPreferences.None, "catalog"));
     }
     [Fact]
-    public void DisabledRecommendationsIgnoreOffersMixerAndBuildPriorities()
+    public void DisabledRecommendationsIgnoreOffersMixerAndPresetFavorites()
     {
         var snapshot = Snapshot();
         var prefs = new PlanPreferences { Recommendations = false };
         var before = PlanFingerprint.Full(snapshot, prefs, "catalog");
         snapshot.Offers.Clear();
         snapshot.Mixer = new MixerState { Cost = 100, Used = true };
-        prefs.PriorityCategories.Add("NEW");
         prefs.PresetCharms.Add(999);
         Assert.Equal(before, PlanFingerprint.Full(snapshot, prefs, "catalog"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ComboPlacementPrioritiesInvalidatePlacementAndRequests(bool recommendations)
+    {
+        var snapshot = Snapshot();
+        var prefs = new PlanPreferences { Recommendations = recommendations };
+        var placement = PlanFingerprint.Placement(snapshot, prefs, "catalog");
+        var full = PlanFingerprint.Full(snapshot, prefs, "catalog");
+        prefs.PriorityCategories.Add("NEW");
+        Assert.NotEqual(placement, PlanFingerprint.Placement(snapshot, prefs, "catalog"));
+        Assert.NotEqual(full, PlanFingerprint.Full(snapshot, prefs, "catalog"));
     }
 
     [Fact]

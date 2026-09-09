@@ -23,6 +23,8 @@
     <Compile Include="..\..\src\SephPlanner.Plugin\CharmValueSource.cs" Link="Plugin\CharmValueSource.cs" />
     <Compile Include="..\..\src\SephPlanner.Plugin\ShortcutCapture.cs" Link="Plugin\ShortcutCapture.cs" />
     <Compile Include="..\..\src\SephPlanner.DataTool\Prediction\*.cs" Link="Prediction\%(Filename)%(Extension)" />
+    <Compile Include="..\..\src\SephPlanner.DataTool\PlanReproduce.cs" Link="DataTool\PlanReproduce.cs" />
+    <Compile Include="..\..\src\SephPlanner.DataTool\CommandLine.cs" Link="DataTool\CommandLine.cs" />
   </ItemGroup>
 
 </Project>

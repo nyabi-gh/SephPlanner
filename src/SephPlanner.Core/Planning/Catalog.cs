@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using SephPlanner.Core.Model;
+using SephPlanner.Core.Runtime;
 
 namespace SephPlanner.Core.Planning
 {
@@ -46,6 +47,13 @@ namespace SephPlanner.Core.Planning
 
         public ComboDefinition? Combo(string categoryId) =>
             _combos.TryGetValue(categoryId, out var definition) ? definition : null;
+
+        public ReplayCatalog Export() => new ReplayCatalog
+        {
+            Tablets = new List<TabletDefinition>(_tablets.Values),
+            Charms = new List<CharmDefinition>(_charms.Values),
+            Combos = new List<ComboDefinition>(_combos.Values),
+        };
 
         // 같은 번호가 두 번 나오면 먼저 나온 것을 쓴다. 덤프에 중복이 있어도 터지지 않아야 한다.
         private static Dictionary<int, T> ToMap<T>(IEnumerable<T> items, Func<T, int> key)

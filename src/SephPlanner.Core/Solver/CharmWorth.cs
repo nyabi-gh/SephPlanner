@@ -165,6 +165,7 @@ namespace SephPlanner.Core.Solver
         public static readonly CharmValueBook Empty = new CharmValueBook(null);
 
         private readonly Dictionary<int, CharmValueEntry> _byEntity = new Dictionary<int, CharmValueEntry>();
+        private readonly List<CharmValueEntry> _entries = new List<CharmValueEntry>();
         private readonly Dictionary<string, CharmValueEntry> _byId =
             new Dictionary<string, CharmValueEntry>(StringComparer.Ordinal);
 
@@ -172,12 +173,19 @@ namespace SephPlanner.Core.Solver
         {
             foreach (var entry in file?.Charms ?? new List<CharmValueEntry>())
             {
+                _entries.Add(entry);
                 if (entry.EntityId > 0 && !_byEntity.ContainsKey(entry.EntityId)) _byEntity[entry.EntityId] = entry;
                 if (entry.Id.Length > 0 && !_byId.ContainsKey(entry.Id)) _byId[entry.Id] = entry;
             }
         }
 
         public int Count => _byEntity.Count + _byId.Count;
+
+        public CharmValueFile Export() => new CharmValueFile
+        {
+            Version = 1,
+            Charms = new List<CharmValueEntry>(_entries),
+        };
 
         internal IEnumerable<KeyValuePair<int, CharmValueEntry>> EntityValues => _byEntity;
         internal IEnumerable<KeyValuePair<string, CharmValueEntry>> IdValues => _byId;
