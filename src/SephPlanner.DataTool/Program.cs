@@ -12,6 +12,9 @@ using SephPlanner.DataTool;
 if (args.Contains("--solve"))
     return SolverSmokeTest.Run(tabletCount: 3, charmCount: 12);
 
+if (args.Contains("--prediction-probe"))
+    return SephPlanner.DataTool.Prediction.PredictionProbe.Run();
+
 // 콤보 한 단계가 아티팩트 레벨 몇 개 값어치인지 잰다. 플러그인이 떠 둔 능력치 표를 읽는다.
 if (args.Contains("--measure"))
     return ComboMeasure.Run();
