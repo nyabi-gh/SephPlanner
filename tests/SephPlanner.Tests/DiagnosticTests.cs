@@ -11,6 +11,38 @@ namespace SephPlanner.Tests;
 public sealed class DiagnosticTests
 {
     [Fact]
+    public void UploadThrottleRejectsBurstsWithoutExtendingTheWait()
+    {
+        var now = TimeSpan.Zero;
+        var throttle = new DiagnosticUploadThrottle(TimeSpan.FromMinutes(1), () => now);
+        Assert.True(throttle.TryStart(out var firstWait));
+        Assert.Equal(TimeSpan.Zero, firstWait);
+        for (var second = 1; second < 60; second++)
+        {
+            now = TimeSpan.FromSeconds(second);
+            Assert.False(throttle.TryStart(out var remaining));
+            Assert.Equal(TimeSpan.FromSeconds(60 - second), remaining);
+        }
+        now = TimeSpan.FromMinutes(1);
+        Assert.True(throttle.TryStart(out _));
+        Assert.False(throttle.TryStart(out var nextWait));
+        Assert.Equal(TimeSpan.FromMinutes(1), nextWait);
+    }
+
+    [Fact]
+    public void UploadThrottleAllowsOnlyOneConcurrentAttempt()
+    {
+        var throttle = new DiagnosticUploadThrottle(TimeSpan.FromMinutes(1), () => TimeSpan.Zero);
+        var accepted = 0;
+        Parallel.For(0, 32, _ =>
+        {
+            if (throttle.TryStart(out var remaining)) Interlocked.Increment(ref accepted);
+            else Assert.Equal(TimeSpan.FromMinutes(1), remaining);
+        });
+        Assert.Equal(1, accepted);
+    }
+
+    [Fact]
     public void ArchiveKeepsReplayBytesAndRejectsUnapprovedFiles()
     {
         var files = new Dictionary<string, string> { ["report.json"] = "{}", ["plan.replay"] = "재현 자료\n그대로" };

@@ -45,6 +45,7 @@ namespace SephPlanner.Plugin
         private DiagnosticUploadClient _diagnosticClient;
         private CancellationTokenSource _diagnosticCancellation;
         private Task<string> _diagnosticTask;
+        private readonly DiagnosticUploadThrottle _diagnosticThrottle = new DiagnosticUploadThrottle(DiagnosticUploadThrottle.DefaultInterval);
         private string _diagnosticNotice;
         private float _diagnosticNoticeUntil;
         private string _lastPanelOrigin;
@@ -385,6 +386,16 @@ namespace SephPlanner.Plugin
         private void StartDiagnosticUpload(DiagnosticCapture capture)
         {
             if (!_settings.DiagnosticUploadAllowed || _diagnosticTask != null) return;
+            if (!_diagnosticThrottle.TryStart(out var remaining))
+            {
+                var message = "이번 진단은 로컬에 저장했습니다. " + Math.Ceiling(remaining.TotalSeconds) + "초 뒤부터 다시 전송할 수 있습니다.";
+                if (capture.HasFailures) message += " 일부 자료 수집에 실패했습니다.";
+                ReportDiagnostic(message);
+                Logger.LogInfo(message);
+                try { File.WriteAllText(Path.Combine(capture.DirectoryPath, "upload-result.txt"), message); }
+                catch (Exception ex) { Logger.LogWarning("진단 전송 제한 기록을 저장하지 못했습니다: " + ex); }
+                return;
+            }
             _diagnosticCancellation = new CancellationTokenSource();
             // 초기 운영 제한값이다. 느린 연결이 게임 종료나 다음 조작을 붙잡지 않도록 한다.
             _diagnosticCancellation.CancelAfter(TimeSpan.FromSeconds(60));
