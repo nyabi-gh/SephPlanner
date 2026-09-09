@@ -130,6 +130,12 @@ namespace SephPlanner.Plugin
         /// </summary>
         private static readonly SceneCache<TabletMix> Mixers = new SceneCache<TabletMix>(5f);
 
+        internal static bool IsMixerOpen()
+        {
+            var panel = UIManager.Instance != null ? UIManager.Instance.GetElement<UI_TabletMixPanel>() : null;
+            return panel != null && panel.IsOpened;
+        }
+
         private static MixerState ReadMixer()
         {
             // 쓸 수 있는 것을 찾으면서 아무거나 하나를 함께 기억해 두면, 다 썼을 때를 위해

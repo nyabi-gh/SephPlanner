@@ -229,8 +229,8 @@ namespace SephPlanner.Plugin.Ui
             if (_tab == Tab.Combos)
             {
                 _note.text = _context.Recommendations
-                    ? "선택한 콤보를 추천과 열쇠·종이 배치에 우선 반영합니다. 여러 개면 진행과 배치 가치를 비교합니다."
-                    : "추천은 꺼져 있지만 선택한 콤보는 열쇠·종이 배치에 우선 반영합니다.";
+                    ? "선택한 콤보를 추천과 열쇠·종이·북향의 침 배치에 우선 반영합니다. 여러 개면 진행과 배치 가치를 비교합니다."
+                    : "추천은 꺼져 있지만 선택한 콤보는 열쇠·종이·북향의 침 배치에 우선 반영합니다.";
                 _note.color = _context.Recommendations ? NativeSkin.TextDim : NativeSkin.Amber;
                 return;
             }

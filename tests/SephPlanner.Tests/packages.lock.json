@@ -99,7 +99,7 @@
       "sephplanner.diagnostics": {
         "type": "Project",
         "dependencies": {
-          "SephPlanner.Core": "[0.2.7, )"
+          "SephPlanner.Core": "[0.2.8, )"
         }
       }
     }

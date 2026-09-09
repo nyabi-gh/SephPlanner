@@ -12,7 +12,7 @@ namespace SephPlanner.Core.Solver
         private const int Passes = 3;
 
         public static bool Applies(CharmDefinition definition) =>
-            definition.LineCategories.Count > 0 || definition.Behavior == "Charm_WhitePaper";
+            ComboCounting.IsPositional(definition);
 
         internal static string FailureReason(PlacementProblem problem, CharmSlot charm)
         {
@@ -23,6 +23,16 @@ namespace SephPlanner.Core.Solver
                     return "열쇠가 제공하는 콤보 중 F2에서 선택한 것이 없습니다.";
                 if (!cells.Any(cell => problem.PriorityCategories.Contains(PositionalWorth.LineCategory(charm.Definition, cell))))
                     return "지정 콤보에 해당하는 행이 아직 열리지 않았습니다.";
+            }
+            else if (PositionalWorth.IsNeedle(charm.Definition))
+            {
+                if (!cells.Any(cell => problem.Grid.Contains(cell.Offset(
+                        charm.Definition.DependencyOffsetX, charm.Definition.DependencyOffsetY))))
+                    return "침의 방향에 대상을 놓을 칸이 없습니다.";
+                if (!problem.Charms.Any(other => other != charm && !PositionalWorth.IsNeedle(other.Definition) &&
+                        DirectedCharmSupport.Accepts(charm, other) && cells.Any(cell =>
+                            PositionalWorth.CategoriesOf(other, cell).Any(problem.PriorityCategories.Contains))))
+                    return "지정 콤보를 가진 공격 가능한 대상을 찾지 못했습니다.";
             }
             else
             {
@@ -153,6 +163,20 @@ namespace SephPlanner.Core.Solver
             {
                 if (problem.PriorityCategories.Contains(PositionalWorth.LineCategory(charm.Definition, cell)))
                     yield return new[] { (charm.InstanceId, cell) };
+                yield break;
+            }
+
+            if (PositionalWorth.IsNeedle(charm.Definition))
+            {
+                var targetCell = cell.Offset(charm.Definition.DependencyOffsetX, charm.Definition.DependencyOffsetY);
+                if (targetCell == cell || !problem.Grid.Contains(targetCell)) yield break;
+                var neighbors = problem.Charms.ToDictionary(other => seed.CharmPositions[other.InstanceId]);
+                foreach (var target in problem.Charms.OrderBy(other => seed.CharmPositions[other.InstanceId] == targetCell ? 0 : 1))
+                {
+                    if (!DirectedCharmSupport.Accepts(charm, target) ||
+                        !PositionalWorth.CategoriesOf(target, targetCell, neighbors).Any(problem.PriorityCategories.Contains)) continue;
+                    yield return new[] { (charm.InstanceId, cell), (target.InstanceId, targetCell) };
+                }
                 yield break;
             }
 

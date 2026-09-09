@@ -8,6 +8,118 @@ namespace SephPlanner.Tests;
 
 public class PriorityComboPlacementTests
 {
+    [Theory]
+    [InlineData(1289)]
+    [InlineData(1290)]
+    public void EitherNeedleHonorsTheSelectedPlanetComboEvenAfterItsThresholdsAreComplete(int definitionId)
+    {
+        var problem = NeedleProblem(definitionId);
+        var result = PlacementSolver.Solve(problem);
+        Assert.Equal(result.CharmPositions[2], result.CharmPositions[1].Offset(0, -1));
+        Assert.Equal(1, result.PriorityComboMatches);
+        Assert.Empty(result.UnlinkedCharms);
+        Assert.Empty(result.UnmatchedComboCharms);
+    }
+
+    [Theory]
+    [InlineData(1289)]
+    [InlineData(1290)]
+    public void NeedleDoesNotUseAnUnattackablePlanetToSatisfyComboPreference(int definitionId)
+    {
+        var problem = NeedleProblem(definitionId);
+        problem.Charms[1].IsAttackable = false;
+        var result = PlacementSolver.Solve(problem);
+        Assert.Equal(result.CharmPositions[3], result.CharmPositions[1].Offset(0, -1));
+        Assert.Equal(0, result.PriorityComboMatches);
+        Assert.Equal(new[] { 1 }, result.UnmatchedComboCharms);
+        Assert.Empty(result.UnlinkedCharms);
+    }
+
+    private static PlacementProblem NeedleProblem(int definitionId)
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(2, 2, 4), PriorityCategories = { "PLANET" } };
+        problem.Charms.Add(new CharmSlot
+        {
+            InstanceId = 1,
+            Definition = new CharmDefinition
+            {
+                EntityId = definitionId,
+                MaxLevel = 2,
+                Behavior = "Charm_UpCharmDamage",
+                DependencyOffsetY = -1,
+                DependencyBonusByLevel = { 6, 8, 10 },
+                DependencyExtraByLevel = { 15, 20, 25 },
+                HasDependencyCondition = true,
+                DependencyMaxRarity = Rarity.Uncommon,
+            },
+        });
+        problem.Charms.Add(new CharmSlot
+        {
+            InstanceId = 2,
+            Definition = new CharmDefinition
+            { EntityId = 1015, MaxLevel = 5, IsAttackable = true, Categories = { "PLANET" } }
+        });
+        problem.Charms.Add(new CharmSlot
+        {
+            InstanceId = 3,
+            Definition = new CharmDefinition
+            { EntityId = 3, MaxLevel = 5, IsAttackable = true, Categories = { "OTHER" } }
+        });
+        problem.CurrentCharms[1] = new GridPos(0, 1);
+        problem.CurrentCharms[2] = new GridPos(1, 0);
+        problem.CurrentCharms[3] = new GridPos(0, 0);
+        problem.ComboCounts = new Dictionary<string, int> { ["PLANET"] = 10, ["OTHER"] = 2 };
+        problem.Combos = id => new ComboDefinition { Id = id, Thresholds = { 2 } };
+        return problem;
+    }
+
+    [Theory]
+    [InlineData(1289)]
+    [InlineData(1290)]
+    public void NeedleLeavesATabletBlockedPositionAndPreservesBothNeedleConnections(int definitionId)
+    {
+        var problem = NeedleProblem(definitionId);
+        problem.Grid = new GridSpec(2, 3, 6);
+        problem.Charms.Add(new CharmSlot { InstanceId = 4, Definition = problem.Charms[0].Definition });
+        problem.CurrentCharms[3] = new GridPos(1, 1);
+        problem.CurrentCharms[4] = new GridPos(0, 2);
+        problem.Tablets.Add(new TabletSlot { InstanceId = 10, Definition = new TabletDefinition { EntityId = 10 } });
+        problem.CurrentTablets[10] = new TabletSpot(new GridPos(0, 0), 0);
+        var result = PlacementSolver.Solve(problem);
+        Assert.Equal(2, result.PriorityComboMatches);
+        Assert.Empty(result.UnlinkedCharms);
+        Assert.Empty(result.UnmatchedComboCharms);
+        var neighbors = problem.Charms.ToDictionary(charm => result.CharmPositions[charm.InstanceId]);
+        Assert.Equal(3, ComboCounting.CountAll(neighbors)["PLANET"]);
+    }
+
+    [Theory]
+    [InlineData(1289, true)]
+    [InlineData(1289, false)]
+    [InlineData(1290, true)]
+    [InlineData(1290, false)]
+    public void NeedleComboPreferenceReachesPlanBuilderWithRecommendationsOnOrOff(int definitionId, bool recommendations)
+    {
+        var problem = NeedleProblem(definitionId);
+        var inventory = new InventoryState { Width = 2, Height = 2, Storage = 4, ComboCounts = problem.ComboCounts!.ToDictionary(pair => pair.Key, pair => pair.Value) };
+        foreach (var charm in problem.Charms)
+            inventory.Items.Add(new PlacedItem
+            {
+                InstanceId = charm.InstanceId,
+                DefinitionId = charm.Definition.EntityId,
+                Position = problem.CurrentCharms[charm.InstanceId],
+                IsActive = true,
+                IsAttackable = charm.Definition.IsAttackable
+            });
+        var catalog = new Catalog(Array.Empty<TabletDefinition>(), problem.Charms.Select(charm => charm.Definition));
+        var plan = PlanBuilder.Build(new GameSnapshot { Inventory = inventory }, catalog,
+            new PlanPreferences { Recommendations = recommendations, PriorityCategories = { "PLANET" } })!;
+        Assert.True(plan.Verification.Passed);
+        Assert.Equal(plan.Best.CharmPositions[2], plan.Best.CharmPositions[1].Offset(0, -1));
+        Assert.Equal(1, plan.Best.PriorityComboMatches);
+        Assert.Empty(plan.Best.UnlinkedCharms);
+    }
+
     private static CharmDefinition Key() => new()
     {
         EntityId = 10,

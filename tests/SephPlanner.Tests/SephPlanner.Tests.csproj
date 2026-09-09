@@ -21,6 +21,7 @@
     <ProjectReference Include="..\..\src\SephPlanner.Core\SephPlanner.Core.csproj" />
     <ProjectReference Include="..\..\src\SephPlanner.Diagnostics\SephPlanner.Diagnostics.csproj" />
     <Compile Include="..\..\src\SephPlanner.Plugin\DiagnosticCapture.cs" Link="Plugin\DiagnosticCapture.cs" />
+    <Compile Include="..\..\src\SephPlanner.Plugin\AdvicePanelExpansion.cs" Link="Plugin\AdvicePanelExpansion.cs" />
     <Compile Include="..\..\src\SephPlanner.Plugin\PluginPreferences.cs" Link="Plugin\PluginPreferences.cs" />
     <Compile Include="..\..\src\SephPlanner.Plugin\CharmValueSource.cs" Link="Plugin\CharmValueSource.cs" />
     <Compile Include="..\..\src\SephPlanner.Plugin\ShortcutCapture.cs" Link="Plugin\ShortcutCapture.cs" />

@@ -32,6 +32,7 @@ namespace SephPlanner.Plugin.Ui
         public PluginPreferences Prefs;
         public CharmValueBook Values = CharmValueBook.Empty;
         public bool Expanded;
+        public bool MixerOpen;
         public bool Recommendations = true;
         public bool MultiplayerAutoPlace;
         public bool QueryVerified;
@@ -580,7 +581,7 @@ namespace SephPlanner.Plugin.Ui
                 _moves.End();
             }
             RenderOffers(plan, frame, previewed);
-            RenderMixes(plan, snapshot.Mixer);
+            RenderMixes(plan, snapshot.Mixer, frame.MixerOpen);
             RenderDiscards(plan, previewed == null);
             RenderChips(snapshot, frame);
         }
@@ -917,7 +918,7 @@ namespace SephPlanner.Plugin.Ui
             Widgets.SetActive(_discards.Root, visible && plan.Discards.Count > 0);
         }
 
-        private void RenderMixes(Plan plan, MixerState mixer)
+        private void RenderMixes(Plan plan, MixerState mixer, bool mixerOpen)
         {
             _mixes.Begin();
             for (var i = 0; i < plan.Mixes.Count && i < MixRows; i++)
@@ -931,9 +932,12 @@ namespace SephPlanner.Plugin.Ui
                     advice.Affordable ? NativeSkin.Text : NativeSkin.TextDim);
                 Hover(row, name, () => Explain.Join(Explain.Mix(advice)));
             }
+            if (mixerOpen && plan.Mixes.Count == 0)
+                _mixes.Add("추천 조합 없음", mixer == null ? "합성기 정보를 읽는 중입니다." :
+                    mixer.Used ? "이 합성기는 이미 사용했습니다." : "현재 석판에서 추천할 수 있는 조합을 찾지 못했습니다.", NativeSkin.TextDim);
             _mixes.End();
 
-            Widgets.SetActive(_mixes.Root, mixer != null && !mixer.Used && plan.Mixes.Count > 0);
+            Widgets.SetActive(_mixes.Root, mixerOpen || mixer != null && !mixer.Used && plan.Mixes.Count > 0);
         }
 
         /// <summary>

@@ -17,7 +17,7 @@ namespace SephPlanner.Plugin
     /// 세피리아 상태를 읽어 게임 HUD에 배치와 추천을 표시하고, 싱글플레이에서는 제안된 배치를
     /// 게임 자체의 이동 경로로 적용한다. 멀티 세션에서는 읽기만 한다.
     /// </summary>
-    [BepInPlugin(PluginGuid, "SephPlanner", "0.2.7")]
+    [BepInPlugin(PluginGuid, "SephPlanner", "0.2.8")]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001", Justification = "Unity의 OnDestroy에서 계산 작업을 정리합니다.")]
     public sealed class SephPlannerPlugin : BaseUnityPlugin
     {
@@ -58,7 +58,7 @@ namespace SephPlanner.Plugin
         private float _appliedOpacity = -1f;
         private bool _expanded;
         private bool _hidden;
-        private bool _hadOffers;
+        private readonly AdvicePanelExpansion _adviceExpansion = new AdvicePanelExpansion();
         private bool _moving;
         private bool _panelEnabledLastFrame;
         private bool _panelAwaitingRefresh;
@@ -674,12 +674,13 @@ namespace SephPlanner.Plugin
                 return;
             }
 
-            AutoExpand(plan);
+            var mixerOpen = _settings.Recommendations.Value && GameReader.IsMixerOpen();
+            AutoExpand(plan, mixerOpen);
 
             var preview = PreviewName(plan);
             try
             {
-                Render(plan, preview, state);
+                Render(plan, preview, state, mixerOpen);
             }
             catch (Exception ex)
             {
@@ -694,7 +695,7 @@ namespace SephPlanner.Plugin
             }
         }
 
-        private void Render(Plan plan, string preview, PlanRunState state)
+        private void Render(Plan plan, string preview, PlanRunState state, bool mixerOpen)
         {
             _hud.Render(new HudFrame
             {
@@ -704,6 +705,7 @@ namespace SephPlanner.Plugin
                 Prefs = _prefs,
                 Values = CharmValueSource.Book,
                 Expanded = _expanded,
+                MixerOpen = mixerOpen,
                 Recommendations = _settings.Recommendations.Value,
                 MultiplayerAutoPlace = _settings.MultiplayerAutoPlace.Value,
                 QueryVerified = CatalogDump.QueryVerificationPassed(),
@@ -834,16 +836,13 @@ namespace SephPlanner.Plugin
         }
 
         /// <summary>
-        /// 무엇을 집을지 고르는 순간에는 격자와 후보를 다 봐야 한다. 상자나 상점이 열리면 저절로
+        /// 무엇을 집거나 합칠지 고르는 순간에는 격자와 후보를 다 봐야 한다. 후보나 합성 창이 나타나면
         /// 펼치고 닫히면 되돌린다. 그 사이에 직접 접거나 편 것은 상황이 바뀔 때까지 그대로 둔다.
         /// </summary>
-        private void AutoExpand(Plan plan)
+        private void AutoExpand(Plan plan, bool mixerOpen)
         {
-            var hasOffers = plan.Offers.Count > 0;
-            if (hasOffers == _hadOffers) return;
-
-            _hadOffers = hasOffers;
-            _expanded = hasOffers;
+            var expanded = _adviceExpansion.Update(plan.Offers.Count > 0, mixerOpen);
+            if (expanded.HasValue) _expanded = expanded.Value;
         }
 
         /// <summary>
