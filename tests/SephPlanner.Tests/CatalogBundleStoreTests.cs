@@ -135,6 +135,20 @@ public class CatalogBundleStoreTests : IDisposable
         writer.Publish(comparisons: 10, mismatches: 0);
     }
 
+    [Fact]
+    public void AnOldCatalogFormatMustBeRegenerated()
+    {
+        Publish("old", "1", "assembly-1");
+        var manifestPath = Path.Combine(_directory, PlannerData.CatalogGenerationsDirectory,
+            "old", PlannerData.CatalogManifestFile);
+        var manifest = File.ReadAllText(manifestPath).Replace(
+            $"catalogVersion={PlannerData.CatalogVersion}", $"catalogVersion={PlannerData.CatalogVersion - 1}");
+        File.WriteAllText(manifestPath, manifest);
+
+        Assert.False(CatalogBundleStore.TryGetActive(_directory, "1", "assembly-1", out _, out var error));
+        Assert.Contains("형식 버전", error);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_directory)) Directory.Delete(_directory, recursive: true);

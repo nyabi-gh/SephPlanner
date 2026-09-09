@@ -48,8 +48,9 @@ namespace SephPlanner.Core.Runtime
         /// v9: 값어치 표의 환산 누락 여부와 미환산 능력치를 담는다.
         /// v10: 가중치가 패널티를 키우지 않도록 능력치 이득과 손해를 따로 담는다.
         /// v11: 방향에 따라 마법을 강화하는 효과의 위치와 레벨별 회복 속도를 담는다.
+        /// v12: 게임 공통 콤보 데이터의 특수 발동 단계를 포함한다.
         /// </summary>
-        public const int CatalogVersion = 11;
+        public const int CatalogVersion = 12;
 
         /// <summary>플러그인이 생성하고 진단 도구가 읽는 데이터 위치.</summary>
         public static string DataDirectory =>

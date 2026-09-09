@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using SephPlanner.Core.Model;
+using SephPlanner.Core.Runtime;
 using SephPlanner.Core.Solver;
 using SephPlanner.Core.Tablets;
 using UnityEngine;
@@ -143,9 +144,7 @@ namespace SephPlanner.Plugin
         }
 
         /// <summary>
-        /// 콤보(세트 효과) 정의. 임계값은 콤보 프리팹의 <c>addStatByCombo</c>와 구형 세트 효과의
-        /// <c>setStatus</c> 양쪽에서 모은다. 게임의 <c>SearchSetEffectInInventory</c>가 두 경로를
-        /// 다 쓰기 때문이다.
+        /// 일반 능력치·구형 세트 효과의 단계와 게임 공통 콤보 데이터의 특수 단계를 합친다.
         /// </summary>
         public static List<ComboDefinition> LoadCombos()
         {
@@ -166,19 +165,15 @@ namespace SephPlanner.Plugin
                 foreach (var target in category.setStatus)
                     if (target.itemCount > 0) thresholds.Add(target.itemCount);
 
-                if (thresholds.Count == 0) continue;
+                var definition = ComboCatalogBuilder.Build(category.id, thresholds, () => EffectLines(combo));
+                if (definition.Thresholds.Count == 0) continue;
 
                 var names = new Dictionary<string, string>();
                 var text = category.categoryName?.ToString();
                 if (!string.IsNullOrEmpty(text)) names["current"] = text;
 
-                result.Add(new ComboDefinition
-                {
-                    Id = category.id,
-                    Thresholds = new List<int>(thresholds),
-                    Names = names,
-                    Effects = EffectLines(combo),
-                });
+                definition.Names = names;
+                result.Add(definition);
             }
             return result;
         }
@@ -346,27 +341,16 @@ namespace SephPlanner.Plugin
         }
 
         /// <summary>
-        /// 임계값별 효과 텍스트. 게임 콤보 패널이 쓰는 <c>RequestComboData</c>를 프리팹 컴포넌트에
-        /// 그대로 부른다. 아바타 없이도 대부분 동작하지만, 런타임 상태가 필요한 콤보는 터질 수
-        /// 있으므로 그때는 임계값만 남긴다.
+        /// 설명이 비어 있어도 단계는 남긴다. 게임 데이터 요청 실패는 호출자가 갱신 실패로 처리한다.
         /// </summary>
         private static List<ComboEffectLine> EffectLines(ComboEffectBase combo)
         {
             var lines = new List<ComboEffectLine>();
             if (combo == null) return lines;
 
-            try
+            foreach (var element in combo.RequestComboData(null))
             {
-                foreach (var element in combo.RequestComboData(null))
-                {
-                    if (string.IsNullOrEmpty(element.effectName)) continue;
-                    lines.Add(new ComboEffectLine { Threshold = element.comboCount, Text = element.effectName });
-                }
-                lines.Sort((a, b) => a.Threshold.CompareTo(b.Threshold));
-            }
-            catch (System.Exception)
-            {
-                lines.Clear();
+                lines.Add(new ComboEffectLine { Threshold = element.comboCount, Text = element.effectName });
             }
             return lines;
         }
