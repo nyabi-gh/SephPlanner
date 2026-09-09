@@ -67,6 +67,7 @@ namespace SephPlanner.Core.Planning
 
         /// <summary>소유한 해당 종류의 아티팩트 전부를 활성 상태로 유지한다.</summary>
         public HashSet<int> RetainedCharms { get; set; } = new HashSet<int>();
+        public HashSet<int> DeactivationAllowed { get; set; } = new HashSet<int>();
 
         /// <summary>
         /// 프리셋 코드가 알려 준, 그 빌드가 노리는 아티팩트(엔티티 번호). 손으로 지정하는

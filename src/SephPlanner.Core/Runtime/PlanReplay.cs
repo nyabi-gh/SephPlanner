@@ -78,6 +78,7 @@ namespace SephPlanner.Core.Runtime
         public Dictionary<int, int>? PinnedCharms { get; set; }
         public HashSet<int>? HeldCharms { get; set; }
         public HashSet<int>? RetainedCharms { get; set; }
+        public HashSet<int>? DeactivationAllowed { get; set; }
         public HashSet<int>? PresetCharms { get; set; }
         public CharmValueFile? CharmValues { get; set; }
         public bool? Recommendations { get; set; }
@@ -88,6 +89,7 @@ namespace SephPlanner.Core.Runtime
             PinnedCharms = new Dictionary<int, int>(preferences.PinnedCharms),
             HeldCharms = new HashSet<int>(preferences.HeldCharms),
             RetainedCharms = new HashSet<int>(preferences.RetainedCharms),
+            DeactivationAllowed = new HashSet<int>(preferences.DeactivationAllowed),
             PresetCharms = new HashSet<int>(preferences.PresetCharms),
             CharmValues = preferences.CharmValues.Export(),
             Recommendations = preferences.Recommendations,
@@ -96,7 +98,7 @@ namespace SephPlanner.Core.Runtime
         public PlanPreferences Restore()
         {
             if (PriorityCategories is null || PinnedCharms is null || HeldCharms is null || RetainedCharms is null ||
-                PresetCharms is null || CharmValues?.Charms is null || !Recommendations.HasValue)
+                DeactivationAllowed is null || PresetCharms is null || CharmValues?.Charms is null || !Recommendations.HasValue)
                 throw new InvalidDataException("재현 자료에 계산 설정이 빠졌습니다.");
             return new PlanPreferences
             {
@@ -104,6 +106,7 @@ namespace SephPlanner.Core.Runtime
                 PinnedCharms = new Dictionary<int, int>(PinnedCharms),
                 HeldCharms = new HashSet<int>(HeldCharms),
                 RetainedCharms = new HashSet<int>(RetainedCharms),
+                DeactivationAllowed = new HashSet<int>(DeactivationAllowed),
                 PresetCharms = new HashSet<int>(PresetCharms),
                 CharmValues = new CharmValueBook(CharmValues),
                 Recommendations = Recommendations.Value,

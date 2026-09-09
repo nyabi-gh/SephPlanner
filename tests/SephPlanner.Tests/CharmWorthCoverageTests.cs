@@ -96,6 +96,10 @@ public class CharmWorthCoverageTests
             Charms = { new CharmSlot { InstanceId = 1, Definition = charm } },
         };
         problem.CurrentCharms[1] = off;
+        var preserved = PlacementSolver.Solve(problem);
+        Assert.Equal(new GridPos(1, 0), preserved.CharmPositions[1]);
+        Assert.Equal(0, preserved.Score);
+        problem.Charms[0].AllowDeactivation = true;
         Assert.Equal(off, PlacementSolver.Solve(problem).CharmPositions[1]);
         problem.FixedEffects.Add(new FixedEffectCell { Position = new GridPos(1, 0), Level = 1 });
         Assert.Equal(new GridPos(1, 0), PlacementSolver.Solve(problem).CharmPositions[1]);

@@ -9,6 +9,21 @@ public sealed class PluginPreferencesTests : IDisposable
     private string SettingsPath => Path.Combine(_directory, "settings.json");
 
     private PluginPreferences Load() => PluginPreferences.Load(_ => { }, SettingsPath);
+
+    [Fact]
+    public void DeactivationPermissionIsSeparateFromYieldAndResetsWithTheBuild()
+    {
+        var prefs = Load();
+        prefs.StepPin(9, -1);
+        Assert.False(prefs.IsDeactivationAllowed(9));
+        prefs.ToggleDeactivation(9);
+        var restored = Load();
+        Assert.True(restored.IsDeactivationAllowed(9));
+        Assert.Equal(-1, restored.PinLevel(9));
+        Assert.Contains(9, restored.ToPreferences(false).DeactivationAllowed);
+        restored.ResetBuild();
+        Assert.False(Load().IsDeactivationAllowed(9));
+    }
     private static string Code(string categories) => PresetCode.Encode("AAP1\nW:503\nC:PinkRabbit\nS:\nR:" + categories + "\n");
 
     [Fact]

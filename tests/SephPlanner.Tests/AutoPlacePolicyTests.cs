@@ -6,6 +6,19 @@ namespace SephPlanner.Tests;
 public class AutoPlacePolicyTests
 {
     [Fact]
+    public void UnapprovedDeactivationIsCheckedEvenWhenThePlanFlagIsMissing()
+    {
+        var context = Context();
+        var plan = context.Runner!.Latest!;
+        plan.Current.CharmPositions[99] = new SephPlanner.Core.Model.GridPos(0, 0);
+        plan.Best.UnpreservedCharms.Add(99);
+        Assert.False(plan.HasUnapprovedDeactivation);
+        var denied = AutoPlacePolicy.Evaluate(context);
+        Assert.False(denied.Allowed);
+        Assert.Contains("끄기 허용", denied.Reason);
+    }
+
+    [Fact]
     public void UnsatisfiedRetentionBlocksAutoPlacement()
     {
         var context = Context();

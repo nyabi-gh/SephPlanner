@@ -53,6 +53,7 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         public bool Held { get; set; }
         public bool Retained { get; set; }
+        public bool AllowDeactivation { get; set; }
 
         private CharmCriteriaKind? _criteria;
 
@@ -113,6 +114,10 @@ namespace SephPlanner.Core.Solver
         public IReadOnlyDictionary<string, int>? ComboCounts { get; set; }
         public Func<string, ComboDefinition?>? Combos { get; set; }
         public HashSet<string> PriorityCategories { get; set; } = new HashSet<string>();
+        public HashSet<int> DeactivationAllowed { get; set; } = new HashSet<int>();
+        public Dictionary<int, int> PinnedCharms { get; set; } = new Dictionary<int, int>();
+        public HashSet<int> RetainedCharms { get; set; } = new HashSet<int>();
+        internal HashSet<int> ProtectedActive { get; set; } = new HashSet<int>();
 
         /// <summary>
         /// <see cref="ComboCounts"/>에서 자리 의존 아티팩트의 지금 자리 몫을 뺀 것. <see cref="ComboCounting"/>이
@@ -121,9 +126,7 @@ namespace SephPlanner.Core.Solver
         public Dictionary<string, int>? BaseComboCounts { get; set; }
 
         /// <summary>
-        /// 지금 놓여 있는 자리. 여기서 벗어나는 자리마다 솔버가 이사 비용을 문다 - 점수는 끝 상태만
-        /// 세므로, 이것이 없으면 아무것도 달라지지 않았는데도 제안이 이리저리 바뀌고 티끌만 한
-        /// 이득에 판 전체를 뒤집으라고 한다.
+        /// 지금 놓여 있는 자리. 같은 조건과 효과·빈칸 품질에서는 이동을 줄인다.
         /// </summary>
         public Dictionary<int, TabletSpot> CurrentTablets { get; } = new Dictionary<int, TabletSpot>();
         public Dictionary<int, GridPos> CurrentCharms { get; } = new Dictionary<int, GridPos>();
@@ -182,6 +185,8 @@ namespace SephPlanner.Core.Solver
 
         /// <summary>양옆 빈칸을 함께 확보하는 배정의 상한. 실측 최적값이 아닌 탐색 예산이다.</summary>
         public int EmptySideTrials { get; set; } = 192;
+        /// <summary>석판 이동·회전 뒤 재배정할 후보 예산. 실측 최적값이 아닌 추정이다.</summary>
+        public int TabletRefinementTrials { get; set; } = 64;
 
         /// <summary>
         /// 이 풀이가 이미 쓸모없어졌는지. 폴링이 풀이보다 빠르면 답이 나오기도 전에 그 답을 버릴
@@ -222,9 +227,8 @@ namespace SephPlanner.Core.Solver
         public double Score { get; set; }
 
         /// <summary>
-        /// 배치들 사이에서 고를 때 쓰는 값. <see cref="Score"/>에 지금 자리를 지키는 몫(이사 비용의
-        /// 반대 부호)과 직전 제안을 지키는 몫을 더한 것이다. 화면에 보이는 점수가 아니다 - 같은
-        /// 판의 배치들끼리만 견줄 수 있고 절대값에는 뜻이 없다.
+        /// 현재 자리와 직전 제안을 유지하는 정도. <see cref="Score"/>와 별도이며 마지막 동점
+        /// 비교에만 쓴다. 같은 판의 배치끼리만 견줄 수 있다.
         /// </summary>
         public double Preference { get; set; }
 
@@ -260,6 +264,10 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         public List<int> UnheldCharms { get; } = new List<int>();
         public List<int> UnretainedCharms { get; } = new List<int>();
+        public List<int> UnpreservedCharms { get; } = new List<int>();
+        public List<int> UnapprovedDeactivations { get; } = new List<int>();
+        public int UnsafeEmptyCells { get; set; }
+        public int WastedLevels { get; set; }
 
         /// <summary>자체 활성 상태지만 강화할 대상과 유효하게 연결되지 않은 아티팩트.</summary>
         public List<int> UnlinkedCharms { get; } = new List<int>();

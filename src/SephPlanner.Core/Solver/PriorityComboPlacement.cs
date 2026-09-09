@@ -37,23 +37,7 @@ namespace SephPlanner.Core.Solver
         }
 
         public static int Compare(Arrangement left, Arrangement right)
-        {
-            var retained = right.UnretainedCharms.Count.CompareTo(left.UnretainedCharms.Count);
-            if (retained != 0) return retained;
-            var requested = left.PriorityComboMatches + left.UnmatchedComboCharms.Count +
-                            right.PriorityComboMatches + right.UnmatchedComboCharms.Count;
-            if (requested > 0)
-            {
-                var held = right.UnheldCharms.Count.CompareTo(left.UnheldCharms.Count);
-                if (held != 0) return held;
-                var matches = left.PriorityComboMatches.CompareTo(right.PriorityComboMatches);
-                if (matches != 0) return matches;
-                var progress = left.PriorityComboProgress - right.PriorityComboProgress;
-                if (Math.Abs(progress) > 1e-9) return Math.Sign(progress);
-            }
-            var preference = left.Preference - right.Preference;
-            return Math.Abs(preference) > 1e-9 ? Math.Sign(preference) : 0;
-        }
+            => PlacementQuality.From(left).CompareTo(PlacementQuality.From(right));
 
         internal static void Describe(
             PlacementProblem problem, Arrangement arrangement, IReadOnlyDictionary<GridPos, CharmSlot> neighbors)

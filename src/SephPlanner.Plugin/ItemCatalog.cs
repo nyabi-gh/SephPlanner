@@ -146,7 +146,11 @@ namespace SephPlanner.Plugin
                         AmountByLevel = Doubles(reducer.reducePercentByLevel),
                     };
                 if (charm is Charm_Magic magic && magic.ContainedMagic != null)
+                {
                     definition.MagicCostByLevel = Doubles(magic.ContainedMagic.mpCostsByLevel);
+                    definition.UsesMagicCritical = magic.ContainedMagic.magicPrefab != null &&
+                        magic.ContainedMagic.magicPrefab.GetComponent<ActiveSkill>() is ActiveSkill_Bolt;
+                }
                 Dependency(charm, definition);
                 ContextStats(charm, definition);
                 if (charm is Charm_WhitePaper paper) definition.PaperMatch = paper.match;

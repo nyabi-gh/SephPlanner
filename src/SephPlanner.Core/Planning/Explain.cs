@@ -58,6 +58,8 @@ namespace SephPlanner.Core.Planning
 
             if (worth.Source == CharmWorthSource.MeasuredFloor)
                 lines.Add("효과의 일부만 측정되어 레어도 어림값을 함께 사용합니다. 실제 전투 효과와 다를 수 있습니다.");
+            if (definition.StatEffects.Count > 0 && worth.Source != CharmWorthSource.Curated)
+                lines.Add("능력치 표의 환산값입니다. 확인된 마법 지원 능력치는 주력 선호를 반영하지만 실제 사용률·전투 피해량은 추정하지 않습니다.");
 
             return lines;
         }

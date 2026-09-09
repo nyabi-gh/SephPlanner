@@ -64,7 +64,13 @@ namespace SephPlanner.Core.Planning
             }
 
             var grid = new GridSpec(inventory.Width, inventory.Height, inventory.Storage);
-            var problem = new PlacementProblem { Grid = grid };
+            var problem = new PlacementProblem
+            {
+                Grid = grid,
+                DeactivationAllowed = new HashSet<int>(preferences.DeactivationAllowed),
+                PinnedCharms = new Dictionary<int, int>(preferences.PinnedCharms),
+                RetainedCharms = new HashSet<int>(preferences.RetainedCharms),
+            };
 
             // 빔 서치는 후보를 살펴보는 순서에 따라 같은 점수의 다른 배치를 내놓는다. 스냅샷의 순서는
             // 석판을 옮기면 바뀌므로, 여기서 한 번 고정해 두어야 제안이 흔들리지 않는다.
@@ -135,6 +141,7 @@ namespace SephPlanner.Core.Planning
                         : 1,
                     Held = definition is not null && preferences.HeldCharms.Contains(item.DefinitionId),
                     Retained = definition is not null && preferences.RetainedCharms.Contains(item.DefinitionId),
+                    AllowDeactivation = definition is not null && preferences.DeactivationAllowed.Contains(item.DefinitionId),
                 };
                 if (definition is not null) slot.Worth = CharmWorth.Resolve(definition, values.Of(definition));
                 problem.Charms.Add(slot);
@@ -166,9 +173,7 @@ namespace SephPlanner.Core.Planning
             var best = PlacementSolver.Solve(problem, new SolverOptions { Cancellation = cancellation });
             if (cancellation.IsCancellationRequested) return null;
 
-            // 지금이 이기면 지금이 답이다. 조건부 아티팩트는 배정과 조건이 서로 물려 수렴 반복이
-            // 소진될 수 있고 그 결과가 지금 배치보다 나쁠 수 있다(실제로 재현됐다). 이사 비용까지
-            // 쳐서 견주므로, 옮기는 수고만큼도 못 얻는 배치도 여기서 걸러진다.
+            // 조건부 배정은 수렴하지 않을 수 있으므로 현재 배치도 같은 우선순위로 비교한다.
             if (PriorityComboPlacement.Compare(best, current) < 0) best = current;
 
             var offers = new List<OfferAdvice>();
@@ -206,12 +211,13 @@ namespace SephPlanner.Core.Planning
             }
 
             var moves = Moves(problem, current, best, out var manualMovesAvailable);
+            var unapprovedDeactivation = !ActivationPolicy.AllowsTransition(current, best);
             var targets = Targets(problem, best);
             var hasPlacementChanges = targets.Any(target =>
                 target.From != target.To || target.IsTablet && target.FromRotation != target.Rotation);
 
-            if (best.UnplacedTablets > 0 || !verification.Passed || best.UnretainedCharms.Count > 0) targets.Clear();
-            if (best.UnretainedCharms.Count > 0)
+            if (best.UnplacedTablets > 0 || !verification.Passed || best.UnretainedCharms.Count > 0 || unapprovedDeactivation) targets.Clear();
+            if (best.UnretainedCharms.Count > 0 || unapprovedDeactivation)
             {
                 moves.Clear();
                 manualMovesAvailable = false;
@@ -229,6 +235,14 @@ namespace SephPlanner.Core.Planning
                 SupportWarnings = problem.Charms.Where(charm => best.UnlinkedCharms.Contains(charm.InstanceId) && !charm.Retained)
                     .Select(charm => Naming.Of(charm.Definition.Names, charm.Definition.Id, "아티팩트") + ": " +
                         Explain.SupportMissing(charm.Definition)).ToList(),
+                HasUnapprovedDeactivation = unapprovedDeactivation,
+                ActivationWarnings = problem.Charms.Where(charm => best.UnpreservedCharms.Contains(charm.InstanceId) &&
+                        !charm.Retained && !best.UnlinkedCharms.Contains(charm.InstanceId))
+                    .Select(charm => Naming.Of(charm.Definition.Names, charm.Definition.Id, "아티팩트") +
+                        ": 활성 배치를 찾지 못했습니다. " +
+                        (best.CharmPositions.TryGetValue(charm.InstanceId, out var cell) && best.InactiveCells.TryGetValue(cell, out var reason)
+                            ? Explain.InactiveReason(reason) : "놓을 자리가 부족합니다.") +
+                        (unapprovedDeactivation ? " 끄기 허용 없이 새로 비활성화하는 배치는 적용하지 않습니다." : "")).ToList(),
                 ManualMoveInstructionsAvailable = manualMovesAvailable,
                 HasPlacementChanges = hasPlacementChanges,
                 InventoryWidth = inventory.Width,

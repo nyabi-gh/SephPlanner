@@ -56,6 +56,18 @@ namespace SephPlanner.Core.Solver
 
             foreach (var charm in charms)
             {
+                charm.StatEffects.Clear();
+                foreach (var table in measurement.CharmStats)
+                {
+                    if (table.EntityId != charm.EntityId) continue;
+                    charm.StatEffects.Add(new CharmStatEffect
+                    {
+                        StatusId = table.StatusId,
+                        AmountByLevel = new List<int>(table.ValuesByLevel),
+                        WorthPerUnit = report.Exchange.TryConvert(table.StatusId, 1, out var perUnit) ? perUnit : (double?)null,
+                        Samples = report.Exchange.Samples.TryGetValue(table.StatusId, out var samples) ? samples : 0,
+                    });
+                }
                 foreach (var bonus in charm.ContextStats)
                     bonus.WorthPerUnit = report.Exchange.TryConvert(bonus.StatusId, 1, out var unit) ? unit : (double?)null;
                 charm.StatWorthByLevel.Clear();

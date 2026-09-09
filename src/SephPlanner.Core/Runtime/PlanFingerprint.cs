@@ -147,6 +147,8 @@ namespace SephPlanner.Core.Runtime
             }
             foreach (var retained in preferences.RetainedCharms.OrderBy(value => value))
                 Add(builder, "retained", retained);
+            foreach (var allowed in preferences.DeactivationAllowed.OrderBy(value => value))
+                Add(builder, "deactivationAllowed", allowed);
             foreach (var held in preferences.HeldCharms.OrderBy(value => value))
                 Add(builder, "held", held);
             foreach (var pair in preferences.CharmValues.EntityValues.OrderBy(value => value.Key))

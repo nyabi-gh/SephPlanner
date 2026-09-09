@@ -490,16 +490,16 @@ public class StabilityTests
     }
 
     [Fact]
-    public void AGainSmallerThanTheCostOfMovingIsNotProposed()
+    public void MovementPreferenceDoesNotEraseASmallGameplayGain()
     {
-        // 한 칸 옮기면 레벨이 하나 오르지만 그 레벨의 값어치가 0.2 뿐이다. 옮기는 수고(0.3)보다
-        // 적게 얻는 이동은 제안하지 않는다 - 점수는 끝 상태만 세므로 이 비용이 없으면 티끌만 한
-        // 이득에도 판을 뒤집으라고 한다.
         var problem = OneStepProblem(perLevel: 0.2);
 
         var arrangement = PlacementSolver.Solve(problem);
 
-        Assert.Equal(new GridPos(4, 0), arrangement.CharmPositions[10]);
+        Assert.Equal(new GridPos(1, 0), arrangement.CharmPositions[10]);
+        var current = PlacementSolver.Score(problem,
+            new[] { problem.Tablets[0].At(new GridPos(0, 0), 0) }, problem.CurrentCharms);
+        Assert.Equal(0.2, arrangement.Score - current.Score, 9);
     }
 
     [Fact]
@@ -527,7 +527,7 @@ public class StabilityTests
     }
 
     [Fact]
-    public void APlanThatDoesNotPayForItsMovesIsWithheld()
+    public void PlanReportsGameplayGainSeparatelyFromMovementPreference()
     {
         // 사용자에게 닿는 계약이다. 이득이 이사 비용에 못 미치면 화면에는 "변경 없음" 이 떠야 한다.
         var catalog = new Catalog(
@@ -561,8 +561,8 @@ public class StabilityTests
         var plan = PlanBuilder.Build(
             new GameSnapshot { Inventory = inventory, Run = new RunState() }, catalog)!;
 
-        Assert.Empty(plan.Moves);
-        Assert.Equal(0, plan.Gain, 9);
+        Assert.Single(plan.Moves);
+        Assert.Equal(0.2, plan.Gain, 9);
         Assert.Equal(1.0, plan.Current.Score, 9);
     }
 

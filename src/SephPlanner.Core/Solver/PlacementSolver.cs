@@ -7,79 +7,73 @@ using SephPlanner.Core.Tablets;
 
 namespace SephPlanner.Core.Solver
 {
-    /// <summary>
-    /// 석판과 아티팩트를 격자에 배치해 점수를 최대화한다.
-    ///
-    /// 두 단계로 나눈다. 석판 배치는 조합 탐색이라 빔 서치로 후보를 좁히고, 석판이 고정되면
-    /// 아티팩트 배치는 배정 문제가 되므로 헝가리안으로 정확히 푼다. 조건 판정이 배치에 의존하고
-    /// 배치가 다시 조건에 의존하므로 몇 번 되풀이해 수렴시킨 뒤, 마지막 점수는 수렴한 배치로
-    /// 다시 계산한다. 그래서 보고되는 점수는 항상 실제 배치의 점수다.
-    ///
-    /// <b>두 단계가 같은 것을 재야 한다.</b> 1단계가 어림값으로 후보를 버리고 2단계만 진짜
-    /// 점수를 보면, 1단계에서 잘못 버린 것은 되찾을 길이 없다. 이 클래스가 겪은 문제가 그것이고
-    /// 세 자리에서 고쳤다.
-    ///
-    /// <list type="number">
-    /// <item>어림값(<see cref="EstimateModel"/>)이 아티팩트마다 다른 값어치와 사용자가 찍은
-    /// 강화 우선까지 본다. 전에는 "켜져 있으면 1, 레벨 하나에 1"이라 어느 아티팩트가 센지 몰랐다.</item>
-    /// <item>빔을 자를 때 한 부모가 다 가져가지 못하게 한다(Select). 좋은 부분 배치 하나에서
-    /// 나온 사촌들이 빔을 메우면 폭을 넓혀도 보는 넓이가 안 늘어난다.</item>
-    /// <item>이긴 배치를 자리 맞바꾸기로 다듬는다(Polish). 배정 비용이 직전 반복의 이웃을 보는
-    /// 근사라, 두 아티팩트가 함께 움직여야 좋아지는 수를 배정기 혼자서는 못 넘는다.</item>
-    /// </list>
-    ///
-    /// 셋을 넣기 전에는 <b>빔을 여덟 배로 넓혀도 점수가 안 올랐다</b>. 잘못된 잣대로 400개를
-    /// 남기든 3200개를 남기든 같은 것만 남기 때문이다. 넣은 뒤에는 빔 400 이 예전의 빔 1600 보다
-    /// 좋으면서 네 배 빠르다. 폭을 늘리는 것이 답이 아니었다는 뜻이므로, "정밀 탐색" 같은
-    /// 시간을 더 쓰는 모드는 두지 않는다.
-    /// </summary>
+    /// <summary>석판 후보 탐색과 조건부 아티팩트 배정을 공통 우선순위로 비교한다.</summary>
     public static class PlacementSolver
     {
-        private const double WastePenalty = 1e-4;
-
-        /// <summary>
-        /// 자리 하나를 옮기는 비용. 점수는 배치의 끝 상태만 세므로, 이것이 없으면 한 수로 얻는
-        /// +3.35 와 열두 수로 얻는 +3.35 가 같은 값이 되어 빈 칸이 많은 판에서는 티끌만 한 이득에도
-        /// 판 전체가 뒤집힌다(실측: 아이템 하나에 목표 12개가 바뀌고 +3.35, 다른 판은 19수에 +1.2).
-        /// 잰 최적값이 아니라 그 두 사례는 막히고(12 x 0.3 &gt; 3.35) 한두 수짜리 좋은 제안은
-        /// 통과하는 크기로 잡은 추정치다.
-        ///
-        /// 지금 자리에 그대로 있는 것마다 이만큼을 더하는 식으로 매긴다. 이 몫은 배치들 사이에서
-        /// 고를 때만 쓰고(<see cref="Arrangement.Preference"/>) 보고되는 점수에는 넣지 않는다 -
-        /// 점수는 레벨 단위의 값어치라 거기에 섞이면 "현재 / 최선" 이 뜻을 잃는다.
-        /// </summary>
-        private const double MoveCost = 0.3;
-
-        /// <summary>
-        /// 직전 제안과 같은 자리에 주는 몫. 이사 비용보다 훨씬 약해야 한다 - 옮길 필요가 없어진
-        /// 것은 그대로 두는 쪽이 먼저고, 어차피 옮길 것이라면 저번에 말한 자리가 먼저다. 동점을
-        /// 가르는 크기라 격자 42칸이 다 맞아도 낭비 판단 하나를 넘지 않게 잡았다(42 x 2e-8 &lt; 1e-4).
-        /// </summary>
         private const double PlanBonus = 2e-8;
-
-        /// <summary>자리 맞바꾸기를 받아들이는 문턱. 부동소수 잡음을 이득으로 읽지 않기 위한 것이다.</summary>
-        private const double Tie = 1e-9;
-
-        /// <summary>
-        /// 제한 해제 칸에 고정한 아티팩트가 보통 칸에 앉을 때 무는 값. 어떤 점수 차이보다 커야
-        /// 다른 아티팩트가 그 칸을 빼앗지 못한다. 그런 칸이 하나도 없으면 모든 칸이 같은 값을
-        /// 물어 배정이 흔들리지 않고, 고정만 지켜지지 않는다. 이사 비용처럼 선택 기준에만 들어간다.
-        /// </summary>
-        private const double HoldPenalty = 1000;
-
         public static Arrangement Solve(PlacementProblem problem, SolverOptions? options = null)
         {
             options ??= new SolverOptions();
-            return EvaluateLayouts(problem, SearchLayouts(problem, options), options);
+            CaptureProtectedActivation(problem);
+            return ImproveTablets(problem, EvaluateLayouts(problem, SearchLayouts(problem, options), options), options);
+        }
+
+        private static void CaptureProtectedActivation(PlacementProblem problem)
+        {
+            problem.ProtectedActive.Clear();
+            if (problem.CurrentCharms.Count != problem.Charms.Count ||
+                !problem.Charms.All(charm => problem.CurrentCharms.ContainsKey(charm.InstanceId))) return;
+            var layout = problem.Tablets.Count == 0 ? new List<TabletPlacement>() : Layout(problem, problem.CurrentTablets);
+            if (layout is null) return;
+            var current = Score(problem, layout, problem.CurrentCharms);
+            foreach (var charm in problem.Charms)
+                if (!charm.Retained && Preserve(charm) && !current.InactiveCharms.Contains(charm.InstanceId) &&
+                    !current.UnlinkedCharms.Contains(charm.InstanceId)) problem.ProtectedActive.Add(charm.InstanceId);
+        }
+
+        private static Arrangement ImproveTablets(PlacementProblem problem, Arrangement best, SolverOptions options)
+        {
+            if (best.UnplacedTablets > 0 || problem.Tablets.Count == 0 || options.TabletRefinementTrials <= 0) return best;
+            var cells = Cells(problem);
+            var model = BuildEstimateModel(problem);
+            var remaining = options.TabletRefinementTrials;
+            for (var pass = 0; pass < options.PolishPasses && remaining > 0; pass++)
+            {
+                if (options.Cancellation.IsCancellationRequested) break;
+                var candidates = new List<(List<TabletPlacement> Layout, PlacementQuality Quality)>();
+                for (var index = 0; index < problem.Tablets.Count; index++)
+                {
+                    var slot = problem.Tablets[index];
+                    var origin = best.Tablets[index];
+                    foreach (var cell in cells)
+                    {
+                        if (options.Cancellation.IsCancellationRequested) return best;
+                        foreach (var rotation in DistinctRotations(slot, CurrentRotation(problem, slot)))
+                        {
+                            if (cell == origin.Position && rotation == origin.Rotation) continue;
+                            var trial = new List<TabletPlacement>(best.Tablets);
+                            var other = trial.FindIndex(tablet => tablet.Position == cell);
+                            if (other >= 0 && other != index)
+                                trial[other] = problem.Tablets[other].At(origin.Position, trial[other].Rotation);
+                            trial[index] = slot.At(cell, rotation);
+                            candidates.Add((trial, Estimate(problem, cells, trial, model)));
+                        }
+                    }
+                }
+                var allowance = Math.Max(1, remaining / (options.PolishPasses - pass));
+                var layouts = candidates.OrderByDescending(candidate => candidate.Quality)
+                    .Take(allowance).Select(candidate => candidate.Layout).ToList();
+                if (layouts.Count == 0) break;
+                remaining -= layouts.Count;
+                var improved = EvaluateLayouts(problem, layouts, options);
+                if (PriorityComboPlacement.Compare(improved, best) <= 0) break;
+                best = improved;
+            }
+            return best;
         }
 
         /// <summary>
-        /// 채점까지 가 볼 석판 배치 후보들.
-        ///
-        /// <b>풀이 비용의 대부분이 여기다</b> - 42칸 판에서 재어 보면 <see cref="Solve"/>의 97%가
-        /// 이 탐색이고, 나머지 3%가 <see cref="EvaluateLayouts"/>의 정확한 배정이다. 그래서 같은
-        /// 석판 구성을 여러 번 채점해야 할 때는 이것을 한 번만 짓고 돌려 쓴다
-        /// (<see cref="LayoutCache"/>).
+        /// 채점할 석판 후보를 만든다. 같은 석판 구성의 조언들은 <see cref="LayoutCache"/>로 공유한다.
         /// </summary>
         public static List<List<TabletPlacement>> SearchLayouts(
             PlacementProblem problem, SolverOptions? options = null)
@@ -163,7 +157,7 @@ namespace SephPlanner.Core.Solver
         {
             if (problem.Grid.Storage - problem.Tablets.Count - problem.Charms.Count < 2) return best;
             var budget = options.EmptySideTrials;
-            foreach (var candidate in evaluated.OrderByDescending(pair => pair.Result.Preference))
+            foreach (var candidate in evaluated.OrderByDescending(pair => PlacementQuality.From(pair.Result)))
             {
                 var occupied = new HashSet<GridPos>(candidate.Layout.Select(tablet => tablet.Position));
                 foreach (var charm in problem.Charms.Where(c => !c.IsDormant && !c.IsFiller &&
@@ -273,18 +267,7 @@ namespace SephPlanner.Core.Solver
         }
 
         /// <summary>
-        /// 빔이 배치를 줄 세울 때 쓰는 잣대.
-        ///
-        /// <b>여기가 어림값의 전부다.</b> 예전에는 "켜져 있는 아티팩트 하나에 1, 레벨 하나에 1"
-        /// 이라는 한 가지 잣대로 모두를 쟀다. 그래서 빔은 <b>어느 아티팩트가 센지도, 사용자가
-        /// 무엇을 강화 우선으로 찍었는지도 모른 채</b> 배치를 골랐다 - 레벨 5 칸 하나를 만드는
-        /// 배치와 레벨 5 칸 하나를 만드는 다른 배치가, 그 칸에 갈 아티팩트가 전설이든 잡템이든
-        /// 똑같은 값으로 보였다. 빔을 여덟 배로 넓혀도 점수가 안 오르던 까닭이 이것이다.
-        /// 잘못된 잣대로 400개를 남기든 3200개를 남기든 같은 것만 남는다.
-        ///
-        /// 이제 아티팩트를 값어치 순으로 세워 두고, 레벨이 높은 칸부터 값어치가 큰 아티팩트를
-        /// 짝지어 본다. 재배열 부등식이라 값이 레벨에 대해 늘기만 하면 이 짝짓기가 가장 큰 합을
-        /// 주고, 그래서 어림값은 실제 배정이 낼 수 있는 값의 위쪽 어림이 된다.
+        /// 필수 조건과 레벨별 최대 가치 순으로 탐욕 배정할 입력. 음수·비단조 표도 보존한다.
         /// </summary>
         private sealed class EstimateModel
         {
@@ -293,6 +276,20 @@ namespace SephPlanner.Core.Solver
 
             /// <summary>값어치 순위별, 레벨별 값어치. <c>[순위][레벨]</c>. 풀이마다 한 번만 짓는다.</summary>
             public double[][] ValueByRank = Array.Empty<double[]>();
+            public CharmSlot[] Items = Array.Empty<CharmSlot>();
+            public bool[] Required = Array.Empty<bool>(), Preserved = Array.Empty<bool>();
+            public int[] Current = Array.Empty<int>(), Planned = Array.Empty<int>();
+            public EstimateGroup[] Groups = Array.Empty<EstimateGroup>();
+            public int[,] Members = new int[0, 0];
+            public int[] GroupByCell = Array.Empty<int>();
+            public bool[] Used = Array.Empty<bool>();
+        }
+
+        private struct EstimateGroup
+        {
+            public GridPos Cell;
+            public int Level, Multiplier, Count, Head;
+            public bool Disabled, Ignore, Unsafe;
         }
 
         /// <summary>
@@ -304,7 +301,7 @@ namespace SephPlanner.Core.Solver
                 ? ContextStatWorth.Value(problem, charm, default, Math.Min(charm.Definition.MaxLevel, level), null, true) :
             charm.Definition.MagicSupport is not null
                 ? DirectedCharmSupport.Estimate(problem, charm, level)
-                : charm.Worth.WeightedAt(Math.Min(charm.Definition.MaxLevel, level), charm.Weight);
+                : BuildStatWorth.Value(problem, charm, Math.Min(charm.Definition.MaxLevel, level));
 
         private static EstimateModel BuildEstimateModel(PlacementProblem problem)
         {
@@ -315,27 +312,42 @@ namespace SephPlanner.Core.Solver
             foreach (var charm in problem.Charms)
             {
                 if (charm.Definition.IsMagic) anyMagic = true;
-                if (charm.IsFiller || charm.IsDormant) continue;
-
                 scoring.Add(charm);
                 levelCap = Math.Max(levelCap, charm.Definition.MaxLevel);
             }
             if (scoring.Count == 0) levelCap = 5;
 
-            // 상한에서의 값어치로 줄 세운다. 레벨마다 순서가 뒤바뀔 수는 있지만(상한이 낮은
-            // 아티팩트는 낮은 레벨에서만 앞선다) 빔을 좁히는 잣대에는 한 줄이면 넉넉하다.
-            scoring.Sort((a, b) => RankValue(problem, b, levelCap).CompareTo(RankValue(problem, a, levelCap)));
-
-            var table = new double[scoring.Count][];
-            for (var rank = 0; rank < scoring.Count; rank++)
+            var rows = new List<(CharmSlot Charm, double[] Values)>();
+            foreach (var charm in scoring)
             {
                 var row = new double[levelCap + 1];
-                for (var level = 0; level <= levelCap; level++) row[level] = RankValue(problem, scoring[rank], level);
-                table[rank] = row;
+                if (!charm.IsFiller && !charm.IsDormant)
+                    for (var level = 0; level <= levelCap; level++) row[level] = RankValue(problem, charm, level);
+                rows.Add((charm, row));
             }
-
-            return new EstimateModel { LevelCap = levelCap, AnyMagic = anyMagic, ValueByRank = table };
+            var ordered = rows.OrderByDescending(row => RequiresUse(problem, row.Charm))
+                .ThenByDescending(row => row.Charm.Held).ThenByDescending(row => Preserve(row.Charm))
+                .ThenByDescending(row => row.Values.Max()).ThenBy(row => row.Charm.InstanceId).ToList();
+            return new EstimateModel
+            {
+                LevelCap = levelCap,
+                AnyMagic = anyMagic,
+                Items = ordered.Select(row => row.Charm).ToArray(),
+                ValueByRank = ordered.Select(row => row.Values).ToArray(),
+                Required = ordered.Select(row => RequiresUse(problem, row.Charm)).ToArray(),
+                Preserved = ordered.Select(row => Preserve(row.Charm)).ToArray(),
+                Current = ordered.Select(row => AnchorIndex(problem, row.Charm, problem.CurrentCharms)).ToArray(),
+                Planned = ordered.Select(row => AnchorIndex(problem, row.Charm, problem.PlannedCharms)).ToArray(),
+                Groups = new EstimateGroup[problem.Grid.Storage],
+                Members = new int[problem.Grid.Storage, problem.Grid.Storage],
+                GroupByCell = new int[problem.Grid.Storage],
+                Used = new bool[problem.Grid.Storage],
+            };
         }
+
+        private static int AnchorIndex(PlacementProblem problem, CharmSlot charm, Dictionary<int, GridPos> anchors) =>
+            anchors.TryGetValue(charm.InstanceId, out var cell) && problem.Grid.Contains(cell)
+                ? problem.Grid.ToIndex(cell.X, cell.Y) : -1;
 
         /// <summary>
         /// 직전 제안의 배치를 후보로 되살린다. 계획에 없는 새 석판이 끼면 계획된 자리는 그대로
@@ -382,7 +394,7 @@ namespace SephPlanner.Core.Solver
                 var rotations = DistinctRotations(slot, CurrentRotation(problem, slot));
 
                 List<TabletPlacement>? grown = null;
-                var bestScore = double.NegativeInfinity;
+                PlacementQuality? bestScore = null;
                 var bestCell = default(GridPos);
                 foreach (var cell in cells)
                 {
@@ -391,7 +403,7 @@ namespace SephPlanner.Core.Solver
                     {
                         var trial = new List<TabletPlacement>(layout) { slot.At(cell, rotation) };
                         var estimate = Estimate(problem, cells, trial, model);
-                        if (estimate > bestScore)
+                        if (!bestScore.HasValue || estimate.CompareTo(bestScore.Value) > 0)
                         {
                             bestScore = estimate;
                             grown = trial;
@@ -425,7 +437,7 @@ namespace SephPlanner.Core.Solver
                 // 이미 돌아간 채로 잠긴 석판(저주 등)에 불가능한 회전을 제안하게 된다.
                 var rotations = DistinctRotations(slot, CurrentRotation(problem, slot));
 
-                var expanded = new List<(List<TabletPlacement> Layout, double Score, int Parent)>();
+                var expanded = new List<(List<TabletPlacement> Layout, PlacementQuality Score, int Parent)>();
 
                 for (var parent = 0; parent < beam.Count; parent++)
                 {
@@ -475,7 +487,7 @@ namespace SephPlanner.Core.Solver
         /// 하나뿐이다) 빔을 비워 두지 않기 위해서다.
         /// </summary>
         private static List<List<TabletPlacement>> Select(
-            List<(List<TabletPlacement> Layout, double Score, int Parent)> expanded,
+            List<(List<TabletPlacement> Layout, PlacementQuality Score, int Parent)> expanded,
             int parents, SolverOptions options)
         {
             expanded.Sort((a, b) => b.Score.CompareTo(a.Score));
@@ -586,46 +598,100 @@ namespace SephPlanner.Core.Solver
         }
 
         /// <summary>
-        /// 아티팩트를 실제로 배정하지 않고 매기는 값. 빔을 좁히는 용도이므로 정확할 필요는 없고
-        /// 유망한 배치를 위로 올리기만 하면 된다. 탐색의 최심부라 정렬·집합 할당을 두지 않는다 -
-        /// 레벨 분포를 세어 위에서부터, 값어치 순으로 세워 둔 아티팩트와 짝지어 거둔다
-        /// (<see cref="EstimateModel"/>).
-        ///
-        /// 칸 하나가 더 켜지면 그 다음 순위의 값어치가 더해지고 그 값은 음수가 아니므로, 아티팩트를
-        /// 꺼진 채로 두는 배치가 이길 수 없다 - 예전에 상수 하나로 지키던 성질이 짝짓기 구조
-        /// 자체에서 나온다.
+        /// 각 아티팩트가 남은 칸 중 가장 나은 칸을 고르는 빔 추정. 레벨 증가를 가치 증가로
+        /// 가정하지 않는다. 이웃·지원 조건은 낙관적으로 보므로 최종 점수나 상한 보장은 아니다.
         /// </summary>
-        private static double Estimate(
+        private static PlacementQuality Estimate(
             PlacementProblem problem, List<GridPos> cells, List<TabletPlacement> layout, EstimateModel model)
         {
             var occupancy = new EstimateOccupancy(problem.Grid, model.AnyMagic);
             foreach (var placement in layout) occupancy.Take(placement.Position);
             var result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid, problem.FixedEffects);
 
-            var counts = new int[model.LevelCap + 1];
-            foreach (var cell in cells)
+            var used = model.Used;
+            var groups = model.Groups;
+            var groupCount = 0;
+            // 같은 효과의 칸은 레벨 표를 한 번만 비교한다. 남은 현재·직전 자리는 별도로 보존한다.
+            for (var index = 0; index < cells.Count; index++)
             {
-                if (!occupancy.HasCharm(cell)) continue;
-                if (result.IsDisabled(cell)) continue;
-
-                var level = result.EffectiveLevel(cell, 0);
-                if (level < 0) continue;
-                counts[Math.Min(level, model.LevelCap)]++;
+                var cell = cells[index];
+                used[index] = !occupancy.HasCharm(cell);
+                model.GroupByCell[index] = -1;
+                if (used[index]) continue;
+                var level = result.LevelAt(cell);
+                var multiplier = result.MultiplierAt(cell);
+                var disabled = result.IsDisabled(cell);
+                var ignore = result.IgnoreCriteriaAt(cell) > 0;
+                var group = 0;
+                while (group < groupCount && (groups[group].Level != level || groups[group].Multiplier != multiplier ||
+                    groups[group].Disabled != disabled || groups[group].Ignore != ignore)) group++;
+                if (group == groupCount)
+                {
+                    groups[groupCount++] = new EstimateGroup
+                    {
+                        Cell = cell,
+                        Level = level,
+                        Multiplier = multiplier,
+                        Disabled = disabled,
+                        Ignore = ignore,
+                        Unsafe = Unsafe(cell, result)
+                    };
+                }
+                model.Members[group, groups[group].Count++] = index;
+                model.GroupByCell[index] = group;
             }
-
-            var total = 0.0;
-            var rank = 0;
-            var ranks = model.ValueByRank.Length;
-            for (var level = model.LevelCap; level >= 0 && rank < ranks; level--)
+            double total = 0, familiarity = Familiarity(problem, layout);
+            int missing = 0, unheld = 0, unpreserved = 0, unsafeEmpty = 0, waste = 0;
+            for (var rank = 0; rank < model.Items.Length; rank++)
             {
-                var take = Math.Min(counts[level], ranks - rank);
-                for (var taken = 0; taken < take; taken++) total += model.ValueByRank[rank++][level];
+                var charm = model.Items[rank];
+                var selected = -1;
+                PlacementQuality? best = null;
+                var current = model.Current[rank];
+                var planned = model.Planned[rank];
+                for (var group = 0; group < groupCount; group++)
+                {
+                    ref var entry = ref groups[group];
+                    while (entry.Head < entry.Count && used[model.Members[group, entry.Head]]) entry.Head++;
+                    if (entry.Head == entry.Count) continue;
+                    var index = current >= 0 && !used[current] && model.GroupByCell[current] == group ? current :
+                        planned >= 0 && !used[planned] && model.GroupByCell[planned] == group ? planned :
+                        model.Members[group, entry.Head];
+                    var cell = entry.Cell;
+                    var level = result.EffectiveLevel(cell, charm.Enchant);
+                    var active = !entry.Disabled && level >= 0 && !charm.IsDormant;
+                    var held = !charm.Held || entry.Ignore;
+                    var value = active ? model.ValueByRank[rank][Math.Min(level, model.LevelCap)] : 0;
+                    var quality = new PlacementQuality(model.Required[rank] && !active ? 1 : 0,
+                        model.Preserved[rank] && !active ? 1 : 0, held ? 0 : 1, 0, 0, value,
+                        entry.Unsafe ? -1 : 0, charm.IsFiller || charm.IsDormant ? 0 : Math.Max(0, level - charm.Definition.MaxLevel),
+                        (index == current ? 1 : 0) + (index == planned ? PlanBonus : 0));
+                    if (best.HasValue)
+                    {
+                        var order = quality.CompareTo(best.Value);
+                        if (order < 0 || order == 0 && index >= selected) continue;
+                    }
+                    best = quality;
+                    selected = index;
+                }
+                if (!best.HasValue)
+                {
+                    if (RequiresUse(problem, charm)) missing++;
+                    if (charm.Held) unheld++;
+                    if (Preserve(charm)) unpreserved++;
+                    continue;
+                }
+                used[selected] = true;
+                total += best.Value.Value;
+                missing += best.Value.RetentionFailures;
+                unheld += best.Value.HoldFailures;
+                unpreserved += best.Value.ActivationFailures;
+                waste += best.Value.Waste;
+                familiarity += best.Value.Familiarity;
             }
-
-            // 채점 때와 같은 잣대로 이사 비용과 직전 제안을 여기서도 센다. 빔이 비용을 모르면
-            // 석판을 전부 옮기는 배치만 남기고, 채점 단계는 그중에서 고를 수밖에 없다 - 두 단계가
-            // 같은 것을 재야 한다.
-            return total + Familiarity(problem, layout);
+            for (var index = 0; index < cells.Count; index++)
+                if (!used[index] && groups[model.GroupByCell[index]].Unsafe) unsafeEmpty++;
+            return new PlacementQuality(missing, unpreserved, unheld, 0, 0, total, unsafeEmpty, waste, familiarity);
         }
 
         private static Arrangement Evaluate(
@@ -644,7 +710,8 @@ namespace SephPlanner.Core.Solver
             var bestPositions = positions;
             var bestOccupancy = occupancy;
             var bestResult = result;
-            var bestScore = new PlacementQuality(int.MaxValue, double.NegativeInfinity);
+            var bestScore = new PlacementQuality(int.MaxValue, int.MaxValue, int.MaxValue,
+                0, 0, double.NegativeInfinity, int.MaxValue, int.MaxValue, 0);
 
             for (var iteration = 0; iteration < options.FixpointIterations; iteration++)
             {
@@ -692,12 +759,12 @@ namespace SephPlanner.Core.Solver
             {
                 Polish(problem, layout, free, bestPositions, ref bestOccupancy, ref bestResult, options);
             }
-            else if (problem.Charms.Any(charm => charm.Retained && DirectedCharmSupport.HasConnection(charm)))
+            else if (problem.Charms.Any(charm => (charm.Retained || Preserve(charm)) && DirectedCharmSupport.HasConnection(charm)))
             {
                 for (var pass = 0; pass < options.PolishPasses; pass++)
                 {
                     var bestNeighbors = CharmsByCell(problem, bestPositions);
-                    if (!problem.Charms.Any(charm => charm.Retained && DirectedCharmSupport.HasConnection(charm) &&
+                    if (!problem.Charms.Any(charm => (charm.Retained || Preserve(charm)) && DirectedCharmSupport.HasConnection(charm) &&
                         (!bestPositions.TryGetValue(charm.InstanceId, out var position) ||
                          !CanUse(problem, charm, position, bestResult, bestOccupancy, bestNeighbors)))) break;
                     if (!PolishSupportPairs(problem, layout, free, bestPositions, ref bestOccupancy,
@@ -886,37 +953,54 @@ namespace SephPlanner.Core.Solver
             PlacementProblem problem, List<TabletPlacement> layout, Dictionary<int, GridPos> positions,
             GridOccupancy occupancy, SimulationResult result, Dictionary<GridPos, CharmSlot>? neighbors)
         {
-            var score = Familiarity(problem, layout);
-            var missing = 0;
+            var familiarity = Familiarity(problem, layout);
+            double score = 0;
+            int missing = 0, unpreserved = 0, unheld = 0, waste = 0, unsafeEmpty = 0;
+            var combo = problem.PriorityCategories.Count == 0 ? null : new Arrangement();
             foreach (var charm in problem.Charms)
             {
                 if (!positions.TryGetValue(charm.InstanceId, out var position))
                 {
-                    if (charm.Retained && !charm.IsFiller) missing++;
+                    if (RequiresUse(problem, charm) && !charm.IsFiller) missing++;
+                    if (Preserve(charm)) unpreserved++;
+                    if (charm.Held && !charm.IsFiller) unheld++;
                     continue;
                 }
-                if (charm.Retained && !charm.IsFiller &&
-                    !CanUse(problem, charm, position, result, occupancy, neighbors)) missing++;
-
-                score += Value(problem, charm, position, result, occupancy, neighbors)
-                         + Anchors(problem, charm, position) + Hold(charm, position, result);
+                if (!CanUse(problem, charm, position, result, occupancy, neighbors))
+                {
+                    if (RequiresUse(problem, charm) && !charm.IsFiller) missing++;
+                    if (Preserve(charm)) unpreserved++;
+                }
+                if (charm.Held && !charm.IsFiller && result.IgnoreCriteriaAt(position) <= 0) unheld++;
+                score += Value(problem, charm, position, result, occupancy, neighbors);
+                familiarity += Anchors(problem, charm, position);
+                waste += Waste(charm, position, result);
+                if (combo is not null)
+                {
+                    combo.CharmPositions[charm.InstanceId] = position;
+                    if (Reason(charm, position, result, problem.Grid, occupancy) != CharmInactiveReason.None)
+                        combo.InactiveCharms.Add(charm.InstanceId);
+                }
             }
-            return new PlacementQuality(missing, score);
-        }
-
-        private readonly struct PlacementQuality
-        {
-            private readonly int _missing;
-            private readonly double _value;
-            public PlacementQuality(int missing, double value) { _missing = missing; _value = value; }
-            public int CompareTo(PlacementQuality other)
+            for (var index = 0; index < problem.Grid.Storage; index++)
             {
-                var missing = other._missing.CompareTo(_missing);
-                if (missing != 0) return missing;
-                var delta = _value - other._value;
-                return Math.Abs(delta) > Tie ? Math.Sign(delta) : 0;
+                var cell = problem.Grid.ToPosition(index);
+                if (!occupancy.HasItem(cell) && Unsafe(cell, result)) unsafeEmpty++;
             }
+            if (combo is not null && neighbors is not null) PriorityComboPlacement.Describe(problem, combo, neighbors);
+            return new PlacementQuality(missing, unpreserved, unheld, combo?.PriorityComboMatches ?? 0,
+                combo?.PriorityComboProgress ?? 0, score, unsafeEmpty, waste, familiarity);
         }
+
+        internal static bool Preserve(CharmSlot charm) => !charm.IsFiller && !charm.IsDormant && !charm.AllowDeactivation;
+        private static bool RequiresUse(PlacementProblem problem, CharmSlot charm) =>
+            charm.Retained || problem.ProtectedActive.Contains(charm.InstanceId);
+
+        private static bool Unsafe(GridPos cell, SimulationResult result) =>
+            result.IsDisabled(cell) || result.EffectiveLevel(cell, 0) < 0;
+
+        private static int Waste(CharmSlot charm, GridPos cell, SimulationResult result) =>
+            charm.IsFiller || charm.IsDormant ? 0 : Math.Max(0, result.EffectiveLevel(cell, charm.Enchant) - charm.Definition.MaxLevel);
 
         private static Dictionary<GridPos, CharmSlot> CharmsByCell(
             PlacementProblem problem, Dictionary<int, GridPos> positions)
@@ -939,9 +1023,8 @@ namespace SephPlanner.Core.Solver
             var charmsAreRows = problem.Charms.Count <= free.Count;
             var rows = charmsAreRows ? problem.Charms.Count : free.Count;
             var columns = charmsAreRows ? free.Count : problem.Charms.Count;
-            var cost = new double[rows, columns];
-            var priority = new int[rows, columns];
-            var prioritized = forcedCharm.HasValue || problem.Charms.Any(charm => charm.Retained);
+            var cost = new AssignmentCost[rows, columns];
+            var unit = rows + 1.0;
 
             for (var charmIndex = 0; charmIndex < problem.Charms.Count; charmIndex++)
             {
@@ -951,24 +1034,25 @@ namespace SephPlanner.Core.Solver
                     // 여기서 더해야 뜻이 있다 - 채점할 때만 더하면 배정기가 이미 자리를 바꿔 놓은
                     // 뒤라, 이득이 없는데도 맞바꾸라는 제안이 나온다.
                     var charm = problem.Charms[charmIndex];
-                    var value = -(Value(problem, charm, free[cellIndex], result, occupancy, neighbors)
-                                  + Anchors(problem, charm, free[cellIndex])
-                                  + Hold(charm, free[cellIndex], result));
+                    var cell = free[cellIndex];
+                    var usable = CanUse(problem, charm, cell, result, occupancy, neighbors);
+                    var priority = 0.0;
+                    // 하위 조건의 전체 위반 수보다 큰 기수로 강제 배치·사용 유지·고정·활성을 순서대로 비교한다.
+                    if (RequiresUse(problem, charm) && !charm.IsFiller && usable) priority -= unit * unit;
+                    if (charm.Held && !charm.IsFiller && result.IgnoreCriteriaAt(cell) > 0) priority -= unit;
+                    if (Preserve(charm) && usable) priority--;
                     var row = charmsAreRows ? charmIndex : cellIndex;
                     var column = charmsAreRows ? cellIndex : charmIndex;
-                    cost[row, column] = value;
-                    if (charm.Retained && !charm.IsFiller &&
-                        CanUse(problem, charm, free[cellIndex], result, occupancy, neighbors))
-                        priority[row, column] = -1;
                     if (forcedCharm.HasValue &&
                         ((charm.InstanceId == forcedCharm.Value) != (free[cellIndex] == forcedCell)))
-                        priority[row, column] += rows + 1;
+                        priority += unit * unit * unit;
+                    cost[row, column] = new AssignmentCost(priority,
+                        -Value(problem, charm, cell, result, occupancy, neighbors),
+                        Unsafe(cell, result) ? -1 : 0, Waste(charm, cell, result), -Anchors(problem, charm, cell));
                 }
             }
 
-            var assignment = prioritized
-                ? HungarianAssignment.SolvePrioritized(cost, priority)
-                : HungarianAssignment.Solve(cost, out _);
+            var assignment = HungarianAssignment.Solve(cost);
             for (var row = 0; row < assignment.Length; row++)
             {
                 if (assignment[row] < 0) continue;
@@ -995,8 +1079,7 @@ namespace SephPlanner.Core.Solver
             var level = result.EffectiveLevel(cell, charm.Enchant);
             var effective = inactive ? 0 : Math.Min(charm.Definition.MaxLevel, level);
             if (charm.Definition.MagicSupport is not null)
-                return DirectedCharmSupport.Value(problem, charm, cell, effective, result, occupancy, neighbors)
-                    - WastePenalty * Math.Max(0, level - effective);
+                return DirectedCharmSupport.Value(problem, charm, cell, effective, result, occupancy, neighbors);
 
             // 북향의 침은 강화할 대상이 있어야 제 몫을 한다. 대상 없이 선 침은 값어치가 0 이라,
             // 이것이 없으면 솔버가 침을 아무 데나 세우고도 최적이라고 한다.
@@ -1006,13 +1089,9 @@ namespace SephPlanner.Core.Solver
             // DisableEffect는 침의 보너스 요청을 끄지 않고 limitedEffectEnabledLevel만 0으로 만든다.
             if (inactive) return charm.Worth.WeightedAt(0, charm.Weight) * factor;
 
-            // 상한을 넘긴 레벨은 아무 값어치가 없다. 점수가 같은 배치라면 덜 흘리는 쪽을 고르도록
-            // 아주 작은 차이만 준다. 실제 점수 차이를 뒤집을 만한 크기가 아니다.
-            var value = charm.Worth.WeightedAt(effective, charm.Weight) * factor
-                        - WastePenalty * Math.Max(0, level - effective);
+            var value = BuildStatWorth.Value(problem, charm, effective, result, occupancy, neighbors) * factor;
             if (charm.Definition.ContextStats.Count > 0)
-                value = ContextStatWorth.Value(problem, charm, cell, effective, neighbors)
-                        - WastePenalty * Math.Max(0, level - effective);
+                value = ContextStatWorth.Value(problem, charm, cell, effective, neighbors, result: result, occupancy: occupancy);
 
             if (charm.Definition.Behavior == "Charm_NearLevelDamage")
                 value += CharmWorth.ApplyWeight(NearLevelDamageWorth(charm, cell, effective, result, neighbors), charm.Weight);
@@ -1025,12 +1104,8 @@ namespace SephPlanner.Core.Solver
             return value;
         }
 
-        /// <summary>제한 해제 칸에 고정한 아티팩트가 그런 칸이 아닌 곳에 앉으면 무는 값.</summary>
-        private static double Hold(CharmSlot charm, GridPos cell, SimulationResult result) =>
-            charm.Held && !charm.IsFiller && result.IgnoreCriteriaAt(cell) <= 0 ? -HoldPenalty : 0;
-
         /// <summary>
-        /// 지금 자리를 지키는 몫(이사 비용의 반대 부호)과, 그다음 직전 제안의 자리를 지키는 몫.
+        /// 필수 조건·효과·감점·초과 강화가 같을 때 현재 자리, 직전 제안 순으로 유지한다.
         /// 필러와 꺼진 아티팩트도 받는다 - 값어치가 0 이라 전 칸이 동률이면 배정기가 풀 때마다
         /// 아무 데나 보내고, 그 자리가 바뀌면 이웃을 보는 조건과 이웃 의존 가치가 따라 흔들려
         /// 석판 배치의 점수까지 폴링마다 달라진다.
@@ -1039,7 +1114,7 @@ namespace SephPlanner.Core.Solver
         {
             var value = 0.0;
             if (problem.CurrentCharms.TryGetValue(charm.InstanceId, out var current) && current == cell)
-                value += MoveCost;
+                value += 1;
             if (problem.PlannedCharms.TryGetValue(charm.InstanceId, out var planned) && planned == cell)
                 value += PlanBonus;
             return value;
@@ -1144,7 +1219,7 @@ namespace SephPlanner.Core.Solver
         }
 
         /// <summary>
-        /// 지금과 같은 자리·각도에 있는 석판마다 이사 비용만큼, 직전 제안과 같은 자리에 있는
+        /// 지금과 같은 자리·각도에 있는 석판 수와, 직전 제안과 같은 자리에 있는
         /// 석판마다 아주 작은 값을 더한다. 회전만 바뀌는 것도 한 수다. 아티팩트 몫은 배정 단계에서
         /// 반영해야 뜻이 있어 <see cref="Anchors"/>가 따로 챙긴다.
         /// </summary>
@@ -1158,7 +1233,7 @@ namespace SephPlanner.Core.Solver
                 if (problem.CurrentTablets.TryGetValue(id, out var spot) &&
                     spot.Position == layout[i].Position && spot.Rotation == layout[i].Rotation)
                 {
-                    value += MoveCost;
+                    value += 1;
                 }
                 if (problem.PlannedTablets.TryGetValue(id, out var planned) &&
                     planned.Position == layout[i].Position && planned.Rotation == layout[i].Rotation)
@@ -1201,11 +1276,12 @@ namespace SephPlanner.Core.Solver
                 if (!positions.TryGetValue(charm.InstanceId, out var position))
                 {
                     if (!charm.IsFiller) arrangement.InactiveCharms.Add(charm.InstanceId);
+                    if (charm.Held && !charm.IsFiller) arrangement.UnheldCharms.Add(charm.InstanceId);
                     continue;
                 }
 
                 arrangement.CharmPositions[charm.InstanceId] = position;
-                arrangement.Preference += Anchors(problem, charm, position) + Hold(charm, position, result);
+                arrangement.Preference += Anchors(problem, charm, position);
                 if (charm.Held && !charm.IsFiller && result.IgnoreCriteriaAt(position) <= 0)
                     arrangement.UnheldCharms.Add(charm.InstanceId);
 
@@ -1223,14 +1299,12 @@ namespace SephPlanner.Core.Solver
                     arrangement.InactiveCharms.Add(charm.InstanceId);
                     var residual = Value(problem, charm, position, result, occupancy, neighbors);
                     arrangement.Score += residual;
-                    arrangement.Preference += residual;
                     continue;
                 }
 
                 arrangement.EffectiveLevels[position] = Math.Max(0, Math.Min(charm.Definition.MaxLevel, level));
                 var value = Value(problem, charm, position, result, occupancy, neighbors);
                 arrangement.Score += value;
-                arrangement.Preference += value;
             }
 
             // 아티팩트가 놓인 칸은 인챈트가 더해진 위 값을, 나머지 칸은 시뮬레이션 값을 쓴다.
@@ -1251,8 +1325,14 @@ namespace SephPlanner.Core.Solver
                         occupancy, neighbors);
                 if (unlinked) arrangement.UnlinkedCharms.Add(charm.InstanceId);
                 if (charm.Retained && (inactive || unlinked)) arrangement.UnretainedCharms.Add(charm.InstanceId);
+                if (Preserve(charm) && (inactive || unlinked)) arrangement.UnpreservedCharms.Add(charm.InstanceId);
+                if (!charm.Retained && problem.ProtectedActive.Contains(charm.InstanceId) && (inactive || unlinked))
+                    arrangement.UnapprovedDeactivations.Add(charm.InstanceId);
             }
             PriorityComboPlacement.Describe(problem, arrangement, neighbors);
+            var quality = ScoreOf(problem, layout, positions, occupancy, result, neighbors);
+            arrangement.UnsafeEmptyCells = quality.UnsafeEmpty;
+            arrangement.WastedLevels = quality.Waste;
             return arrangement;
         }
     }

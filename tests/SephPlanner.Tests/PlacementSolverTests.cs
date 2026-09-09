@@ -82,7 +82,11 @@ public class PlacementSolverTests
 
         var arrangement = PlacementSolver.Solve(problem);
 
-        Assert.NotEqual(new GridPos(1, 0), arrangement.CharmPositions[10]);
+        var fixedTablet = PlacementSolver.EvaluateLayouts(problem,
+            new[] { new List<TabletPlacement> { problem.Tablets[0].At(new GridPos(0, 0), 0) } });
+        Assert.NotEqual(new GridPos(1, 0), fixedTablet.CharmPositions[10]);
+        Assert.Empty(fixedTablet.InactiveCharms);
+        Assert.Equal(0, arrangement.UnsafeEmptyCells);
         Assert.Equal(1, arrangement.Score, 3);
         Assert.Empty(arrangement.InactiveCharms);
     }

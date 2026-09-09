@@ -102,7 +102,7 @@ namespace SephPlanner.Core.Solver
                 .Take(limit)
                 .ToList();
 
-            shown.RemoveAll(entry => !Confirm(entry, baseScore, layouts, faster));
+            shown.RemoveAll(entry => !Confirm(entry, baseArrangement, layouts, faster));
 
             // 다시 푼 값으로 순서가 뒤집힐 수 있다. 보여주는 것은 다시 푼 값이므로 줄도 그것으로 세운다.
             return shown
@@ -120,14 +120,14 @@ namespace SephPlanner.Core.Solver
         /// 오는데, 어느 쪽이든 결과 질의가 같으므로 따라 해도 같은 석판이 나온다.
         /// </summary>
         private static bool Confirm(
-            MixAdvice advice, double baseScore, LayoutCache layouts, SolverOptions faster)
+            MixAdvice advice, Arrangement baseline, LayoutCache layouts, SolverOptions faster)
         {
             var trial = advice.Trial;
             if (trial is null) return false;
 
             var solved = PlacementSolver.EvaluateLayouts(trial, layouts.Of(trial, faster), faster);
-            if (solved.UnretainedCharms.Count > 0) return false;
-            advice.Gain = solved.Score - baseScore;
+            if (solved.UnretainedCharms.Count > 0 || !ActivationPolicy.AllowsTransition(baseline, solved)) return false;
+            advice.Gain = solved.Score - baseline.Score;
             advice.Effect = EffectOf(trial, solved);
             return true;
         }
@@ -168,7 +168,8 @@ namespace SephPlanner.Core.Solver
                     var guesses = Guesses(baseLayout, indexA, indexB, mixedSlot);
                     var solved = PlacementSolver.EvaluateLayouts(
                         trial, guesses ?? layouts.Of(trial, faster), faster);
-                    if (solved.UnretainedCharms.Count > 0) continue;
+                    if (solved.UnretainedCharms.Count > 0 ||
+                        !ActivationPolicy.AllowsTransition(layouts.Baseline(problem, faster), solved)) continue;
                     var gain = solved.Score - baseScore;
                     if (best is not null && gain <= best.Gain) continue;
 
@@ -280,6 +281,10 @@ namespace SephPlanner.Core.Solver
                 ComboCounts = problem.ComboCounts,
                 Combos = problem.Combos,
                 PriorityCategories = problem.PriorityCategories,
+                DeactivationAllowed = problem.DeactivationAllowed,
+                PinnedCharms = problem.PinnedCharms,
+                RetainedCharms = problem.RetainedCharms,
+                ProtectedActive = new HashSet<int>(problem.ProtectedActive),
             };
 
             foreach (var pair in problem.CurrentTablets)

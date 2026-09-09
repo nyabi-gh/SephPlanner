@@ -330,6 +330,7 @@ namespace SephPlanner.Core.Solver
             LayoutCache layouts, SolverOptions faster)
         {
             TrialOutcome? best = null;
+            var baseline = layouts.Baseline(problem, faster);
 
             // 석판을 그대로 둔 갈래들의 배치. 석판을 하나 빼는 갈래는 여기서 그 자리만 빼면
             // 되므로, 그런 갈래마다 탐색을 다시 돌리지 않는다 - 그 탐색들이 남은 비용의 대부분이었다.
@@ -353,7 +354,8 @@ namespace SephPlanner.Core.Solver
                 var placed = candidate.Charm is not null
                     ? outcome.Solved.CharmPositions.ContainsKey(candidateId)
                     : outcome.Solved.TabletPositions.ContainsKey(candidateId);
-                if (!placed || outcome.Solved.UnretainedCharms.Count > 0) continue;
+                if (!placed || outcome.Solved.UnretainedCharms.Count > 0 ||
+                    !ActivationPolicy.AllowsTransition(baseline, outcome.Solved)) continue;
                 if (best is null || PriorityComboPlacement.Compare(outcome.Solved, best.Solved) > 0) best = outcome;
             }
             if (best is null) return null;
@@ -362,7 +364,7 @@ namespace SephPlanner.Core.Solver
             // 잣대에서 나와야 하고, 미리보기도 이 결과를 그대로 쓴다.
             best.Solved = PlacementSolver.EvaluateLayouts(
                 best.Trial, layouts.Of(best.Trial, faster), faster);
-            return best.Solved.UnretainedCharms.Count == 0 ? best : null;
+            return best.Solved.UnretainedCharms.Count == 0 && ActivationPolicy.AllowsTransition(baseline, best.Solved) ? best : null;
         }
 
         private static IEnumerable<TrialOutcome> Trials(
@@ -463,6 +465,9 @@ namespace SephPlanner.Core.Solver
                     InstanceId = candidateId,
                     IsDormant = candidate.CharmIsDormant,
                     Worth = CharmWorth.Resolve(candidate.Charm, values?.Of(candidate.Charm)),
+                    AllowDeactivation = trial.DeactivationAllowed.Contains(candidate.Charm.EntityId),
+                    Retained = trial.RetainedCharms.Contains(candidate.Charm.EntityId),
+                    Weight = trial.PinnedCharms.TryGetValue(candidate.Charm.EntityId, out var pin) ? PlanPreferences.WeightOf(pin) : 1,
                 });
                 return true;
             }
@@ -489,6 +494,10 @@ namespace SephPlanner.Core.Solver
                 ComboCounts = problem.ComboCounts,
                 Combos = problem.Combos,
                 PriorityCategories = problem.PriorityCategories,
+                DeactivationAllowed = problem.DeactivationAllowed,
+                PinnedCharms = problem.PinnedCharms,
+                RetainedCharms = problem.RetainedCharms,
+                ProtectedActive = new HashSet<int>(problem.ProtectedActive),
             };
 
             // 현재 위치와 직전 제안을 빼먹으면 후보 쪽 풀이만 앵커를 잃어, 기준과 후보가

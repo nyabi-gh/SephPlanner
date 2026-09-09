@@ -1,4 +1,5 @@
 using SephPlanner.Core.Planning;
+using SephPlanner.Core.Solver;
 
 namespace SephPlanner.Core.Runtime
 {
@@ -84,6 +85,8 @@ namespace SephPlanner.Core.Runtime
                     $"석판 {plan.Best.UnplacedTablets}개를 놓을 자리가 없어 자동 배치를 실행하지 않습니다.");
             if (plan.Best.UnretainedCharms.Count > 0)
                 return AutoPlaceDecision.Deny("사용 유지 조건을 만족하는 배치를 찾지 못해 자동 배치를 실행하지 않습니다.");
+            if (plan.HasUnapprovedDeactivation || !ActivationPolicy.AllowsTransition(plan.Current, plan.Best))
+                return AutoPlaceDecision.Deny("끄기 허용 없이 아티팩트를 새로 비활성화하는 배치는 적용하지 않습니다.");
             if (!plan.HasPlacementChanges || plan.Targets.Count == 0)
                 return AutoPlaceDecision.Deny("옮길 것이 없습니다.");
             // 멀티 세션은 기본으로 잠근다. 개발사가 금지한 것은 아니고 인벤토리 동기화 구현을

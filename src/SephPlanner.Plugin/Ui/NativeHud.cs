@@ -521,6 +521,19 @@ namespace SephPlanner.Plugin.Ui
                 : $"{plan.Current.Score:0.#} / {score:0.#}";
             _gain.text = gain > 0.001 ? $"+{gain:0.#}" : gain < -0.001 ? $"{gain:0.#}" : "변경 없음";
             _gain.color = gain > 0.001 ? NativeSkin.Good : gain < -0.001 ? NativeSkin.Bad : NativeSkin.TextDim;
+            if (previewed == null && plan.HasPlacementChanges)
+            {
+                if (plan.Best.UnpreservedCharms.Count < plan.Current.UnpreservedCharms.Count)
+                {
+                    _gain.text = $"활성 보존 우선 ({gain:+0.#;-0.#;0})";
+                    _gain.color = NativeSkin.Mint;
+                }
+                else if (Math.Abs(gain) <= 0.001 && plan.Best.UnsafeEmptyCells < plan.Current.UnsafeEmptyCells)
+                {
+                    _gain.text = "감점 칸 정리";
+                    _gain.color = NativeSkin.Mint;
+                }
+            }
             if (previewed == null && plan.HasPlacementChanges &&
                 (plan.Best.PriorityComboMatches > plan.Current.PriorityComboMatches ||
                  plan.Best.PriorityComboProgress > plan.Current.PriorityComboProgress))
@@ -665,6 +678,7 @@ namespace SephPlanner.Plugin.Ui
             warnings.AddRange(plan.ComboPlacementWarnings);
             warnings.AddRange(plan.RetentionWarnings);
             warnings.AddRange(plan.SupportWarnings);
+            warnings.AddRange(plan.ActivationWarnings);
 
             if (snapshot.IsMultiplayer)
             {

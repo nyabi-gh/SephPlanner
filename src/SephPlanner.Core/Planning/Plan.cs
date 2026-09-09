@@ -65,6 +65,8 @@ namespace SephPlanner.Core.Planning
         public List<string> ComboPlacementWarnings { get; set; } = new List<string>();
         public List<string> RetentionWarnings { get; set; } = new List<string>();
         public List<string> SupportWarnings { get; set; } = new List<string>();
+        public List<string> ActivationWarnings { get; set; } = new List<string>();
+        public bool HasUnapprovedDeactivation { get; set; }
         public bool ManualMoveInstructionsAvailable { get; set; } = true;
         public bool HasPlacementChanges { get; set; }
         public int InventoryWidth { get; set; }

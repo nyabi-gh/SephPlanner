@@ -20,6 +20,8 @@ namespace SephPlanner.Core.Model
 
         public DirectedMagicSupport? MagicSupport { get; set; }
         public List<double> MagicCostByLevel { get; set; } = new List<double>();
+        public bool UsesMagicCritical { get; set; }
+        public List<CharmStatEffect> StatEffects { get; set; } = new List<CharmStatEffect>();
         public List<ContextStatBonus> ContextStats { get; set; } = new List<ContextStatBonus>();
         public int PaperMatch { get; set; } = 2;
 

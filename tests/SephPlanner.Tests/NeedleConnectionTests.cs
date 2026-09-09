@@ -84,6 +84,8 @@ public class NeedleConnectionTests
     public void RetainedNeedleProtectsItsFinalTargetFromDiscard()
     {
         var problem = Chain();
+        problem.Charms[1].AllowDeactivation = true;
+        problem.Charms[2].AllowDeactivation = true;
         problem.Charms[0].Definition.Categories.Clear();
         problem.Charms[0].Worth = new CharmWorth { Base = -100, PerLevel = 0 };
         var solved = PlacementSolver.Solve(problem);

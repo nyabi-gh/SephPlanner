@@ -71,6 +71,8 @@ namespace SephPlanner.Core.Runtime
             result.Fact("경고/콤보", string.Join("\n", plan.ComboPlacementWarnings));
             result.Fact("경고/유지", string.Join("\n", plan.RetentionWarnings));
             result.Fact("경고/연결", string.Join("\n", plan.SupportWarnings));
+            result.Fact("경고/활성", string.Join("\n", plan.ActivationWarnings));
+            result.Fact("끄기 허용 필요", plan.HasUnapprovedDeactivation);
             return result;
         }
 
@@ -107,6 +109,10 @@ namespace SephPlanner.Core.Runtime
             Fact(key + "/비활성", string.Join(",", arrangement.InactiveCharms.OrderBy(id => id)));
             Fact(key + "/고정 실패", string.Join(",", arrangement.UnheldCharms.OrderBy(id => id)));
             Fact(key + "/유지 실패", string.Join(",", arrangement.UnretainedCharms.OrderBy(id => id)));
+            Fact(key + "/활성 보호 실패", string.Join(",", arrangement.UnpreservedCharms.OrderBy(id => id)));
+            Fact(key + "/미허용 비활성", string.Join(",", arrangement.UnapprovedDeactivations.OrderBy(id => id)));
+            Fact(key + "/감점 빈칸", arrangement.UnsafeEmptyCells);
+            Fact(key + "/상한 초과", arrangement.WastedLevels);
             Fact(key + "/연결 실패", string.Join(",", arrangement.UnlinkedCharms.OrderBy(id => id)));
             foreach (var item in arrangement.CharmPositions) Fact(key + "/아이템/" + item.Key, item.Value);
             foreach (var item in arrangement.TabletPositions)
