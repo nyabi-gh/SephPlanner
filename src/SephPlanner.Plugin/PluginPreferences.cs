@@ -163,6 +163,20 @@ namespace SephPlanner.Plugin
             Changed();
         }
 
+        public void ResetBuild()
+        {
+            PresetCode = null;
+            _decodedFrom = null;
+            _decoded = null;
+            PriorityCategories.Clear();
+            SuppressedPresetCategories.Clear();
+            PinnedLevels.Clear();
+            PinnedCharms.Clear();
+            HeldCharms.Clear();
+            RetainedCharms.Clear();
+            Changed();
+        }
+
         /// <summary>가져온 빌드가 무엇을 알려 주는지 한 줄로.</summary>
         public static string Summary(BuildPreset preset)
         {

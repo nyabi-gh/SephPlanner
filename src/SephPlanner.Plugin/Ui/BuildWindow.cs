@@ -113,6 +113,11 @@ namespace SephPlanner.Plugin.Ui
             _presetClear.text = "지우기";
             Widgets.Fixed(_presetClear.rectTransform, S(1.4f), S(4f));
 
+            var reset = Widgets.Clickable(
+                "ResetBuild", row, Skin, S(0.95f), NativeSkin.TextDim, ResetBuild);
+            reset.text = "빌드 초기화";
+            Widgets.Fixed(reset.rectTransform, S(1.4f), S(7f));
+
             _presetStatus = Widgets.Label("PresetStatus", content, Skin, S(0.75f), NativeSkin.TextDim);
             Widgets.Fixed(_presetStatus.rectTransform, S(1.1f));
         }
@@ -528,6 +533,14 @@ namespace SephPlanner.Plugin.Ui
         {
             _prefs.ClearPreset();
             _presetMessage = "";
+            Refresh();
+        }
+
+        private void ResetBuild()
+        {
+            _prefs.ResetBuild();
+            _presetMessage = "";
+            _page = 0;
             Refresh();
         }
 

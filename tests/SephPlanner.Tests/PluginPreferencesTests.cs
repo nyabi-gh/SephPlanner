@@ -12,6 +12,40 @@ public sealed class PluginPreferencesTests : IDisposable
     private static string Code(string categories) => PresetCode.Encode("AAP1\nW:503\nC:PinkRabbit\nS:\nR:" + categories + "\n");
 
     [Fact]
+    public void ResetBuildPersistsDefaultsAndInvalidatesPreviousPlan()
+    {
+        var prefs = Load();
+        Assert.True(prefs.TryImport(Code("FIRST,1;SECOND,1"), out _));
+        prefs.TogglePriority("FIRST");
+        prefs.TogglePriority("MANUAL");
+        prefs.StepPin(1157, 1);
+        prefs.StepPin(1168, -1);
+        prefs.ToggleHold(1157);
+        prefs.ToggleRetain(1168);
+        prefs.PinnedCharms.Add(999);
+        var revision = prefs.Revision;
+        var before = SephPlanner.Core.Runtime.PlanFingerprint.PlanningContext(prefs.ToPreferences(true), "catalog");
+
+        prefs.ResetBuild();
+
+        Assert.Equal(revision + 1, prefs.Revision);
+        var defaults = SephPlanner.Core.Runtime.PlanFingerprint.PlanningContext(new PluginPreferences().ToPreferences(true), "catalog");
+        Assert.NotEqual(before, defaults);
+        foreach (var actual in new[] { prefs, Load() })
+        {
+            Assert.Null(actual.PresetCode);
+            Assert.Null(actual.Preset());
+            Assert.Empty(actual.SuppressedPresetCategories);
+            Assert.Empty(actual.PinnedCharms);
+            Assert.Empty(actual.StorageMessage);
+            Assert.Equal(defaults, SephPlanner.Core.Runtime.PlanFingerprint.PlanningContext(actual.ToPreferences(true), "catalog"));
+        }
+
+        Assert.True(prefs.TryImport(Code("FIRST,1;SECOND,1"), out _));
+        Assert.True(prefs.IsPriority("FIRST"));
+    }
+
+    [Fact]
     public void RetentionPersistsAndInvalidatesPlanningContext()
     {
         var prefs = Load();
