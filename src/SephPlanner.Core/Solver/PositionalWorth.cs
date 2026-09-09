@@ -147,11 +147,16 @@ namespace SephPlanner.Core.Solver
         }
 
         /// <summary>
-        /// 이 아티팩트가 지금 자리에서 게임에 내보이는 카테고리. 대개는 정의 그대로지만, 캘세더니
-        /// 열쇠는 <c>GetItemCategory()</c>를 덮어써 행이 정한 것 하나만 내놓는다.
+        /// 열쇠는 행 카테고리, 침은 이웃 배치가 주어지면 사슬 끝 대상의 카테고리를 반환한다.
+        /// 이웃 없는 조회는 탐색 후보를 좁히는 용도이며 종이 중첩의 갱신 순서는 별도다.
         /// </summary>
-        internal static IEnumerable<string> CategoriesOf(CharmSlot charm, GridPos cell)
+        internal static IEnumerable<string> CategoriesOf(
+            CharmSlot charm, GridPos cell, IReadOnlyDictionary<GridPos, CharmSlot>? neighbors = null)
         {
+            if (neighbors is not null && IsNeedle(charm.Definition))
+                return DependencyTarget(charm, cell, neighbors, out var target, out var targetCell)
+                    ? CategoriesOf(target, targetCell, neighbors)
+                    : System.Array.Empty<string>();
             if (charm.Definition.LineCategories.Count == 0) return charm.Definition.Categories;
 
             return new[] { LineCategory(charm.Definition, cell) };

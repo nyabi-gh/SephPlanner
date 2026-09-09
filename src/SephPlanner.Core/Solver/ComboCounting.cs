@@ -46,8 +46,8 @@ namespace SephPlanner.Core.Solver
             if (!neighbors.TryGetValue(cell.Offset(1, 0), out var right) || right == charm || right.IsFiller) return;
 
             // 열쇠의 카테고리는 정의가 아니라 현재 행에서 결정된다.
-            var rightCategories = new HashSet<string>(PositionalWorth.CategoriesOf(right, cell.Offset(1, 0)));
-            foreach (var category in PositionalWorth.CategoriesOf(left, cell.Offset(-1, 0)))
+            var rightCategories = new HashSet<string>(PositionalWorth.CategoriesOf(right, cell.Offset(1, 0), neighbors));
+            foreach (var category in PositionalWorth.CategoriesOf(left, cell.Offset(-1, 0), neighbors))
             {
                 if (rightCategories.Remove(category)) into.Add(category);
             }

@@ -29,6 +29,49 @@ public class ComboCountingTests
 
     private static CharmSlot Slot(int id, CharmDefinition definition) => new() { InstanceId = id, Definition = definition };
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void PaperReadsTheCategoryInheritedByAnAdjacentNeedle(bool chain, bool mirror)
+    {
+        var paper = Slot(4, new CharmDefinition { Behavior = "Charm_WhitePaper" });
+        var byCell = new Dictionary<GridPos, CharmSlot>
+        {
+            [new GridPos(0, 1)] = Slot(1, Attackable("A", "EMBER")),
+            [new GridPos(0, 2)] = Slot(2, Needle("N")),
+            [new GridPos(1, 2)] = paper,
+            [new GridPos(2, 2)] = Slot(3, Attackable("B", "EMBER")),
+        };
+        if (chain)
+        {
+            byCell[new GridPos(0, 1)] = Slot(5, Needle("N2"));
+            byCell[new GridPos(0, 0)] = Slot(1, Attackable("A", "EMBER"));
+        }
+        if (mirror)
+            byCell = byCell.ToDictionary(pair => new GridPos(2 - pair.Key.X, pair.Key.Y), pair => pair.Value);
+
+        var categories = new List<string>();
+        ComboCounting.PositionalCategories(paper, new GridPos(1, 2), byCell, categories);
+        Assert.Equal(new[] { "EMBER" }, categories);
+        Assert.Equal(chain ? 5 : 4, ComboCounting.CountAll(byCell)["EMBER"]);
+
+        var counts = ComboCounting.CountAll(byCell);
+        var problem = new PlacementProblem { ComboCounts = counts };
+        foreach (var pair in byCell)
+        {
+            problem.Charms.Add(pair.Value);
+            problem.CurrentCharms[pair.Value.InstanceId] = pair.Key;
+        }
+        Assert.Equal(counts["EMBER"] - 1, ComboCounting.CountFor(problem, paper, "EMBER", byCell));
+
+        byCell.Remove(new GridPos(mirror ? 2 : 0, chain ? 0 : 1));
+        categories.Clear();
+        ComboCounting.PositionalCategories(paper, new GridPos(1, 2), byCell, categories);
+        Assert.Empty(categories);
+    }
+
     [Fact]
     public void TheGameCountIncludesWhatANeedleInherits()
     {
