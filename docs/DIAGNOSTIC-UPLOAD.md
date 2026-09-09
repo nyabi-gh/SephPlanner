@@ -59,8 +59,17 @@
 - `scripts/package-diagnostics.ps1`로 만든 서버를 Windows에서 직접 실행하고 `/health` 및 `--healthcheck` 성공 확인. 패키지 항목을 확인해 게임 자료와 관리자 토큰이 포함되지 않음을 확인.
 - 운영자가 서버 배포 후 `https://sephplanner.nyabi.me/health`에서 HTTP 200과 `ok` 응답을 확인했다. 실제 업로드·재부팅 복구·Unity의 동의 화면과 전송은 별도 검증이 필요하다. 이 작업에서 서버 설정이나 공개 릴리즈를 변경하지 않았다.
 
+## 첫 진단 창의 본문 겹침 수정
+
+실기에서 본문이 창 밖으로 넘치고 버튼과 겹치는 문제가 확인됐다. `PlannerWindow.Build`는 부모를 비활성화한 채 글자를 만들고, 진단 창은 이 상태에서 `GetPreferredValues`로 본문 높이를 고정했다. 게임에 설치된 `Unity.TextMeshPro.dll`을 확인하니 `TMP_Text.m_isOrthographic`의 초기값은 false이고, `TextMeshProUGUI.Awake`에서 true로 바뀐다. 높이 계산은 이 값에 따라 글꼴 배율을 0.1 또는 1로 적용하므로 첫 측정과 표시의 기준이 달랐다.
+
+공통 `Widgets.Label`에서 `isOrthographic = true`를 설정해 초기화 전 측정도 UI 표시와 같은 배율을 사용하게 했다. 창 높이를 임의로 늘리거나 지연을 넣지 않는다. 게임에서 창을 처음 열 때와 다시 열 때, F3에서 전송 동의를 여는 경우 모두 본문 아래에 버튼이 배치되는지 확인해야 한다. .NET 테스트는 Unity의 실제 렌더링 검증을 대체하지 않는다.
+
+실기 로그에서 진단 3건의 접수 성공은 확인했다. 수정한 창의 실제 표시 검증은 게임 재시작 후 진행한다.
+
 ## 참고 문서
 
+- [Unity TextMeshPro의 isOrthographic 속성](https://docs.unity3d.com/ja/Packages/com.unity.textmeshpro%403.0/api/TMPro.TMP_Text.isOrthographic.html)
 - [Microsoft: HttpClient 사용 지침](https://learn.microsoft.com/en-us/dotnet/fundamentals/networking/http/httpclient-guidelines)
 - [Microsoft: ASP.NET Core 10 파일 업로드](https://learn.microsoft.com/en-us/aspnet/core/mvc/models/file-uploads?view=aspnetcore-10.0)
 - [Microsoft: ASP.NET Core 10 요청 빈도 제한](https://learn.microsoft.com/en-us/aspnet/core/performance/rate-limit?view=aspnetcore-10.0)

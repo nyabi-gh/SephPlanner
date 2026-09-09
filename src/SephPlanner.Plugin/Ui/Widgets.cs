@@ -71,6 +71,8 @@ namespace SephPlanner.Plugin.Ui
         {
             var rect = Rect(name, parent);
             var text = rect.gameObject.AddComponent<TextMeshProUGUI>();
+            // 비활성 창에서는 Awake 전에도 높이를 잰다. TMP의 UI 배율을 미리 맞춘다.
+            text.isOrthographic = true;
             text.raycastTarget = false;
             text.fontSize = size;
             text.color = color;
