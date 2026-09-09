@@ -779,7 +779,8 @@ namespace SephPlanner.Core.Solver
                 positions.ContainsKey(charm.InstanceId)).ToList();
             if (targets.Count == 0) return false;
             var available = new HashSet<GridPos>(free);
-            var score = ScoreOf(problem, layout, positions, occupancy, result, CharmsByCell(problem, positions));
+            var currentNeighbors = CharmsByCell(problem, positions);
+            var score = ScoreOf(problem, layout, positions, occupancy, result, currentNeighbors);
             var moved = false;
             foreach (var helper in helpers)
             {
@@ -787,30 +788,33 @@ namespace SephPlanner.Core.Solver
                 foreach (var target in targets)
                 {
                     if (!DirectedCharmSupport.Accepts(helper, target)) continue;
+                    HashSet<CharmSlot>? connected = null;
                     foreach (var cell in free)
                     {
                         if (options.Cancellation.IsCancellationRequested) return moved;
                         var targetCell = cell.Offset(support.X, support.Y);
                         if (cell == targetCell || !available.Contains(targetCell)) continue;
                         if (positions[helper.InstanceId] == cell && positions[target.InstanceId] == targetCell) continue;
-                        var currentNeighbors = CharmsByCell(problem, positions);
-                        var connected = new HashSet<CharmSlot> { target };
-                        bool expanded;
-                        do
+                        if (connected is null)
                         {
-                            expanded = false;
-                            foreach (var other in helpers)
+                            connected = new HashSet<CharmSlot> { target };
+                            bool expanded;
+                            do
                             {
-                                if (other == helper) continue;
-                                var direction = DirectedCharmSupport.Offset(other);
-                                var adjacent = positions[other.InstanceId].Offset(direction.X, direction.Y);
-                                if (!currentNeighbors.TryGetValue(adjacent, out var existingTarget) ||
-                                    existingTarget == helper || !DirectedCharmSupport.Accepts(other, existingTarget)) continue;
-                                if (!connected.Contains(other) && !connected.Contains(existingTarget)) continue;
-                                expanded |= connected.Add(other);
-                                expanded |= connected.Add(existingTarget);
-                            }
-                        } while (expanded);
+                                expanded = false;
+                                foreach (var other in helpers)
+                                {
+                                    if (other == helper) continue;
+                                    var direction = DirectedCharmSupport.Offset(other);
+                                    var adjacent = positions[other.InstanceId].Offset(direction.X, direction.Y);
+                                    if (!currentNeighbors.TryGetValue(adjacent, out var existingTarget) ||
+                                        existingTarget == helper || !DirectedCharmSupport.Accepts(other, existingTarget)) continue;
+                                    if (!connected.Contains(other) && !connected.Contains(existingTarget)) continue;
+                                    expanded |= connected.Add(other);
+                                    expanded |= connected.Add(existingTarget);
+                                }
+                            } while (expanded);
+                        }
                         var destinations = new Dictionary<int, GridPos> { [target.InstanceId] = targetCell };
                         foreach (var other in connected)
                         {
@@ -842,6 +846,8 @@ namespace SephPlanner.Core.Solver
                         if (quality.CompareTo(score) <= 0) continue;
                         positions.Clear();
                         foreach (var pair in trial) positions.Add(pair.Key, pair.Value);
+                        currentNeighbors = neighbors;
+                        connected = null;
                         occupancy = trialOccupancy;
                         result = trialResult;
                         score = quality;

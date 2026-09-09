@@ -26,11 +26,13 @@ public class DirectedSupportTests
         return p;
     }
 
-    [Fact]
-    public void OppositeSupportsCanMoveTogetherWithTheirSharedMagic()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OppositeSupportsCanMoveTogetherWithTheirSharedMagic(bool needleChain)
     {
         var p = Board(true);
-        p.Grid = new GridSpec(6, 2, 12);
+        p.Grid = new GridSpec(6, needleChain ? 4 : 2, needleChain ? 24 : 12);
         p.FixedEffects.Clear();
         var reducer = ManaBoard(true).Charms[0];
         reducer.InstanceId = 3;
@@ -39,12 +41,40 @@ public class DirectedSupportTests
         p.CurrentCharms[3] = new GridPos(2, 0);
         p.FixedEffects.Add(new FixedEffectCell { Position = new GridPos(3, 1), Level = 2 });
         p.FixedEffects.Add(new FixedEffectCell { Position = new GridPos(5, 1), Level = 2 });
+        if (needleChain)
+        {
+            p.Charms[1].Definition.IsAttackable = true;
+            for (var id = 4; id <= 5; id++)
+            {
+                p.Charms.Add(new CharmSlot
+                {
+                    InstanceId = id,
+                    Retained = true,
+                    Definition = new CharmDefinition
+                    {
+                        EntityId = 100 + id,
+                        MaxLevel = 2,
+                        DependencyOffsetY = -1,
+                        DependencyBonusByLevel = { 5, 10, 20 },
+                    },
+                });
+                p.CurrentCharms[id] = new GridPos(1, id - 3);
+                p.FixedEffects.Add(new FixedEffectCell { Position = new GridPos(4, id - 2), Level = 2 });
+            }
+        }
         var solved = PlacementSolver.Solve(p);
         Assert.Empty(solved.UnretainedCharms);
         Assert.Empty(solved.UnlinkedCharms);
         Assert.Equal(new GridPos(3, 1), solved.CharmPositions[1]);
         Assert.Equal(new GridPos(4, 1), solved.CharmPositions[2]);
         Assert.Equal(new GridPos(5, 1), solved.CharmPositions[3]);
+        if (needleChain)
+        {
+            Assert.Equal(new GridPos(4, 2), solved.CharmPositions[4]);
+            Assert.Equal(new GridPos(4, 3), solved.CharmPositions[5]);
+        }
+        Assert.Equal(p.Charms.Count, solved.CharmPositions.Values.Distinct().Count());
+        Assert.Equal(solved.Score, PlacementSolver.Score(p, solved.Tablets, solved.CharmPositions).Score, 8);
         foreach (var pair in solved.CharmPositions) p.CurrentCharms[pair.Key] = pair.Value;
         Assert.Equal(solved.CharmPositions.OrderBy(pair => pair.Key),
             PlacementSolver.Solve(p).CharmPositions.OrderBy(pair => pair.Key));
