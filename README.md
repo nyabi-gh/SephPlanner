@@ -1,12 +1,12 @@
 # SephPlanner
 
-[![누적 다운로드](https://img.shields.io/github/downloads/nyabi-gh/SephPlanner-Release/total?style=for-the-badge&logo=github&logoColor=white&label=%EB%8B%A4%EC%9A%B4%EB%A1%9C%EB%93%9C&labelColor=1e1b2e&color=77d8b0)](https://github.com/nyabi-gh/SephPlanner-Release/releases)
+[![누적 다운로드](https://img.shields.io/github/downloads/nyabi-gh/SephPlanner-Release/total?style=for-the-badge&logo=github&logoColor=white&label=%EB%8B%A4%EC%9A%B4%EB%A1%9C%EB%93%9C&labelColor=1e1b2e&color=77d8b0)](https://github.com/nyabi-gh/SephPlanner-Release/releases) [![최신 릴리스](https://img.shields.io/github/v/release/nyabi-gh/SephPlanner-Release?style=for-the-badge&logo=github&logoColor=white&label=%EC%B5%9C%EC%8B%A0&labelColor=1e1b2e&color=b9a7f5)](https://github.com/nyabi-gh/SephPlanner-Release/releases/latest) [![지원 플랫폼](https://img.shields.io/badge/%ED%94%8C%EB%9E%AB%ED%8F%BC-Windows-8bbcf2?style=for-the-badge&labelColor=1e1b2e)](#설치)
 
 세피리아(Sephiria)의 석판·아티팩트 배치를 계산하고 게임 화면에 보여 주는 비공식 도우미입니다. 제안된 배치를 손으로 따라 옮기거나 `F8`로 적용할 수 있으며, 상자·상점·세피라이트의 후보와 석판 합성도 추천합니다.
 
 TEAM HORAY와 제휴·후원·공식 승인 관계가 없는 무료 팬 제작 도구입니다. 이 저장소는 다운로드와 오류 제보를 위한 공개 저장소이며, 소스 코드는 공개하지 않습니다.
 
-**[안정 버전 다운로드](https://github.com/nyabi-gh/SephPlanner-Release/releases/latest) · [전체 버전·변경 사항](https://github.com/nyabi-gh/SephPlanner-Release/releases) · [오류 제보](https://github.com/nyabi-gh/SephPlanner-Release/issues)**
+**[안정 버전 다운로드](https://github.com/nyabi-gh/SephPlanner-Release/releases/latest) · [전체 버전·변경 사항](https://github.com/nyabi-gh/SephPlanner-Release/releases) · [오류 제보](https://github.com/nyabi-gh/SephPlanner-Release/issues) · [문의](#문의)**
 
 Windows용 Steam 세피리아에 설치하며, 게임은 별도로 필요합니다. 배포 ZIP에는 BepInEx 5.4.23.5(win_x64, Mono)가 포함되어 있습니다.
 
@@ -204,6 +204,10 @@ Windows 탐색기 주소창에 `%LOCALAPPDATA%\SephPlanner`를 입력하면 로�
 **진단 원본과 `.replay`에는 게임 데이터가 포함됩니다. 공개 Issues나 배포물에 첨부하지 마세요.** 전송하지 않았거나 전송에 실패했다면 자료를 로컬에 보관하고, 공개 제보에는 증상·스크린샷·오류 메시지만 남겨 주세요. 스크린샷이나 로그 문구에도 공개하고 싶지 않은 정보가 없는지 확인하세요.
 
 도구를 제거한 상태에서도 재현되는지 확인하면 원인을 좁히는 데 도움이 됩니다. 제거 후에도 발생한다는 사실만으로 게임 자체의 문제라고 단정할 수는 없습니다. 다른 모드 사용 여부도 함께 알려 주세요.
+
+## 문의
+
+오류 제보와 기능 제안은 [Issues](https://github.com/nyabi-gh/SephPlanner-Release/issues)에 남기거나 [nyabi@tb.pro](mailto:nyabi@tb.pro)로 보내 주세요. 진단을 전송했다면 제보 번호도 함께 알려 주세요.
 
 ## 제거와 설정 초기화
 
