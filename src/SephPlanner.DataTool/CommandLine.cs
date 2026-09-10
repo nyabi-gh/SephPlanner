@@ -8,6 +8,8 @@ public static class CommandLine
           --check <스냅샷.json>                     현재 로컬 카탈로그로 레벨 대조
           --replay <녹화 폴더>                      기본 설정으로 기존 스냅샷 재생
           --churn <스냅샷.json> [양수 반복 횟수]      반복 적용 시뮬레이션
+          --churn <파일.replay> [양수 반복 횟수] [--allow-model-change]
+                                                   저장 당시 설정 전체로 반복 배치·적용 조건 검사
           --reproduce <파일.replay>                 저장된 설정·카탈로그·직전 목표로 계획 재현
           --reproduce <파일.replay> --allow-model-change
                                                    다른 계산 빌드로 변경 전후 비교
@@ -19,6 +21,7 @@ public static class CommandLine
 
         한 번에 명령 하나만 실행합니다.
         --reproduce 종료 코드: 0=비교 항목 일치, 1=입력·실행 실패, 2=저장 결과와 다름.
+        --churn 재현 파일 종료 코드: 0=수렴, 1=입력·실행 실패, 2=적용 제한·순환·반복 한도.
         재현 파일은 게임 데이터가 포함된 로컬 진단 자료입니다. 배포물이나 저장소에 넣지 않습니다.
         """;
 
@@ -31,8 +34,7 @@ public static class CommandLine
         {
             "--help" or "-h" or "--solve" or "--prediction-probe" or "--measure" or "--values" => args.Length == 1,
             "--check" or "--replay" => args.Length == 2 && PathArgument(args[1]),
-            "--churn" => args.Length is 2 or 3 && PathArgument(args[1]) &&
-                         (args.Length == 2 || int.TryParse(args[2], out var rounds) && rounds > 0),
+            "--churn" => ChurnArguments(args),
             "--reproduce" => args.Length is 2 or 3 && PathArgument(args[1]) &&
                              (args.Length == 2 || args[2] == "--allow-model-change"),
             _ => false,
@@ -41,4 +43,16 @@ public static class CommandLine
     }
 
     private static bool PathArgument(string value) => !string.IsNullOrWhiteSpace(value) && !value.StartsWith('-');
+
+    private static bool ChurnArguments(string[] args)
+    {
+        if (args.Length < 2 || args.Length > 4 || !PathArgument(args[1])) return false;
+        var end = args.Length;
+        if (args[^1] == "--allow-model-change")
+        {
+            if (!string.Equals(Path.GetExtension(args[1]), ".replay", StringComparison.OrdinalIgnoreCase)) return false;
+            end--;
+        }
+        return end == 2 || end == 3 && int.TryParse(args[2], out var rounds) && rounds > 0;
+    }
 }

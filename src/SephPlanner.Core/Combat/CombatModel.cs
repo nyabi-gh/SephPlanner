@@ -8,6 +8,7 @@ namespace SephPlanner.Core.Combat
 
     public sealed class CombatScenario
     {
+        public SephPlanner.Core.Model.HorizontalSide ScalesSide { get; set; }
         public double DurationSeconds { get; set; } = 30;
         public int TargetCount { get; set; } = 1;
         // 첫 대상 외의 적중 비율은 실측 전 비교용 추정값이다.
@@ -63,6 +64,7 @@ namespace SephPlanner.Core.Combat
         public int Threshold { get; set; }
         public string Stat { get; set; } = "PHYSICALDAMAGE";
         public string Element { get; set; } = "PHYSICAL";
+        public bool ElementFromRelatedStat { get; set; }
         public List<double> BaseDamage { get; set; } = new List<double>();
         public List<double> StatPercent { get; set; } = new List<double>();
         public List<double> IntervalByLevel { get; set; } = new List<double>();
@@ -104,6 +106,7 @@ namespace SephPlanner.Core.Combat
         public double ManaRecoveryDelay { get; set; }
         public double GlobalMagicCooldown { get; set; }
         public int InfinityMana { get; set; }
+        // 이전 재현 파일의 지문 호환용이다. 현재 전투식은 소지금을 쓰지 않으며 런타임은 RunState.Gold만 수집한다.
         public int Gold { get; set; }
         public Dictionary<string, int> Constants { get; set; } = new Dictionary<string, int>();
     }

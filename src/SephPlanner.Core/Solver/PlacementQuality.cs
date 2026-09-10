@@ -4,15 +4,16 @@ namespace SephPlanner.Core.Solver
 {
     internal readonly struct PlacementQuality : IComparable<PlacementQuality>
     {
-        internal readonly int RetentionFailures, ActivationFailures, HoldFailures, ComboMatches, UnsafeEmpty, Waste;
+        internal readonly int RetentionFailures, ActivationFailures, HoldFailures, PositionFailures, ComboMatches, UnsafeEmpty, Waste;
         internal readonly double ComboProgress, Value, Familiarity;
 
         internal PlacementQuality(int retentionFailures, int activationFailures, int holdFailures,
-            int comboMatches, double comboProgress, double value, int unsafeEmpty, int waste, double familiarity)
+            int comboMatches, double comboProgress, double value, int unsafeEmpty, int waste, double familiarity, int positionFailures = 0)
         {
             RetentionFailures = retentionFailures;
             ActivationFailures = activationFailures;
             HoldFailures = holdFailures;
+            PositionFailures = positionFailures;
             ComboMatches = comboMatches;
             ComboProgress = comboProgress;
             Value = value;
@@ -24,7 +25,7 @@ namespace SephPlanner.Core.Solver
         internal static PlacementQuality From(Arrangement value) => new PlacementQuality(
             value.UnretainedCharms.Count + value.UnapprovedDeactivations.Count, value.UnpreservedCharms.Count, value.UnheldCharms.Count,
             value.PriorityComboMatches, value.PriorityComboProgress, value.Score,
-            value.UnsafeEmptyCells, value.WastedLevels, value.Preference);
+            value.UnsafeEmptyCells, value.WastedLevels, value.Preference, value.UnpositionedCharms.Count);
 
         public int CompareTo(PlacementQuality other)
         {
@@ -37,6 +38,8 @@ namespace SephPlanner.Core.Solver
             order = Compare(ComboProgress, other.ComboProgress);
             if (order != 0) return order;
             order = other.ActivationFailures.CompareTo(ActivationFailures);
+            if (order != 0) return order;
+            order = other.PositionFailures.CompareTo(PositionFailures);
             if (order != 0) return order;
             order = Compare(Value, other.Value);
             if (order != 0) return order;
@@ -52,13 +55,15 @@ namespace SephPlanner.Core.Solver
 
     internal readonly struct AssignmentCost : IComparable<AssignmentCost>
     {
-        internal readonly double Priority, Value, Safety, Waste, Stability;
-        internal AssignmentCost(double priority, double value, double safety = 0, double waste = 0, double stability = 0)
-        { Priority = priority; Value = value; Safety = safety; Waste = waste; Stability = stability; }
+        internal readonly double Priority, Position, Value, Safety, Waste, Stability;
+        internal AssignmentCost(double priority, double value, double safety = 0, double waste = 0, double stability = 0, double position = 0)
+        { Priority = priority; Position = position; Value = value; Safety = safety; Waste = waste; Stability = stability; }
 
         public int CompareTo(AssignmentCost other)
         {
             var order = Priority.CompareTo(other.Priority);
+            if (order != 0) return order;
+            order = Position.CompareTo(other.Position);
             if (order != 0) return order;
             order = Value.CompareTo(other.Value);
             if (order != 0) return order;
@@ -69,8 +74,8 @@ namespace SephPlanner.Core.Solver
         }
 
         public static AssignmentCost operator +(AssignmentCost a, AssignmentCost b) =>
-            new AssignmentCost(a.Priority + b.Priority, a.Value + b.Value, a.Safety + b.Safety, a.Waste + b.Waste, a.Stability + b.Stability);
+            new AssignmentCost(a.Priority + b.Priority, a.Value + b.Value, a.Safety + b.Safety, a.Waste + b.Waste, a.Stability + b.Stability, a.Position + b.Position);
         public static AssignmentCost operator -(AssignmentCost a, AssignmentCost b) =>
-            new AssignmentCost(a.Priority - b.Priority, a.Value - b.Value, a.Safety - b.Safety, a.Waste - b.Waste, a.Stability - b.Stability);
+            new AssignmentCost(a.Priority - b.Priority, a.Value - b.Value, a.Safety - b.Safety, a.Waste - b.Waste, a.Stability - b.Stability, a.Position - b.Position);
     }
 }

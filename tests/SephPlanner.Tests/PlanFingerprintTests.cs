@@ -138,6 +138,24 @@ public class PlanFingerprintTests
     }
 
     [Fact]
+    public void GoldOnlyChangesAffordabilityWhenACombatSnapshotIsPresent()
+    {
+        var snapshot = Snapshot();
+        snapshot.Run!.Combat = new SephPlanner.Core.Combat.CombatSnapshot();
+        snapshot.Run.Gold = 100;
+        snapshot.Offers.Clear();
+        snapshot.Offers.Add(new OfferedItem { DefinitionId = 3, Kind = "charm", SlotIndex = 1, Price = 500 });
+        var placement = PlanFingerprint.Placement(snapshot, PlanPreferences.None, "catalog");
+        var full = PlanFingerprint.Full(snapshot, PlanPreferences.None, "catalog");
+        snapshot.Run.Gold = 143;
+        Assert.Equal(placement, PlanFingerprint.Placement(snapshot, PlanPreferences.None, "catalog"));
+        Assert.Equal(full, PlanFingerprint.Full(snapshot, PlanPreferences.None, "catalog"));
+        snapshot.Run.Gold = 500;
+        Assert.Equal(placement, PlanFingerprint.Placement(snapshot, PlanPreferences.None, "catalog"));
+        Assert.NotEqual(full, PlanFingerprint.Full(snapshot, PlanPreferences.None, "catalog"));
+    }
+
+    [Fact]
     public void ReachingAnOfferPriceInvalidatesTheFullPlan()
     {
         var snapshot = Snapshot();

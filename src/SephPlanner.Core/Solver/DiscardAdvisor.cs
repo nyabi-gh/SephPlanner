@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using SephPlanner.Core.Combat;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Tablets;
@@ -14,6 +15,7 @@ namespace SephPlanner.Core.Solver
         public bool IsTablet { get; set; }
         public GridPos Position { get; set; }
         public double Gain { get; set; }
+        public CombatResult? Combat { get; set; }
         public List<string> Activated { get; set; } = new List<string>();
         public bool ReducesComboCount { get; set; }
     }
@@ -58,7 +60,7 @@ namespace SephPlanner.Core.Solver
                 else
                 {
                     var charm = trial.Charms.First(c => c.InstanceId == candidate.InstanceId);
-                    if (charm.IsFiller || charm.Held || charm.Retained) continue;
+                    if (charm.IsFiller || charm.Held || charm.Retained || charm.Definition.CannotDiscard) continue;
                     name = Naming.Of(charm.Definition.Names, charm.Definition.Id, "아티팩트");
                     trial.Charms.Remove(charm);
                     trial.CurrentCharms.Remove(candidate.InstanceId);
@@ -69,15 +71,15 @@ namespace SephPlanner.Core.Solver
                 trial.ComboCounts = Adjust(problem.ComboCounts, currentCounts, remainingCounts);
                 var solved = PlacementSolver.EvaluateLayouts(trial, yardstick, options);
                 if (cancellation.IsCancellationRequested) return new List<DiscardAdvice>();
-                if (!ActivationPolicy.AllowsTransition(baseline, solved) || solved.UnretainedCharms.Count > 0 || solved.UnplacedTablets > 0 || solved.CharmPositions.Count != trial.Charms.Count ||
+                if (!ActivationPolicy.AllowsTransition(baseline, solved) || !PositionPolicy.Allows(solved) || solved.UnretainedCharms.Count > 0 || solved.UnplacedTablets > 0 || solved.CharmPositions.Count != trial.Charms.Count ||
                     solved.Score <= baseline.Score + 0.001 || PriorityComboPlacement.Compare(solved, baseline) <= 0)
                     continue;
 
                 var finalCounts = Counts(trial, solved.CharmPositions);
                 var before = Adjust(problem.ComboCounts, currentCounts, baselineCounts);
                 var after = Adjust(problem.ComboCounts, currentCounts, finalCounts);
-                // 고정 콤보의 전투 효과는 배치 점수에 없으므로, 단계가 달라지는 경우를 이득으로 단정하지 않는다.
-                if (before.Keys.Union(after.Keys).Any(key =>
+                // 전투 자료가 없는 예전 평가만 콤보 단계를 보존한다. DPS 모드는 콤보 피해 변화도 이미 계산했다.
+                if (problem.Combat == null && before.Keys.Union(after.Keys).Any(key =>
                     {
                         var combo = problem.Combos?.Invoke(key);
                         return combo is null ? Count(before, key) != Count(after, key) : combo.Thresholds.Any(t =>
@@ -92,6 +94,7 @@ namespace SephPlanner.Core.Solver
                     Position = candidate.Tablet ? problem.CurrentTablets[candidate.InstanceId].Position :
                         problem.CurrentCharms[candidate.InstanceId],
                     Gain = solved.Score - baseline.Score,
+                    Combat = solved.Combat,
                     ReducesComboCount = before.Any(p => Count(after, p.Key) < p.Value),
                     Activated = trial.Charms.Where(c => baseline.InactiveCharms.Contains(c.InstanceId) &&
                                                        !solved.InactiveCharms.Contains(c.InstanceId))

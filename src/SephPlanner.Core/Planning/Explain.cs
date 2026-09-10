@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using SephPlanner.Core.Charms;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Solver;
@@ -17,6 +18,23 @@ namespace SephPlanner.Core.Planning
     /// </summary>
     public static class Explain
     {
+        public static string HorizontalEffect(CharmSlot charm, Arrangement arrangement)
+        {
+            if (!arrangement.CharmPositions.TryGetValue(charm.InstanceId, out var cell)) return "미배치";
+            var side = HorizontalStatBonus.IsLeft(cell) ? "왼쪽" : "오른쪽";
+            if (arrangement.InactiveCharms.Contains(charm.InstanceId)) return side + " · 비활성";
+            var bonus = charm.Definition.HorizontalStats;
+            if (bonus == null) return side;
+            var level = arrangement.EffectiveLevels[cell];
+            var main = SephPlanner.Core.Combat.CombatDamage.At(bonus.MainByLevel, level);
+            var opposite = SephPlanner.Core.Combat.CombatDamage.At(bonus.OppositeByLevel, level);
+            var left = HorizontalStatBonus.IsLeft(cell);
+            return side + " · " + Stat(bonus.LeftStat) + " " + (left ? main : opposite).ToString("+0;-0;0") +
+                " / " + Stat(bonus.RightStat) + " " + (left ? opposite : main).ToString("+0;-0;0");
+
+            string Stat(string key) => key == "FIREDAMAGE" ? "불 피해" : key == "ICEDAMAGE" ? "얼음 피해" : key;
+        }
+
         /// <summary>
         /// 아티팩트가 무슨 일을 하는지, 그리고 우리가 그 값어치를 어떻게 정했는지. 잰 값일 때는
         /// 굳이 말하지 않고, 근거가 레어도뿐일 때만 밝힌다 - 그 자리가 추천이 가장 흔들리는 곳이라
@@ -28,6 +46,8 @@ namespace SephPlanner.Core.Planning
             if (combat)
             {
                 var description = new List<string>(definition.EffectLines) { "선택한 전투 조건의 예상 DPS로 평가합니다. F2 → DPS 내역에서 계산 누락을 확인하세요." };
+                if (definition.HasNoActivationEffect)
+                    description.Add("자체 활성 효과가 없어 음수·비활성 칸을 활용할 수 있습니다. 주변 효과와 사용 유지·고정은 계속 반영합니다.");
                 description.AddRange(definition.Combat.Unsupported);
                 return description;
             }
@@ -179,7 +199,31 @@ namespace SephPlanner.Core.Planning
             if (reach.Length > 0) lines.Add($"결과가 미치는 범위: {reach}");
 
             if (!advice.Affordable) lines.Add("소지금이 모자랍니다.");
+            if (advice.Combat is { } combat)
+            {
+                lines.Add($"합성 후 예상 DPS {combat.Dps:0.##} · 변화 {advice.Gain:+0.##;-0.##;0} DPS");
+                lines.AddRange(combat.Unsupported.Select(message => "계산 누락: " + message));
+            }
 
+            return lines;
+        }
+
+        public static List<string> Discard(DiscardAdvice advice)
+        {
+            var lines = new List<string>
+            {
+                $"현재 위치: {advice.Position.X + 1}열 {advice.Position.Y + 1}행",
+                "이 항목 하나를 가방에서 빼고 다시 배치했을 때의 추정 이득입니다. F8은 아이템을 제거하지 않습니다.",
+            };
+            if (advice.Combat is { } combat)
+            {
+                lines.Add($"제외 후 예상 DPS {combat.Dps:0.##} · 변화 {advice.Gain:+0.##;-0.##;0} DPS");
+                lines.Add("콤보 피해 변화까지 같은 전투 조건에서 비교합니다. 미지원 효과가 있으면 실제 결과와 다를 수 있습니다.");
+                lines.AddRange(combat.Unsupported.Select(message => "계산 누락: " + message));
+            }
+            else lines.Add("콤보 단계가 유지되는 후보만 표시합니다. 실제 전투 효과와 다를 수 있습니다.");
+            if (advice.ReducesComboCount) lines.Add("콤보 개수가 줄어 단계가 낮아지거나 다음 단계가 멀어질 수 있습니다.");
+            if (advice.Activated.Count > 0) lines.Add("켜지는 아티팩트: " + string.Join(", ", advice.Activated));
             return lines;
         }
 

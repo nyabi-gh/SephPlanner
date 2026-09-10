@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using SephPlanner.Core.Combat;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Tablets;
@@ -20,6 +21,7 @@ namespace SephPlanner.Core.Solver
 
         /// <summary>합성했을 때의 점수 증가분. 재료 둘이 사라지고 결과 하나가 생기는 것까지 반영된다.</summary>
         public double Gain { get; set; }
+        public CombatResult? Combat { get; set; }
 
         public bool Affordable { get; set; }
 
@@ -127,8 +129,9 @@ namespace SephPlanner.Core.Solver
             if (trial is null) return false;
 
             var solved = PlacementSolver.EvaluateLayouts(trial, layouts.Of(trial, faster), faster);
-            if (solved.UnretainedCharms.Count > 0 || !ActivationPolicy.AllowsTransition(baseline, solved)) return false;
+            if (solved.UnretainedCharms.Count > 0 || !PositionPolicy.Allows(solved) || !ActivationPolicy.AllowsTransition(baseline, solved)) return false;
             advice.Gain = solved.Score - baseline.Score;
+            advice.Combat = solved.Combat;
             advice.Effect = EffectOf(trial, solved);
             return true;
         }
@@ -169,7 +172,7 @@ namespace SephPlanner.Core.Solver
                     var guesses = Guesses(baseLayout, indexA, indexB, mixedSlot);
                     var solved = PlacementSolver.EvaluateLayouts(
                         trial, guesses ?? layouts.Of(trial, faster), faster);
-                    if (solved.UnretainedCharms.Count > 0 ||
+                    if (solved.UnretainedCharms.Count > 0 || !PositionPolicy.Allows(solved) ||
                         !ActivationPolicy.AllowsTransition(layouts.Baseline(problem, faster), solved)) continue;
                     var gain = solved.Score - baseScore;
                     if (best is not null && gain <= best.Gain) continue;

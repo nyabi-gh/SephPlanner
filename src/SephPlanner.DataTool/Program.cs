@@ -59,6 +59,8 @@ if (churnIndex >= 0)
         return 1;
     }
     var rounds = churnIndex + 2 < args.Length && int.TryParse(args[churnIndex + 2], out var parsed) ? parsed : 12;
+    if (string.Equals(Path.GetExtension(args[churnIndex + 1]), ".replay", StringComparison.OrdinalIgnoreCase))
+        return PlanChurn.Run(args[churnIndex + 1], rounds, args.Contains("--allow-model-change"));
     return SnapshotChurn.Run(args[churnIndex + 1], rounds);
 }
 

@@ -1,3 +1,4 @@
+using SephPlanner.Core.Combat;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Solver;
@@ -7,6 +8,38 @@ namespace SephPlanner.Tests;
 
 public class DiscardAdvisorTests
 {
+    [Fact]
+    public void DpsAdviceCanLoseAComboStepWhenTheResultDealsMoreDamage()
+    {
+        var problem = Problem();
+        foreach (var charm in problem.Charms) charm.Definition.Combat.Collected = true;
+        problem.Charms[0].Definition.Combat.Stats.Add(new() { Key = "PHYSICALDAMAGE", Values = new() { 200 } });
+        problem.Charms[0].Definition.Combat.Unsupported.Add("자물쇠의 미지원 효과");
+        problem.Combos = _ => new()
+        {
+            Id = "TEST",
+            Thresholds = { 2 },
+            Combat = new() { Collected = true, Stats = { new() { Key = "ALLDAMAGEBONUS", Values = new() { 10 }, Threshold = 2 } } }
+        };
+        var layout = problem.Tablets.Select(tablet => tablet.At(problem.CurrentTablets[tablet.InstanceId].Position, 0)).ToList();
+        var current = PlacementSolver.Score(problem, layout, problem.CurrentCharms);
+        problem.Combat = CombatPlanning.Capture(problem, current, new()
+        {
+            ObservedStats = new() { ["PHYSICALDAMAGE"] = 100, ["ALLDAMAGEBONUS"] = 10 },
+            WeaponAttacks = { new() { DamageKind = CombatDamageKind.Weapon } }
+        }, new());
+        var baseline = PlacementSolver.Solve(problem);
+        Assert.Equal(110, baseline.Score, 6);
+        var advice = DiscardAdvisor.Rank(problem, baseline);
+        var removedCharm = advice.First(item => !item.IsTablet);
+        Assert.True(removedCharm.ReducesComboCount);
+        Assert.Equal(190, removedCharm.Gain, 6);
+        Assert.Equal(300, removedCharm.Combat!.Dps, 6);
+        Assert.Contains(removedCharm.Combat.Unsupported, text => text.Contains("자물쇠의 미지원 효과"));
+        Assert.Contains(Explain.Discard(removedCharm), text => text.Contains("계산 누락:"));
+        Assert.DoesNotContain(Explain.Discard(removedCharm), text => text.Contains("단계가 유지되는 후보만"));
+    }
+
     private static PlacementProblem Problem(bool combo = true)
     {
         var problem = new PlacementProblem

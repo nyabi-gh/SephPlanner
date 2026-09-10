@@ -19,7 +19,8 @@ namespace SephPlanner.Core.Combat
             if (attack.DamageKind == CombatDamageKind.IceRelic && stats.Read("FROSTRELICFLAME") > 0) stat = "FIREDAMAGE";
             if (attack.DamageKind == CombatDamageKind.FlameSword)
                 stat = stats.Read("FLAMESWORDFROST") > 0 ? "ICEDAMAGE" : "FIREDAMAGE";
-            var damage = At(attack.BaseDamage, level) + RelatedStat(stat, stats) * At(attack.StatPercent, level, 100) / 100;
+            var related = attack.DamageKind == CombatDamageKind.Weapon ? WeaponStat(stat, attack.Element, stats, out _) : RelatedStat(stat, stats);
+            var damage = At(attack.BaseDamage, level) + related * At(attack.StatPercent, level, 100) / 100;
             switch (attack.DamageKind)
             {
                 case CombatDamageKind.Weapon:
@@ -75,6 +76,7 @@ namespace SephPlanner.Core.Combat
             if (weapon) value *= Factor(stats.Read("WEAPONDAMAGEBONUSBYDASHCOUNT") * (double)stats.Read("DASHCOUNT"));
             value += damage * (stats.Read("ALLDAMAGEBONUS") + (scenario.Boss ? stats.Read("ELITEDAMAGE") : 0)) / 100;
             var element = attack.Element;
+            if (weapon && attack.ElementFromRelatedStat) WeaponStat(attack.Stat, element, stats, out element);
             if (attack.DamageKind == CombatDamageKind.IceRelic)
                 element = stats.Read("FROSTRELICFLAME") > 0 ? "FIRE" : "ICE";
             if (attack.DamageKind == CombatDamageKind.FlameSword)
@@ -105,22 +107,70 @@ namespace SephPlanner.Core.Combat
             return formula.Length == 0 ? 0 : stats.Read(formula);
         }
 
-        private static double Applied(double damage, string element, CombatStatState stats, Dictionary<string, int> target)
+        private static double WeaponStat(string formula, string element, CombatStatState stats, out string resolvedElement)
         {
-            if (stats.Read("DEFENSETOATTACK") > 0) damage *= 1 + DefenseReduction(1, stats.Read("DAMAGEREDUCTION"));
-            damage *= 1 - Clamp(target.GetValueOrDefault("RECEIVEDDAMAGEREDUCTION") / 100d, 0, 1);
-            damage *= Factor(Math.Max(0, target.GetValueOrDefault("RECEIVEDDAMAGEINCREASE")));
-            damage *= 1 - Clamp(target.GetValueOrDefault(element + "DEFENSE"), 0, 99) / 100;
-            var defense = target.GetValueOrDefault("DEFENSETOATTACK") > 0 ? 0 : target.GetValueOrDefault("DAMAGEREDUCTION");
-            var reduction = Math.Min(damage, DefenseReduction(damage, defense));
-            if (stats.Read("IGNOREDEFENSE") > 0) reduction *= 1 - stats.Read("IGNOREDEFENSE") / 100d;
-            damage -= reduction;
-            damage += stats.Read("TRUEDAMAGE") - target.GetValueOrDefault("TOUGHNESS");
-            return CombatStatMath.Truncate(Math.Max(1, damage));
+            resolvedElement = element;
+            if (formula.Length == 0) return Elements.Contains(element + "DAMAGE") ? stats.Read(element + "DAMAGE") : 1;
+            if (Elements.Contains(formula))
+            {
+                resolvedElement = formula.Substring(0, formula.Length - "DAMAGE".Length);
+                return stats.Read(formula);
+            }
+            var parts = formula.Split('/');
+            if (parts[0] == "HIGHEST" || parts[0] == "LOWEST")
+            {
+                var value = RelatedStat(parts[0], stats);
+                var key = Elements.First(candidate => stats.Read(candidate) == value);
+                resolvedElement = key.Substring(0, key.Length - "DAMAGE".Length);
+                return value;
+            }
+            if (parts[0] == "AVERAGEALL") return RelatedStat(parts[0], stats);
+            if (parts[0] == "AVERAGE" && parts.Length > 1) return RelatedStat("AVERAGE/" + parts[1], stats);
+            // WeaponSimple.GetRelatedStatMultiplier는 일반·혼돈 속성과 알 수 없는 식의 배수를 1로 둔다.
+            resolvedElement = "NORMAL";
+            return 1;
         }
 
-        private static double DefenseReduction(double damage, int defense) =>
-            defense > 0 ? damage * Math.Log(defense / 40d + 1) * 0.445 : damage * defense / 100;
+        private static double Applied(double damage, string element, CombatStatState stats, Dictionary<string, int> target)
+        {
+            // UnitAvatar.ApplyDamage와 같은 float 덧셈·뺄셈 순서를 지켜 정수 피해 경계가 달라지지 않게 한다.
+            var value = (float)damage;
+            if (stats.Read("DEFENSETOATTACK") > 0) value += value * DefenseReduction(1, stats.Read("DAMAGEREDUCTION"));
+            value -= value * (float)Clamp(target.GetValueOrDefault("RECEIVEDDAMAGEREDUCTION") / 100f, 0, 1);
+            value += value * (Math.Max(0, target.GetValueOrDefault("RECEIVEDDAMAGEINCREASE")) / 100f);
+            value -= value * (Resistance(element, target) / 100f);
+            var defense = target.GetValueOrDefault("DEFENSETOATTACK") > 0 ? 0 : target.GetValueOrDefault("DAMAGEREDUCTION");
+            var reduction = Math.Min(value, DefenseReduction(value, defense));
+            if (stats.Read("IGNOREDEFENSE") > 0) reduction *= 1 - stats.Read("IGNOREDEFENSE") / 100f;
+            value -= reduction;
+            value += stats.Read("TRUEDAMAGE");
+            value -= target.GetValueOrDefault("TOUGHNESS");
+            return CombatStatMath.Truncate(Math.Max(1, value));
+        }
+
+        private static int Resistance(string element, Dictionary<string, int> target)
+        {
+            var fire = target.GetValueOrDefault("FIREDEFENSE");
+            var ice = target.GetValueOrDefault("ICEDEFENSE");
+            var lightning = target.GetValueOrDefault("LIGHTNINGDEFENSE");
+            var physical = target.GetValueOrDefault("PHYSICALDEFENSE");
+            var value = element switch
+            {
+                "FIRE" => fire,
+                "ICE" => ice,
+                "LIGHTNING" => lightning,
+                "PHYSICAL" => physical,
+                "FIREANDICE" => Math.Max(fire, ice),
+                "FIREANDLIGHTNING" => Math.Max(fire, lightning),
+                "ICEANDLIGHTNING" => Math.Max(ice, lightning),
+                "CHAOS" => Math.Max(Math.Max(fire, ice), Math.Max(lightning, physical)),
+                _ => 0,
+            };
+            return Math.Min(99, Math.Max(0, value));
+        }
+
+        private static float DefenseReduction(float damage, int defense) =>
+            defense > 0 ? damage * (float)Math.Log(defense / 40f + 1f) * 0.445f : damage * defense / 100f;
 
         internal static double Factor(double percent) => 1 + percent / 100;
         internal static double Clamp(double value, double min, double max) => Math.Max(min, Math.Min(max, value));

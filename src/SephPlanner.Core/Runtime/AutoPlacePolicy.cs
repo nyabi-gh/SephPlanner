@@ -78,6 +78,20 @@ namespace SephPlanner.Core.Runtime
             if (plan.PlacementFingerprint.Length == 0 ||
                 plan.PlacementFingerprint != context.CurrentPlacementFingerprint)
                 return AutoPlaceDecision.Deny("배치 계산 이후 게임 상태가 바뀌어 최신 계획을 기다립니다.");
+            var placement = EvaluatePlacement(plan);
+            if (!placement.Allowed) return placement;
+            // 멀티 세션과 서버 반영 상태는 저장된 배치만으로 확인할 수 없어 런타임에서 검사한다.
+            if (context.IsMultiplayer && !context.AllowMultiplayer)
+                return AutoPlaceDecision.Deny("멀티플레이 세션에서는 자동 배치를 실행하지 않습니다.");
+            if (!context.SessionActive)
+                return AutoPlaceDecision.Deny("네트워크 세션이 없어 자동 배치를 실행할 수 없습니다.");
+
+            return AutoPlaceDecision.Allow();
+        }
+
+        public static AutoPlaceDecision EvaluatePlacement(Plan plan)
+        {
+            if (!plan.Verification.Passed) return AutoPlaceDecision.Deny(plan.Verification.Reason);
             // 놓을 자리가 없는 석판이 있으면 계획이 목표를 비우므로, 사유를 가르지 않으면
             // "옮길 것이 없습니다"가 되어 화면의 경고와 딴소리를 하게 된다.
             if (plan.Best.UnplacedTablets > 0)
@@ -85,6 +99,8 @@ namespace SephPlanner.Core.Runtime
                     $"석판 {plan.Best.UnplacedTablets}개를 놓을 자리가 없어 자동 배치를 실행하지 않습니다.");
             if (plan.Best.UnretainedCharms.Count > 0)
                 return AutoPlaceDecision.Deny("사용 유지 조건을 만족하는 배치를 찾지 못해 자동 배치를 실행하지 않습니다.");
+            if (!PositionPolicy.Allows(plan.Best))
+                return AutoPlaceDecision.Deny("대립의 천칭의 지정 방향과 보호 조건을 함께 만족하는 배치를 찾지 못해 자동 배치를 실행하지 않습니다.");
             if (plan.HasUnapprovedDeactivation || !ActivationPolicy.AllowsTransition(plan.Current, plan.Best))
                 return AutoPlaceDecision.Deny("끄기 허용 없이 아티팩트를 새로 비활성화하는 배치는 적용하지 않습니다.");
             if (!plan.HasPlacementChanges || plan.Targets.Count == 0)
@@ -92,16 +108,6 @@ namespace SephPlanner.Core.Runtime
             if (!plan.AllowUnsupportedChanges && plan.UnsupportedChangeWarnings.Count > 0)
                 return AutoPlaceDecision.Deny("미지원 효과에 영향을 주는 변경으로 자동 배치를 제한했습니다. " +
                     plan.UnsupportedChangeWarnings[0] + " F2 → DPS 내역에서 확인하고 전투 탭에서 별도로 허용할 수 있습니다.");
-            // 멀티 세션은 기본으로 잠근다. 개발사가 금지한 것은 아니고 인벤토리 동기화 구현을
-            // 바꾸는 중이라 잠가 두는 편이 안전하다고 답했다(docs/LEGAL.md "받은 답변"). 그래서
-            // 켜는 길은 두되 기본은 꺼짐이다. 켜면 호스트와 참가자 양쪽에서 돈다 - 이동은
-            // CmdSwap, 회전은 CmdDoClickAction 으로 게임 자신이 클라이언트에게 열어 둔 길이 있다
-            // (docs/RESEARCH.md 의 "멀티플레이").
-            if (context.IsMultiplayer && !context.AllowMultiplayer)
-                return AutoPlaceDecision.Deny("멀티플레이 세션에서는 자동 배치를 실행하지 않습니다.");
-            if (!context.SessionActive)
-                return AutoPlaceDecision.Deny("네트워크 세션이 없어 자동 배치를 실행할 수 없습니다.");
-
             return AutoPlaceDecision.Allow();
         }
     }

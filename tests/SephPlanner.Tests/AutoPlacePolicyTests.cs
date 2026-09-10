@@ -6,6 +6,17 @@ namespace SephPlanner.Tests;
 public class AutoPlacePolicyTests
 {
     [Fact]
+    public void DirectionConstraintIsCheckedEvenWithoutWarningText()
+    {
+        var context = Context();
+        context.Runner!.Latest!.Best.UnpositionedCharms.Add(1);
+        context.Runner.Latest.AllowUnsupportedChanges = true;
+        var denied = AutoPlacePolicy.Evaluate(context);
+        Assert.False(denied.Allowed);
+        Assert.Contains("지정 방향", denied.Reason);
+    }
+
+    [Fact]
     public void UnapprovedDeactivationIsCheckedEvenWhenThePlanFlagIsMissing()
     {
         var context = Context();

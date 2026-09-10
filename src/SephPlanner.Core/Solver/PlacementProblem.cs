@@ -95,6 +95,7 @@ namespace SephPlanner.Core.Solver
 
     public sealed class PlacementProblem
     {
+        public HorizontalSide ScalesSide { get; set; }
         public PlacementCombatContext? Combat { get; set; }
         internal CombatEstimateCache CombatEstimates { get; } = new CombatEstimateCache();
         public GridSpec Grid { get; set; } = GridSpec.WithStorage(GridSpec.DefaultWidth * GridSpec.DefaultHeight);
@@ -270,6 +271,7 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         public List<int> UnheldCharms { get; } = new List<int>();
         public List<int> UnretainedCharms { get; } = new List<int>();
+        public List<int> UnpositionedCharms { get; } = new List<int>();
         public List<int> UnpreservedCharms { get; } = new List<int>();
         public List<int> UnapprovedDeactivations { get; } = new List<int>();
         public int UnsafeEmptyCells { get; set; }

@@ -12,6 +12,30 @@ namespace SephPlanner.Tests;
 public sealed class CombatPlanningTests(ITestOutputHelper output)
 {
     [Fact]
+    public void MixAdviceKeepsItsDamageAndUnsupportedEffectDetails()
+    {
+        var problem = new PlacementProblem { Grid = new(3, 1, 3) };
+        problem.Charms.Add(Charm(1, "PHYSICALDAMAGE", new() { 0, 10, 20 }));
+        problem.Charms[0].Definition.Combat.Unsupported.Add("합성 비교의 미지원 효과");
+        problem.CurrentCharms[1] = new(0, 0);
+        for (var id = 2; id <= 3; id++)
+        {
+            problem.Tablets.Add(new() { InstanceId = id, Definition = new() { EntityId = id, Query = "RIGHT 1" } });
+            problem.CurrentTablets[id] = new(new(id - 1, 0), 0);
+        }
+        var catalog = new Catalog(problem.Tablets.Select(tablet => tablet.Definition), problem.Charms.Select(charm => charm.Definition));
+        var layout = problem.Tablets.Select(tablet => tablet.At(problem.CurrentTablets[tablet.InstanceId].Position, 0)).ToList();
+        var current = PlacementSolver.Score(problem, layout, problem.CurrentCharms);
+        problem.Combat = CombatPlanning.Capture(problem, current, Snapshot(CombatActionKind.Basic), new());
+        var baseline = PlacementSolver.Solve(problem);
+        var advice = Assert.Single(TabletMixAdvisor.Rank(problem, catalog, 0, 0));
+        Assert.NotNull(advice.Combat);
+        Assert.Equal(baseline.Score + advice.Gain, advice.Combat.Dps, 6);
+        Assert.Contains(advice.Combat.Unsupported, text => text.Contains("합성 비교의 미지원 효과"));
+        Assert.Contains(Explain.Mix(advice), text => text.Contains("계산 누락:"));
+    }
+
+    [Fact]
     public void BuildPriorityMustBeEnabledBeforeSavedComboPreferencesCanBeatDps()
     {
         var key = Charm(1, "PHYSICALDAMAGE", new() { 0 }).Definition;

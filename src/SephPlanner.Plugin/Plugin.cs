@@ -17,7 +17,7 @@ namespace SephPlanner.Plugin
     /// 세피리아 상태를 읽어 게임 HUD에 배치와 추천을 표시하고, 싱글플레이에서는 제안된 배치를
     /// 게임 자체의 이동 경로로 적용한다. 멀티 세션에서는 읽기만 한다.
     /// </summary>
-    [BepInPlugin(PluginGuid, "SephPlanner", "0.2.8")]
+    [BepInPlugin(PluginGuid, "SephPlanner", "0.3.0")]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001", Justification = "Unity의 OnDestroy에서 계산 작업을 정리합니다.")]
     public sealed class SephPlannerPlugin : BaseUnityPlugin
     {
@@ -38,6 +38,7 @@ namespace SephPlanner.Plugin
         private BuildWindow _build;
         private PluginPreferences _prefs;
         private PlanRunner _runner;
+        private int _submittedPreferencesRevision = -1;
         private GameSnapshot _lastSnapshot;
         private DiagnosticConsentWindow _diagnosticWindow;
         private DiagnosticCapture _pendingDiagnostic;
@@ -99,6 +100,7 @@ namespace SephPlanner.Plugin
             // 단축키·화면 쪽에서 난 예외가 폴링까지 굶기면 안 된다. Update 안의 예외는 유니티가
             // Player.log 에만 쌓고 우리 로그는 조용하므로, 여기서 잡아 같은 것 한 번씩 남긴다.
             Guarded(HandleInput, "입력 처리");
+            Guarded(() => _build.RefreshIfChanged(), "빌드 결과 갱신");
             Guarded(CheckDiagnosticUpload, "진단 전송 상태");
 
             var panelStarted = FrameCost.Now;
@@ -551,25 +553,24 @@ namespace SephPlanner.Plugin
             _currentPlacementFingerprint = PlanFingerprint.Placement(
                 snapshot, preferences, _currentCatalogGeneration);
             _runner.Submit(snapshot, preferences, _currentCatalogGeneration);
+            _submittedPreferencesRevision = _prefs.Revision;
             _panelAwaitingRefresh = false;
         }
 
-        /// <summary>빌드 창이 목록을 채울 재료. 창은 열려 있는 동안 시간이 멈추므로 그때 한 번 읽는다.</summary>
-        private BuildContext CurrentBuild() => new BuildContext
+        private BuildContext CurrentBuild()
         {
-            Catalog = _runner != null ? CatalogSource.Get() : null,
-            Snapshot = _lastSnapshot,
-
-            // 최신 계획이 아니라 마지막으로 게시된 계획을 준다. 강화 우선을 누르면 그 지정이
-            // 계획 지문에 들어가 곧바로 다시 풀리는데, 그동안 "최신이 아니다"를 "계획이 없다"로
-            // 읽으면 가방에 있는 아티팩트가 목록에서 사라지고 지정해 둔 것만 "가방에 없음"으로
-            // 남는다. 누른 순간이 재계산과 겹치느냐에 따라 그랬다 말았다 한다.
-            //
-            // 이 창이 계획에서 읽는 것은 가방에 무엇이 있느냐인데, 지정을 바꾼다고 가방이
-            // 바뀌지는 않는다. 그래서 최신성을 요구할 이유가 없다.
-            Plan = _runner?.State?.Latest,
-            Recommendations = _settings.Recommendations.Value,
-        };
+            var state = _runner?.State;
+            return new BuildContext
+            {
+                Catalog = _runner != null ? CatalogSource.Get() : null,
+                Snapshot = _lastSnapshot,
+                // 재계산 중에도 아이템 설정 목록은 유지하고 DPS 결과의 최신 여부를 따로 표시한다.
+                Plan = state?.Latest,
+                PlanCurrent = state?.IsCurrent == true && _submittedPreferencesRevision == _prefs.Revision && _settings.Panel.Value && !_panelAwaitingRefresh,
+                PlanError = state?.Error ?? "",
+                Recommendations = _settings.Recommendations.Value,
+            };
+        }
 
         /// <summary>
         /// 지금 설정으로 푼다. 후보 추천을 끄면 가리는 것이 아니라 계산 자체를 건너뛴다 -

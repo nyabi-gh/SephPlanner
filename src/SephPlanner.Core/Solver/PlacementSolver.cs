@@ -278,6 +278,7 @@ namespace SephPlanner.Core.Solver
         private sealed class EstimateModel
         {
             public int LevelCap;
+            public bool SplitSides;
             // 추정 후보 밖으로 반환하지 않는 작업 공간이며, 동시 실행하는 풀이는 각자 소유한다.
             public readonly EstimateOccupancy Occupancy;
             public readonly SimulationResult Simulation;
@@ -347,6 +348,8 @@ namespace SephPlanner.Core.Solver
             return new EstimateModel(problem.Grid, anyMagic)
             {
                 LevelCap = levelCap,
+                SplitSides = problem.ScalesSide != HorizontalSide.Automatic || problem.Charms.Any(charm =>
+                    charm.Definition.HorizontalStats != null || charm.Definition.Combat.FireIcePosition),
                 Items = ordered.Select(row => row.Charm).ToArray(),
                 ValueByRank = ordered.Select(row => row.Values).ToArray(),
                 Required = ordered.Select(row => RequiresUse(problem, row.Charm)).ToArray(),
@@ -643,7 +646,8 @@ namespace SephPlanner.Core.Solver
                 var ignore = result.IgnoreCriteriaAt(cell) > 0;
                 var group = 0;
                 while (group < groupCount && (groups[group].Level != level || groups[group].Multiplier != multiplier ||
-                    groups[group].Disabled != disabled || groups[group].Ignore != ignore)) group++;
+                    groups[group].Disabled != disabled || groups[group].Ignore != ignore ||
+                    model.SplitSides && HorizontalStatBonus.IsLeft(groups[group].Cell) != HorizontalStatBonus.IsLeft(cell))) group++;
                 if (group == groupCount)
                 {
                     groups[groupCount++] = new EstimateGroup
@@ -660,7 +664,7 @@ namespace SephPlanner.Core.Solver
                 model.GroupByCell[index] = group;
             }
             double total = 0, familiarity = Familiarity(problem, layout);
-            int missing = 0, unheld = 0, unpreserved = 0, unsafeEmpty = 0, waste = 0;
+            int missing = 0, unheld = 0, unpreserved = 0, unpositioned = 0, unsafeEmpty = 0, waste = 0;
             for (var rank = 0; rank < model.Items.Length; rank++)
             {
                 var charm = model.Items[rank];
@@ -681,10 +685,13 @@ namespace SephPlanner.Core.Solver
                     var active = !entry.Disabled && level >= 0 && !charm.IsDormant;
                     var held = !charm.Held || entry.Ignore;
                     var value = active ? model.ValueByRank[rank][Math.Min(level, model.LevelCap)] : 0;
+                    if (active && problem.Combat != null && (charm.Definition.HorizontalStats != null || charm.Definition.Combat.FireIcePosition))
+                        value = CombatPlanning.Estimate(problem, charm, Math.Min(level, charm.Definition.MaxLevel), cells[index], true);
                     var quality = new PlacementQuality(model.Required[rank] && !active ? 1 : 0,
                         model.Preserved[rank] && !active ? 1 : 0, held ? 0 : 1, 0, 0, value,
                         entry.Unsafe ? -1 : 0, charm.IsFiller || charm.IsDormant ? 0 : Math.Max(0, level - charm.Definition.MaxLevel),
-                        (index == current ? 1 : 0) + (index == planned ? PlanBonus : 0));
+                        (index == current ? 1 : 0) + (index == planned ? PlanBonus : 0),
+                        PositionPolicy.Accepts(problem, charm, cells[index]) ? 0 : 1);
                     if (best.HasValue)
                     {
                         var order = quality.CompareTo(best.Value);
@@ -698,6 +705,7 @@ namespace SephPlanner.Core.Solver
                     if (RequiresUse(problem, charm)) missing++;
                     if (charm.Held) unheld++;
                     if (Preserve(charm)) unpreserved++;
+                    if (PositionPolicy.Required(problem, charm)) unpositioned++;
                     continue;
                 }
                 used[selected] = true;
@@ -705,12 +713,13 @@ namespace SephPlanner.Core.Solver
                 missing += best.Value.RetentionFailures;
                 unheld += best.Value.HoldFailures;
                 unpreserved += best.Value.ActivationFailures;
+                unpositioned += best.Value.PositionFailures;
                 waste += best.Value.Waste;
                 familiarity += best.Value.Familiarity;
             }
             for (var index = 0; index < cells.Count; index++)
                 if (!used[index] && groups[model.GroupByCell[index]].Unsafe) unsafeEmpty++;
-            return new PlacementQuality(missing, unpreserved, unheld, 0, 0, total, unsafeEmpty, waste, familiarity);
+            return new PlacementQuality(missing, unpreserved, unheld, 0, 0, total, unsafeEmpty, waste, familiarity, unpositioned);
         }
 
         private static Arrangement Evaluate(
@@ -974,7 +983,7 @@ namespace SephPlanner.Core.Solver
         {
             var familiarity = Familiarity(problem, layout);
             double score = 0;
-            int missing = 0, unpreserved = 0, unheld = 0, waste = 0, unsafeEmpty = 0;
+            int missing = 0, unpreserved = 0, unheld = 0, unpositioned = 0, waste = 0, unsafeEmpty = 0;
             var combo = problem.PriorityCategories.Count == 0 ? null : new Arrangement();
             foreach (var charm in problem.Charms)
             {
@@ -983,6 +992,7 @@ namespace SephPlanner.Core.Solver
                     if (RequiresUse(problem, charm) && !charm.IsFiller) missing++;
                     if (Preserve(charm)) unpreserved++;
                     if (charm.Held && !charm.IsFiller) unheld++;
+                    if (PositionPolicy.Required(problem, charm)) unpositioned++;
                     continue;
                 }
                 if (!CanUse(problem, charm, position, result, occupancy, neighbors))
@@ -991,6 +1001,7 @@ namespace SephPlanner.Core.Solver
                     if (Preserve(charm)) unpreserved++;
                 }
                 if (charm.Held && !charm.IsFiller && result.IgnoreCriteriaAt(position) <= 0) unheld++;
+                if (!PositionPolicy.Accepts(problem, charm, position)) unpositioned++;
                 if (problem.Combat == null) score += Value(problem, charm, position, result, occupancy, neighbors);
                 familiarity += Anchors(problem, charm, position);
                 waste += Waste(charm, position, result);
@@ -1009,10 +1020,11 @@ namespace SephPlanner.Core.Solver
             if (combo is not null && neighbors is not null) PriorityComboPlacement.Describe(problem, combo, neighbors);
             if (problem.Combat != null) score = CombatScore(problem, positions, occupancy, result).Dps;
             return new PlacementQuality(missing, unpreserved, unheld, combo?.PriorityComboMatches ?? 0,
-                combo?.PriorityComboProgress ?? 0, score, unsafeEmpty, waste, familiarity);
+                combo?.PriorityComboProgress ?? 0, score, unsafeEmpty, waste, familiarity, unpositioned);
         }
 
-        internal static bool Preserve(CharmSlot charm) => !charm.IsFiller && !charm.IsDormant && !charm.AllowDeactivation;
+        internal static bool Preserve(CharmSlot charm) => !charm.IsFiller && !charm.IsDormant &&
+            !charm.Definition.HasNoActivationEffect && !charm.AllowDeactivation;
         private static bool RequiresUse(PlacementProblem problem, CharmSlot charm) =>
             charm.Retained || problem.ProtectedActive.Contains(charm.InstanceId);
 
@@ -1068,7 +1080,8 @@ namespace SephPlanner.Core.Solver
                         priority += unit * unit * unit;
                     cost[row, column] = new AssignmentCost(priority,
                         -Value(problem, charm, cell, result, occupancy, neighbors),
-                        Unsafe(cell, result) ? -1 : 0, Waste(charm, cell, result), -Anchors(problem, charm, cell));
+                        Unsafe(cell, result) ? -1 : 0, Waste(charm, cell, result), -Anchors(problem, charm, cell),
+                        PositionPolicy.Accepts(problem, charm, cell) ? 0 : 1);
                 }
             }
 
@@ -1341,6 +1354,9 @@ namespace SephPlanner.Core.Solver
             foreach (var charm in problem.Charms)
             {
                 if (charm.IsFiller) continue;
+                if (PositionPolicy.Required(problem, charm) &&
+                    (!positions.TryGetValue(charm.InstanceId, out var position) || !PositionPolicy.Accepts(problem, charm, position)))
+                    arrangement.UnpositionedCharms.Add(charm.InstanceId);
                 var inactive = arrangement.InactiveCharms.Contains(charm.InstanceId);
                 var unlinked = !inactive && DirectedCharmSupport.HasConnection(charm) &&
                     !DirectedCharmSupport.IsConnected(charm, positions[charm.InstanceId], result, problem.Grid,

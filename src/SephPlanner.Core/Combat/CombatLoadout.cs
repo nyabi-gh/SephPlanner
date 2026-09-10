@@ -60,7 +60,13 @@ namespace SephPlanner.Core.Combat
                 var level = Math.Min(definition.MaxLevel, item.Level);
                 var source = Source("charm:" + charm.InstanceId, definition.Combat, level);
                 if (definition.Combat.FireIcePosition)
-                    Add(source.Stats, item.Position.X <= 2 ? "FROSTRELICFLAME" : "FLAMESWORDFROST", 1);
+                    Add(source.Stats, HorizontalStatBonus.IsLeft(item.Position) ? "FROSTRELICFLAME" : "FLAMESWORDFROST", 1);
+                if (definition.HorizontalStats is { } horizontal)
+                {
+                    var left = HorizontalStatBonus.IsLeft(item.Position);
+                    Add(source.Stats, horizontal.LeftStat, CombatDamage.At(left ? horizontal.MainByLevel : horizontal.OppositeByLevel, level));
+                    Add(source.Stats, horizontal.RightStat, CombatDamage.At(left ? horizontal.OppositeByLevel : horizontal.MainByLevel, level));
+                }
                 foreach (var bonus in definition.ContextStats)
                 {
                     if (bonus.CombatKey.Length == 0) continue;

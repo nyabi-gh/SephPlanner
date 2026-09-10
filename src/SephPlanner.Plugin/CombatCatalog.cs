@@ -48,6 +48,17 @@ namespace SephPlanner.Plugin
                 effect.FireIcePosition = true;
                 supported = true;
             }
+            if (charm is Charm_FireIce scales)
+            {
+                definition.HorizontalStats = new HorizontalStatBonus
+                {
+                    LeftStat = scales.leftStatName.ToString().ToUpperInvariant(),
+                    RightStat = scales.rightStatName.ToString().ToUpperInvariant(),
+                    MainByLevel = scales.mainStat.ToList(),
+                    OppositeByLevel = scales.oppositeStat.ToList(),
+                };
+                supported = true;
+            }
             if (charm is Charm_DashDamage collision)
             {
                 effect.Attacks.Add(new CombatAttack

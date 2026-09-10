@@ -49,6 +49,8 @@ namespace SephPlanner.Core.Combat
         }
 
         private static bool Missing(CharmDefinition definition) => Missing(definition.Combat) ||
+            definition.HorizontalStats is { } horizontal &&
+                (!CombatCoverage.Supports(horizontal.LeftStat) || !CombatCoverage.Supports(horizontal.RightStat)) ||
             definition.Behavior == "Charm_WhitePaper" || definition.ContextStats.Any(bonus =>
                 bonus.CombatKey.Length == 0 || !CombatCoverage.Supports(bonus.CombatKey));
 

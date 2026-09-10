@@ -362,7 +362,7 @@ namespace SephPlanner.Core.Solver
                 var placed = candidate.Charm is not null
                     ? outcome.Solved.CharmPositions.ContainsKey(candidateId)
                     : outcome.Solved.TabletPositions.ContainsKey(candidateId);
-                if (!placed || outcome.Solved.UnretainedCharms.Count > 0 ||
+                if (!placed || outcome.Solved.UnretainedCharms.Count > 0 || !PositionPolicy.Allows(outcome.Solved) ||
                     !ActivationPolicy.AllowsTransition(baseline, outcome.Solved)) continue;
                 if (best is null || PriorityComboPlacement.Compare(outcome.Solved, best.Solved) > 0) best = outcome;
             }
@@ -372,7 +372,7 @@ namespace SephPlanner.Core.Solver
             // 잣대에서 나와야 하고, 미리보기도 이 결과를 그대로 쓴다.
             best.Solved = PlacementSolver.EvaluateLayouts(
                 best.Trial, layouts.Of(best.Trial, faster), faster);
-            return best.Solved.UnretainedCharms.Count == 0 && ActivationPolicy.AllowsTransition(baseline, best.Solved) ? best : null;
+            return best.Solved.UnretainedCharms.Count == 0 && PositionPolicy.Allows(best.Solved) && ActivationPolicy.AllowsTransition(baseline, best.Solved) ? best : null;
         }
 
         private static IEnumerable<TrialOutcome> Trials(
@@ -389,7 +389,7 @@ namespace SephPlanner.Core.Solver
 
             foreach (var charm in problem.Charms.OrderBy(value => value.InstanceId))
             {
-                if (charm.Retained) continue;
+                if (charm.Retained || charm.Definition.CannotDiscard) continue;
                 var trial = Clone(problem);
                 trial.Charms.RemoveAll(value => value.InstanceId == charm.InstanceId);
                 trial.CurrentCharms.Remove(charm.InstanceId);
@@ -496,6 +496,7 @@ namespace SephPlanner.Core.Solver
             var clone = new PlacementProblem
             {
                 Grid = problem.Grid,
+                ScalesSide = problem.ScalesSide,
                 Combat = problem.Combat,
                 Charms = new List<CharmSlot>(problem.Charms),
                 Tablets = new List<TabletSlot>(problem.Tablets),

@@ -60,6 +60,7 @@ namespace SephPlanner.Plugin
         public static readonly Step Simulation = new Step("  시뮬레이터 대조");
         public static readonly Step Feed = new Step("  지문 계산과 제출");
         public static readonly Step Panel = new Step("화면 갱신(매 프레임)");
+        public static readonly Step BuildWindow = new Step("F2 내용 다시 그리기");
 
         /// <summary>
         /// 카탈로그를 짓느라 쓴 시간. 부팅 직후에는 지역화가 준비될 때까지 실패하며 여러 번
@@ -106,6 +107,7 @@ namespace SephPlanner.Plugin
             text.AppendLine("  " + Simulation.Describe());
             text.AppendLine("  " + Feed.Describe());
             text.AppendLine("  " + Panel.Describe());
+            text.AppendLine("  " + BuildWindow.Describe());
             text.AppendLine("  " + Catalog.Describe() +
                             "  시도 " + CatalogSource.Attempts + "회");
             text.AppendLine(

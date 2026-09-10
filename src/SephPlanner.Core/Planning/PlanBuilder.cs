@@ -68,6 +68,7 @@ namespace SephPlanner.Core.Planning
             var problem = new PlacementProblem
             {
                 Grid = grid,
+                ScalesSide = preferences.Combat.ScalesSide,
                 DeactivationAllowed = new HashSet<int>(preferences.DeactivationAllowed),
                 PinnedCharms = new Dictionary<int, int>(preferences.PinnedCharms),
                 RetainedCharms = new HashSet<int>(preferences.RetainedCharms),
@@ -225,8 +226,8 @@ namespace SephPlanner.Core.Planning
             var hasPlacementChanges = targets.Any(target =>
                 target.From != target.To || target.IsTablet && target.FromRotation != target.Rotation);
 
-            if (best.UnplacedTablets > 0 || !verification.Passed || best.UnretainedCharms.Count > 0 || unapprovedDeactivation) targets.Clear();
-            if (best.UnretainedCharms.Count > 0 || unapprovedDeactivation)
+            if (best.UnplacedTablets > 0 || !verification.Passed || best.UnretainedCharms.Count > 0 || unapprovedDeactivation || !PositionPolicy.Allows(best)) targets.Clear();
+            if (best.UnretainedCharms.Count > 0 || unapprovedDeactivation || !PositionPolicy.Allows(best))
             {
                 moves.Clear();
                 manualMovesAvailable = false;
@@ -241,6 +242,13 @@ namespace SephPlanner.Core.Planning
                 AllowUnsupportedChanges = preferences.Combat.AllowUnsupportedChanges,
                 PrioritizeBuild = prioritizeBuild,
                 Moves = moves,
+                PositionWarnings = problem.Charms.Where(charm => best.UnpositionedCharms.Contains(charm.InstanceId))
+                    .Select(charm => Naming.Of(charm.Definition.Names, charm.Definition.Id, "아티팩트") + ": " +
+                        PositionPolicy.Label(problem.ScalesSide) + "과 활성 보호·사용 유지·고정 조건을 함께 만족하는 배치를 찾지 못했습니다. 자동 배치를 제한합니다.").ToList(),
+                PositionDetails = problem.Charms.Where(charm => charm.Definition.HorizontalStats != null)
+                    .Select(charm => Naming.Of(charm.Definition.Names, charm.Definition.Id, "아티팩트") + ": " +
+                        Explain.HorizontalEffect(charm, current) + " → " + Explain.HorizontalEffect(charm, best) +
+                        " · " + PositionPolicy.Label(problem.ScalesSide)).ToList(),
                 ComboPlacementWarnings = ComboPlacementWarnings(problem, best),
                 RetentionWarnings = problem.Charms.Where(charm => best.UnretainedCharms.Contains(charm.InstanceId))
                     .Select(charm => RetentionWarning(charm, best)).ToList(),

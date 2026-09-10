@@ -10,7 +10,7 @@ namespace SephPlanner.Plugin
     {
         internal static CombatSnapshot Read(PlayerAvatar avatar, WeaponControllerSimple controller)
         {
-            var result = new CombatSnapshot { Gold = avatar.Money, InfinityMana = KeywordDatabase.GetConstValue("infinityMPMax") };
+            var result = new CombatSnapshot { InfinityMana = KeywordDatabase.GetConstValue("infinityMPMax") };
             foreach (var key in avatar.customStats.Keys.Concat(avatar.calculatedBonusStats.Keys).Concat(avatar.customStatsAmp.Keys).Distinct())
             {
                 result.ObservedStats[key] = avatar.GetCustomBaseStatUnsafe(key);
@@ -54,7 +54,8 @@ namespace SephPlanner.Plugin
                     Action = kind,
                     DamageKind = CombatDamageKind.Weapon,
                     Element = element,
-                    Stat = string.IsNullOrEmpty(data.relatedStatFormula) ? element + "DAMAGE" : data.relatedStatFormula.ToUpperInvariant(),
+                    ElementFromRelatedStat = data.useElementalTypeFromRelatedStatFormula,
+                    Stat = data.relatedStatFormula ?? "",
                     Multiplier = data.damageMultiplier,
                     AttackSpeedAmplification = weapon.attackSpeedAmplify,
                     SpecialUsesAttackSpeed = weapon.specialAttackIsRelatedToAttackSpeed,
@@ -72,8 +73,6 @@ namespace SephPlanner.Plugin
                 }
                 else if (!(data is NewWeaponFireData_MeleeAttack) && !(data is NewWeaponFireData_Bullet))
                     attack.Unsupported.Add("특수 공격 프리팹의 적중 횟수 미지원: " + data.GetType().Name);
-                if (data.useElementalTypeFromRelatedStatFormula || element == "CHAOS")
-                    attack.Unsupported.Add("무기의 가변·혼돈 속성 방어 판정은 미반영입니다.");
                 snapshot.WeaponAttacks.Add(attack);
             }
         }

@@ -13,7 +13,7 @@ namespace SephPlanner.Core.Runtime
     // 게시된 계획의 입력이다. F10 순간의 새 관측값과 섞지 않는다.
     public sealed class PlanReplay
     {
-        public const int CurrentVersion = 3;
+        public const int CurrentVersion = 5;
         public static string CurrentCoreBuild =>
             typeof(PlanBuilder).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion +
             "/" + typeof(PlanBuilder).Assembly.ManifestModule.ModuleVersionId;
@@ -103,6 +103,7 @@ namespace SephPlanner.Core.Runtime
             if (Combat is null || PriorityCategories is null || PinnedCharms is null || HeldCharms is null || RetainedCharms is null ||
                 DeactivationAllowed is null || PresetCharms is null || CharmValues?.Charms is null || !Recommendations.HasValue)
                 throw new InvalidDataException("재현 자료에 계산 설정이 빠졌습니다.");
+            CombatSimulator.Validate(Combat);
             return new PlanPreferences
             {
                 Combat = Combat.Copy(),

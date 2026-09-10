@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using SephPlanner.Core.Combat;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Solver;
 
@@ -47,6 +48,7 @@ namespace SephPlanner.Core.Runtime
                 result.Scores[key + "/콤보"] = offer.ComboBonus;
                 if (offer.Preview is null) continue;
                 result.Scores[key + "/미리보기"] = offer.Preview.Score;
+                result.Combat(key, offer.Preview.Combat);
                 foreach (var cell in offer.Preview.Names)
                     result.Fact(key + "/칸/" + cell.Key, cell.Value);
                 foreach (var cell in offer.Preview.EffectiveLevels)
@@ -60,6 +62,7 @@ namespace SephPlanner.Core.Runtime
                 result.Fact(key + "/구매", mix.Affordable);
                 result.Fact(key + "/질의", mix.Query);
                 result.Scores[key] = mix.Gain;
+                result.Combat(key, mix.Combat);
             }
             for (var i = 0; i < plan.Discards.Count; i++)
             {
@@ -67,11 +70,14 @@ namespace SephPlanner.Core.Runtime
                 var key = "빼기/" + i;
                 result.Fact(key, discard.InstanceId);
                 result.Scores[key] = discard.Gain;
+                result.Combat(key, discard.Combat);
             }
             result.Fact("경고/콤보", string.Join("\n", plan.ComboPlacementWarnings));
             result.Fact("경고/유지", string.Join("\n", plan.RetentionWarnings));
             result.Fact("경고/연결", string.Join("\n", plan.SupportWarnings));
             result.Fact("경고/활성", string.Join("\n", plan.ActivationWarnings));
+            result.Fact("경고/방향", string.Join("\n", plan.PositionWarnings));
+            result.Fact("방향 효과", string.Join("\n", plan.PositionDetails));
             result.Fact("경고/미지원 변경", string.Join("\n", plan.UnsupportedChangeWarnings));
             result.Fact("미지원 변경 허용", plan.AllowUnsupportedChanges);
             result.Fact("빌드 우선", plan.PrioritizeBuild);
@@ -102,10 +108,9 @@ namespace SephPlanner.Core.Runtime
         private static bool Finite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
         private void Fact(string key, object value) => Facts[key] = Convert.ToString(value, CultureInfo.InvariantCulture) ?? "";
 
-        private void Arrangement(string key, Arrangement arrangement)
+        private void Combat(string key, CombatResult? combat)
         {
-            Scores[key] = arrangement.Score;
-            if (arrangement.Combat is { } combat)
+            if (combat != null)
             {
                 Scores[key + "/예상 DPS"] = combat.Dps;
                 Scores[key + "/총 피해"] = combat.TotalDamage;
@@ -120,6 +125,12 @@ namespace SephPlanner.Core.Runtime
                     Fact(key + "/사용 횟수/" + part.Id, part.Uses);
                 }
             }
+        }
+
+        private void Arrangement(string key, Arrangement arrangement)
+        {
+            Scores[key] = arrangement.Score;
+            Combat(key, arrangement.Combat);
             Scores[key + "/선택 기준"] = arrangement.Preference;
             Scores[key + "/콤보 진행"] = arrangement.PriorityComboProgress;
             Fact(key + "/콤보 만족", arrangement.PriorityComboMatches);
@@ -127,6 +138,7 @@ namespace SephPlanner.Core.Runtime
             Fact(key + "/비활성", string.Join(",", arrangement.InactiveCharms.OrderBy(id => id)));
             Fact(key + "/고정 실패", string.Join(",", arrangement.UnheldCharms.OrderBy(id => id)));
             Fact(key + "/유지 실패", string.Join(",", arrangement.UnretainedCharms.OrderBy(id => id)));
+            Fact(key + "/방향 실패", string.Join(",", arrangement.UnpositionedCharms.OrderBy(id => id)));
             Fact(key + "/활성 보호 실패", string.Join(",", arrangement.UnpreservedCharms.OrderBy(id => id)));
             Fact(key + "/미허용 비활성", string.Join(",", arrangement.UnapprovedDeactivations.OrderBy(id => id)));
             Fact(key + "/감점 빈칸", arrangement.UnsafeEmptyCells);

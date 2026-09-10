@@ -7,6 +7,9 @@ namespace SephPlanner.Core.Model
     public sealed class CharmDefinition
     {
         public CharmCombatEffect Combat { get; set; } = new CharmCombatEffect();
+        public bool HasNoActivationEffect { get; set; }
+        public bool CannotDiscard { get; set; }
+        public HorizontalStatBonus? HorizontalStats { get; set; }
         public string Id { get; set; } = "";
         public int EntityId { get; set; }
         public Rarity Rarity { get; set; }

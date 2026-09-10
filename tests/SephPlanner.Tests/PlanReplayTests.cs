@@ -21,7 +21,7 @@ public sealed class PlanReplayTests : IDisposable
         snapshot.Run.Combat = new()
         {
             ObservedStats = { ["PHYSICALDAMAGE"] = 100 },
-            WeaponAttacks = { new() { Id = "weapon", DamageKind = SephPlanner.Core.Combat.CombatDamageKind.Weapon } },
+            WeaponAttacks = { new() { Id = "weapon", DamageKind = SephPlanner.Core.Combat.CombatDamageKind.Weapon, ElementFromRelatedStat = true } },
             Unsupported = { "미지원 발동 효과" },
         };
         preferences.Combat.TargetCount = 3;
@@ -38,6 +38,7 @@ public sealed class PlanReplayTests : IDisposable
         var captured = runner.CaptureReplay()!;
         var restored = System.Text.Json.JsonSerializer.Deserialize<PlanReplay>(JsonConvert.SerializeObject(captured))!;
         var result = restored.Rebuild();
+        Assert.True(restored.Snapshot!.Run!.Combat!.WeaponAttacks[0].ElementFromRelatedStat);
         Assert.Equal(3, result.Best.Combat!.TargetCount);
         Assert.Equal(7, result.Best.Combat.DurationSeconds);
         Assert.Equal(0.2, result.Best.Combat.AdditionalTargetFraction);
@@ -309,6 +310,38 @@ public sealed class PlanReplayTests : IDisposable
         Assert.Contains(expected.Differences(ReplayResult.From(plan)), text => text.StartsWith("후보/", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void ReplayChurnUsesTheOriginalFullPreferencesAndPreviousTargets()
+    {
+        var replay = Capture();
+        var report = PlanChurn.Analyze(replay, 3);
+        Assert.Empty(replay.Expected!.Differences(ReplayResult.From(report.Plans[0])));
+    }
+
+    [Theory]
+    [InlineData("후보/0")]
+    [InlineData("합성/0")]
+    [InlineData("빼기/0")]
+    public void ResultComparisonDetectsRecommendationCoverageAndUseCountChangesAtTheSameDps(string key)
+    {
+        var combat = new SephPlanner.Core.Combat.CombatResult
+        {
+            DurationSeconds = 30,
+            TotalDamage = 3000,
+            Contributions = { new() { Id = "attack", Uses = 30, Damage = 3000 } }
+        };
+        var plan = new Plan();
+        if (key == "후보/0") plan.Offers.Add(new() { Preview = new() { Combat = combat } });
+        else if (key == "합성/0") plan.Mixes.Add(new() { Combat = combat });
+        else plan.Discards.Add(new() { Combat = combat });
+        var expected = ReplayResult.From(plan);
+        combat.Unsupported.Add("추가로 확인된 미지원 효과");
+        combat.Contributions[0].Uses++;
+        var differences = expected.Differences(ReplayResult.From(plan));
+        Assert.Contains(differences, text => text.StartsWith(key + "/계산 누락", StringComparison.Ordinal));
+        Assert.Contains(differences, text => text.StartsWith(key + "/사용 횟수", StringComparison.Ordinal));
+    }
+
     [Theory]
     [InlineData("--help")]
     [InlineData("--solve")]
@@ -316,6 +349,9 @@ public sealed class PlanReplayTests : IDisposable
     [InlineData("--reproduce", "input.replay")]
     [InlineData("--reproduce", "input.replay", "--allow-model-change")]
     [InlineData("--churn", "snapshot.json", "3")]
+    [InlineData("--churn", "saved.replay", "3")]
+    [InlineData("--churn", "saved.replay", "--allow-model-change")]
+    [InlineData("--churn", "saved.replay", "3", "--allow-model-change")]
     public void DocumentedCommandsAreAccepted(params string[] args) => Assert.Null(CommandLine.Error(args));
 
     [Theory]
@@ -327,6 +363,9 @@ public sealed class PlanReplayTests : IDisposable
     [InlineData("--allow-model-change")]
     [InlineData("--churn", "snapshot.json", "0")]
     [InlineData("--churn", "snapshot.json", "bad")]
+    [InlineData("--churn", "snapshot.json", "--allow-model-change")]
+    [InlineData("--churn", "saved.replay", "0", "--allow-model-change")]
+    [InlineData("--churn", "saved.replay", "--allow-model-change", "3")]
     public void InvalidCommandsAreRejected(params string[] args) => Assert.NotNull(CommandLine.Error(args));
 
     private static PlanReplay Capture()

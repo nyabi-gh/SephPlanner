@@ -6,18 +6,21 @@ using SephPlanner.Core.Combat;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
+using SephPlanner.Core.Solver;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace SephPlanner.Plugin.Ui
 {
-    /// <summary>창을 열 때의 판 상황. 창은 열려 있는 동안 시간이 멈추므로 한 번 읽으면 된다.</summary>
+    /// <summary>아이템 목록과 비동기로 갱신되는 계획 결과.</summary>
     internal sealed class BuildContext
     {
         public ICatalog Catalog;
         public GameSnapshot Snapshot;
         public Plan Plan;
+        public bool PlanCurrent;
+        public string PlanError = "";
         public bool Recommendations;
     }
 
@@ -53,6 +56,7 @@ namespace SephPlanner.Plugin.Ui
         private readonly Dictionary<Tab, TextMeshProUGUI> _tabs = new Dictionary<Tab, TextMeshProUGUI>();
 
         private BuildContext _context = new BuildContext();
+        private int _renderedRevision = -1;
         private readonly List<Entry> _entries = new List<Entry>();
         private readonly List<Row> _rows = new List<Row>();
 
@@ -197,7 +201,9 @@ namespace SephPlanner.Plugin.Ui
 
         public override void Refresh()
         {
+            var started = FrameCost.Now;
             _context = _source() ?? new BuildContext();
+            _renderedRevision = _prefs.Revision;
             CollectEntries();
 
             _page = Mathf.Clamp(_page, 0, LastPage);
@@ -205,6 +211,17 @@ namespace SephPlanner.Plugin.Ui
             RenderTabs();
             RenderRows();
             Widgets.FitHeight(_note, _noteSize, _noteWidth);
+            FrameCost.BuildWindow.Add(started);
+        }
+
+        public void RefreshIfChanged()
+        {
+            if (!IsOpen) return;
+            var latest = _source() ?? new BuildContext();
+            if (_renderedRevision != _prefs.Revision || !ReferenceEquals(latest.Plan, _context.Plan) ||
+                !ReferenceEquals(latest.Snapshot, _context.Snapshot) || latest.PlanCurrent != _context.PlanCurrent ||
+                latest.PlanError != _context.PlanError || latest.Recommendations != _context.Recommendations)
+                Refresh();
         }
 
         private void RenderPreset()
@@ -340,6 +357,10 @@ namespace SephPlanner.Plugin.Ui
         private void CollectCombat()
         {
             var scenario = _prefs.Combat;
+            Setting("대립의 천칭 방향", PositionPolicy.Label(scenario.ScalesSide),
+                (copy, delta) => copy.ScalesSide = (HorizontalSide)(((int)copy.ScalesSide + delta + 3) % 3));
+            Detail("천칭 방향의 의미", "왼쪽 1~3열 · 오른쪽 4~6열",
+                "자동은 두 방향의 전체 예상 DPS를 비교합니다. 수동 지정은 같은 종류의 천칭 모두에 적용되며, 활성 보호·사용 유지·고정과 충돌하면 자동 적용을 제한합니다. 영원의 식 등 속성 전환도 함께 계산합니다.");
             Setting("추천 기준", scenario.PrioritizeBuild ? "빌드 우선 → DPS" : "보호 조건 안에서 DPS 우선", (copy, _) => copy.PrioritizeBuild = !copy.PrioritizeBuild);
             Setting("미지원 변경 자동 적용", scenario.AllowUnsupportedChanges ? "별도 허용됨" : "제한 · 권장", (copy, _) => copy.AllowUnsupportedChanges = !copy.AllowUnsupportedChanges);
             Setting("대상 수", scenario.TargetCount + (scenario.TargetCount == 1 ? " · 단일" : " · 다수"), (copy, delta) => copy.TargetCount = Math.Max(1, Math.Min(100, copy.TargetCount + delta)));
@@ -484,9 +505,15 @@ namespace SephPlanner.Plugin.Ui
 
         private void CollectCombatDetails()
         {
+            Detail("계산 상태", _context.PlanError.Length > 0 ? "계산 실패 · 이전 결과" : _context.PlanCurrent ? "최신 결과" : "계산 대기 · 이전 결과",
+                _context.PlanError.Length > 0 ? _context.PlanError : "설정 변경 직후에는 이전 결과를 표시합니다. 새 계산이 게시되면 열린 창도 자동으로 갱신됩니다.");
             var current = _context.Plan?.Current.Combat;
             var best = _context.Plan?.Best.Combat;
             if (best == null) return;
+            foreach (var message in _context.Plan.PositionWarnings)
+                Detail("방향 조건 충돌", "자동 적용 제한", message);
+            foreach (var message in _context.Plan.PositionDetails)
+                Detail("천칭 위치 효과", "현재 → 추천", message);
             Detail("현재 → 추천 예상 DPS", $"{current?.Dps:0.##} → {best.Dps:0.##}", "DPS는 선택한 시간 동안 계산한 총 피해를 시간으로 나눈 값입니다. 추천 순위는 이 전체 구간 DPS로 정합니다.");
             Detail("추천 기준", _context.Plan.PrioritizeBuild ? "빌드 우선 → DPS" : "보호 조건 안에서 DPS 우선", "빌드 우선일 때만 지정 콤보와 프리셋 즐겨찾기가 DPS보다 앞섭니다. 계산 가능한 콤보 효과는 두 모드 모두 피해에 포함됩니다.");
             Detail("비교 조건", $"{best.DurationSeconds:0.##}초 / {best.TargetCount}명", $"첫 대상은 적중한다고 가정합니다. 공격 대상 상한 안에서 추가 대상의 {best.AdditionalTargetFraction:P0}에 적중하는 기대값입니다. 적의 사망·이동은 재현하지 않습니다.");
@@ -504,6 +531,12 @@ namespace SephPlanner.Plugin.Ui
             foreach (var offer in _context.Plan.Offers.Where(offer => offer.Preview?.Combat != null))
                 foreach (var message in offer.Preview.Combat.Unsupported.Except(best.Unsupported))
                     Detail(offer.Candidate.Name + " · " + message, "획득 시 누락", message);
+            foreach (var mix in _context.Plan.Mixes.Where(mix => mix.Combat != null))
+                foreach (var message in mix.Combat.Unsupported.Except(best.Unsupported))
+                    Detail(mix.NameA + " + " + mix.NameB + " · " + message, "합성 시 누락", message);
+            foreach (var discard in _context.Plan.Discards.Where(discard => discard.Combat != null))
+                foreach (var message in discard.Combat.Unsupported.Except(best.Unsupported))
+                    Detail(discard.Name + " · " + message, "제외 시 누락", message);
         }
 
         private void Detail(string name, string detail, string message) => _entries.Add(new Entry

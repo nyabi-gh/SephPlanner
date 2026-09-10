@@ -686,6 +686,7 @@ namespace SephPlanner.Plugin.Ui
             warnings.AddRange(plan.RetentionWarnings);
             warnings.AddRange(plan.SupportWarnings);
             warnings.AddRange(plan.ActivationWarnings);
+            warnings.AddRange(plan.PositionWarnings);
 
             if (snapshot.IsMultiplayer)
             {
@@ -905,12 +906,7 @@ namespace SephPlanner.Plugin.Ui
             foreach (var advice in plan.Discards)
             {
                 var row = _discards.Add(advice.Name, $"제외 후 재배치 +{advice.Gain:0.#} DPS", NativeSkin.Text);
-                Hover(row, advice.Name, () =>
-                    $"현재 위치: {advice.Position.X + 1}열 {advice.Position.Y + 1}행\n" +
-                    "이 항목 하나를 가방에서 빼고 다시 배치했을 때의 추정 이득입니다. F8은 아이템을 제거하지 않습니다.\n" +
-                    "콤보 단계가 유지되는 후보만 표시합니다. 실제 전투 효과와 다를 수 있습니다." +
-                    (advice.ReducesComboCount ? "\n콤보 개수는 줄어 다음 단계가 멀어질 수 있습니다." : "") +
-                    (advice.Activated.Count > 0 ? "\n켜지는 아티팩트: " + string.Join(", ", advice.Activated) : ""));
+                Hover(row, advice.Name, () => Explain.Join(Explain.Discard(advice)));
             }
             _discards.End();
             Widgets.SetActive(_discards.Root, visible && plan.Discards.Count > 0);
@@ -925,7 +921,7 @@ namespace SephPlanner.Plugin.Ui
                 var name = advice.NameA + " + " + advice.NameB;
                 var row = _mixes.Add(
                     name,
-                    RotationTag(advice) + Tint($"+{advice.Gain:0.#} DPS",
+                    RotationTag(advice) + Tint($"{advice.Gain:+0.#;-0.#;0} DPS",
                         advice.Gain > 0.001 ? NativeSkin.Good : NativeSkin.TextDim),
                     advice.Affordable ? NativeSkin.Text : NativeSkin.TextDim);
                 Hover(row, name, () => Explain.Join(Explain.Mix(advice)));
