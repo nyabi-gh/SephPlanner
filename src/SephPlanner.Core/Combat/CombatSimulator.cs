@@ -159,7 +159,7 @@ namespace SephPlanner.Core.Combat
                 var hits = CombatDamage.At(attack.HitsByLevel, item.Level, 1) * attack.Hits;
                 var targets = attack.MaxTargets == 0 ? scenario.TargetCount : Math.Min(scenario.TargetCount, attack.MaxTargets);
                 var expectedTargets = 1 + (targets - 1) * scenario.AdditionalTargetFraction;
-                var dealt = CombatDamage.ExpectedHit(attack, damage, stats, scenario) * hits * expectedTargets;
+                var dealt = CombatDamage.ExpectedHit(attack, damage, stats, scenario, loadout.DirectAttackCritical) * hits * expectedTargets;
                 state.Contribution.Damage += dealt;
                 if (details)
                 {
@@ -262,6 +262,8 @@ namespace SephPlanner.Core.Combat
 
         public static void Validate(CombatScenario scenario)
         {
+            if (scenario != null && !Enum.IsDefined(typeof(SephPlanner.Core.Model.HorizontalSide), scenario.EternalSide))
+                throw new ArgumentException("영원의 식 방향은 자동·왼쪽·오른쪽 중에서 선택해 주세요.");
             if (scenario != null && !Enum.IsDefined(typeof(SephPlanner.Core.Model.HorizontalSide), scenario.ScalesSide))
                 throw new ArgumentException("대립의 천칭 방향은 자동·왼쪽·오른쪽 중에서 선택해 주세요.");
             if (scenario == null || scenario.TargetStats == null || scenario.WeaponSequence == null || scenario.MagicPriority == null ||

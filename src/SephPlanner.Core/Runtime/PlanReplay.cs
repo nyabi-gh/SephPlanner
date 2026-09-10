@@ -13,7 +13,7 @@ namespace SephPlanner.Core.Runtime
     // 게시된 계획의 입력이다. F10 순간의 새 관측값과 섞지 않는다.
     public sealed class PlanReplay
     {
-        public const int CurrentVersion = 6;
+        public const int CurrentVersion = 7;
         public static string CurrentCoreBuild =>
             typeof(PlanBuilder).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion +
             "/" + typeof(PlanBuilder).Assembly.ManifestModule.ModuleVersionId;
@@ -36,7 +36,8 @@ namespace SephPlanner.Core.Runtime
 
         public Plan Rebuild(bool allowModelChange = false)
         {
-            if ((Version != 5 && Version != CurrentVersion) || CatalogVersion != PlannerData.CatalogVersion)
+            var legacy = (Version == 5 || Version == 6) && CatalogVersion == 18;
+            if (!legacy && (Version != CurrentVersion || CatalogVersion != PlannerData.CatalogVersion))
                 throw new InvalidDataException("지원하지 않는 재현 자료 또는 카탈로그 형식입니다.");
             if (CoreBuild.Length == 0 || (!allowModelChange && CoreBuild != CurrentCoreBuild))
                 throw new InvalidDataException("계산 코드가 저장 당시와 다릅니다. 변경 전후 비교에는 --allow-model-change를 지정하세요.");
@@ -46,8 +47,8 @@ namespace SephPlanner.Core.Runtime
                 throw new InvalidDataException("재현에 필요한 입력이나 기준 결과가 없습니다.");
 
             var preferences = Preferences.Restore();
-            var matches = Version == 5
-                ? PlanFingerprint.MatchesLegacyReplay(Snapshot, preferences, CatalogGeneration, RequestFingerprint)
+            var matches = legacy
+                ? PlanFingerprint.MatchesLegacyReplay(Snapshot, preferences, CatalogGeneration, RequestFingerprint, Version)
                 : PlanFingerprint.Full(Snapshot, preferences, CatalogGeneration) == RequestFingerprint;
             if (!matches)
                 throw new InvalidDataException("스냅샷·설정의 지문이 게시된 계획과 다릅니다.");

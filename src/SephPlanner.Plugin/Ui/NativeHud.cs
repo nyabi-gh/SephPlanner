@@ -463,9 +463,9 @@ namespace SephPlanner.Plugin.Ui
                 frame.RuntimeVerification, frame.RuntimeVerificationReason);
             var combat = previewed?.Preview.Combat ?? plan.Best.Combat;
             if (combat != null && combat.Unsupported.Count > 0)
-                warning += (warning.Length > 0 ? "\n" : "") + $"추정·미반영 {combat.Unsupported.Count}항목 · F2 → DPS 내역";
+                warning += (warning.Length > 0 ? "\n" : "") + "DPS 계산의 가정·미반영 효과 안내 · F2 → DPS 내역";
             if (previewed == null && plan.UnsupportedChangeWarnings.Count > 0)
-                warning += (warning.Length > 0 ? "\n" : "") + (plan.AllowUnsupportedChanges ? "미지원 변경 자동 적용 허용됨" : "미지원 변경으로 자동 적용 제한") + " · F2 → DPS 내역";
+                warning += (warning.Length > 0 ? "\n" : "") + (plan.AllowUnsupportedChanges ? "미지원 변경 자동 적용 허용됨" : "효과 변경 확인 필요 · 자동 배치 제한") + " · F2 → DPS 내역";
             _notice.text = warning;
             Widgets.FitHeight(_notice, _noticeSize, inner);
             Widgets.SetActive(_notice, warning.Length > 0);

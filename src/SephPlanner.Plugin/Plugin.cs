@@ -875,9 +875,7 @@ namespace SephPlanner.Plugin
                        Describe(_settings.PreviewKey) + " 로 다음 후보";
             }
 
-            // 접었을 때는 안내 줄도 접는다. 게임 화면을 가리지 않는 것이 접는 이유인데 안내가
-            // 늘 붙어 있으면 줄어드는 것이 반뿐이다. 키를 누르면 잠깐 다시 뜬다.
-            return _expanded ? Guide(state) : "";
+            return Guide(state);
         }
 
         private string _guide = "";
@@ -915,6 +913,7 @@ namespace SephPlanner.Plugin
             _guideShortcuts = shortcuts;
 
             var text = Describe(_settings.ExpandKey) + (_expanded ? " 접기" : " 펼치기");
+            if (!_expanded) return _guide = Describe(_settings.ExpandKey) + " 가방 배치 펼치기";
             if (autoPlace) text += "   " + Describe(_settings.AutoPlaceKey) + " 자동 배치";
             if (offers) text += "   " + Describe(_settings.PreviewKey) + " 후보 미리보기";
 

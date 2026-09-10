@@ -23,6 +23,7 @@ public sealed class PluginPreferencesTests : IDisposable
         scenario.PrioritizeBuild = true;
         scenario.AllowUnsupportedChanges = true;
         scenario.ScalesSide = SephPlanner.Core.Model.HorizontalSide.Right;
+        scenario.EternalSide = SephPlanner.Core.Model.HorizontalSide.Left;
         scenario.MeasuredWeaponKey = "weapon:1:Basic:0";
         scenario.MeasuredActionSeconds["Basic"] = 0.8;
         scenario.MagicPriority.AddRange(new[] { 10, 20 });
@@ -38,6 +39,8 @@ public sealed class PluginPreferencesTests : IDisposable
         Assert.True(restored.Combat.AllowUnsupportedChanges);
         Assert.Equal(SephPlanner.Core.Model.HorizontalSide.Right, restored.Combat.ScalesSide);
         Assert.Equal(SephPlanner.Core.Model.HorizontalSide.Right, submitted.Combat.ScalesSide);
+        Assert.Equal(SephPlanner.Core.Model.HorizontalSide.Left, restored.Combat.EternalSide);
+        Assert.Equal(SephPlanner.Core.Model.HorizontalSide.Left, submitted.Combat.EternalSide);
         Assert.Equal("weapon:1:Basic:0", restored.Combat.MeasuredWeaponKey);
         Assert.Equal(0.8, restored.Combat.MeasuredActionSeconds["Basic"]);
         Assert.Equal(2, restored.Combat.WeaponSequence.Count);
@@ -54,6 +57,7 @@ public sealed class PluginPreferencesTests : IDisposable
         Assert.False(Load().Combat.PrioritizeBuild);
         Assert.False(Load().Combat.AllowUnsupportedChanges);
         Assert.Equal(SephPlanner.Core.Model.HorizontalSide.Automatic, Load().Combat.ScalesSide);
+        Assert.Equal(SephPlanner.Core.Model.HorizontalSide.Automatic, Load().Combat.EternalSide);
     }
 
     [Fact]
@@ -65,6 +69,7 @@ public sealed class PluginPreferencesTests : IDisposable
         Assert.Contains("FIRE", restored.PriorityCategories);
         Assert.False(restored.Combat.PrioritizeBuild);
         Assert.False(restored.Combat.AllowUnsupportedChanges);
+        Assert.Equal(SephPlanner.Core.Model.HorizontalSide.Automatic, restored.Combat.EternalSide);
     }
 
     [Fact]

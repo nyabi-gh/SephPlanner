@@ -348,7 +348,7 @@ namespace SephPlanner.Core.Solver
             return new EstimateModel(problem.Grid, anyMagic)
             {
                 LevelCap = levelCap,
-                SplitSides = problem.ScalesSide != HorizontalSide.Automatic || problem.Charms.Any(charm =>
+                SplitSides = problem.ScalesSide != HorizontalSide.Automatic || problem.EternalSide != HorizontalSide.Automatic || problem.Charms.Any(charm =>
                     charm.Definition.HorizontalStats != null || charm.Definition.Combat.FireIcePosition),
                 Items = ordered.Select(row => row.Charm).ToArray(),
                 ValueByRank = ordered.Select(row => row.Values).ToArray(),

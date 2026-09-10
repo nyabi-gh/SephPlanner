@@ -9,6 +9,7 @@ namespace SephPlanner.Core.Combat
     public sealed class CombatScenario
     {
         public SephPlanner.Core.Model.HorizontalSide ScalesSide { get; set; }
+        public SephPlanner.Core.Model.HorizontalSide EternalSide { get; set; }
         public double DurationSeconds { get; set; } = 30;
         public int TargetCount { get; set; } = 1;
         // 첫 대상 외의 적중 비율은 실측 전 비교용 추정값이다.
@@ -94,6 +95,7 @@ namespace SephPlanner.Core.Combat
         public List<CombatAttack> Attacks { get; set; } = new List<CombatAttack>();
         public List<string> Unsupported { get; set; } = new List<string>();
         public bool FireIcePosition { get; set; }
+        public List<double> DirectAttackCriticalByLevel { get; set; } = new List<double>();
         public bool Collected { get; set; }
     }
 

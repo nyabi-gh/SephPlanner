@@ -48,6 +48,21 @@ namespace SephPlanner.Plugin
                 effect.FireIcePosition = true;
                 supported = true;
             }
+            if (charm is Charm_IncreaseCriticalChance_NormalAttack critical)
+            {
+                effect.DirectAttackCriticalByLevel = critical.criticalBonusPercentByLevel.Select(value => (double)value).ToList();
+                supported = true;
+            }
+            if (charm is Charm_ScytheOfBerut)
+            {
+                effect.Stats.Add(new CombatStatGrant { Key = "EXECUTION", Values = new List<int> { 1 } });
+                supported = true;
+            }
+            if (charm is Charm_SpeedRun speed)
+            {
+                effect.Unsupported.Add($"층 진입 후 {speed.buffDuration}초 동안의 이동·공격 속도 효과는 남은 시간을 수집하지 못해 현재 관측값에 고정합니다. 레벨·활성 변경과 시간 만료는 예측하지 못합니다.");
+                supported = true;
+            }
             if (charm is Charm_FireIce scales)
             {
                 definition.HorizontalStats = new HorizontalStatBonus

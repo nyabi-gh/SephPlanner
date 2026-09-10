@@ -96,6 +96,7 @@ namespace SephPlanner.Core.Solver
     public sealed class PlacementProblem
     {
         public HorizontalSide ScalesSide { get; set; }
+        public HorizontalSide EternalSide { get; set; }
         public PlacementCombatContext? Combat { get; set; }
         internal CombatEstimateCache CombatEstimates { get; } = new CombatEstimateCache();
         public GridSpec Grid { get; set; } = GridSpec.WithStorage(GridSpec.DefaultWidth * GridSpec.DefaultHeight);

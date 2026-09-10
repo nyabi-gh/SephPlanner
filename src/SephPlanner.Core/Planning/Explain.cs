@@ -23,6 +23,8 @@ namespace SephPlanner.Core.Planning
             if (!arrangement.CharmPositions.TryGetValue(charm.InstanceId, out var cell)) return "미배치";
             var side = HorizontalStatBonus.IsLeft(cell) ? "왼쪽" : "오른쪽";
             if (arrangement.InactiveCharms.Contains(charm.InstanceId)) return side + " · 비활성";
+            if (charm.Definition.Combat.FireIcePosition)
+                return side + " · " + (HorizontalStatBonus.IsLeft(cell) ? "얼음 무구 → 화염" : "화염검 → 얼음");
             var bonus = charm.Definition.HorizontalStats;
             if (bonus == null) return side;
             var level = arrangement.EffectiveLevels[cell];

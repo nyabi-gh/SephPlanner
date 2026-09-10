@@ -21,9 +21,21 @@ public sealed class PlanReplayCompatibilityTests
     public void MonoCanonicalCaptureMatchesDotNetIncludingFractionalSettingsAndCuratedValues()
     {
         var replay = Read("v6-mono");
+        Assert.Equal(6, replay.Version);
+        Assert.True(PlanFingerprint.MatchesLegacyReplay(replay.Snapshot!, replay.Preferences!.Restore(),
+            replay.CatalogGeneration, replay.RequestFingerprint, 6));
+        Assert.Empty(replay.Expected!.Differences(ReplayResult.From(replay.Rebuild(true))));
+    }
+
+    [Fact]
+    public void MonoV7CaptureMatchesWithIndependentDirectionsAndDirectCriticalMetadata()
+    {
+        var replay = Read("v7-mono");
         Assert.Equal(PlanReplay.CurrentVersion, replay.Version);
         Assert.Equal(replay.RequestFingerprint,
             PlanFingerprint.Full(replay.Snapshot!, replay.Preferences!.Restore(), replay.CatalogGeneration));
+        Assert.NotEqual(replay.Preferences.Combat!.ScalesSide, replay.Preferences.Combat.EternalSide);
+        Assert.NotEmpty(replay.Catalog!.Charms![0].Combat.DirectAttackCriticalByLevel);
         Assert.Empty(replay.Expected!.Differences(ReplayResult.From(replay.Rebuild(true))));
     }
 
@@ -47,10 +59,12 @@ public sealed class PlanReplayCompatibilityTests
     [Theory]
     [InlineData("v5-mono")]
     [InlineData("v5-net10")]
+    [InlineData("v6-mono")]
     public void NewFormatDoesNotFallBackToLegacyFingerprints(string fixture)
     {
         var replay = Read(fixture);
         replay.Version = PlanReplay.CurrentVersion;
+        replay.CatalogVersion = PlannerData.CatalogVersion;
         Assert.Throws<InvalidDataException>(() => replay.Rebuild(true));
     }
 
@@ -59,9 +73,21 @@ public sealed class PlanReplayCompatibilityTests
     {
         var replay = Read("v6-mono");
         var preferences = replay.Preferences!.Restore();
+        var original = PlanFingerprint.Full(replay.Snapshot!, preferences, replay.CatalogGeneration);
         replay.Snapshot!.Run!.Combat!.ManaRecoveryDelay = Math.BitIncrement(replay.Snapshot.Run.Combat.ManaRecoveryDelay);
-        Assert.NotEqual(replay.RequestFingerprint, PlanFingerprint.Full(replay.Snapshot, preferences, replay.CatalogGeneration));
+        Assert.NotEqual(original, PlanFingerprint.Full(replay.Snapshot, preferences, replay.CatalogGeneration));
         Assert.Equal(CombatFingerprint.Of(0d), CombatFingerprint.Of(-0d));
+    }
+
+    [Theory]
+    [InlineData("v5-mono")]
+    [InlineData("v5-net10")]
+    [InlineData("v6-mono")]
+    public void LegacyFormatsCannotIgnoreAnInjectedEternalDirection(string fixture)
+    {
+        var replay = Read(fixture);
+        replay.Preferences!.Combat!.EternalSide = SephPlanner.Core.Model.HorizontalSide.Right;
+        Assert.Throws<InvalidDataException>(() => replay.Rebuild(true));
     }
 
     private static PlanReplay Read(string fixture)

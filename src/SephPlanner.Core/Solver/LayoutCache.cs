@@ -116,6 +116,7 @@ namespace SephPlanner.Core.Solver
             var builder = new StringBuilder();
             builder.Append(problem.Grid.Width).Append('x').Append(problem.Grid.Height)
                    .Append('/').Append((int)problem.ScalesSide)
+                   .Append('/').Append((int)problem.EternalSide)
                    .Append('/').Append(problem.Grid.Storage)
                    .Append('/').Append(options.BeamWidth)
                    .Append('/').Append(options.ExactCandidates)

@@ -7,11 +7,11 @@ namespace SephPlanner.Tests;
 public sealed class CombatChangeAssessmentTests
 {
     [Theory]
-    [InlineData("move")]
-    [InlineData("level")]
-    [InlineData("disable")]
-    [InlineData("remove")]
-    public void UnsupportedSourceChangesAreIdentified(string change)
+    [InlineData("move", "위치 (1,1) → (2,1)")]
+    [InlineData("level", "유효 레벨 0 → 1")]
+    [InlineData("disable", "활성 → 비활성")]
+    [InlineData("remove", "추천 배치에서 제외")]
+    public void UnsupportedSourceChangesAreIdentified(string change, string expected)
     {
         var problem = Problem();
         var current = At((1, 0, 0));
@@ -19,7 +19,7 @@ public sealed class CombatChangeAssessmentTests
         if (change == "level") best.Levels[new(0, 0)] = 1;
         if (change == "disable") best.InactiveCharms.Add(1);
         if (change == "remove") best.CharmPositions.Clear();
-        Assert.Contains("위치·레벨·활성", Assert.Single(CombatChangeAssessment.Compare(problem, current, best)));
+        Assert.Contains(expected, Assert.Single(CombatChangeAssessment.Compare(problem, current, best)));
     }
 
     [Fact]

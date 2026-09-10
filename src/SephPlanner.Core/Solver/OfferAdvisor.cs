@@ -497,6 +497,7 @@ namespace SephPlanner.Core.Solver
             {
                 Grid = problem.Grid,
                 ScalesSide = problem.ScalesSide,
+                EternalSide = problem.EternalSide,
                 Combat = problem.Combat,
                 Charms = new List<CharmSlot>(problem.Charms),
                 Tablets = new List<TabletSlot>(problem.Tablets),

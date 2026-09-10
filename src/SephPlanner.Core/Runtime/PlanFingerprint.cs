@@ -142,11 +142,11 @@ namespace SephPlanner.Core.Runtime
         public static string PlanningContext(PlanPreferences preferences, string catalogGeneration)
             => PlanningContext(preferences, catalogGeneration, FingerprintFormat.Canonical);
 
-        private static string PlanningContext(PlanPreferences preferences, string catalogGeneration, FingerprintFormat format)
+        private static string PlanningContext(PlanPreferences preferences, string catalogGeneration, FingerprintFormat format, bool legacyScenario = false)
         {
             var builder = new StringBuilder();
             Add(builder, "catalog", catalogGeneration);
-            Add(builder, "combatScenario", CombatFingerprint.Of(preferences.Combat, format));
+            Add(builder, "combatScenario", CombatFingerprint.Of(preferences.Combat, format, legacyScenario));
             foreach (var category in preferences.PriorityCategories.OrderBy(value => value, StringComparer.Ordinal))
                 Add(builder, "priority", category);
             foreach (var pin in preferences.PinnedCharms.OrderBy(pair => pair.Key))
@@ -168,11 +168,13 @@ namespace SephPlanner.Core.Runtime
         }
 
         internal static bool MatchesLegacyReplay(
-            GameSnapshot snapshot, PlanPreferences preferences, string catalogGeneration, string fingerprint)
+            GameSnapshot snapshot, PlanPreferences preferences, string catalogGeneration, string fingerprint, int version = 5)
         {
-            foreach (var format in new[] { FingerprintFormat.LegacyMono, FingerprintFormat.LegacyDotNet })
+            if (preferences.Combat.EternalSide != HorizontalSide.Automatic || (version != 5 && version != 6)) return false;
+            var formats = version == 5 ? new[] { FingerprintFormat.LegacyMono, FingerprintFormat.LegacyDotNet } : new[] { FingerprintFormat.Canonical };
+            foreach (var format in formats)
             {
-                var context = PlanningContext(preferences, catalogGeneration, format);
+                var context = PlanningContext(preferences, catalogGeneration, format, true);
                 var placement = Placement(snapshot, context, format);
                 if (Full(snapshot, preferences, catalogGeneration, placement) == fingerprint) return true;
             }

@@ -359,8 +359,10 @@ namespace SephPlanner.Plugin.Ui
             var scenario = _prefs.Combat;
             Setting("대립의 천칭 방향", PositionPolicy.Label(scenario.ScalesSide),
                 (copy, delta) => copy.ScalesSide = (HorizontalSide)(((int)copy.ScalesSide + delta + 3) % 3));
-            Detail("천칭 방향의 의미", "왼쪽 1~3열 · 오른쪽 4~6열",
-                "자동은 두 방향의 전체 예상 DPS를 비교합니다. 수동 지정은 같은 종류의 천칭 모두에 적용되며, 활성 보호·사용 유지·고정과 충돌하면 자동 적용을 제한합니다. 영원의 식 등 속성 전환도 함께 계산합니다.");
+            Setting("영원의 식 방향", PositionPolicy.EternalLabel(scenario.EternalSide),
+                (copy, delta) => copy.EternalSide = (HorizontalSide)(((int)copy.EternalSide + delta + 3) % 3));
+            Detail("좌우 방향의 의미", "왼쪽 1~3열 · 오른쪽 4~6열",
+                "천칭과 영원의 식의 방향은 각각 지정합니다. 자동은 두 방향의 전체 예상 DPS를 비교합니다. 수동 지정은 같은 종류의 아이템 모두에 적용되며, 활성 보호·사용 유지·고정과 충돌하면 자동 적용을 제한합니다. 획득·제외·합성 추천에도 적용합니다.");
             Setting("추천 기준", scenario.PrioritizeBuild ? "빌드 우선 → DPS" : "보호 조건 안에서 DPS 우선", (copy, _) => copy.PrioritizeBuild = !copy.PrioritizeBuild);
             Setting("미지원 변경 자동 적용", scenario.AllowUnsupportedChanges ? "별도 허용됨" : "제한 · 권장", (copy, _) => copy.AllowUnsupportedChanges = !copy.AllowUnsupportedChanges);
             Setting("대상 수", scenario.TargetCount + (scenario.TargetCount == 1 ? " · 단일" : " · 다수"), (copy, delta) => copy.TargetCount = Math.Max(1, Math.Min(100, copy.TargetCount + delta)));
@@ -513,21 +515,21 @@ namespace SephPlanner.Plugin.Ui
             foreach (var message in _context.Plan.PositionWarnings)
                 Detail("방향 조건 충돌", "자동 적용 제한", message);
             foreach (var message in _context.Plan.PositionDetails)
-                Detail("천칭 위치 효과", "현재 → 추천", message);
+                Detail("좌우 배치 효과", "현재 → 추천", message);
             Detail("현재 → 추천 예상 DPS", $"{current?.Dps:0.##} → {best.Dps:0.##}", "DPS는 선택한 시간 동안 계산한 총 피해를 시간으로 나눈 값입니다. 추천 순위는 이 전체 구간 DPS로 정합니다.");
             Detail("추천 기준", _context.Plan.PrioritizeBuild ? "빌드 우선 → DPS" : "보호 조건 안에서 DPS 우선", "빌드 우선일 때만 지정 콤보와 프리셋 즐겨찾기가 DPS보다 앞섭니다. 계산 가능한 콤보 효과는 두 모드 모두 피해에 포함됩니다.");
             Detail("비교 조건", $"{best.DurationSeconds:0.##}초 / {best.TargetCount}명", $"첫 대상은 적중한다고 가정합니다. 공격 대상 상한 안에서 추가 대상의 {best.AdditionalTargetFraction:P0}에 적중하는 기대값입니다. 적의 사망·이동은 재현하지 않습니다.");
             Detail($"초반 {best.ComparisonWindowSeconds:0.##}초 DPS", $"{current?.OpeningDps:0.##} → {best.OpeningDps:0.##}", "선택한 전투의 시작 구간입니다. 시작 자원에 따른 집중 피해를 비교합니다.");
             Detail($"후반 {best.ComparisonWindowSeconds:0.##}초 DPS", $"{current?.EndingDps:0.##} → {best.EndingDps:0.##}", "같은 전투의 마지막 구간입니다. 아직 자원이 남거나 긴 재사용 대기가 있으면 안정된 지속 DPS와 다를 수 있습니다. 짧은 전투에서는 초반 구간과 겹칠 수 있습니다.");
             Detail("자원 비우고 시작한 DPS", $"{current?.EmptyStartDps:0.##} → {best.EmptyStartDps:0.##}", "마나·충전만 0으로 바꾼 별도 전투입니다. 시간·공격 순서·대상 조건은 같습니다. 회복과 충전이 시작되는 과정을 포함하며 무한 시간의 지속 DPS는 아닙니다.");
-            Detail("미지원 변경 자동 적용", _context.Plan.AllowUnsupportedChanges ? "별도 허용됨" : "제한 · 권장", "계산 누락이 존재한다는 이유만으로 막지는 않습니다. 미지원 아이템의 상태·주변·지원 연결 또는 미지원 콤보 수량이 달라질 때 자동 적용을 제한합니다. 추천은 계속 표시합니다.");
+            Detail("미지원 변경 자동 적용", _context.Plan.AllowUnsupportedChanges ? "별도 허용됨" : "제한 · 권장", "가방 인식 상태와 DPS 계산 범위는 별개입니다. 체력 효과 또는 계산하지 못한 아이템의 상태·주변·지원 연결·콤보 수량이 달라질 때 자동 적용을 제한합니다. 아래 아이템별 변경을 확인하세요. 추천은 계속 표시합니다.");
             foreach (var message in _context.Plan.UnsupportedChangeWarnings)
                 Detail("미지원 변경 · " + message, _context.Plan.AllowUnsupportedChanges ? "허용됨" : "자동 적용 제한", message);
             Detail("추천 총 피해 / 남은 마나", $"{best.TotalDamage:0.##} / {best.RemainingMana:0.##}", "미반영 효과는 아래 목록에서 확인하세요.");
             foreach (var part in best.Contributions.OrderByDescending(part => part.Damage))
                 Detail(part.Name, $"{part.Damage / best.DurationSeconds:0.##} DPS", $"{part.Name}: {part.Uses}회 사용, 총 피해 {part.Damage:0.##}");
             foreach (var message in (current?.Unsupported ?? new List<string>()).Concat(best.Unsupported).Distinct())
-                Detail("계산 누락 · " + message, "눌러서 보기", message);
+                Detail("계산 범위·가정 · " + message, "눌러서 보기", message);
             foreach (var offer in _context.Plan.Offers.Where(offer => offer.Preview?.Combat != null))
                 foreach (var message in offer.Preview.Combat.Unsupported.Except(best.Unsupported))
                     Detail(offer.Candidate.Name + " · " + message, "획득 시 누락", message);

@@ -47,7 +47,7 @@ namespace SephPlanner.Core.Combat
             return damage * attack.Multiplier * support;
         }
 
-        public static double ExpectedHit(CombatAttack attack, double damage, CombatStatState stats, CombatScenario scenario)
+        public static double ExpectedHit(CombatAttack attack, double damage, CombatStatState stats, CombatScenario scenario, double directAttackCritical = 0)
         {
             if (!Finite(damage)) throw new ArithmeticException("피해 계산이 유한한 값이 아닙니다.");
             if (damage <= 0) return 0;
@@ -55,6 +55,7 @@ namespace SephPlanner.Core.Combat
             var weapon = attack.DamageKind == CombatDamageKind.Weapon;
             var magic = attack.UsesMagicCritical;
             var chance = stats.Read("CRITICAL") / 100d;
+            if (weapon) chance += directAttackCritical;
             var criticalBonus = stats.Read("CRITICALDAMAGEBONUS") + 50;
             if (magic)
             {

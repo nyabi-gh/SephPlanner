@@ -19,6 +19,7 @@ namespace SephPlanner.Core.Combat
 
     public sealed class CombatLoadout
     {
+        public double DirectAttackCritical { get; set; }
         public CombatStatState Stats { get; set; } = new CombatStatState();
         public List<CombatAttackInstance> Attacks { get; set; } = new List<CombatAttackInstance>();
         public List<string> Unsupported { get; set; } = new List<string>();
@@ -144,6 +145,7 @@ namespace SephPlanner.Core.Combat
 
         private static void AddEffect(CombatLoadout loadout, CharmCombatEffect effect, int level, int instance, int definition, int count = int.MaxValue, bool details = true)
         {
+            loadout.DirectAttackCritical += CombatDamage.At(effect.DirectAttackCriticalByLevel, level);
             foreach (var attack in effect.Attacks)
                 if (attack.Threshold <= count)
                     loadout.Attacks.Add(new CombatAttackInstance { Attack = attack, Level = level, InstanceId = instance, DefinitionId = definition });

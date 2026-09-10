@@ -69,6 +69,7 @@ namespace SephPlanner.Core.Planning
             {
                 Grid = grid,
                 ScalesSide = preferences.Combat.ScalesSide,
+                EternalSide = preferences.Combat.EternalSide,
                 DeactivationAllowed = new HashSet<int>(preferences.DeactivationAllowed),
                 PinnedCharms = new Dictionary<int, int>(preferences.PinnedCharms),
                 RetainedCharms = new HashSet<int>(preferences.RetainedCharms),
@@ -244,11 +245,11 @@ namespace SephPlanner.Core.Planning
                 Moves = moves,
                 PositionWarnings = problem.Charms.Where(charm => best.UnpositionedCharms.Contains(charm.InstanceId))
                     .Select(charm => Naming.Of(charm.Definition.Names, charm.Definition.Id, "아티팩트") + ": " +
-                        PositionPolicy.Label(problem.ScalesSide) + "과 활성 보호·사용 유지·고정 조건을 함께 만족하는 배치를 찾지 못했습니다. 자동 배치를 제한합니다.").ToList(),
-                PositionDetails = problem.Charms.Where(charm => charm.Definition.HorizontalStats != null)
+                        PositionPolicy.Label(problem, charm) + "과 활성 보호·사용 유지·고정 조건을 함께 만족하는 배치를 찾지 못했습니다. 자동 배치를 제한합니다.").ToList(),
+                PositionDetails = problem.Charms.Where(charm => charm.Definition.HorizontalStats != null || charm.Definition.Combat.FireIcePosition)
                     .Select(charm => Naming.Of(charm.Definition.Names, charm.Definition.Id, "아티팩트") + ": " +
                         Explain.HorizontalEffect(charm, current) + " → " + Explain.HorizontalEffect(charm, best) +
-                        " · " + PositionPolicy.Label(problem.ScalesSide)).ToList(),
+                        " · " + PositionPolicy.Label(problem, charm)).ToList(),
                 ComboPlacementWarnings = ComboPlacementWarnings(problem, best),
                 RetentionWarnings = problem.Charms.Where(charm => best.UnretainedCharms.Contains(charm.InstanceId))
                     .Select(charm => RetentionWarning(charm, best)).ToList(),

@@ -15,13 +15,15 @@ namespace SephPlanner.Core.Combat
             var before = CombatPlanning.Locate(problem, current);
             var after = CombatPlanning.Locate(problem, proposed);
             var changes = new List<string>();
-            foreach (var charm in problem.Charms.Where(charm => !charm.IsFiller && Missing(charm.Definition)))
+            foreach (var charm in problem.Charms.Where(charm => !charm.IsFiller))
             {
                 var oldItem = before.FirstOrDefault(item => item.Charm.InstanceId == charm.InstanceId);
                 var newItem = after.FirstOrDefault(item => item.Charm.InstanceId == charm.InstanceId);
                 if (oldItem?.Active != true && newItem?.Active != true) continue;
+                changes.AddRange(HealthChanges(charm, oldItem, newItem));
+                if (!Missing(charm.Definition)) continue;
                 if (State(oldItem) != State(newItem))
-                    changes.Add(Name(charm) + ": 미지원 효과가 있는 아이템의 위치·레벨·활성 상태가 달라집니다.");
+                    changes.Add(Name(charm) + ": " + ChangedState(oldItem, newItem) + ". 미지원 효과에 미치는 영향은 계산하지 못합니다.");
                 else if (Connections(oldItem!, before) != Connections(newItem!, after))
                     changes.Add(Name(charm) + ": 미지원 효과와 관련된 주변 배치·지원 연결이 달라집니다.");
             }
@@ -48,15 +50,48 @@ namespace SephPlanner.Core.Combat
             }
         }
 
-        private static bool Missing(CharmDefinition definition) => Missing(definition.Combat) ||
+        private static bool Missing(CharmDefinition definition) => Missing(definition.Combat, false) ||
             definition.HorizontalStats is { } horizontal &&
                 (!CombatCoverage.Supports(horizontal.LeftStat) || !CombatCoverage.Supports(horizontal.RightStat)) ||
             definition.Behavior == "Charm_WhitePaper" || definition.ContextStats.Any(bonus =>
                 bonus.CombatKey.Length == 0 || !CombatCoverage.Supports(bonus.CombatKey));
 
-        private static bool Missing(CharmCombatEffect effect) => !effect.Collected || effect.Unsupported.Count > 0 ||
+        private static bool Missing(CharmCombatEffect effect, bool includeHealth = true) => !effect.Collected || effect.Unsupported.Count > 0 ||
             effect.Attacks.Any(attack => attack.Unsupported.Count > 0) ||
-            effect.Stats.Any(grant => !CombatCoverage.Supports(grant.Key) && grant.Values.Any(value => value != 0));
+            effect.Stats.Any(grant => !CombatCoverage.Supports(grant.Key) &&
+                (includeHealth || !HealthGrant(grant)) && grant.Values.Any(value => value != 0));
+
+        private static bool HealthGrant(CombatStatGrant grant) => !grant.Amplification && (grant.Key == "@MAXHP" || grant.Key == "@FINALHP");
+
+        private static IEnumerable<string> HealthChanges(CharmSlot charm, LocatedCombatCharm? before, LocatedCombatCharm? after)
+        {
+            foreach (var grants in charm.Definition.Combat.Stats.Where(HealthGrant).GroupBy(grant => grant.Key))
+            {
+                var oldValue = Value(before);
+                var newValue = Value(after);
+                if (oldValue == newValue) continue;
+                var percent = grants.Key == "@FINALHP";
+                yield return Name(charm) + ": " + (percent ? "최대 체력 증감률" : "최대 체력 가산값") + " " +
+                    oldValue.ToString("+0;-0;0") + (percent ? "%" : "") + " → " + newValue.ToString("+0;-0;0") + (percent ? "%" : "") +
+                    ". DPS에 포함하지 않는 체력 효과 변경이므로 자동 적용 전 확인이 필요합니다.";
+
+                int Value(LocatedCombatCharm? item) => item?.Active == true
+                    ? grants.Sum(grant => CombatDamage.At(grant.Values, Math.Min(item.Level, charm.Definition.MaxLevel))) : 0;
+            }
+        }
+
+        private static string ChangedState(LocatedCombatCharm? before, LocatedCombatCharm? after)
+        {
+            if (before == null) return "추천 배치에 추가됩니다";
+            if (after == null) return "추천 배치에서 제외됩니다";
+            var parts = new List<string>();
+            if (before.Position != after.Position) parts.Add($"위치 ({before.Position.X + 1},{before.Position.Y + 1}) → ({after.Position.X + 1},{after.Position.Y + 1})");
+            var oldLevel = Math.Min(before.Level, before.Charm.Definition.MaxLevel);
+            var newLevel = Math.Min(after.Level, after.Charm.Definition.MaxLevel);
+            if (oldLevel != newLevel) parts.Add($"유효 레벨 {oldLevel} → {newLevel}");
+            if (before.Active != after.Active) parts.Add(before.Active ? "활성 → 비활성" : "비활성 → 활성");
+            return string.Join(" · ", parts);
+        }
 
         private static string State(LocatedCombatCharm? item) => item == null ? "없음" : FormattableString.Invariant(
             $"{item.Charm.InstanceId}:{item.Position.X},{item.Position.Y}:{Math.Min(item.Level, item.Charm.Definition.MaxLevel)}:{item.Active}");
