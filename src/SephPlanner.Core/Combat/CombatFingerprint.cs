@@ -8,14 +8,14 @@ namespace SephPlanner.Core.Combat
 {
     internal static class CombatFingerprint
     {
-        internal static string Of(object? value)
+        internal static string Of(object? value, FingerprintFormat format = FingerprintFormat.Canonical)
         {
             var builder = new StringBuilder();
-            Write(builder, value);
+            Write(builder, value, format);
             return builder.ToString();
         }
 
-        private static void Write(StringBuilder builder, object? value)
+        private static void Write(StringBuilder builder, object? value, FingerprintFormat format)
         {
             if (value == null) { builder.Append("null;"); return; }
             if (value is string text) { builder.Append(text.Length).Append(':').Append(text); return; }
@@ -23,22 +23,24 @@ namespace SephPlanner.Core.Combat
             {
                 builder.Append('{');
                 foreach (var key in dictionary.Keys.Cast<string>().OrderBy(key => key, StringComparer.Ordinal))
-                { Write(builder, key); Write(builder, dictionary[key]); }
+                { Write(builder, key, format); Write(builder, dictionary[key], format); }
                 builder.Append('}');
             }
             else if (value is IEnumerable sequence)
             {
                 builder.Append('[');
-                foreach (var item in sequence) Write(builder, item);
+                foreach (var item in sequence) Write(builder, item, format);
                 builder.Append(']');
             }
+            else if (value is double number)
+                builder.Append(FingerprintNumber.Of(number, format)).Append(';');
             else if (value.GetType().IsPrimitive || value.GetType().IsEnum)
                 builder.Append(Convert.ToString(value, CultureInfo.InvariantCulture)).Append(';');
             else
             {
                 builder.Append('(');
                 foreach (var property in value.GetType().GetProperties().OrderBy(property => property.Name, StringComparer.Ordinal))
-                { Write(builder, property.Name); Write(builder, property.GetValue(value)); }
+                { Write(builder, property.Name, format); Write(builder, property.GetValue(value), format); }
                 builder.Append(')');
             }
         }

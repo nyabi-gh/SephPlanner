@@ -55,12 +55,15 @@ namespace SephPlanner.Core.Runtime
             Placement(snapshot, PlanningContext(preferences, catalogGeneration));
 
         public static string Placement(GameSnapshot snapshot, string planningContextFingerprint)
+            => Placement(snapshot, planningContextFingerprint, FingerprintFormat.Canonical);
+
+        private static string Placement(GameSnapshot snapshot, string planningContextFingerprint, FingerprintFormat format)
         {
             var builder = new StringBuilder();
             Add(builder, "context", planningContextFingerprint);
             Add(builder, "gameVersion", snapshot.GameVersion);
             Add(builder, "weapon", snapshot.Run?.WeaponId ?? "");
-            Add(builder, "combat", CombatFingerprint.Of(snapshot.Run?.Combat));
+            Add(builder, "combat", CombatFingerprint.Of(snapshot.Run?.Combat, format));
 
             var inventory = snapshot.Inventory;
             Add(builder, "inventory", inventory is not null);
@@ -137,10 +140,13 @@ namespace SephPlanner.Core.Runtime
         }
 
         public static string PlanningContext(PlanPreferences preferences, string catalogGeneration)
+            => PlanningContext(preferences, catalogGeneration, FingerprintFormat.Canonical);
+
+        private static string PlanningContext(PlanPreferences preferences, string catalogGeneration, FingerprintFormat format)
         {
             var builder = new StringBuilder();
             Add(builder, "catalog", catalogGeneration);
-            Add(builder, "combatScenario", CombatFingerprint.Of(preferences.Combat));
+            Add(builder, "combatScenario", CombatFingerprint.Of(preferences.Combat, format));
             foreach (var category in preferences.PriorityCategories.OrderBy(value => value, StringComparer.Ordinal))
                 Add(builder, "priority", category);
             foreach (var pin in preferences.PinnedCharms.OrderBy(pair => pair.Key))
@@ -155,21 +161,33 @@ namespace SephPlanner.Core.Runtime
             foreach (var held in preferences.HeldCharms.OrderBy(value => value))
                 Add(builder, "held", held);
             foreach (var pair in preferences.CharmValues.EntityValues.OrderBy(value => value.Key))
-                AddCharmValue(builder, "valueEntity", pair.Key.ToString(CultureInfo.InvariantCulture), pair.Value);
+                AddCharmValue(builder, "valueEntity", pair.Key.ToString(CultureInfo.InvariantCulture), pair.Value, format);
             foreach (var pair in preferences.CharmValues.IdValues.OrderBy(value => value.Key, StringComparer.Ordinal))
-                AddCharmValue(builder, "valueId", pair.Key, pair.Value);
+                AddCharmValue(builder, "valueId", pair.Key, pair.Value, format);
             return Hash(builder);
         }
 
+        internal static bool MatchesLegacyReplay(
+            GameSnapshot snapshot, PlanPreferences preferences, string catalogGeneration, string fingerprint)
+        {
+            foreach (var format in new[] { FingerprintFormat.LegacyMono, FingerprintFormat.LegacyDotNet })
+            {
+                var context = PlanningContext(preferences, catalogGeneration, format);
+                var placement = Placement(snapshot, context, format);
+                if (Full(snapshot, preferences, catalogGeneration, placement) == fingerprint) return true;
+            }
+            return false;
+        }
+
         private static void AddCharmValue(
-            StringBuilder builder, string prefix, string key, CharmValueEntry entry)
+            StringBuilder builder, string prefix, string key, CharmValueEntry entry, FingerprintFormat format)
         {
             Add(builder, prefix + "Key", key);
             Add(builder, prefix + "Entity", entry.EntityId);
             Add(builder, prefix + "Id", entry.Id);
             Add(builder, prefix + "Tier", entry.Tier);
-            Add(builder, prefix + "Base", entry.Base?.ToString("R", CultureInfo.InvariantCulture) ?? "unset");
-            Add(builder, prefix + "PerLevel", entry.PerLevel?.ToString("R", CultureInfo.InvariantCulture) ?? "unset");
+            Add(builder, prefix + "Base", entry.Base.HasValue ? FingerprintNumber.Of(entry.Base.Value, format, true) : "unset");
+            Add(builder, prefix + "PerLevel", entry.PerLevel.HasValue ? FingerprintNumber.Of(entry.PerLevel.Value, format, true) : "unset");
         }
 
         private static void AddTablet(StringBuilder builder, string prefix, PlacedTablet tablet)

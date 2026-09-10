@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <EmbeddedResource Include="Fixtures\replay-*.json" />
   </ItemGroup>
 
   <ItemGroup>

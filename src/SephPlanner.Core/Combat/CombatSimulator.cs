@@ -208,8 +208,13 @@ namespace SephPlanner.Core.Combat
                 Contribution = new CombatContribution { Id = item.InstanceId + ":" + attack.Id, Name = attack.Name },
             };
             if (attack.Action == CombatActionKind.Magic)
-                state.Cost = stats.Read("NOMAGICCOST") > 0 ? 0 : Math.Max(0, (int)Math.Round(state.Cost *
-                    Math.Max(0, CombatDamage.Factor(item.CostBonus - stats.Read("MAGICCOSTREDUCE")))));
+            {
+                var bonus = item.CostBonus - stats.Read("MAGICCOSTREDUCE");
+                float cost = state.Cost;
+                // Charm_Magic.GetCost와 같은 float 정밀도·연산 순서로 반 정수 경계를 계산한다.
+                state.Cost = stats.Read("NOMAGICCOST") > 0 || bonus <= -100 ? 0 :
+                    Math.Max(0, (int)Math.Round(cost + cost * ((float)bonus / 100f)));
+            }
             for (var i = 0; attack.Recharges && i < capacity - state.Charges; i++)
                 state.Recharge.Enqueue(cooldown * (attack.ParallelRecharge ? 1 : i + 1));
             return state;
