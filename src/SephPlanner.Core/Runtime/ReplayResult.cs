@@ -108,6 +108,8 @@ namespace SephPlanner.Core.Runtime
             Fact(key + "/미배치 석판", arrangement.UnplacedTablets);
             Fact(key + "/비활성", string.Join(",", arrangement.InactiveCharms.OrderBy(id => id)));
             Fact(key + "/고정 실패", string.Join(",", arrangement.UnheldCharms.OrderBy(id => id)));
+            if (arrangement.WrongSideCharms.Count > 0)
+                Fact(key + "/천칭 방향 실패", string.Join(",", arrangement.WrongSideCharms.OrderBy(id => id)));
             Fact(key + "/유지 실패", string.Join(",", arrangement.UnretainedCharms.OrderBy(id => id)));
             Fact(key + "/활성 보호 실패", string.Join(",", arrangement.UnpreservedCharms.OrderBy(id => id)));
             Fact(key + "/미허용 비활성", string.Join(",", arrangement.UnapprovedDeactivations.OrderBy(id => id)));

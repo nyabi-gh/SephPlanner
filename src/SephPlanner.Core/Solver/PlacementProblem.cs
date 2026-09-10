@@ -265,6 +265,7 @@ namespace SephPlanner.Core.Solver
         /// 화면이 알린다.
         /// </summary>
         public List<int> UnheldCharms { get; } = new List<int>();
+        public List<int> WrongSideCharms { get; set; } = new List<int>();
         public List<int> UnretainedCharms { get; } = new List<int>();
         public List<int> UnpreservedCharms { get; } = new List<int>();
         public List<int> UnapprovedDeactivations { get; } = new List<int>();

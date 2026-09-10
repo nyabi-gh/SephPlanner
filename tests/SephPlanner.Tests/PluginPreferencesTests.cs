@@ -1,3 +1,4 @@
+using Newtonsoft.Json.Linq;
 using SephPlanner.Core.Planning;
 using SephPlanner.Plugin;
 
@@ -24,6 +25,25 @@ public sealed class PluginPreferencesTests : IDisposable
         restored.ResetBuild();
         Assert.False(Load().IsDeactivationAllowed(9));
     }
+    [Fact]
+    public void NewerSettingsSurviveEditingAndResetWithoutAffectingLegacyPlanning()
+    {
+        Directory.CreateDirectory(_directory);
+        const string original = """{"PinnedLevels":{"1114":2},"Combat":{"PreserveActivation":false,"ScalesSide":1},"MinimumLevels":{"1114":3},"FutureSetting":[1,null,"값"]}""";
+        File.WriteAllText(SettingsPath, original);
+        var source = JObject.Parse(original);
+        var prefs = Load();
+        Assert.Equal(2, prefs.ToPreferences(false).PinnedCharms[1114]);
+        prefs.StepPin(1114, 1);
+        Assert.Equal(3, Load().PinLevel(1114));
+        foreach (var name in new[] { "Combat", "MinimumLevels", "FutureSetting" })
+            Assert.True(JToken.DeepEquals(source[name], JObject.Parse(File.ReadAllText(SettingsPath))[name]));
+        prefs.ResetBuild();
+        Assert.Empty(Load().ToPreferences(false).PinnedCharms);
+        foreach (var name in new[] { "Combat", "MinimumLevels", "FutureSetting" })
+            Assert.True(JToken.DeepEquals(source[name], JObject.Parse(File.ReadAllText(SettingsPath))[name]));
+    }
+
     private static string Code(string categories) => PresetCode.Encode("AAP1\nW:503\nC:PinkRabbit\nS:\nR:" + categories + "\n");
 
     [Fact]

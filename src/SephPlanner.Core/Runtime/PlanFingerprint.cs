@@ -134,7 +134,20 @@ namespace SephPlanner.Core.Runtime
             return Hash(builder);
         }
 
-        public static string PlanningContext(PlanPreferences preferences, string catalogGeneration)
+        public static string PlanningContext(PlanPreferences preferences, string catalogGeneration) =>
+            PlanningContext(preferences, catalogGeneration, FingerprintFormat.Canonical);
+
+        internal static bool MatchesLegacyReplay(GameSnapshot snapshot, PlanPreferences preferences, string generation, string fingerprint)
+        {
+            foreach (var format in new[] { FingerprintFormat.LegacyMono, FingerprintFormat.LegacyDotNet })
+            {
+                var placement = Placement(snapshot, PlanningContext(preferences, generation, format));
+                if (Full(snapshot, preferences, generation, placement) == fingerprint) return true;
+            }
+            return false;
+        }
+
+        internal static string PlanningContext(PlanPreferences preferences, string catalogGeneration, FingerprintFormat format)
         {
             var builder = new StringBuilder();
             Add(builder, "catalog", catalogGeneration);
@@ -152,21 +165,21 @@ namespace SephPlanner.Core.Runtime
             foreach (var held in preferences.HeldCharms.OrderBy(value => value))
                 Add(builder, "held", held);
             foreach (var pair in preferences.CharmValues.EntityValues.OrderBy(value => value.Key))
-                AddCharmValue(builder, "valueEntity", pair.Key.ToString(CultureInfo.InvariantCulture), pair.Value);
+                AddCharmValue(builder, "valueEntity", pair.Key.ToString(CultureInfo.InvariantCulture), pair.Value, format);
             foreach (var pair in preferences.CharmValues.IdValues.OrderBy(value => value.Key, StringComparer.Ordinal))
-                AddCharmValue(builder, "valueId", pair.Key, pair.Value);
+                AddCharmValue(builder, "valueId", pair.Key, pair.Value, format);
             return Hash(builder);
         }
 
         private static void AddCharmValue(
-            StringBuilder builder, string prefix, string key, CharmValueEntry entry)
+            StringBuilder builder, string prefix, string key, CharmValueEntry entry, FingerprintFormat format)
         {
             Add(builder, prefix + "Key", key);
             Add(builder, prefix + "Entity", entry.EntityId);
             Add(builder, prefix + "Id", entry.Id);
             Add(builder, prefix + "Tier", entry.Tier);
-            Add(builder, prefix + "Base", entry.Base?.ToString("R", CultureInfo.InvariantCulture) ?? "unset");
-            Add(builder, prefix + "PerLevel", entry.PerLevel?.ToString("R", CultureInfo.InvariantCulture) ?? "unset");
+            Add(builder, prefix + "Base", entry.Base.HasValue ? FingerprintNumber.Of(entry.Base.Value, format, true) : "unset");
+            Add(builder, prefix + "PerLevel", entry.PerLevel.HasValue ? FingerprintNumber.Of(entry.PerLevel.Value, format, true) : "unset");
         }
 
         private static void AddTablet(StringBuilder builder, string prefix, PlacedTablet tablet)

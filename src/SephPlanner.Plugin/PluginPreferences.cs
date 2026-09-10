@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
 
@@ -18,6 +19,9 @@ namespace SephPlanner.Plugin
     internal sealed class PluginPreferences
     {
         private const string FileName = "plugin-settings.json";
+
+        // 새 버전 전용 설정은 적용하지 않지만 버전을 오갈 때 잃지 않도록 보존한다.
+        [JsonExtensionData] private IDictionary<string, JToken> OtherVersionSettings { get; set; }
 
         public List<string> PriorityCategories { get; set; } = new List<string>();
         public List<string> SuppressedPresetCategories { get; set; } = new List<string>();

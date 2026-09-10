@@ -216,8 +216,8 @@ namespace SephPlanner.Core.Planning
             var hasPlacementChanges = targets.Any(target =>
                 target.From != target.To || target.IsTablet && target.FromRotation != target.Rotation);
 
-            if (best.UnplacedTablets > 0 || !verification.Passed || best.UnretainedCharms.Count > 0 || unapprovedDeactivation) targets.Clear();
-            if (best.UnretainedCharms.Count > 0 || unapprovedDeactivation)
+            if (best.UnplacedTablets > 0 || !verification.Passed || best.UnretainedCharms.Count > 0 || best.WrongSideCharms.Count > 0 || unapprovedDeactivation) targets.Clear();
+            if (best.UnretainedCharms.Count > 0 || best.WrongSideCharms.Count > 0 || unapprovedDeactivation)
             {
                 moves.Clear();
                 manualMovesAvailable = false;
@@ -242,7 +242,8 @@ namespace SephPlanner.Core.Planning
                         ": 활성 배치를 찾지 못했습니다. " +
                         (best.CharmPositions.TryGetValue(charm.InstanceId, out var cell) && best.InactiveCells.TryGetValue(cell, out var reason)
                             ? Explain.InactiveReason(reason) : "놓을 자리가 부족합니다.") +
-                        (unapprovedDeactivation ? " 끄기 허용 없이 새로 비활성화하는 배치는 적용하지 않습니다." : "")).ToList(),
+                        (unapprovedDeactivation ? " 끄기 허용 없이 새로 비활성화하는 배치는 적용하지 않습니다." : ""))
+                    .Concat(best.WrongSideCharms.Select(_ => "대립의 천칭: 현재 놓인 쪽을 유지하는 배치를 찾지 못했습니다. 직접 원하는 쪽으로 옮긴 뒤 다시 계산하세요.")).ToList(),
                 ManualMoveInstructionsAvailable = manualMovesAvailable,
                 HasPlacementChanges = hasPlacementChanges,
                 InventoryWidth = inventory.Width,

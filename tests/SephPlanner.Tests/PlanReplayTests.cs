@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Newtonsoft.Json;
+using SephPlanner.Core;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
@@ -290,6 +291,51 @@ public sealed class PlanReplayTests : IDisposable
     [InlineData("--churn", "snapshot.json", "0")]
     [InlineData("--churn", "snapshot.json", "bad")]
     public void InvalidCommandsAreRejected(params string[] args) => Assert.NotNull(CommandLine.Error(args));
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LegacyNumericFingerprintsReplayWithoutSkippingTamperChecks(bool mono)
+    {
+        var replay = Capture();
+        replay.Version = 1;
+        replay.CatalogVersion = 15;
+        replay.Preferences!.CharmValues!.Charms[0].Base = 0.85000002384185791;
+        var prefs = replay.Preferences.Restore();
+        var context = PlanFingerprint.PlanningContext(prefs, replay.CatalogGeneration,
+            mono ? FingerprintFormat.LegacyMono : FingerprintFormat.LegacyDotNet);
+        replay.RequestFingerprint = PlanFingerprint.Full(replay.Snapshot!, prefs, replay.CatalogGeneration,
+            PlanFingerprint.Placement(replay.Snapshot!, context));
+        Assert.NotNull(replay.Rebuild());
+        replay.Preferences.CharmValues.Charms[0].Base = 9;
+        Assert.Throws<InvalidDataException>(() => replay.Rebuild(true));
+    }
+
+    [Fact]
+    public void NewReplayPreservesBackportedCatalogFlags()
+    {
+        var replay = Capture();
+        replay.Catalog!.Charms![0].CannotDiscard = true;
+        replay.Catalog.Charms[0].HasNoActivationEffect = true;
+        var restored = RoundTrip(replay);
+        Assert.Equal(9, restored.Version);
+        Assert.Equal(20, restored.CatalogVersion);
+        Assert.True(restored.Catalog!.Restore().Charm(1)!.CannotDiscard);
+        Assert.True(restored.Catalog.Restore().Charm(1)!.HasNoActivationEffect);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(9)]
+    public void ActualGameMonoCaptureReplaysAndRejectsAlteredInput(int version)
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "Fixtures", $"replay-v{version}-mono.json");
+        var replay = System.Text.Json.JsonSerializer.Deserialize<PlanReplay>(File.ReadAllText(path))!;
+        Assert.Equal(version, replay.Version);
+        Assert.Empty(replay.Expected!.Differences(ReplayResult.From(replay.Rebuild(true))));
+        replay.Snapshot!.Inventory!.Items[0].Enchant++;
+        Assert.Throws<InvalidDataException>(() => replay.Rebuild(true));
+    }
 
     private static PlanReplay Capture()
     {

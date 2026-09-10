@@ -131,6 +131,9 @@ namespace SephPlanner.Core.Solver
                        .Append(slot.InstanceQuery ?? "").Append(':')
                        .Append(slot.InstanceConditionQuery ?? "").Append(';');
             }
+            foreach (var charm in problem.Charms.Where(charm => ScalesPosition.Required(problem, charm)).OrderBy(charm => charm.InstanceId))
+                builder.Append("scales:").Append(charm.InstanceId).Append(':')
+                    .Append(ScalesPosition.IsLeft(problem.CurrentCharms[charm.InstanceId]) ? 'L' : 'R').Append(';');
             foreach (var category in problem.PriorityCategories.OrderBy(value => value, System.StringComparer.Ordinal))
                 builder.Append("priority:").Append(category.Length).Append(':').Append(category).Append(';');
             return builder.ToString();

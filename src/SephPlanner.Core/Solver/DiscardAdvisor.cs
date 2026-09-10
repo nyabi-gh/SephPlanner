@@ -58,7 +58,7 @@ namespace SephPlanner.Core.Solver
                 else
                 {
                     var charm = trial.Charms.First(c => c.InstanceId == candidate.InstanceId);
-                    if (charm.IsFiller || charm.Held || charm.Retained) continue;
+                    if (charm.IsFiller || charm.Held || charm.Retained || charm.Definition.CannotDiscard) continue;
                     name = Naming.Of(charm.Definition.Names, charm.Definition.Id, "아티팩트");
                     trial.Charms.Remove(charm);
                     trial.CurrentCharms.Remove(candidate.InstanceId);

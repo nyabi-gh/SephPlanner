@@ -381,7 +381,7 @@ namespace SephPlanner.Core.Solver
 
             foreach (var charm in problem.Charms.OrderBy(value => value.InstanceId))
             {
-                if (charm.Retained) continue;
+                if (charm.Retained || charm.Definition.CannotDiscard) continue;
                 var trial = Clone(problem);
                 trial.Charms.RemoveAll(value => value.InstanceId == charm.InstanceId);
                 trial.CurrentCharms.Remove(charm.InstanceId);

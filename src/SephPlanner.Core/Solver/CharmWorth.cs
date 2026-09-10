@@ -134,6 +134,9 @@ namespace SephPlanner.Core.Solver
                 };
             }
 
+            if (definition.HasNoActivationEffect)
+                return new CharmWorth { Base = 0, PerLevel = 0, Source = CharmWorthSource.Measured, Confidence = 1 };
+
             if (definition.StatWorthByLevel.Count > 0)
             {
                 // 능력치형이라도 전환·해금 같은 고정 효과는 환산되지 않을 수 있다.

@@ -22,7 +22,7 @@ namespace SephPlanner.Core.Solver
         }
 
         internal static PlacementQuality From(Arrangement value) => new PlacementQuality(
-            value.UnretainedCharms.Count + value.UnapprovedDeactivations.Count, value.UnpreservedCharms.Count, value.UnheldCharms.Count,
+            value.UnretainedCharms.Count + value.UnapprovedDeactivations.Count + value.WrongSideCharms.Count, value.UnpreservedCharms.Count, value.UnheldCharms.Count,
             value.PriorityComboMatches, value.PriorityComboProgress, value.Score,
             value.UnsafeEmptyCells, value.WastedLevels, value.Preference);
 

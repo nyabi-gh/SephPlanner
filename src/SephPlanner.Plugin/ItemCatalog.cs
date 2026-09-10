@@ -122,6 +122,10 @@ namespace SephPlanner.Plugin
                         ? charm.relatedWeapon.ToString()
                         : "",
                     Behavior = charm != null ? charm.GetType().Name : "",
+                    HasNoActivationEffect = charm != null && charm.GetType() == typeof(Charm_StatusInstance) &&
+                        ((Charm_StatusInstance)charm).stats != null && ((Charm_StatusInstance)charm).stats.Length == 0 &&
+                        !charm.isUniqueEffect && !charm.flameGround && !charm.darkCloud,
+                    CannotDiscard = entity.cannotThrow,
                     EffectLines = EffectLines(charm),
                     NeighborLevelBonus = NeighborLevelBonus(charm),
                     IsAttackable = charm is IAttackableCharm &&
