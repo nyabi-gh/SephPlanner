@@ -11,6 +11,59 @@ public sealed class PluginPreferencesTests : IDisposable
     private PluginPreferences Load() => PluginPreferences.Load(_ => { }, SettingsPath);
 
     [Fact]
+    public void CombatSettingsRoundTripWithoutDuplicatingDefaultActionsAndFreezeForWorkers()
+    {
+        var prefs = Load();
+        var scenario = prefs.Combat.Copy();
+        scenario.WeaponSequence = new() { SephPlanner.Core.Combat.CombatActionKind.Dash, SephPlanner.Core.Combat.CombatActionKind.Basic };
+        scenario.DurationSeconds = 45;
+        scenario.TargetCount = 4;
+        scenario.AdditionalTargetFraction = 0.3;
+        scenario.ComparisonWindowSeconds = 8;
+        scenario.PrioritizeBuild = true;
+        scenario.AllowUnsupportedChanges = true;
+        scenario.MeasuredWeaponKey = "weapon:1:Basic:0";
+        scenario.MeasuredActionSeconds["Basic"] = 0.8;
+        scenario.MagicPriority.AddRange(new[] { 10, 20 });
+        prefs.SetCombat(scenario);
+        scenario.MagicPriority.Clear();
+        var submitted = prefs.ToPreferences(false);
+        var restored = Load();
+        Assert.Equal(45, restored.Combat.DurationSeconds);
+        Assert.Equal(4, restored.Combat.TargetCount);
+        Assert.Equal(0.3, restored.Combat.AdditionalTargetFraction);
+        Assert.Equal(8, restored.Combat.ComparisonWindowSeconds);
+        Assert.True(restored.Combat.PrioritizeBuild);
+        Assert.True(restored.Combat.AllowUnsupportedChanges);
+        Assert.Equal("weapon:1:Basic:0", restored.Combat.MeasuredWeaponKey);
+        Assert.Equal(0.8, restored.Combat.MeasuredActionSeconds["Basic"]);
+        Assert.Equal(2, restored.Combat.WeaponSequence.Count);
+        Assert.Equal(new[] { 10, 20 }, restored.Combat.MagicPriority);
+        restored.SetCombat(restored.Combat);
+        Assert.Equal(2, Load().Combat.WeaponSequence.Count);
+        prefs.Combat.MagicPriority.Clear();
+        prefs.Combat.MeasuredActionSeconds.Clear();
+        Assert.Equal(new[] { 10, 20 }, submitted.Combat.MagicPriority);
+        Assert.Equal(0.8, submitted.Combat.MeasuredActionSeconds["Basic"]);
+        restored.ResetBuild();
+        Assert.Equal(30, Load().Combat.DurationSeconds);
+        Assert.Single(Load().Combat.WeaponSequence);
+        Assert.False(Load().Combat.PrioritizeBuild);
+        Assert.False(Load().Combat.AllowUnsupportedChanges);
+    }
+
+    [Fact]
+    public void ExistingSettingsKeepBuildSelectionsButDefaultToDpsAndRestrictedChanges()
+    {
+        Directory.CreateDirectory(_directory);
+        File.WriteAllText(SettingsPath, "{\"PriorityCategories\":[\"FIRE\"],\"Combat\":{\"DurationSeconds\":30}}");
+        var restored = Load();
+        Assert.Contains("FIRE", restored.PriorityCategories);
+        Assert.False(restored.Combat.PrioritizeBuild);
+        Assert.False(restored.Combat.AllowUnsupportedChanges);
+    }
+
+    [Fact]
     public void DeactivationPermissionIsSeparateFromYieldAndResetsWithTheBuild()
     {
         var prefs = Load();

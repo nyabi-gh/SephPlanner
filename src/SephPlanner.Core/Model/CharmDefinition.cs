@@ -1,10 +1,12 @@
 using System.Collections.Generic;
+using SephPlanner.Core.Combat;
 
 namespace SephPlanner.Core.Model
 {
     /// <summary>아티팩트 정의. 게임 코드에서는 <c>Charm</c>이다.</summary>
     public sealed class CharmDefinition
     {
+        public CharmCombatEffect Combat { get; set; } = new CharmCombatEffect();
         public string Id { get; set; } = "";
         public int EntityId { get; set; }
         public Rarity Rarity { get; set; }

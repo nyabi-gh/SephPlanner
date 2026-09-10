@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using SephPlanner.Core.Combat;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 
@@ -59,6 +60,7 @@ namespace SephPlanner.Core.Runtime
             Add(builder, "context", planningContextFingerprint);
             Add(builder, "gameVersion", snapshot.GameVersion);
             Add(builder, "weapon", snapshot.Run?.WeaponId ?? "");
+            Add(builder, "combat", CombatFingerprint.Of(snapshot.Run?.Combat));
 
             var inventory = snapshot.Inventory;
             Add(builder, "inventory", inventory is not null);
@@ -138,6 +140,7 @@ namespace SephPlanner.Core.Runtime
         {
             var builder = new StringBuilder();
             Add(builder, "catalog", catalogGeneration);
+            Add(builder, "combatScenario", CombatFingerprint.Of(preferences.Combat));
             foreach (var category in preferences.PriorityCategories.OrderBy(value => value, StringComparer.Ordinal))
                 Add(builder, "priority", category);
             foreach (var pin in preferences.PinnedCharms.OrderBy(pair => pair.Key))

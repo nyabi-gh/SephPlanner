@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using SephPlanner.Core.Charms;
+using SephPlanner.Core.Combat;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Tablets;
 
@@ -94,6 +95,8 @@ namespace SephPlanner.Core.Solver
 
     public sealed class PlacementProblem
     {
+        public PlacementCombatContext? Combat { get; set; }
+        internal CombatEstimateCache CombatEstimates { get; } = new CombatEstimateCache();
         public GridSpec Grid { get; set; } = GridSpec.WithStorage(GridSpec.DefaultWidth * GridSpec.DefaultHeight);
         public List<CharmSlot> Charms { get; set; } = new List<CharmSlot>();
         public List<TabletSlot> Tablets { get; set; } = new List<TabletSlot>();
@@ -227,6 +230,7 @@ namespace SephPlanner.Core.Solver
         public Dictionary<int, GridPos> CharmPositions { get; } = new Dictionary<int, GridPos>();
 
         public double Score { get; set; }
+        public CombatResult? Combat { get; set; }
 
         /// <summary>
         /// 현재 자리와 직전 제안을 유지하는 정도. <see cref="Score"/>와 별도이며 마지막 동점

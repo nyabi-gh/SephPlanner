@@ -72,6 +72,9 @@ namespace SephPlanner.Core.Runtime
             result.Fact("경고/유지", string.Join("\n", plan.RetentionWarnings));
             result.Fact("경고/연결", string.Join("\n", plan.SupportWarnings));
             result.Fact("경고/활성", string.Join("\n", plan.ActivationWarnings));
+            result.Fact("경고/미지원 변경", string.Join("\n", plan.UnsupportedChangeWarnings));
+            result.Fact("미지원 변경 허용", plan.AllowUnsupportedChanges);
+            result.Fact("빌드 우선", plan.PrioritizeBuild);
             result.Fact("끄기 허용 필요", plan.HasUnapprovedDeactivation);
             return result;
         }
@@ -102,6 +105,21 @@ namespace SephPlanner.Core.Runtime
         private void Arrangement(string key, Arrangement arrangement)
         {
             Scores[key] = arrangement.Score;
+            if (arrangement.Combat is { } combat)
+            {
+                Scores[key + "/예상 DPS"] = combat.Dps;
+                Scores[key + "/총 피해"] = combat.TotalDamage;
+                Scores[key + "/남은 마나"] = combat.RemainingMana;
+                Scores[key + "/초반 DPS"] = combat.OpeningDps;
+                Scores[key + "/후반 DPS"] = combat.EndingDps;
+                if (combat.EmptyStartDps is { } emptyStart) Scores[key + "/빈 자원 DPS"] = emptyStart;
+                Fact(key + "/계산 누락", string.Join("\n", combat.Unsupported));
+                foreach (var part in combat.Contributions)
+                {
+                    Scores[key + "/피해/" + part.Id] = part.Damage;
+                    Fact(key + "/사용 횟수/" + part.Id, part.Uses);
+                }
+            }
             Scores[key + "/선택 기준"] = arrangement.Preference;
             Scores[key + "/콤보 진행"] = arrangement.PriorityComboProgress;
             Fact(key + "/콤보 만족", arrangement.PriorityComboMatches);

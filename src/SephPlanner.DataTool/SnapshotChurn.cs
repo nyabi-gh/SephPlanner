@@ -1,4 +1,5 @@
 using System.Text.Json;
+using SephPlanner.Core.Combat;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
@@ -90,6 +91,11 @@ public static class SnapshotChurn
             }
 
             Apply(inventory, plan, catalog);
+            if (snapshot.Run?.Combat is { } combat && plan.Best.Combat is { } predicted)
+            {
+                combat.ObservedStats = new(predicted.FinalStats);
+                combat.ObservedAmplification = new(predicted.FinalAmplification);
+            }
         }
 
         Console.WriteLine($"{rounds}번 뒤에도 계획이 바뀐다.");
@@ -106,19 +112,22 @@ public static class SnapshotChurn
         try
         {
             var settings = JsonSerializer.Deserialize<PluginSettingsFile>(File.ReadAllText(path), Options);
+            if (settings?.Combat != null) preferences.Combat = settings.Combat.Copy();
             if (settings?.PinnedLevels is not null)
             {
                 foreach (var pair in settings.PinnedLevels) preferences.PinnedCharms[pair.Key] = pair.Value;
             }
         }
-        catch (JsonException)
+        catch (JsonException exception)
         {
+            throw new InvalidDataException("전투·빌드 설정 파일을 해석하지 못했습니다.", exception);
         }
         return preferences;
     }
 
     private sealed class PluginSettingsFile
     {
+        public CombatScenario? Combat { get; set; }
         public Dictionary<int, int>? PinnedLevels { get; set; }
     }
 
@@ -151,6 +160,7 @@ public static class SnapshotChurn
         foreach (var item in inventory.Items)
         {
             if (plan.Best.Levels.TryGetValue(item.Position, out var level)) item.EffectiveLevel = level;
+            item.IsActive = !plan.Best.DisabledCells.Contains(item.Position);
         }
         inventory.ComboCounts = Recount(inventory, catalog);
     }

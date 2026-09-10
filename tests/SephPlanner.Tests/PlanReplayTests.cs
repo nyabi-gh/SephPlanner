@@ -14,6 +14,44 @@ public sealed class PlanReplayTests : IDisposable
     private string PathOf(string name) => Path.Combine(_directory, name);
 
     [Fact]
+    public void DpsScenarioSourceStatsAndMissingEffectsReplayFromPluginJson()
+    {
+        var (catalog, snapshot, preferences) = Inputs();
+        snapshot.Run ??= new();
+        snapshot.Run.Combat = new()
+        {
+            ObservedStats = { ["PHYSICALDAMAGE"] = 100 },
+            WeaponAttacks = { new() { Id = "weapon", DamageKind = SephPlanner.Core.Combat.CombatDamageKind.Weapon } },
+            Unsupported = { "미지원 발동 효과" },
+        };
+        preferences.Combat.TargetCount = 3;
+        preferences.Combat.DurationSeconds = 7;
+        preferences.Combat.AdditionalTargetFraction = 0.2;
+        preferences.Combat.ComparisonWindowSeconds = 2;
+        preferences.Combat.PrioritizeBuild = true;
+        preferences.Combat.AllowUnsupportedChanges = true;
+        preferences.Combat.MeasuredWeaponKey = "weapon";
+        preferences.Combat.MeasuredActionSeconds["Basic"] = 0.5;
+        using var runner = new PlanRunner(catalog);
+        runner.Submit(snapshot, preferences, "dps-catalog");
+        Await(runner);
+        var captured = runner.CaptureReplay()!;
+        var restored = System.Text.Json.JsonSerializer.Deserialize<PlanReplay>(JsonConvert.SerializeObject(captured))!;
+        var result = restored.Rebuild();
+        Assert.Equal(3, result.Best.Combat!.TargetCount);
+        Assert.Equal(7, result.Best.Combat.DurationSeconds);
+        Assert.Equal(0.2, result.Best.Combat.AdditionalTargetFraction);
+        Assert.Equal(2, result.Best.Combat.ComparisonWindowSeconds);
+        Assert.True(result.AllowUnsupportedChanges);
+        Assert.True(result.PrioritizeBuild);
+        Assert.NotNull(result.Best.Combat.EmptyStartDps);
+        Assert.Contains(result.Best.Combat.Unsupported, message => message.Contains("실측", StringComparison.Ordinal));
+        Assert.Contains("미지원 발동 효과", result.Best.Combat.Unsupported);
+        Assert.Empty(restored.Expected!.Differences(ReplayResult.From(result)));
+        Assert.NotEmpty(result.Targets);
+    }
+
+    [Fact]
     public void DiagnosticArchiveAndErrorRedactionPreserveReplayFingerprintsAndResults()
     {
         var (catalog, snapshot, preferences) = Inputs();

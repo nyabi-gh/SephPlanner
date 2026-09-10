@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using SephPlanner.Core.Charms;
+using SephPlanner.Core.Combat;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Tablets;
 
@@ -310,6 +311,8 @@ namespace SephPlanner.Core.Solver
         /// 잣대이되, 자리에 달린 몫(조건·이웃·안정)은 뺀 것이다 - 아직 어느 칸인지 모르기 때문이다.
         /// </summary>
         private static double RankValue(PlacementProblem problem, CharmSlot charm, int level) =>
+            problem.Combat != null ? CombatPlanning.Estimate(problem, charm, level,
+                problem.CurrentCharms.TryGetValue(charm.InstanceId, out var at) ? at : default, true) :
             charm.Definition.ContextStats.Count > 0
                 ? ContextStatWorth.Value(problem, charm, default, Math.Min(charm.Definition.MaxLevel, level), null, true) :
             charm.Definition.MagicSupport is not null
@@ -988,7 +991,7 @@ namespace SephPlanner.Core.Solver
                     if (Preserve(charm)) unpreserved++;
                 }
                 if (charm.Held && !charm.IsFiller && result.IgnoreCriteriaAt(position) <= 0) unheld++;
-                score += Value(problem, charm, position, result, occupancy, neighbors);
+                if (problem.Combat == null) score += Value(problem, charm, position, result, occupancy, neighbors);
                 familiarity += Anchors(problem, charm, position);
                 waste += Waste(charm, position, result);
                 if (combo is not null)
@@ -1004,6 +1007,7 @@ namespace SephPlanner.Core.Solver
                 if (!occupancy.HasItem(cell) && Unsafe(cell, result)) unsafeEmpty++;
             }
             if (combo is not null && neighbors is not null) PriorityComboPlacement.Describe(problem, combo, neighbors);
+            if (problem.Combat != null) score = CombatScore(problem, positions, occupancy, result).Dps;
             return new PlacementQuality(missing, unpreserved, unheld, combo?.PriorityComboMatches ?? 0,
                 combo?.PriorityComboProgress ?? 0, score, unsafeEmpty, waste, familiarity);
         }
@@ -1090,6 +1094,8 @@ namespace SephPlanner.Core.Solver
         {
             if (charm.IsFiller) return 0;
             var inactive = Reason(charm, cell, result, problem.Grid, occupancy) != CharmInactiveReason.None;
+            if (problem.Combat != null)
+                return CombatPlanning.Estimate(problem, charm, result.EffectiveLevel(cell, charm.Enchant), cell, !inactive);
             if (inactive && !PositionalWorth.IsNeedle(charm.Definition)) return 0;
 
             var level = result.EffectiveLevel(cell, charm.Enchant);
@@ -1313,13 +1319,13 @@ namespace SephPlanner.Core.Solver
                     arrangement.EffectiveLevels[position] = 0;
                     arrangement.InactiveCells[position] = reason;
                     arrangement.InactiveCharms.Add(charm.InstanceId);
-                    var residual = Value(problem, charm, position, result, occupancy, neighbors);
+                    var residual = problem.Combat == null ? Value(problem, charm, position, result, occupancy, neighbors) : 0;
                     arrangement.Score += residual;
                     continue;
                 }
 
                 arrangement.EffectiveLevels[position] = Math.Max(0, Math.Min(charm.Definition.MaxLevel, level));
-                var value = Value(problem, charm, position, result, occupancy, neighbors);
+                var value = problem.Combat == null ? Value(problem, charm, position, result, occupancy, neighbors) : 0;
                 arrangement.Score += value;
             }
 
@@ -1349,7 +1355,22 @@ namespace SephPlanner.Core.Solver
             var quality = ScoreOf(problem, layout, positions, occupancy, result, neighbors);
             arrangement.UnsafeEmptyCells = quality.UnsafeEmpty;
             arrangement.WastedLevels = quality.Waste;
+            if (problem.Combat != null)
+            {
+                arrangement.Combat = CombatScore(problem, positions, occupancy, result, true);
+                arrangement.Score = arrangement.Combat.Dps;
+            }
             return arrangement;
         }
+
+        private static CombatResult CombatScore(PlacementProblem problem, Dictionary<int, GridPos> positions,
+            GridOccupancy occupancy, SimulationResult result, bool details = false) => CombatPlanning.Evaluate(problem, problem.Charms
+                .Where(charm => positions.ContainsKey(charm.InstanceId)).Select(charm => new LocatedCombatCharm
+                {
+                    Charm = charm,
+                    Position = positions[charm.InstanceId],
+                    Level = result.EffectiveLevel(positions[charm.InstanceId], charm.Enchant),
+                    Active = Reason(charm, positions[charm.InstanceId], result, problem.Grid, occupancy) == CharmInactiveReason.None,
+                }).ToList(), details);
     }
 }

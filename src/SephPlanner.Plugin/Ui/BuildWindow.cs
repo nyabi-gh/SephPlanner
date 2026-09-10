@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using SephPlanner.Core.Combat;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
@@ -37,6 +38,9 @@ namespace SephPlanner.Plugin.Ui
         {
             Combos,
             Charms,
+            Combat,
+            Magic,
+            Details,
         }
 
         private readonly PluginPreferences _prefs;
@@ -45,6 +49,8 @@ namespace SephPlanner.Plugin.Ui
         private Tab _tab = Tab.Combos;
         private int _page;
         private string _presetMessage = "";
+        private string _combatDetail = "";
+        private readonly Dictionary<Tab, TextMeshProUGUI> _tabs = new Dictionary<Tab, TextMeshProUGUI>();
 
         private BuildContext _context = new BuildContext();
         private readonly List<Entry> _entries = new List<Entry>();
@@ -96,6 +102,7 @@ namespace SephPlanner.Plugin.Ui
         {
             _rows.Clear();
             _entries.Clear();
+            _tabs.Clear();
         }
 
         private void BuildPresetSection(RectTransform content)
@@ -130,6 +137,9 @@ namespace SephPlanner.Plugin.Ui
 
             _comboTab = Tab_(row, "콤보", Tab.Combos);
             _charmTab = Tab_(row, "아티팩트", Tab.Charms);
+            Tab_(row, "전투", Tab.Combat);
+            Tab_(row, "마법", Tab.Magic);
+            Tab_(row, "DPS 내역", Tab.Details);
         }
 
         private TextMeshProUGUI Tab_(RectTransform row, string label, Tab tab)
@@ -141,6 +151,7 @@ namespace SephPlanner.Plugin.Ui
                     if (_tab == tab) return;
 
                     _tab = tab;
+                    _combatDetail = "";
 
                     // 쪽 번호는 목록마다 따로다. 이어받으면 세 쪽짜리에서 넘어온 뒤 빈 쪽이 뜬다.
                     _page = 0;
@@ -148,7 +159,8 @@ namespace SephPlanner.Plugin.Ui
                 });
             text.text = label;
             text.alignment = TextAlignmentOptions.Center;
-            Widgets.Fixed(text.rectTransform, S(1.4f), S(7f));
+            Widgets.Fixed(text.rectTransform, S(1.4f), S(5.4f));
+            _tabs[tab] = text;
             return text;
         }
 
@@ -223,26 +235,30 @@ namespace SephPlanner.Plugin.Ui
 
         private void RenderTabs()
         {
+            foreach (var tab in _tabs) tab.Value.color = _tab == tab.Key ? NativeSkin.Mint : NativeSkin.TextDim;
             _comboTab.color = _tab == Tab.Combos ? NativeSkin.Mint : NativeSkin.TextDim;
             _charmTab.color = _tab == Tab.Charms ? NativeSkin.Mint : NativeSkin.TextDim;
 
             if (_tab == Tab.Combos)
             {
-                _note.text = _context.Recommendations
-                    ? "선택한 콤보를 추천과 열쇠·종이·북향의 침 배치에 우선 반영합니다. 여러 개면 진행과 배치 가치를 비교합니다."
-                    : "추천은 꺼져 있지만 선택한 콤보는 열쇠·종이·북향의 침 배치에 우선 반영합니다.";
+                _note.text = _prefs.Combat.PrioritizeBuild
+                    ? "빌드 우선: 지정 콤보와 프리셋 즐겨찾기를 DPS보다 먼저 반영합니다. DPS가 낮은 배치·후보를 고를 수 있습니다."
+                    : "DPS 우선: 지정은 보관하고 계산 가능한 콤보 피해만 DPS에 반영합니다. 강제 우선을 원하면 빌드 우선을 켜세요.";
                 _note.color = _context.Recommendations ? NativeSkin.TextDim : NativeSkin.Amber;
                 return;
             }
 
-            _note.text = PinNote();
+            _note.text = _tab == Tab.Combat ? (_combatDetail.Length > 0 ? _combatDetail : "누르면 증가·다음, 우클릭하면 감소·이전입니다. 동작 시간은 공격 속도 적용 전 비교용 추정값입니다.") :
+                _tab == Tab.Magic ? "마법은 위에서부터 우선 사용하며 마나를 공유합니다. 누르면 위로, 우클릭하면 아래로 옮깁니다." :
+                _tab == Tab.Details ? (_combatDetail.Length > 0 ? _combatDetail : "현재·추천 DPS와 미지원 변경을 비교합니다. 줄을 누르면 설명을 봅니다. 미지원 변경의 자동 적용은 기본 제한됩니다.") :
+                "예상 DPS로 배치합니다. 기존 강화·양보 배수는 적용하지 않습니다. 사용 유지·끄기 허용·제한 해제 칸 고정을 선택할 수 있습니다.";
             _note.color = NativeSkin.TextDim;
         }
 
         /// <summary>우클릭은 단계를 내린다. 아티팩트 줄에서만 뜻이 있다.</summary>
         public override void RightClick(Vector2 cursor)
         {
-            if (!IsOpen || _tab != Tab.Charms) return;
+            if (!IsOpen || _tab == Tab.Combos) return;
 
             foreach (var row in _rows)
             {
@@ -279,6 +295,7 @@ namespace SephPlanner.Plugin.Ui
 
         private void ToggleRetain(Entry entry)
         {
+            if (entry?.OnToggle != null) { entry.OnToggle(); Refresh(); return; }
             if (entry == null || entry.EntityId == 0) return;
             _prefs.ToggleRetain(entry.EntityId);
             Refresh();
@@ -302,8 +319,8 @@ namespace SephPlanner.Plugin.Ui
         private void Toggle(Entry entry, int direction)
         {
             if (entry == null) return;
-
-            if (entry.EntityId != 0) _prefs.StepPin(entry.EntityId, direction);
+            if (entry.Change != null) entry.Change(direction);
+            else if (entry.EntityId != 0) return;
             else if (direction > 0) _prefs.TogglePriority(entry.Key);
             else return;
 
@@ -314,8 +331,183 @@ namespace SephPlanner.Plugin.Ui
         {
             _entries.Clear();
             if (_tab == Tab.Combos) CollectCombos();
-            else CollectCharms();
+            else if (_tab == Tab.Charms) CollectCharms();
+            else if (_tab == Tab.Combat) CollectCombat();
+            else if (_tab == Tab.Magic) CollectMagic();
+            else CollectCombatDetails();
         }
+
+        private void CollectCombat()
+        {
+            var scenario = _prefs.Combat;
+            Setting("추천 기준", scenario.PrioritizeBuild ? "빌드 우선 → DPS" : "보호 조건 안에서 DPS 우선", (copy, _) => copy.PrioritizeBuild = !copy.PrioritizeBuild);
+            Setting("미지원 변경 자동 적용", scenario.AllowUnsupportedChanges ? "별도 허용됨" : "제한 · 권장", (copy, _) => copy.AllowUnsupportedChanges = !copy.AllowUnsupportedChanges);
+            Setting("대상 수", scenario.TargetCount + (scenario.TargetCount == 1 ? " · 단일" : " · 다수"), (copy, delta) => copy.TargetCount = Math.Max(1, Math.Min(100, copy.TargetCount + delta)));
+            Setting("추가 대상 적중 비율", scenario.AdditionalTargetFraction.ToString("P0") + " · 추정", (copy, delta) => copy.AdditionalTargetFraction = Math.Round(Math.Max(0, Math.Min(1, copy.AdditionalTargetFraction + delta * 0.1)), 1));
+            Setting("비교 시간", scenario.DurationSeconds + "초", (copy, delta) => copy.DurationSeconds = Math.Max(1, Math.Min(600, copy.DurationSeconds + delta)));
+            Setting("초반·후반 구간 길이", scenario.ComparisonWindowSeconds + "초", (copy, delta) => copy.ComparisonWindowSeconds = Math.Max(1, Math.Min(600, copy.ComparisonWindowSeconds + delta)));
+            Setting("시작 마나", scenario.InitialManaFraction.ToString("P0"), (copy, delta) => copy.InitialManaFraction = Math.Round(Math.Max(0, Math.Min(1, copy.InitialManaFraction + delta * 0.1)), 1));
+            Setting("시작 충전", scenario.InitialChargeFraction.ToString("P0"), (copy, delta) => copy.InitialChargeFraction = Math.Round(Math.Max(0, Math.Min(1, copy.InitialChargeFraction + delta * 0.1)), 1));
+            Setting("시간·자원 프리셋 · 단기", "30초 · 마나·충전 가득", (copy, _) =>
+            {
+                copy.DurationSeconds = 30;
+                copy.InitialManaFraction = copy.InitialChargeFraction = 1;
+            });
+            Setting("시간·자원 프리셋 · 장기", "120초 · 마나·충전 비움", (copy, _) =>
+            {
+                // 장기 비교를 위한 선택값이며 게임의 전투 길이 실측값이 아니다.
+                copy.DurationSeconds = 120;
+                copy.InitialManaFraction = copy.InitialChargeFraction = 0;
+            });
+            var patterns = new[] { new[] { CombatActionKind.Basic }, new[] { CombatActionKind.Dash }, new[] { CombatActionKind.Special },
+                new[] { CombatActionKind.Basic, CombatActionKind.Dash }, new[] { CombatActionKind.Basic, CombatActionKind.Special },
+                new[] { CombatActionKind.Basic, CombatActionKind.Dash, CombatActionKind.Special }, Array.Empty<CombatActionKind>() };
+            Setting("공격 반복 순서", scenario.WeaponSequence.Count == 0 ? "무기 공격 안 함" : string.Join("→", scenario.WeaponSequence.Select(ActionName)), (copy, delta) =>
+            {
+                var index = Array.FindIndex(patterns, pattern => pattern.SequenceEqual(copy.WeaponSequence));
+                copy.WeaponSequence = patterns[(index + delta + patterns.Length) % patterns.Length].ToList();
+            });
+            _entries.Add(new Entry { Name = "복사한 공격 순서 붙여넣기", Detail = "일반,일반,대시", Mark = "", Change = _ => PasteAttackSequence() });
+            Setting("일반 공격 시간", scenario.BasicSeconds.ToString("0.##") + "초", (copy, delta) => copy.BasicSeconds = Seconds(copy.BasicSeconds, delta));
+            Setting("대시 공격 시간", scenario.DashSeconds.ToString("0.##") + "초", (copy, delta) => copy.DashSeconds = Seconds(copy.DashSeconds, delta));
+            Setting("특수 공격 시간", scenario.SpecialSeconds.ToString("0.##") + "초", (copy, delta) => copy.SpecialSeconds = Seconds(copy.SpecialSeconds, delta));
+            Setting("마법 시전 시간", scenario.CastingSeconds.ToString("0.##") + "초", (copy, delta) => copy.CastingSeconds = Seconds(copy.CastingSeconds, delta));
+            _entries.Add(new Entry { Name = "복사한 실측 간격으로 보정", Detail = "일반=0.42,대시=0.8", Mark = "", Change = _ => PasteMeasuredTiming() });
+            Detail("실측 간격 보정 상태", scenario.MeasuredActionSeconds.Count == 0 ? "없음" :
+                _context.Snapshot?.Run?.Combat is { } captured && CombatTiming.Matches(captured, scenario) ? "현재 무기에 적용" : "다른 무기 · 미적용",
+                "마법·이동·대기 없이 동일 동작을 반복한 평균 발동 간격을 입력하세요. 일반 공격은 전체 연속 공격을 여러 번 반복해 측정합니다. 현재 공격 속도를 역산하며 보정된 동작은 위의 기본 시간보다 먼저 사용합니다.");
+            Setting("실측 간격 보정 해제", "기본 동작 시간 사용", (copy, _) =>
+            {
+                copy.MeasuredActionSeconds.Clear();
+                copy.MeasuredWeaponKey = "";
+            });
+            Setting("마법 사용", scenario.UseMagic ? "켜짐" : "꺼짐", (copy, _) => copy.UseMagic = !copy.UseMagic);
+            Setting("현재 활성·연결 보호", scenario.PreserveActivation ? "켜짐" : "꺼짐", (copy, _) => copy.PreserveActivation = !copy.PreserveActivation);
+            Detail("보호 범위", "활성·사용·연결", "보호는 체력·방어력·이동 능력의 최저치를 보장하지 않습니다. 미지원 변경 허용은 활성·사용 유지 검증을 해제하지 않습니다.");
+            Setting("대상 종류", scenario.Boss ? "정예·보스" : "일반", (copy, _) => copy.Boss = !copy.Boss);
+            foreach (var target in new[] { ("DAMAGEREDUCTION", "대상 방어력"), ("PHYSICALDEFENSE", "대상 물리 저항"), ("FIREDEFENSE", "대상 화염 저항"), ("ICEDEFENSE", "대상 냉기 저항"), ("LIGHTNINGDEFENSE", "대상 번개 저항") })
+            {
+                scenario.TargetStats.TryGetValue(target.Item1, out var value);
+                Setting(target.Item2, value.ToString(), (copy, delta) =>
+                {
+                    copy.TargetStats.TryGetValue(target.Item1, out var current);
+                    copy.TargetStats[target.Item1] = Math.Max(0, current + delta * 5);
+                });
+            }
+            _entries.Add(new Entry { Name = "전투 조건 기본값 복원", Detail = "30초 · 자원 가득", Mark = "", Change = _ => _prefs.SetCombat(new CombatScenario()) });
+        }
+
+        private void Setting(string name, string value, Action<CombatScenario, int> change) => _entries.Add(new Entry
+        {
+            Name = name,
+            Detail = value,
+            Mark = "",
+            Change = delta =>
+            {
+                var copy = _prefs.Combat.Copy();
+                change(copy, delta);
+                _prefs.SetCombat(copy);
+            },
+        });
+
+        private static double Seconds(double value, int delta) => Math.Round(Math.Max(0.1, Math.Min(60, value + delta * 0.1)), 1);
+        private static string ActionName(CombatActionKind action) => action == CombatActionKind.Basic ? "일반" : action == CombatActionKind.Dash ? "대시" : "특수";
+
+        private void PasteAttackSequence()
+        {
+            var sequence = new List<CombatActionKind>();
+            foreach (var word in GUIUtility.systemCopyBuffer.Split(new[] { ',', ' ', '→', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (word != "일반" && word != "대시" && word != "특수")
+                {
+                    _presetMessage = "공격 순서는 일반, 대시, 특수를 쉼표로 나눠 복사하세요.";
+                    return;
+                }
+                sequence.Add(word == "일반" ? CombatActionKind.Basic : word == "대시" ? CombatActionKind.Dash : CombatActionKind.Special);
+            }
+            var copy = _prefs.Combat.Copy();
+            copy.WeaponSequence = sequence;
+            _prefs.SetCombat(copy);
+            _presetMessage = "공격 반복 순서를 적용했습니다.";
+        }
+
+        private void PasteMeasuredTiming()
+        {
+            if (_context.Snapshot?.Run?.Combat is not { } snapshot)
+            {
+                _presetMessage = "전투 자료를 읽은 뒤 실측 간격을 적용할 수 있습니다.";
+                return;
+            }
+            try
+            {
+                _prefs.SetCombat(CombatTiming.Calibrate(snapshot, _prefs.Combat, GUIUtility.systemCopyBuffer));
+                _presetMessage = "현재 무기·공격 속도를 기준으로 실측 간격을 보정했습니다.";
+            }
+            catch (ArgumentException error) { _presetMessage = error.Message; }
+            catch (InvalidOperationException error) { _presetMessage = error.Message; }
+        }
+
+        private void CollectMagic()
+        {
+            var ids = (_context.Snapshot?.Inventory?.Items ?? new List<PlacedItem>()).Select(item => item.DefinitionId)
+                .Where(id => _context.Catalog?.Charm(id)?.IsMagic == true).Distinct()
+                .OrderBy(id => _prefs.Combat.MagicPriority.Contains(id) ? _prefs.Combat.MagicPriority.IndexOf(id) : int.MaxValue).ThenBy(id => id).ToList();
+            foreach (var id in ids)
+            {
+                var definition = _context.Catalog.Charm(id);
+                _entries.Add(new Entry
+                {
+                    Name = Naming.Of(definition.Names, definition.Id, "마법"),
+                    Mark = (ids.IndexOf(id) + 1) + ". ",
+                    Detail = definition.Combat.Attacks.Count > 0 ? "예상 피해 반영" : "피해 동작 미지원",
+                    Retained = !_prefs.Combat.DisabledMagic.Contains(id),
+                    ToggleLabel = "사용",
+                    OnToggle = () =>
+                    {
+                        var copy = _prefs.Combat.Copy();
+                        if (!copy.DisabledMagic.Remove(id)) copy.DisabledMagic.Add(id);
+                        _prefs.SetCombat(copy);
+                    },
+                    Change = delta =>
+                    {
+                        var order = new List<int>(ids);
+                        var index = order.IndexOf(id);
+                        order.RemoveAt(index);
+                        order.Insert(Math.Max(0, Math.Min(order.Count, index - delta)), id);
+                        var copy = _prefs.Combat.Copy();
+                        copy.MagicPriority = order.Concat(copy.MagicPriority.Where(previous => !order.Contains(previous))).ToList();
+                        _prefs.SetCombat(copy);
+                    },
+                });
+            }
+        }
+
+        private void CollectCombatDetails()
+        {
+            var current = _context.Plan?.Current.Combat;
+            var best = _context.Plan?.Best.Combat;
+            if (best == null) return;
+            Detail("현재 → 추천 예상 DPS", $"{current?.Dps:0.##} → {best.Dps:0.##}", "DPS는 선택한 시간 동안 계산한 총 피해를 시간으로 나눈 값입니다. 추천 순위는 이 전체 구간 DPS로 정합니다.");
+            Detail("추천 기준", _context.Plan.PrioritizeBuild ? "빌드 우선 → DPS" : "보호 조건 안에서 DPS 우선", "빌드 우선일 때만 지정 콤보와 프리셋 즐겨찾기가 DPS보다 앞섭니다. 계산 가능한 콤보 효과는 두 모드 모두 피해에 포함됩니다.");
+            Detail("비교 조건", $"{best.DurationSeconds:0.##}초 / {best.TargetCount}명", $"첫 대상은 적중한다고 가정합니다. 공격 대상 상한 안에서 추가 대상의 {best.AdditionalTargetFraction:P0}에 적중하는 기대값입니다. 적의 사망·이동은 재현하지 않습니다.");
+            Detail($"초반 {best.ComparisonWindowSeconds:0.##}초 DPS", $"{current?.OpeningDps:0.##} → {best.OpeningDps:0.##}", "선택한 전투의 시작 구간입니다. 시작 자원에 따른 집중 피해를 비교합니다.");
+            Detail($"후반 {best.ComparisonWindowSeconds:0.##}초 DPS", $"{current?.EndingDps:0.##} → {best.EndingDps:0.##}", "같은 전투의 마지막 구간입니다. 아직 자원이 남거나 긴 재사용 대기가 있으면 안정된 지속 DPS와 다를 수 있습니다. 짧은 전투에서는 초반 구간과 겹칠 수 있습니다.");
+            Detail("자원 비우고 시작한 DPS", $"{current?.EmptyStartDps:0.##} → {best.EmptyStartDps:0.##}", "마나·충전만 0으로 바꾼 별도 전투입니다. 시간·공격 순서·대상 조건은 같습니다. 회복과 충전이 시작되는 과정을 포함하며 무한 시간의 지속 DPS는 아닙니다.");
+            Detail("미지원 변경 자동 적용", _context.Plan.AllowUnsupportedChanges ? "별도 허용됨" : "제한 · 권장", "계산 누락이 존재한다는 이유만으로 막지는 않습니다. 미지원 아이템의 상태·주변·지원 연결 또는 미지원 콤보 수량이 달라질 때 자동 적용을 제한합니다. 추천은 계속 표시합니다.");
+            foreach (var message in _context.Plan.UnsupportedChangeWarnings)
+                Detail("미지원 변경 · " + message, _context.Plan.AllowUnsupportedChanges ? "허용됨" : "자동 적용 제한", message);
+            Detail("추천 총 피해 / 남은 마나", $"{best.TotalDamage:0.##} / {best.RemainingMana:0.##}", "미반영 효과는 아래 목록에서 확인하세요.");
+            foreach (var part in best.Contributions.OrderByDescending(part => part.Damage))
+                Detail(part.Name, $"{part.Damage / best.DurationSeconds:0.##} DPS", $"{part.Name}: {part.Uses}회 사용, 총 피해 {part.Damage:0.##}");
+            foreach (var message in (current?.Unsupported ?? new List<string>()).Concat(best.Unsupported).Distinct())
+                Detail("계산 누락 · " + message, "눌러서 보기", message);
+            foreach (var offer in _context.Plan.Offers.Where(offer => offer.Preview?.Combat != null))
+                foreach (var message in offer.Preview.Combat.Unsupported.Except(best.Unsupported))
+                    Detail(offer.Candidate.Name + " · " + message, "획득 시 누락", message);
+        }
+
+        private void Detail(string name, string detail, string message) => _entries.Add(new Entry
+        { Name = name, Detail = detail, Mark = "", Change = _ => _combatDetail = message });
 
         /// <summary>
         /// 지금 세어져 있는 콤보와, 개수가 0이 되어도 지정을 풀 수 있도록 이미 지정된 카테고리를
@@ -324,6 +516,7 @@ namespace SephPlanner.Plugin.Ui
         /// </summary>
         private void CollectCombos()
         {
+            Setting("추천 기준", _prefs.Combat.PrioritizeBuild ? "빌드 우선 → DPS" : "DPS 우선 · 지정 보관", (copy, _) => copy.PrioritizeBuild = !copy.PrioritizeBuild);
             var counts = _context.Snapshot?.Inventory?.ComboCounts;
             var seen = new HashSet<string>();
             var ids = new List<string>();
@@ -374,45 +567,6 @@ namespace SephPlanner.Plugin.Ui
             }
         }
 
-        /// <summary>
-        /// 아티팩트 탭의 안내. 단계와 배수를 <see cref="PlanPreferences"/>에서 읽어 짓는다 -
-        /// 여기 손으로 적어 두면 배수가 바뀌었을 때 이 줄만 옛말을 하게 된다. 실제로 단계가
-        /// 셋으로 늘어난 뒤에도 "2배로 칩니다"가 남아 있었다.
-        /// </summary>
-        private string PinNote()
-        {
-            var note = new StringBuilder("누르면 ");
-            for (var level = 1; level <= PlanPreferences.MaxPinLevel; level++)
-            {
-                note.Append(Marks(level)).Append(' ')
-                    .Append(PlanPreferences.WeightOf(level).ToString("0.##")).Append("배 → ");
-            }
-            note.Append("해제로 좋은 칸을 먼저 받고, 우클릭은 ");
-            for (var level = -1; level >= PlanPreferences.MinPinLevel; level--)
-            {
-                note.Append(Marks(level)).Append(' ')
-                    .Append(PlanPreferences.WeightOf(level).ToString("0.##")).Append("배 → ");
-            }
-            return note.Append("해제로 강화 칸을 양보합니다. 기본은 활성 보존이며, 끄기 허용을 켠 아이템만 점수 이득을 위해 끕니다. 사용 유지는 끄기 허용보다 우선하고 지원 연결·빼기·교체도 보호합니다. 고정은 배치 조건을 무시하는 칸을 요구합니다.").ToString();
-        }
-
-        /// <summary>단계를 기호로. 양수는 ★, 음수는 양보 표시를 단계 수만큼.</summary>
-        private string Marks(int level) =>
-            level > 0 ? new string('★', level) : Repeat(Skin.YieldMark, -level);
-
-        private static string Repeat(string mark, int count)
-        {
-            var text = new StringBuilder(mark.Length * count);
-            for (var i = 0; i < count; i++) text.Append(mark);
-            return text.ToString();
-        }
-
-        /// <summary>
-        /// 줄 앞의 단계 표시. 폭이 흔들리지 않게 네 칸으로 맞춘다 - 누를 때마다 이름이 좌우로
-        /// 밀리면 연달아 누르기가 어렵다.
-        /// </summary>
-        private string PinMark(int level) => level == 0 ? "○   " : Marks(level).PadRight(4);
-
         private static int Count(Dictionary<string, int> counts, string id) =>
             counts != null && counts.TryGetValue(id, out var value) ? value : 0;
 
@@ -459,8 +613,8 @@ namespace SephPlanner.Plugin.Ui
                         Name = string.IsNullOrEmpty(name) ? "아티팩트" : name,
                         Count = 1,
                         Level = level,
-                        Selected = _prefs.IsPinned(entityId),
-                        Mark = PinMark(_prefs.PinLevel(entityId)),
+                        Selected = _prefs.IsRetained(entityId) || _prefs.IsHeld(entityId),
+                        Mark = "",
                         Held = _prefs.IsHeld(entityId),
                         Retained = _prefs.IsRetained(entityId),
                         AllowDeactivation = _prefs.IsDeactivationAllowed(entityId),
@@ -473,7 +627,7 @@ namespace SephPlanner.Plugin.Ui
             // 가방에 없는데 지정돼 있는 것도 보여야 푼다. 다른 판에서 지정한 것이 남아 있는 경우다.
             // 가져온 빌드의 아티팩트도 같이 보인다 - 무엇을 아직 못 모았는지가 곧 살 목록이다.
             var favorites = new HashSet<int>(_prefs.Preset()?.FavoriteCharms ?? new List<int>());
-            var listed = _prefs.PinnedLevels.Keys.Concat(_prefs.HeldCharms).Concat(_prefs.RetainedCharms)
+            var listed = _prefs.HeldCharms.Concat(_prefs.RetainedCharms)
                 .Concat(_prefs.DeactivationAllowed).Concat(favorites).Distinct().ToList();
             foreach (var entityId in listed)
             {
@@ -487,8 +641,8 @@ namespace SephPlanner.Plugin.Ui
                         ? Naming.Of(definition.Names, definition.Id, "아티팩트")
                         : "아티팩트 #" + entityId,
                     Detail = favorites.Contains(entityId) ? "빌드 · 가방에 없음" : "가방에 없음",
-                    Selected = _prefs.IsPinned(entityId),
-                    Mark = PinMark(_prefs.PinLevel(entityId)),
+                    Selected = _prefs.IsRetained(entityId) || _prefs.IsHeld(entityId),
+                    Mark = "",
                     Held = _prefs.IsHeld(entityId),
                     Retained = _prefs.IsRetained(entityId),
                     AllowDeactivation = _prefs.IsDeactivationAllowed(entityId),
@@ -557,6 +711,9 @@ namespace SephPlanner.Plugin.Ui
         /// <summary>목록 한 칸의 내용. 콤보면 <see cref="Key"/>가, 아티팩트면 <see cref="EntityId"/>가 찬다.</summary>
         private sealed class Entry
         {
+            public Action<int> Change;
+            public Action OnToggle;
+            public string ToggleLabel;
             public string Key = "";
             public int EntityId;
             public string Name = "";
@@ -630,7 +787,8 @@ namespace SephPlanner.Plugin.Ui
                 _name.color = entry.Selected ? NativeSkin.Mint : NativeSkin.Text;
                 _detail.text = entry.Detail;
                 _retain.color = entry.Retained ? NativeSkin.Mint : NativeSkin.TextDim;
-                Widgets.SetActive(_retain, entry.EntityId != 0);
+                _retain.text = entry.ToggleLabel ?? "사용 유지";
+                Widgets.SetActive(_retain, entry.EntityId != 0 || entry.OnToggle != null);
                 _deactivation.color = entry.AllowDeactivation ? NativeSkin.Mint : NativeSkin.TextDim;
                 Widgets.SetActive(_deactivation, entry.EntityId != 0);
                 _hold.color = entry.Held ? NativeSkin.Mint : NativeSkin.TextDim;

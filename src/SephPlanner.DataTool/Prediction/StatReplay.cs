@@ -1,3 +1,5 @@
+using SephPlanner.Core.Combat;
+
 namespace SephPlanner.DataTool.Prediction;
 
 // 원본/대상은 StatusInstance 이름이 아닌 실제 customStats 키다. 일반 가산형 전환만 재현한다.
@@ -13,7 +15,6 @@ public sealed class StatReplay
         public bool Enabled { get; set; } = true;
     }
 
-    private static readonly string[] Elements = { "PHYSICAL", "FIRE", "ICE", "LIGHTNING" };
     private readonly Dictionary<string, int> _base;
     private readonly Dictionary<string, int> _amplification;
     private readonly Dictionary<int, Conversion> _conversions = new();
@@ -40,22 +41,7 @@ public sealed class StatReplay
 
     public void ChangeBase(string key, int delta) => _base[key] = unchecked(_base.GetValueOrDefault(key) + delta);
 
-    public int Read(string key)
-    {
-        var element = Array.FindIndex(Elements, name => name + "DAMAGE" == key);
-        if (element < 0) return Raw(key);
-        var value = Raw(key);
-        if (value > 20 && Destination(element).Index >= 0) value = 20;
-        for (var from = 0; from < Elements.Length; from++)
-        {
-            if (from == element) continue;
-            var destination = Destination(from);
-            if (destination.Index != element) continue;
-            var excess = Raw(Elements[from] + "DAMAGE") - 20;
-            if (excess > 0) value = unchecked(value + Truncate((float)unchecked(excess * destination.Percent) / 100f));
-        }
-        return value;
-    }
+    public int Read(string key) => CombatStatMath.Read(key, Raw);
 
     public IReadOnlyDictionary<string, int> Applied(int id) =>
         new System.Collections.ObjectModel.ReadOnlyDictionary<string, int>(_conversions[id].Applied);
@@ -86,7 +72,7 @@ public sealed class StatReplay
 
     private static void Apply(Conversion conversion, int source)
     {
-        var count = Truncate(Math.Floor((float)source / conversion.Divisor));
+        var count = CombatStatMath.Truncate(Math.Floor((float)source / conversion.Divisor));
         conversion.LastSource = source;
         foreach (var target in conversion.Amounts)
             conversion.Applied[target.Key] = unchecked(target.Value * count);
@@ -97,25 +83,6 @@ public sealed class StatReplay
         var total = _base.GetValueOrDefault(key);
         foreach (var conversion in _conversions.Values)
             total = unchecked(total + conversion.Applied.GetValueOrDefault(key));
-        return total == 0 ? 0 : Truncate((float)unchecked(total * unchecked(100 + _amplification.GetValueOrDefault(key))) / 100f);
-    }
-
-    private (int Index, int Percent) Destination(int from)
-    {
-        var best = (Index: -1, Percent: 0);
-        for (var to = 0; to < Elements.Length; to++)
-        {
-            if (to == from) continue;
-            var percent = Raw(Elements[from] + "TO" + Elements[to]);
-            if (percent > best.Percent) best = (to, percent);
-        }
-        return best;
-    }
-
-    private static int Truncate(double value)
-    {
-        if (!double.IsFinite(value) || value < int.MinValue || value > int.MaxValue)
-            throw new OverflowException("정수 범위를 벗어나는 게임 런타임 변환은 아직 검증하지 않았습니다.");
-        return (int)value;
+        return CombatStatMath.Amplify(total, _amplification.GetValueOrDefault(key));
     }
 }

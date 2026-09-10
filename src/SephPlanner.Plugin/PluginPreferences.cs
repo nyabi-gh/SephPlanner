@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Newtonsoft.Json;
+using SephPlanner.Core.Combat;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
 
@@ -18,6 +19,14 @@ namespace SephPlanner.Plugin
     internal sealed class PluginPreferences
     {
         private const string FileName = "plugin-settings.json";
+        public CombatScenario Combat { get; set; } = new CombatScenario();
+
+        public void SetCombat(CombatScenario scenario)
+        {
+            CombatSimulator.Validate(scenario);
+            Combat = scenario.Copy();
+            Changed();
+        }
 
         public List<string> PriorityCategories { get; set; } = new List<string>();
         public List<string> SuppressedPresetCategories { get; set; } = new List<string>();
@@ -175,6 +184,7 @@ namespace SephPlanner.Plugin
 
         public void ResetBuild()
         {
+            Combat = new CombatScenario();
             PresetCode = null;
             _decodedFrom = null;
             _decoded = null;
@@ -209,6 +219,7 @@ namespace SephPlanner.Plugin
         /// </summary>
         public PlanPreferences ToPreferences(bool recommendations) => new PlanPreferences
         {
+            Combat = Combat.Copy(),
             Recommendations = recommendations,
             PriorityCategories = EffectivePriorityCategories(),
             PinnedCharms = new Dictionary<int, int>(PinnedLevels),
@@ -255,7 +266,8 @@ namespace SephPlanner.Plugin
             {
                 if (File.Exists(path))
                 {
-                    var loaded = JsonConvert.DeserializeObject<PluginPreferences>(File.ReadAllText(path));
+                    var loaded = JsonConvert.DeserializeObject<PluginPreferences>(File.ReadAllText(path),
+                        new JsonSerializerSettings { ObjectCreationHandling = ObjectCreationHandling.Replace });
                     if (loaded == null) throw new JsonSerializationException("설정 내용이 비어 있습니다.");
                     if (loaded != null)
                     {
@@ -266,6 +278,8 @@ namespace SephPlanner.Plugin
                         loaded.HeldCharms = loaded.HeldCharms ?? new List<int>();
                         loaded.RetainedCharms = loaded.RetainedCharms ?? new List<int>();
                         loaded.DeactivationAllowed = loaded.DeactivationAllowed ?? new List<int>();
+                        loaded.Combat = loaded.Combat ?? new CombatScenario();
+                        CombatSimulator.Validate(loaded.Combat);
                         loaded.MigrateLegacyPins();
                         loaded.DropInvalidPins();
                         loaded._log = log;

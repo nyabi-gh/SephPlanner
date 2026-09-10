@@ -154,6 +154,7 @@ namespace SephPlanner.Plugin
                 Dependency(charm, definition);
                 ContextStats(charm, definition);
                 if (charm is Charm_WhitePaper paper) definition.PaperMatch = paper.match;
+                CombatCatalog.ReadCharm(charm, definition);
                 result.Add(definition);
             }
             return result;
@@ -189,6 +190,7 @@ namespace SephPlanner.Plugin
                 if (!string.IsNullOrEmpty(text)) names["current"] = text;
 
                 definition.Names = names;
+                CombatCatalog.ReadCombo(combo, definition);
                 result.Add(definition);
             }
             return result;

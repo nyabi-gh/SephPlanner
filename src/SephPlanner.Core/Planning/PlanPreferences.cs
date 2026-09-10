@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using SephPlanner.Core.Combat;
 using SephPlanner.Core.Solver;
 
 namespace SephPlanner.Core.Planning
@@ -8,6 +9,7 @@ namespace SephPlanner.Core.Planning
     /// </summary>
     public sealed class PlanPreferences
     {
+        public CombatScenario Combat { get; set; } = new CombatScenario();
         public static readonly PlanPreferences None = new PlanPreferences();
 
         /// <summary>

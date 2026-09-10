@@ -22,9 +22,15 @@ namespace SephPlanner.Core.Planning
         /// 굳이 말하지 않고, 근거가 레어도뿐일 때만 밝힌다 - 그 자리가 추천이 가장 흔들리는 곳이라
         /// 사용자가 "왜 이게 위에 있지"라고 물을 지점이다.
         /// </summary>
-        public static List<string> Charm(CharmDefinition? definition, CharmValueBook? values)
+        public static List<string> Charm(CharmDefinition? definition, CharmValueBook? values, bool combat = false)
         {
             if (definition is null) return new List<string>();
+            if (combat)
+            {
+                var description = new List<string>(definition.EffectLines) { "선택한 전투 조건의 예상 DPS로 평가합니다. F2 → DPS 내역에서 계산 누락을 확인하세요." };
+                description.AddRange(definition.Combat.Unsupported);
+                return description;
+            }
 
             var entry = (values ?? CharmValueBook.Empty).Of(definition);
             var lines = new List<string>(definition.EffectLines);
@@ -70,10 +76,10 @@ namespace SephPlanner.Core.Planning
         /// </summary>
         public static List<string> Cell(
             string name, int level, int effective, CharmInactiveReason reason,
-            CharmDefinition? definition, CharmValueBook? values)
+            CharmDefinition? definition, CharmValueBook? values, bool combat = false)
         {
             var lines = new List<string> { name };
-            lines.AddRange(Charm(definition, values));
+            lines.AddRange(Charm(definition, values, combat));
 
             if (reason != CharmInactiveReason.None)
             {
@@ -116,7 +122,12 @@ namespace SephPlanner.Core.Planning
         /// <summary>지금 집을 수 있는 후보 하나. 왜 그 자리에 있는지를 순위 대신 설명한다.</summary>
         public static List<string> Offer(OfferAdvice advice, int gold, CharmValueBook? values)
         {
-            var lines = Charm(advice.Candidate.Charm, values);
+            var lines = Charm(advice.Candidate.Charm, values, advice.Preview?.Combat != null);
+            if (advice.Preview?.Combat is { } combat)
+            {
+                lines.Add($"획득 후 예상 DPS {combat.Dps:0.##} · 같은 조건 대비 {advice.Gain:+0.##;-0.##;0} DPS");
+                lines.AddRange(combat.Unsupported);
+            }
 
             if (!advice.Available) lines.Add("가방의 공간과 사용 유지 조건을 만족하는 후보 배치를 찾지 못했습니다.");
             if (!advice.Affordable) lines.Add($"소지금 {gold}골드로는 살 수 없습니다.");

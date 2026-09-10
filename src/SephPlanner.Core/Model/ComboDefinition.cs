@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using SephPlanner.Core.Combat;
 
 namespace SephPlanner.Core.Model
 {
@@ -9,6 +10,7 @@ namespace SephPlanner.Core.Model
     /// </summary>
     public sealed class ComboDefinition
     {
+        public CharmCombatEffect Combat { get; set; } = new CharmCombatEffect();
         /// <summary>게임 내부 카테고리 식별자. 아티팩트의 <c>Categories</c> 값과 같은 체계다.</summary>
         public string Id { get; set; } = "";
 

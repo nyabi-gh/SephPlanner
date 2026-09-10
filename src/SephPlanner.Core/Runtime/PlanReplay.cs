@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using SephPlanner.Core.Combat;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Solver;
@@ -12,7 +13,7 @@ namespace SephPlanner.Core.Runtime
     // 게시된 계획의 입력이다. F10 순간의 새 관측값과 섞지 않는다.
     public sealed class PlanReplay
     {
-        public const int CurrentVersion = 1;
+        public const int CurrentVersion = 3;
         public static string CurrentCoreBuild =>
             typeof(PlanBuilder).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion +
             "/" + typeof(PlanBuilder).Assembly.ManifestModule.ModuleVersionId;
@@ -74,6 +75,7 @@ namespace SephPlanner.Core.Runtime
 
     public sealed class ReplayPreferences
     {
+        public CombatScenario? Combat { get; set; }
         public HashSet<string>? PriorityCategories { get; set; }
         public Dictionary<int, int>? PinnedCharms { get; set; }
         public HashSet<int>? HeldCharms { get; set; }
@@ -85,6 +87,7 @@ namespace SephPlanner.Core.Runtime
 
         public static ReplayPreferences From(PlanPreferences preferences) => new ReplayPreferences
         {
+            Combat = preferences.Combat.Copy(),
             PriorityCategories = new HashSet<string>(preferences.PriorityCategories),
             PinnedCharms = new Dictionary<int, int>(preferences.PinnedCharms),
             HeldCharms = new HashSet<int>(preferences.HeldCharms),
@@ -97,11 +100,12 @@ namespace SephPlanner.Core.Runtime
 
         public PlanPreferences Restore()
         {
-            if (PriorityCategories is null || PinnedCharms is null || HeldCharms is null || RetainedCharms is null ||
+            if (Combat is null || PriorityCategories is null || PinnedCharms is null || HeldCharms is null || RetainedCharms is null ||
                 DeactivationAllowed is null || PresetCharms is null || CharmValues?.Charms is null || !Recommendations.HasValue)
                 throw new InvalidDataException("재현 자료에 계산 설정이 빠졌습니다.");
             return new PlanPreferences
             {
+                Combat = Combat.Copy(),
                 PriorityCategories = new HashSet<string>(PriorityCategories),
                 PinnedCharms = new Dictionary<int, int>(PinnedCharms),
                 HeldCharms = new HashSet<int>(HeldCharms),

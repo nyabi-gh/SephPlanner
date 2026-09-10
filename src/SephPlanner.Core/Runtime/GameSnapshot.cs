@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using SephPlanner.Core.Combat;
 using SephPlanner.Core.Model;
 
 namespace SephPlanner.Core.Runtime
@@ -40,6 +41,7 @@ namespace SephPlanner.Core.Runtime
 
     public sealed class RunState
     {
+        public CombatSnapshot? Combat { get; set; }
         /// <summary>장착한 무기 종류(<c>EWeaponType</c> 이름). 무기 연동 아티팩트의 발동 여부를 가른다.</summary>
         public string WeaponId { get; set; } = "";
 

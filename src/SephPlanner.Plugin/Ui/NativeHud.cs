@@ -518,8 +518,8 @@ namespace SephPlanner.Plugin.Ui
             var score = previewed?.Preview.Score ?? plan.Best.Score;
             var gain = score - plan.Current.Score;
             _score.text = previewed != null
-                ? $"미리보기 {plan.Current.Score:0.#} / {score:0.#}"
-                : $"{plan.Current.Score:0.#} / {score:0.#}";
+                ? $"예상 DPS · 미리보기 {score:0.#}"
+                : $"예상 DPS {plan.Current.Score:0.#} → {score:0.#}";
             _gain.text = gain > 0.001 ? $"+{gain:0.#}" : gain < -0.001 ? $"{gain:0.#}" :
                 previewed == null && plan.HasPlacementChanges ? "배치 정리" : "변경 없음";
             _gain.color = gain > 0.001 ? NativeSkin.Good : gain < -0.001 ? NativeSkin.Bad : NativeSkin.TextDim;
@@ -554,6 +554,11 @@ namespace SephPlanner.Plugin.Ui
             var warning = Warning(
                 snapshot, plan, frame.MultiplayerAutoPlace, frame.QueryVerified,
                 frame.RuntimeVerification, frame.RuntimeVerificationReason);
+            var combat = previewed?.Preview.Combat ?? plan.Best.Combat;
+            if (combat != null && combat.Unsupported.Count > 0)
+                warning += (warning.Length > 0 ? "\n" : "") + $"추정·미반영 {combat.Unsupported.Count}항목 · F2 → DPS 내역";
+            if (previewed == null && plan.UnsupportedChangeWarnings.Count > 0)
+                warning += (warning.Length > 0 ? "\n" : "") + (plan.AllowUnsupportedChanges ? "미지원 변경 자동 적용 허용됨" : "미지원 변경으로 자동 적용 제한") + " · F2 → DPS 내역";
             _notice.text = warning;
             Widgets.FitHeight(_notice, _noticeSize, inner);
             Widgets.SetActive(_notice, warning.Length > 0);
@@ -746,7 +751,7 @@ namespace SephPlanner.Plugin.Ui
                     names.TryGetValue(position, out var name);
                     charms.TryGetValue(position, out var charmId);
 
-                    var pinned = frame.Prefs != null ? frame.Prefs.PinLevel(charmId) : 0;
+                    var pinned = 0;
                     cell.SetCharm(
                         name ?? "", level, effective, reason, marked.Contains(position),
                         IconOf(charmId), pinned);
@@ -768,7 +773,7 @@ namespace SephPlanner.Plugin.Ui
 
             Hover(cell.Rect, name, () =>
             {
-                var lines = Explain.Cell(name, level, effective, reason, definition, values);
+                var lines = Explain.Cell(name, level, effective, reason, definition, values, combat: true);
 
                 // 첫 줄은 쪽지의 제목으로 올라간다.
                 lines.RemoveAt(0);
@@ -834,14 +839,7 @@ namespace SephPlanner.Plugin.Ui
                 var advice = plan.Offers[i];
                 var charm = advice.Candidate.Charm;
 
-                // 손으로 채운 가치를 함께 넘긴다. 빠뜨리면 채워 넣은 아티팩트까지 "레어도로
-                // 어림잡았다"고 세어, 화면이 실제보다 못 미더운 말을 하게 된다.
-                if (charm != null)
-                {
-                    var source = CharmWorth.Resolve(charm, frame.Values.Of(charm)).Source;
-                    if (source == CharmWorthSource.Rarity || source == CharmWorthSource.MeasuredFloor)
-                        guessed++;
-                }
+                if (advice.Preview?.Combat?.Unsupported.Count > 0) guessed++;
 
                 var picked = previewed != null && previewed.Key == advice.Key;
                 var row = _offers.Add(
@@ -854,8 +852,8 @@ namespace SephPlanner.Plugin.Ui
             _offers.End();
 
             _offerNotice.text = guessed > 0
-                ? $"순위는 참고용입니다 — 이 중 {guessed}개는 값어치를 레어도로 어림잡았습니다."
-                : "순위는 참고용입니다.";
+                ? $"예상 DPS · {guessed}개 후보에 추정·미반영 효과가 있습니다. F2 → DPS 내역"
+                : "선택한 전투 조건과 추천 기준으로 비교한 예상 DPS입니다.";
             Widgets.SetActive(_offerNotice, plan.Offers.Count > 0);
         }
 
@@ -895,7 +893,7 @@ namespace SephPlanner.Plugin.Ui
             }
 
             var gain = advice.Gain;
-            var text = gain > 0.001 ? $"+{gain:0.#}" : gain < -0.001 ? $"{gain:0.#}" : "0";
+            var text = (gain > 0.001 ? $"+{gain:0.#}" : gain < -0.001 ? $"{gain:0.#}" : "0") + " DPS";
             parts.Append(Tint(
                 text, gain > 0.001 ? NativeSkin.Good : gain < -0.001 ? NativeSkin.Bad : NativeSkin.TextDim));
             return parts.ToString();
@@ -906,7 +904,7 @@ namespace SephPlanner.Plugin.Ui
             _discards.Begin();
             foreach (var advice in plan.Discards)
             {
-                var row = _discards.Add(advice.Name, $"제외 후 재배치 +{advice.Gain:0.#}", NativeSkin.Text);
+                var row = _discards.Add(advice.Name, $"제외 후 재배치 +{advice.Gain:0.#} DPS", NativeSkin.Text);
                 Hover(row, advice.Name, () =>
                     $"현재 위치: {advice.Position.X + 1}열 {advice.Position.Y + 1}행\n" +
                     "이 항목 하나를 가방에서 빼고 다시 배치했을 때의 추정 이득입니다. F8은 아이템을 제거하지 않습니다.\n" +
@@ -927,7 +925,7 @@ namespace SephPlanner.Plugin.Ui
                 var name = advice.NameA + " + " + advice.NameB;
                 var row = _mixes.Add(
                     name,
-                    RotationTag(advice) + Tint($"+{advice.Gain:0.#}",
+                    RotationTag(advice) + Tint($"+{advice.Gain:0.#} DPS",
                         advice.Gain > 0.001 ? NativeSkin.Good : NativeSkin.TextDim),
                     advice.Affordable ? NativeSkin.Text : NativeSkin.TextDim);
                 Hover(row, name, () => Explain.Join(Explain.Mix(advice)));

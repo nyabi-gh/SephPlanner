@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using SephPlanner.Core.Charms;
+using SephPlanner.Core.Combat;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Runtime;
 using SephPlanner.Core.Solver;
@@ -99,7 +100,8 @@ namespace SephPlanner.Core.Planning
             problem.FixedEffects.AddRange(inventory.FixedEffects);
             problem.ComboCounts = inventory.ComboCounts;
             problem.Combos = catalog.Combo;
-            problem.PriorityCategories = new System.Collections.Generic.HashSet<string>(preferences.PriorityCategories);
+            var prioritizeBuild = snapshot.Run?.Combat == null || preferences.Combat.PrioritizeBuild;
+            problem.PriorityCategories = prioritizeBuild ? new HashSet<string>(preferences.PriorityCategories) : new HashSet<string>();
 
             foreach (var engraving in inventory.Engravings)
             {
@@ -135,13 +137,13 @@ namespace SephPlanner.Core.Planning
                     Enchant = definition is null ? 0 : item.Enchant,
                     IsFiller = definition is null,
                     IsDormant = definition is not null && WeaponMatch.IsDormant(definition, weapon),
-                    Weight = definition is not null &&
+                    Weight = snapshot.Run?.Combat == null && definition is not null &&
                              preferences.PinnedCharms.TryGetValue(item.DefinitionId, out var pin)
                         ? PlanPreferences.WeightOf(pin)
                         : 1,
                     Held = definition is not null && preferences.HeldCharms.Contains(item.DefinitionId),
                     Retained = definition is not null && preferences.RetainedCharms.Contains(item.DefinitionId),
-                    AllowDeactivation = definition is not null && preferences.DeactivationAllowed.Contains(item.DefinitionId),
+                    AllowDeactivation = definition is not null && (!preferences.Combat.PreserveActivation || preferences.DeactivationAllowed.Contains(item.DefinitionId)),
                 };
                 if (definition is not null) slot.Worth = CharmWorth.Resolve(definition, values.Of(definition));
                 problem.Charms.Add(slot);
@@ -169,12 +171,19 @@ namespace SephPlanner.Core.Planning
             }
 
             var current = PlacementSolver.Score(problem, layout, positions);
+            if (snapshot.Run?.Combat is { } combat)
+            {
+                problem.Combat = CombatPlanning.Capture(problem, current, combat, preferences.Combat, cancellation);
+                current = PlacementSolver.Score(problem, layout, positions);
+            }
             var verification = Verify(inventory, current, grid);
             var best = PlacementSolver.Solve(problem, new SolverOptions { Cancellation = cancellation });
             if (cancellation.IsCancellationRequested) return null;
 
             // 조건부 배정은 수렴하지 않을 수 있으므로 현재 배치도 같은 우선순위로 비교한다.
             if (PriorityComboPlacement.Compare(best, current) < 0) best = current;
+            CombatPlanning.AddEmptyStartComparison(problem, current);
+            if (!ReferenceEquals(current, best)) CombatPlanning.AddEmptyStartComparison(problem, best);
 
             var offers = new List<OfferAdvice>();
             var mixes = new List<MixAdvice>();
@@ -197,8 +206,8 @@ namespace SephPlanner.Core.Planning
                 var candidates = Candidates(snapshot, catalog, weapon, out skippedOffers);
                 offers = OfferAdvisor.Rank(
                     problem, candidates, snapshot.Run?.Gold ?? int.MaxValue,
-                    inventory.ComboCounts, catalog.Combo, preferences.PriorityCategories,
-                    preferences.PresetCharms, values, layouts, cancellation);
+                    inventory.ComboCounts, catalog.Combo, problem.PriorityCategories,
+                    prioritizeBuild ? preferences.PresetCharms : new HashSet<int>(), values, layouts, cancellation);
                 if (cancellation.IsCancellationRequested) return null;
 
                 // 후보마다 이미 배치를 다 풀어 두었다. 그 결과를 버리지 않고 화면이 쓸 모양으로
@@ -228,6 +237,9 @@ namespace SephPlanner.Core.Planning
                 Verification = verification,
                 Current = current,
                 Best = best,
+                UnsupportedChangeWarnings = CombatChangeAssessment.Compare(problem, current, best),
+                AllowUnsupportedChanges = preferences.Combat.AllowUnsupportedChanges,
+                PrioritizeBuild = prioritizeBuild,
                 Moves = moves,
                 ComboPlacementWarnings = ComboPlacementWarnings(problem, best),
                 RetentionWarnings = problem.Charms.Where(charm => best.UnretainedCharms.Contains(charm.InstanceId))
@@ -304,6 +316,7 @@ namespace SephPlanner.Core.Planning
                 var preview = new PlanPreview
                 {
                     Score = solved.Score,
+                    Combat = solved.Combat,
                     Names = NamesByCell(trial, solved),
                     Charms = CharmsByCell(trial, solved),
                 };

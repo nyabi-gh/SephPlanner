@@ -92,6 +92,7 @@ namespace SephPlanner.Core.Solver
     /// <summary>후보를 집었다고 쳤을 때의 배치. 화면이 그리는 데 필요한 것만 담는다.</summary>
     public sealed class PlanPreview
     {
+        public SephPlanner.Core.Combat.CombatResult? Combat { get; set; }
         public List<TabletPlacement> Tablets { get; set; } = new List<TabletPlacement>();
         public Dictionary<GridPos, string> Names { get; set; } = new Dictionary<GridPos, string>();
         public Dictionary<GridPos, int> Charms { get; set; } = new Dictionary<GridPos, int>();
@@ -149,6 +150,11 @@ namespace SephPlanner.Core.Solver
             // 볼 것이 없으면 기준 점수조차 풀 이유가 없다. 상자도 상점도 열지 않은 평상시가
             // 이 경우이고, 그때가 프레임을 가장 아껴야 할 때다.
             if (candidates.Count == 0) return new List<OfferAdvice>();
+            if (problem.Combat is { Scenario.PrioritizeBuild: false })
+            {
+                priorityCategories = null;
+                presetCharms = null;
+            }
 
             layouts ??= new LayoutCache();
             var faster = SolverOptions.ForAdvice(cancellation);
@@ -187,6 +193,7 @@ namespace SephPlanner.Core.Solver
                 EvaluateCombo(
                     entry, comboCounts, combos, priorityCategories, presetCharms,
                     outcome?.DisplacedCharm);
+                if (problem.Combat != null) entry.ComboBonus = 0;
                 advice.Add(entry);
             }
 
@@ -199,6 +206,7 @@ namespace SephPlanner.Core.Solver
             return advice.OrderByDescending(entry => entry.Available)
                          .ThenByDescending(entry => entry.Affordable)
                          .ThenByDescending(entry => entry.MatchesPreset)
+                         .ThenByDescending(entry => problem.Combat != null && entry.MatchesPriority)
                          .ThenByDescending(entry => entry.Gain + entry.ComboBonus)
                          .ThenByDescending(entry => entry.Effect.Reach)
                          .ThenBy(entry => entry.Candidate.DefinitionId)
@@ -465,9 +473,9 @@ namespace SephPlanner.Core.Solver
                     InstanceId = candidateId,
                     IsDormant = candidate.CharmIsDormant,
                     Worth = CharmWorth.Resolve(candidate.Charm, values?.Of(candidate.Charm)),
-                    AllowDeactivation = trial.DeactivationAllowed.Contains(candidate.Charm.EntityId),
+                    AllowDeactivation = trial.Combat?.Scenario.PreserveActivation == false || trial.DeactivationAllowed.Contains(candidate.Charm.EntityId),
                     Retained = trial.RetainedCharms.Contains(candidate.Charm.EntityId),
-                    Weight = trial.PinnedCharms.TryGetValue(candidate.Charm.EntityId, out var pin) ? PlanPreferences.WeightOf(pin) : 1,
+                    Weight = trial.Combat == null && trial.PinnedCharms.TryGetValue(candidate.Charm.EntityId, out var pin) ? PlanPreferences.WeightOf(pin) : 1,
                 });
                 return true;
             }
@@ -488,6 +496,7 @@ namespace SephPlanner.Core.Solver
             var clone = new PlacementProblem
             {
                 Grid = problem.Grid,
+                Combat = problem.Combat,
                 Charms = new List<CharmSlot>(problem.Charms),
                 Tablets = new List<TabletSlot>(problem.Tablets),
                 FixedTablets = problem.FixedTablets,

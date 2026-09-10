@@ -89,6 +89,9 @@ namespace SephPlanner.Core.Runtime
                 return AutoPlaceDecision.Deny("끄기 허용 없이 아티팩트를 새로 비활성화하는 배치는 적용하지 않습니다.");
             if (!plan.HasPlacementChanges || plan.Targets.Count == 0)
                 return AutoPlaceDecision.Deny("옮길 것이 없습니다.");
+            if (!plan.AllowUnsupportedChanges && plan.UnsupportedChangeWarnings.Count > 0)
+                return AutoPlaceDecision.Deny("미지원 효과에 영향을 주는 변경으로 자동 배치를 제한했습니다. " +
+                    plan.UnsupportedChangeWarnings[0] + " F2 → DPS 내역에서 확인하고 전투 탭에서 별도로 허용할 수 있습니다.");
             // 멀티 세션은 기본으로 잠근다. 개발사가 금지한 것은 아니고 인벤토리 동기화 구현을
             // 바꾸는 중이라 잠가 두는 편이 안전하다고 답했다(docs/LEGAL.md "받은 답변"). 그래서
             // 켜는 길은 두되 기본은 꺼짐이다. 켜면 호스트와 참가자 양쪽에서 돈다 - 이동은

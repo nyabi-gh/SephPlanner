@@ -165,6 +165,7 @@ namespace SephPlanner.Plugin
                     ? weapons.currentWeapon.weaponType.ToString()
                     : "",
                 Gold = avatar.Money,
+                Combat = CombatReader.Read(avatar, weapons),
             };
         }
 

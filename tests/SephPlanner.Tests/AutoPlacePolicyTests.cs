@@ -197,6 +197,29 @@ public class AutoPlacePolicyTests
         Assert.Contains("석판 2개", decision.Reason);
     }
 
+    [Fact]
+    public void UnsupportedChangesNeedExplicitPermissionAndDoNotBypassOtherChecks()
+    {
+        var context = Context();
+        var plan = context.Runner!.Latest!;
+        plan.UnsupportedChangeWarnings.Add("미지원 마법의 연결이 달라집니다.");
+        var blocked = AutoPlacePolicy.Evaluate(context);
+        Assert.False(blocked.Allowed);
+        Assert.Contains("미지원 마법", blocked.Reason);
+        plan.AllowUnsupportedChanges = true;
+        Assert.True(AutoPlacePolicy.Evaluate(context).Allowed);
+        context.RuntimeVerification = PlanVerificationStatus.Unavailable;
+        Assert.False(AutoPlacePolicy.Evaluate(context).Allowed);
+    }
+
+    [Fact]
+    public void UnchangedUnsupportedEffectsDoNotBlanketBlockAutoPlacement()
+    {
+        var context = Context();
+        context.Runner!.Latest!.Best.Combat = new() { Unsupported = { "무기 고유 동작 미반영" } };
+        Assert.True(AutoPlacePolicy.Evaluate(context).Allowed);
+    }
+
     private static AutoPlaceContext Context()
     {
         var plan = new Plan
