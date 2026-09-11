@@ -80,7 +80,7 @@ public class DiscardAdvisorTests
         var problem = Problem();
         var baseline = PlacementSolver.Solve(problem);
         Assert.Throws<OperationCanceledException>(
-            () => DiscardAdvisor.Rank(problem, baseline, new CancellationToken(true)));
+            () => DiscardAdvisor.Rank(problem, baseline, cancellation: new CancellationToken(true)));
     }
 
     [Fact]

@@ -249,7 +249,7 @@ namespace SephPlanner.Core.Planning
                 // 기준 배치는 조언이 이미 푼 것을 그대로 받는다 - 여기서 다시 풀지 않는다.
                 if (offers.Count > 0)
                     FillPreviews(offers, problem, layouts.Baseline(problem, SolverOptions.ForAdvice(cancellation)));
-                if (verification.Passed) discards = DiscardAdvisor.Rank(problem, best, cancellation);
+                if (verification.Passed) discards = DiscardAdvisor.Rank(problem, best, layouts, cancellation);
             }
 
             var moves = Moves(problem, current, best, out var manualMovesAvailable);

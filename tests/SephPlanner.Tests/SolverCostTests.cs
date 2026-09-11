@@ -231,6 +231,40 @@ public class SolverCostTests
     }
 
     /// <summary>
+    /// 제거 조언은 제 빔을 따로 찾지 않는다.
+    ///
+    /// <see cref="DiscardAdvisor"/>는 <see cref="LayoutCache"/>를 받지 않고
+    /// <c>PlacementSolver.SearchLayouts</c>를 직접 불렀다 - <see cref="LayoutCache.Searches"/>에
+    /// 잡히지도 않는 탐색이었고, 제보 <c>3fc4d9ac</c>(석판 13)에서 재계산 <b>672ms 중 490ms</b>가
+    /// 그 한 번이었다. 다른 조언이 이미 같은 강도의 빔을 찾아 두었으면 한 번도 더 찾지 않아야
+    /// 하고, 다음 계획에서도 마찬가지여야 한다.
+    /// </summary>
+    [Fact]
+    public void RankingDiscardsDoesNotSearchItsOwnBeam()
+    {
+        var problem = FullBag(charmCount: 35);
+        var cache = new LayoutCache();
+        var advice = SolverOptions.ForAdvice(default);
+
+        OfferAdvisor.Rank(problem, Candidates(charms: 2, tablets: 0), int.MaxValue, layouts: cache);
+        var searched = cache.Searches;
+
+        var baseline = cache.Baseline(problem, advice);
+        var ranked = DiscardAdvisor.Rank(problem, baseline, cache);
+        Assert.Equal(searched, cache.Searches);
+
+        // 다음 계획. 빔은 계획을 넘어 살고 잣대만 버려진다.
+        cache.BeginPlan();
+        DiscardAdvisor.Rank(problem, cache.Baseline(problem, advice), cache);
+        Assert.Equal(searched, cache.Searches);
+
+        // 캐시를 안 준 쪽과 같은 답을 내야 한다. 안 그러면 위의 0은 답을 바꿔 번 것이다.
+        Assert.Equal(
+            ranked.Select(a => (a.InstanceId, a.Gain)),
+            DiscardAdvisor.Rank(problem, baseline).Select(a => (a.InstanceId, a.Gain)));
+    }
+
+    /// <summary>
     /// 취소된 탐색은 캐시에 남지 않는다.
     ///
     /// 예전에는 취소 검사마다 <b>중간까지 푼 것을 돌려주었다.</b> 석판 몇 장만 놓은 빔과 첫 배치만

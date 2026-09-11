@@ -21,18 +21,25 @@ namespace SephPlanner.Core.Solver
     /// <summary>하나를 제외하는 가상 배치만 비교한다. 실제 제거 명령이나 자동 배치 목표는 만들지 않는다.</summary>
     public static class DiscardAdvisor
     {
-        public static List<DiscardAdvice> Rank(PlacementProblem problem, Arrangement baseline, CancellationToken cancellation = default)
+        /// <param name="layouts">
+        /// 배치 탐색을 나눠 쓸 자리. 제거 후보는 석판을 밀어내는 갈래에서만 구성이 달라지고,
+        /// 나머지 마흔 갈래는 지금 구성 그대로다. 여기가 캐시를 안 받고 직접 탐색하던 동안
+        /// <b>석판 13장짜리 판에서 재계산 650ms 중 490ms</b>가 그 한 번의 탐색이었다.
+        /// </param>
+        public static List<DiscardAdvice> Rank(PlacementProblem problem, Arrangement baseline,
+            LayoutCache? layouts = null, CancellationToken cancellation = default)
         {
             var advice = new List<DiscardAdvice>();
             if (problem.Charms.Count == 0 || baseline.UnplacedTablets > 0) return advice;
             cancellation.ThrowIfCancellationRequested();
 
+            layouts ??= new LayoutCache();
             var options = SolverOptions.ForAdvice(cancellation);
             options.EmptySideTrials = 12;
             options.PriorityComboTrials = 24;
             // 제거 후보마다 빔을 다시 만들지 않는다. 현재·제안 배치를 포함한 공통 후보 위에서 비교한다.
-            var layouts = new List<List<TabletPlacement>> { baseline.Tablets };
-            layouts.AddRange(PlacementSolver.SearchLayouts(problem, options).Take(4));
+            var candidateLayouts = new List<List<TabletPlacement>> { baseline.Tablets };
+            candidateLayouts.AddRange(layouts.Of(problem, options).Take(4));
             var currentCounts = Counts(problem, problem.CurrentCharms);
             var baselineCounts = Counts(problem, baseline.CharmPositions);
             var candidates = problem.Charms.Select(c => (c.InstanceId, Tablet: false))
@@ -43,7 +50,7 @@ namespace SephPlanner.Core.Solver
                 cancellation.ThrowIfCancellationRequested();
                 var trial = OfferAdvisor.Clone(problem);
                 string name;
-                var yardstick = layouts;
+                var yardstick = candidateLayouts;
                 if (candidate.Tablet)
                 {
                     var index = trial.Tablets.FindIndex(t => t.InstanceId == candidate.InstanceId);
@@ -52,7 +59,7 @@ namespace SephPlanner.Core.Solver
                     trial.Tablets.RemoveAt(index);
                     trial.CurrentTablets.Remove(candidate.InstanceId);
                     trial.PlannedTablets.Remove(candidate.InstanceId);
-                    yardstick = layouts.Where(l => l.Count == problem.Tablets.Count)
+                    yardstick = candidateLayouts.Where(l => l.Count == problem.Tablets.Count)
                         .Select(l => l.Where((_, i) => i != index).ToList()).ToList();
                 }
                 else
