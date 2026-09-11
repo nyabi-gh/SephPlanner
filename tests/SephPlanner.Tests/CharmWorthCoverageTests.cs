@@ -92,8 +92,8 @@ public class CharmWorthCoverageTests
         Assert.Equal(CharmWorthSource.Measured, worth.Source);
         Assert.Equal(0, worth.At(0));
 
-        // 레벨 1->2 가 안 오르는 표다. 걸음별로 재면 레벨당 1 이 되지만 상한까지 4 를 오르므로
-        // 실제로는 레벨당 0.8 이고, 그래서 레벨 하나가 1.25 어치다.
+        // 레벨 1->2 가 안 오르는 표다. 씨앗은 오르는 걸음만 보므로 레벨당 1 이지만, 눈금은
+        // 이 아티팩트가 상한까지 실제로 오른 만큼(레벨당 0.8)으로 맞춰지므로 1.25 어치가 된다.
         Assert.Equal(1.25, worth.At(1));
         var off = new GridPos(0, 0);
         var problem = new PlacementProblem

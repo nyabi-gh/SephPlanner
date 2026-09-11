@@ -79,6 +79,29 @@ public class StatExchangeTests
     }
 
     [Fact]
+    public void AStandingBonusDoesNotInheritTheRateOfAStatThatBarelyRises()
+    {
+        // 도시락은 레벨 넷에 HP 흡수 +1 을 준다. 그것을 "레벨당 0.25" 로 읽으면 붙박이로 8 을
+        // 주는 혈석 귀걸이가 32 레벨짜리가 된다. 붙박이는 레벨로 사는 것이 아니라 켜 두는 값이다.
+        var tables = new List<CharmStatTable>
+        {
+            Table(1, "STEAL", 1, 1, 1, 1, 2),
+            Table(2, "STEAL", 8, 8, 8, 8),
+        };
+        var profiles = new List<CharmStatProfile> { Profile(1, 4), Profile(2, 3) };
+        for (var entity = 3; entity <= 5; entity++)
+        {
+            tables.Add(Table(entity, "DEFENSE", 0, 5));
+            profiles.Add(Profile(entity, 1));
+        }
+
+        var exchange = StatExchange.From(tables, profiles);
+
+        Assert.True(exchange.TryConvert("STEAL", 8, out var levels));
+        Assert.InRange(levels, 0, 12);
+    }
+
+    [Fact]
     public void AStatThatOnlyRisesAboveTheLevelCapIsNotPriced()
     {
         // 상한이 0 이면 그 위의 표는 게임이 닿지 못하는 칸이다. 거기서 걸음을 재면 아무도

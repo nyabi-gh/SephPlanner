@@ -264,7 +264,10 @@ namespace SephPlanner.Core.Solver
                     tops[entity] = cap >= 0 ? Math.Min(cap, span - 1) : span - 1;
                 }
 
-                // 걸음별로 재면 중간에 안 오르는 레벨이 있는 아티팩트의 환산율이 부풀려진다.
+                // 씨앗은 "오르는 레벨에서 얼마나 오르나"로 잰다. 상한까지의 총 오름폭을 레벨 수로
+                // 나누면, 거의 안 오르는 능력치의 환산율이 0 에 가까워지면서 그 능력치를 붙박이로
+                // 많이 주는 아티팩트의 값어치가 터진다 - 도시락은 레벨 넷에 HP 흡수 +1 을 주는데
+                // 그것으로 환산율을 잡으면 붙박이 8 을 주는 혈석 귀걸이가 30 레벨짜리가 된다.
                 var samples = new Dictionary<string, List<double>>(StringComparer.Ordinal);
                 foreach (var entity in entities)
                 {
@@ -272,7 +275,7 @@ namespace SephPlanner.Core.Solver
                     {
                         if (table.FromCode) continue;
 
-                        var rise = RisePerLevel(table, tops[entity]);
+                        var rise = RisingStep(table, tops[entity]);
                         if (rise <= 0) continue;
 
                         if (!samples.TryGetValue(table.StatusId, out var list))
@@ -336,6 +339,23 @@ namespace SephPlanner.Core.Solver
                         .OrderBy(cell => cell.Column)
                         .ToArray());
                 return design;
+            }
+
+            /// <summary>
+            /// 값이 실제로 오르는 레벨에서의 걸음 크기(중앙값). 상한 위의 칸은 게임이 닿지
+            /// 못하므로 세지 않는다.
+            /// </summary>
+            private static double RisingStep(CharmStatTable table, int top)
+            {
+                if (table.ValuesByLevel.Count == 0 || top < 1) return 0;
+
+                var steps = new List<double>();
+                for (var level = 1; level <= top && level < table.ValuesByLevel.Count; level++)
+                {
+                    var step = table.ValuesByLevel[level] - (double)table.ValuesByLevel[level - 1];
+                    if (step > 0) steps.Add(step);
+                }
+                return Median(steps);
             }
 
             private static double RisePerLevel(CharmStatTable table, int top)
