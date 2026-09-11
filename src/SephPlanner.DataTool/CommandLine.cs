@@ -11,9 +11,10 @@ public static class CommandLine
           --reproduce <파일.replay>                 저장된 설정·카탈로그·직전 목표로 계획 재현
           --reproduce <파일.replay> --allow-model-change
                                                    다른 계산 빌드로 변경 전후 비교
+                                                   (값어치도 여기 덤프로 다시 잰다)
           --solve                                  합성 배치 검사
           --prediction-probe                       효과 갱신 순서의 합성 반례 검사
-          --measure                                콤보 가치 환산
+          --measure                                능력치 환산율과 콤보 가치
           --values                                 가치 평가 현황과 초안
           --help                                   이 도움말
 

@@ -12,11 +12,11 @@ namespace SephPlanner.Core.Solver
         /// <summary>
         /// 같은 카테고리를 하나 더 모아 콤보가 발동할 때의 가치. 레벨 단위다.
         ///
-        /// 실측값이다. 콤보가 임계값에서 주는 능력치를, 같은 능력치를 주는 아티팩트의 레벨당
-        /// 증가분으로 나눠 레벨로 환산한 뒤 임계값 63건의 중앙값을 썼다(못 옮긴 11건 제외).
+        /// 실측값이다. 콤보가 임계값에서 주는 능력치를 <see cref="StatExchange"/>로 레벨로
+        /// 환산한 뒤 임계값 63건의 중앙값을 썼다(못 옮긴 11건 제외).
         /// 방법과 결과는 docs/RESEARCH.md 의 "콤보 가중치" 절.
         /// </summary>
-        public const double ComboThreshold = 3.4;
+        public const double ComboThreshold = 2.59;
 
         /// <summary>
         /// 아직 임계값에 못 미치지만 한 걸음 다가가는 가치.
@@ -25,17 +25,17 @@ namespace SephPlanner.Core.Solver
         /// 정적 데이터로는 답이 안 나온다. 그래서 <see cref="ComboThreshold"/>에 대한 비율
         /// (1/8)만 예전 그대로 두고 크기만 함께 옮겼다.
         /// </summary>
-        public const double ComboProgress = 0.43;
+        public const double ComboProgress = 0.32;
 
         /// <summary>
         /// 전체 피해 보너스(<c>ECustomStat.AllDamageBonus</c>) 1점을 점수(레벨) 단위로 환산하는 값.
         /// 조화의 수정처럼 효과가 이웃에 달린 아티팩트를 점수에 넣으려면 단위를 옮겨 와야 한다.
         ///
         /// 실측값이다. 게임의 <c>StatusInstance_FinalDamage</c>가 조화의 수정과 똑같은 커스텀
-        /// 능력치를 더하므로 `FINAL_DAMAGE`가 그대로 다리가 된다. 측정된 레벨당 증가분이 2.5라
-        /// 1점은 레벨 0.4 값어치다.
+        /// 능력치를 더하므로 `FINAL_DAMAGE`가 그대로 다리가 된다. 측정된 레벨당 증가분이 3.80이라
+        /// 1점은 레벨 0.26 값어치다.
         /// </summary>
-        public const double DamageBonus = 0.4;
+        public const double DamageBonus = 0.26;
 
         /// <summary>
         /// 아무 근거가 없을 때 쓰는 마지막 어림값. 능력치를 주지 않아 잴 수 없고 손으로도 채우지

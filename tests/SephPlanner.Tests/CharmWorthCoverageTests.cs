@@ -71,7 +71,11 @@ public class CharmWorthCoverageTests
                 Table(2, "BEYOND_CAP", 0, -1),
             },
         };
-        var report = CharmStatWorth.Run(measurement, id => id == 1 ? 1 : 0);
+        var report = CharmStatWorth.Run(measurement, new[]
+        {
+            new CharmStatProfile { EntityId = 1, MaxLevel = 1 },
+            new CharmStatProfile { EntityId = 2, MaxLevel = 0 },
+        });
         Assert.Equal(new[] { "LATER_PENALTY" }, report.ByEntity[1].Unconverted);
         Assert.Empty(report.ByEntity[2].Unconverted);
     }
@@ -87,7 +91,10 @@ public class CharmWorthCoverageTests
         var worth = CharmWorth.Resolve(charm);
         Assert.Equal(CharmWorthSource.Measured, worth.Source);
         Assert.Equal(0, worth.At(0));
-        Assert.Equal(1, worth.At(1));
+
+        // 레벨 1->2 가 안 오르는 표다. 걸음별로 재면 레벨당 1 이 되지만 상한까지 4 를 오르므로
+        // 실제로는 레벨당 0.8 이고, 그래서 레벨 하나가 1.25 어치다.
+        Assert.Equal(1.25, worth.At(1));
         var off = new GridPos(0, 0);
         var problem = new PlacementProblem
         {

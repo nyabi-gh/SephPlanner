@@ -42,6 +42,11 @@ namespace SephPlanner.Core.Solver
     public sealed class MeasurementReport
     {
         public Dictionary<string, double> PerLevel { get; set; } = new Dictionary<string, double>();
+
+        /// <summary>능력치 하나만 떼어 세던 값. 나누기 전후를 나란히 보라고 남긴다.</summary>
+        public Dictionary<string, double> SeedPerLevel { get; set; } = new Dictionary<string, double>();
+
+        public StatExchange Exchange { get; set; } = new StatExchange();
         public List<ThresholdWorth> Thresholds { get; set; } = new List<ThresholdWorth>();
 
         /// <summary>환산된 임계값들의 중앙값. <see cref="Worth.ComboThreshold"/>가 되어야 할 값.</summary>
@@ -63,10 +68,16 @@ namespace SephPlanner.Core.Solver
     /// </summary>
     public static class ComboWorthMeasure
     {
-        public static MeasurementReport Run(StatMeasurement measurement)
+        public static MeasurementReport Run(
+            StatMeasurement measurement, IReadOnlyCollection<CharmStatProfile>? profiles = null)
         {
-            var exchange = StatExchange.From(measurement.CharmStats);
-            var report = new MeasurementReport { PerLevel = exchange.PerLevel };
+            var exchange = StatExchange.From(measurement.CharmStats, profiles);
+            var report = new MeasurementReport
+            {
+                PerLevel = exchange.PerLevel,
+                SeedPerLevel = exchange.SeedPerLevel,
+                Exchange = exchange,
+            };
 
             var grouped = measurement.ComboStats
                 .GroupBy(grant => (grant.CategoryId, grant.Threshold))

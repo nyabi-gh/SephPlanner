@@ -45,7 +45,7 @@ public class CharmWorthTests
         // 게임의 LevelToIdx 가 상한에서 자르므로 그 위로는 값어치가 늘지 않는다.
         var measurement = new StatMeasurement { CharmStats = { Table(1, "DEFENSE", 0, 5, 10, 15) } };
 
-        var report = CharmStatWorth.Run(measurement, _ => 1);
+        var report = CharmStatWorth.Run(measurement, new[] { new CharmStatProfile { EntityId = 1, MaxLevel = 1 } });
 
         Assert.Equal(new[] { 0.0, 1.0 }, report.ByEntity[1].ByLevel);
     }

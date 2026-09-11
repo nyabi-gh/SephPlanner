@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using SephPlanner.Core.Model;
 
 namespace SephPlanner.Core.Solver
@@ -49,10 +50,7 @@ namespace SephPlanner.Core.Solver
         public static CharmWorthReport Apply(
             IReadOnlyCollection<CharmDefinition> charms, StatMeasurement measurement)
         {
-            var maxLevels = new Dictionary<int, int>();
-            foreach (var charm in charms) maxLevels[charm.EntityId] = charm.MaxLevel;
-
-            var report = Run(measurement, entityId => maxLevels.TryGetValue(entityId, out var max) ? max : -1);
+            var report = Run(measurement, charms.Select(Profile).ToList());
 
             foreach (var charm in charms)
             {
@@ -88,11 +86,27 @@ namespace SephPlanner.Core.Solver
         }
 
         /// <summary>
-        /// <paramref name="maxLevelOf"/>가 알려진 아티팩트는 게임의 레벨 상한에서 표를 자른다.
+        /// 환산율이 쓰는 아티팩트 신원. 능력치 표가 값어치 전부인 아티팩트만이 "레벨 하나가
+        /// 값어치 1" 이라는 눈금의 표본이 된다 - <see cref="CharmWorth.Resolve"/>가 잰 값을
+        /// 그대로 쓰는 것과 같은 조건이다.
         /// </summary>
-        public static CharmWorthReport Run(StatMeasurement measurement, Func<int, int>? maxLevelOf = null)
+        public static CharmStatProfile Profile(CharmDefinition charm) => new CharmStatProfile
         {
-            var exchange = StatExchange.From(measurement.CharmStats);
+            EntityId = charm.EntityId,
+            MaxLevel = charm.MaxLevel,
+            StatsAreEverything = charm.Behavior == "Charm_StatusInstance" && !charm.HasNoActivationEffect,
+        };
+
+        /// <summary>
+        /// <paramref name="profiles"/>가 알려진 아티팩트는 게임의 레벨 상한에서 표를 자른다.
+        /// </summary>
+        public static CharmWorthReport Run(
+            StatMeasurement measurement, IReadOnlyCollection<CharmStatProfile>? profiles = null)
+        {
+            var exchange = StatExchange.From(measurement.CharmStats, profiles);
+            var maxLevels = new Dictionary<int, int>();
+            foreach (var profile in profiles ?? Array.Empty<CharmStatProfile>())
+                maxLevels[profile.EntityId] = profile.MaxLevel;
             var report = new CharmWorthReport { Exchange = exchange };
 
             var byEntity = new Dictionary<int, List<CharmStatTable>>();
@@ -111,7 +125,7 @@ namespace SephPlanner.Core.Solver
 
                 // 상한을 모르는 아티팩트(음수)는 표 전체를 쓴다. 상한이 0 이면 레벨을 올려도
                 // 값이 바뀌지 않으므로 한 칸만 남는다.
-                var cap = maxLevelOf?.Invoke(pair.Key) ?? -1;
+                var cap = maxLevels.TryGetValue(pair.Key, out var max) ? max : -1;
                 var top = cap >= 0 ? Math.Min(cap, span - 1) : span - 1;
 
                 var worth = new CharmWorthTable { EntityId = pair.Key };

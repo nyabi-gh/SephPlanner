@@ -1,10 +1,13 @@
 using System.Text.Json;
 using SephPlanner.Core.Runtime;
+using SephPlanner.Core.Solver;
 
 namespace SephPlanner.DataTool;
 
 public static class PlanReproduce
 {
+    private static readonly JsonSerializerOptions Read = new() { PropertyNameCaseInsensitive = true };
+
     public static int Run(string path, bool allowModelChange = false)
     {
         try
@@ -17,6 +20,7 @@ public static class PlanReproduce
                 Console.WriteLine("마지막으로 게시된 계획을 재생합니다. F10 시점의 최신 상태와 다를 수 있습니다. " + replay.LatestError);
             if (replay.CoreBuild != PlanReplay.CurrentCoreBuild)
                 Console.WriteLine($"계산 코드 차이: 저장={replay.CoreBuild}, 현재={PlanReplay.CurrentCoreBuild}");
+            if (allowModelChange) Remeasure(replay);
             var plan = replay.Rebuild(allowModelChange);
             var differences = replay.Expected!.Differences(ReplayResult.From(plan));
             Console.WriteLine($"점수 {plan.Current.Score:0.########} → {plan.Best.Score:0.########}");
@@ -32,5 +36,30 @@ public static class PlanReproduce
             Console.Error.WriteLine("계획 재현 실패: " + ex.Message);
             return 1;
         }
+    }
+
+    /// <summary>
+    /// 재현 자료는 제보자 기계에서 이미 계산된 값어치 표를 싣고 온다. 그래서 환산율을 고쳐도
+    /// 재현은 옛 표로 풀리고 변경이 보이지 않는다. 여기 덤프가 있으면 다시 재어 얹는다.
+    /// </summary>
+    private static void Remeasure(PlanReplay replay)
+    {
+        var charms = replay.Catalog?.Charms;
+        if (charms is null || charms.Count == 0) return;
+
+        var path = PlannerData.ActiveDataFile(PlannerData.StatMeasurementFile);
+        if (path is null || !File.Exists(path))
+        {
+            Console.WriteLine("값어치를 다시 잴 덤프가 없어 재현 자료의 표를 그대로 씁니다.");
+            return;
+        }
+
+        var measurement = JsonSerializer.Deserialize<StatMeasurement>(File.ReadAllText(path), Read);
+        if (measurement is null || measurement.CharmStats.Count == 0) return;
+
+        var before = charms.Count(charm => charm.StatWorthByLevel.Count > 0);
+        CharmStatWorth.Apply(charms, measurement);
+        var after = charms.Count(charm => charm.StatWorthByLevel.Count > 0);
+        Console.WriteLine($"값어치를 지금 덤프로 다시 쟀습니다: 능력치 표가 있는 아티팩트 {before}종 → {after}종");
     }
 }
