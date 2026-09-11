@@ -28,6 +28,9 @@ namespace SephPlanner.Plugin
             snapshot.IsMultiplayer = IsMultiplayerSession();
 
             var avatar = FindLocalPlayer();
+
+            // 성장 진행도는 게임이 화면으로 보낼 때만 손에 들어온다. 아바타가 바뀌면 다시 붙는다.
+            GrowthProgressWatch.Follow(avatar);
             if (avatar == null || avatar.Inventory == null || avatar.IsDead) return snapshot;
 
             snapshot.Run = ReadRun(avatar);
@@ -204,7 +207,7 @@ namespace SephPlanner.Plugin
                         ? (bool?)(instance.Charm is IAttackableCharm attackable && attackable.IsAttackableCharm())
                         : null,
                     Enchant = EnchantOf(instance.InstanceID),
-                    GrowthProgress = GrowthProgressOf(instance.Charm),
+                    GrowthProgress = GrowthProgressOf(instance.InstanceID, instance.Charm),
                 });
             }
 
@@ -321,13 +324,19 @@ namespace SephPlanner.Plugin
         /// 그 자리에서 필드를 읽으면 서버의 진짜 값이 아니라 초기값이 나온다. 0 으로 적으면
         /// 아직 아무것도 못 채운 것과 구분되지 않으므로 모를 때는 비워 둔다.
         /// </summary>
-        private static int? GrowthProgressOf(Charm_Basic charm)
+        private static int? GrowthProgressOf(int instanceId, Charm_Basic charm)
         {
             if (charm is not Charm_GrowthStatusInstance growth || !growth.hasGrowthQuest) return null;
-            if (!Mirror.NetworkServer.active || GrowthCounter == null) return null;
 
-            var value = GrowthCounter.GetValue(growth);
-            return value is int counter ? counter : (int?)null;
+            // 게임이 보내 준 표시값이 먼저다. 호스트든 참가자든 같은 이벤트로 오고, 효과가 켜질
+            // 때마다 다시 오므로 배치가 갱신되면 최신값이 들어와 있다.
+            var watched = GrowthProgressWatch.Of(instanceId);
+            if (watched != null) return watched;
+
+            // 아직 한 번도 안 왔으면 서버에서만 원본을 읽는다. 참가자 자리에서 이 필드를 읽으면
+            // 서버의 값이 아니라 초기값이 나오므로 모르는 채로 둔다.
+            if (!Mirror.NetworkServer.active || GrowthCounter == null) return null;
+            return GrowthCounter.GetValue(growth) is int counter ? counter : (int?)null;
         }
 
         private static PlacedTablet Describe(StoneTablet tablet) => new PlacedTablet

@@ -1152,6 +1152,7 @@ namespace SephPlanner.Plugin
             _build.Destroy();
             _diagnosticWindow.Destroy();
             _noteWindow.Destroy();
+            GrowthProgressWatch.Clear();
         }
     }
 }
