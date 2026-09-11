@@ -225,10 +225,26 @@ NetworkInventory.SendMessageTabletRotated(this, rotation);
 퍼지지만 **테두리는 이 알림을 받아야 갱신된다.** 우리가 첫째만 하던 동안 옛 각도의 테두리가 남았고
 가방을 다시 열어야 사라졌다. 참가자 경로는 `DoClickAction` → `Rotate` 라 처음부터 해당이 없었다.
 
+**그 알림은 커서가 올라간 석판에만 보낸다(2026-09-11 실기).** `OnItemSelected` 는 테두리만 다시
+그리는 것이 아니라 석판 툴팁(`UI_StoneTabletTooltip.Open`)까지 연다. 툴팁 위치는 커서가 아니라
+`TooltipsParent` 의 위치로 잡히고(`UI_BaseTooltip.SetPositionToTarget`), 닫히는 것은 아이콘의
+`Showing` 이 내려갈 때뿐이다(`LateUpdate`). 그래서 **가방을 닫은 채 `F8` 을 누르자 석판 설명이
+화면 오른쪽 툴팁 자리에 혼자 떠서 가방을 열었다 닫을 때까지 남았다.** `HandleTabletRotated` 의
+구독은 패널 열기·닫기가 아니라 `Connect`/`Disconnect` 에 묶여 있어 가방을 닫아도 살아 있다.
+
+게임에서 `OnItemSelected` 를 부르는 다른 자리는 전부
+`EventSystem.current.currentSelectedGameObject == icon.gameObject` 를 먼저 보는데
+`HandleTabletRotated` 에만 그 검사가 없다 - 게임은 우클릭으로만 그 경로에 닿으므로 필요가 없었다.
+우리가 커서 없이 알림만 보내 그 전제를 깬 것이라, `PlanApplier` 가 그 검사를 대신 한다. 테두리는
+선택된 아이템의 범위 표시라 그 석판에 커서가 올라가 있을 때만 생기므로 잃는 것이 없고, 반대로
+다른 아이템을 보고 있을 때 보내면 그쪽 테두리와 툴팁을 빼앗는다. 참가자 쪽은 게임의 `Rotate` 가
+직접 알림을 보내므로 같은 툴팁이 뜰 수 있고 우리가 막을 수 없다.
+
 **이동 뒤에도 게임은 화면을 다시 잡는다.** 드래그로 옮기는 자리는 `Swap` 다음에
 `OnItemSelected(icon, -1)` 을 부르는데, 그 첫 동작이 모든 `stoneTabletFrame` 과 `dependencyFrame`
 을 끄는 것이다. 우리는 부르지 않으므로 같은 부류의 잔상이 남을 수 있다. 고치려면 게임의 선택
-상태를 우리가 운전해야 해서 아직 손대지 않았다.
+상태를 우리가 운전해야 해서 아직 손대지 않았다. 부르게 된다면 위 툴팁과 같은 게이트가 함께
+필요하다 - 같은 `OnItemSelected` 이므로 커서 없이 부르면 같은 툴팁이 뜬다.
 
 **참가자로 접속한 세션에서는 `Networkrotation` 을 쓸 수 없다.** SyncVar 라 클라이언트에서 써 봐야
 서버 값이 덮는다. 대신 우클릭이 타는 길이 있다:

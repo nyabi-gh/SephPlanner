@@ -5,6 +5,7 @@ using Mirror;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Runtime;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 namespace SephPlanner.Plugin
 {
@@ -345,7 +346,8 @@ namespace SephPlanner.Plugin
             }
 
             /// <summary>
-            /// 게임이 <c>StoneTablet.Rotate</c> 끝에 보내는 알림을 우리도 보낸다.
+            /// 게임이 <c>StoneTablet.Rotate</c> 끝에 보내는 알림을 우리도 보낸다. <b>커서가 올라가
+            /// 있는 석판에만 보낸다.</b>
             ///
             /// 각도만 바꾸면 <c>Networkrotation</c> 이 SyncVar 라 값 자체는 퍼지지만, 화면의 석판
             /// 범위 테두리는 이 알림을 받아야 다시 그려진다
@@ -353,14 +355,31 @@ namespace SephPlanner.Plugin
             /// <c>OnItemSelected</c>). 빠뜨리면 가방을 열어 둔 채 자동 배치했을 때 옛 각도의
             /// 테두리가 화면에 남고, 가방을 닫았다 열어야 사라진다.
             ///
-            /// 참가자 경로는 <c>DoClickAction</c> 이 게임의 <c>Rotate</c> 를 그대로 타므로 해당 없다.
-            /// 되돌린 뒤에도 보낸다 - 그때는 되돌아간 각도가 화면에 맞아야 한다.
+            /// <b>그 <c>OnItemSelected</c> 는 테두리만 다시 그리지 않고 석판 툴팁까지 연다</b>
+            /// (<c>UI_StoneTabletTooltip.Open</c>). 게임은 이 경로를 우클릭으로만, 즉 가방이 열려
+            /// 있고 커서가 그 칸에 있을 때만 타므로 거기서는 맞는 동작이다. 커서와 무관하게 보내자
+            /// 가방을 닫은 채 자동 배치했을 때 석판 설명이 툴팁 자리(화면 오른쪽)에 혼자 떠서
+            /// 가방을 열었다 닫을 때까지 남았다 - 커서가 올라간 적이 없어 <c>Showing</c> 을 내려 줄
+            /// 이벤트도 오지 않기 때문이다. 게임에서 <c>OnItemSelected</c> 를 부르는 다른 자리들은
+            /// 모두 <c>currentSelectedGameObject</c> 를 먼저 보는데 <c>HandleTabletRotated</c> 에만
+            /// 그 검사가 없다. 그래서 우리가 대신 한다.
+            ///
+            /// 테두리는 선택된 아이템의 범위 표시라 그 석판에 커서가 올라가 있을 때만 생기므로
+            /// 게이트가 잃는 것은 없다. 반대로 다른 아이템을 보고 있을 때 보내면 그쪽 테두리와
+            /// 툴팁을 빼앗는다.
+            ///
+            /// 참가자 경로는 <c>DoClickAction</c> 이 게임의 <c>Rotate</c> 를 그대로 타므로 해당
+            /// 없다. 알림도 게임이 보내므로 그쪽 툴팁은 우리가 막을 수 없다. 되돌린 뒤에도 보낸다 -
+            /// 그때는 되돌아간 각도가 화면에 맞아야 한다.
             /// </summary>
             private void Announce(IReadOnlyList<KeyValuePair<StoneTablet, int>> rotated)
             {
+                var hovered = Hovered();
+                if (hovered == null) return;
+
                 foreach (var pair in rotated)
                 {
-                    if (pair.Key == null) continue;
+                    if (pair.Key != hovered) continue;
                     try
                     {
                         _inventory.SendMessageTabletRotated(pair.Key, pair.Key.rotation);
@@ -371,6 +390,20 @@ namespace SephPlanner.Plugin
                         UnityEngine.Debug.LogWarning("석판 회전 알림 실패: " + ex.Message);
                     }
                 }
+            }
+
+            /// <summary>
+            /// 게임이 지금 선택으로 보는 칸의 석판. 가방이 닫혀 있거나 커서가 석판 위가 아니면
+            /// <c>null</c> 이다.
+            /// </summary>
+            private static StoneTablet Hovered()
+            {
+                var selected = EventSystem.current == null ? null : EventSystem.current.currentSelectedGameObject;
+                if (selected == null) return null;
+
+                var icon = selected.GetComponent<UI_NewInventoryIcon>();
+                var item = icon == null ? null : icon.Item;
+                return item?.StoneTablet;
             }
 
             public int LevelAt(GridPos cell)
