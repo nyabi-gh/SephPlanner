@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 
 namespace SephPlanner.Core.Runtime
@@ -21,12 +22,12 @@ namespace SephPlanner.Core.Runtime
             instanceId = 0;
             progress = 0;
             if (effectName is null || value is null) return false;
-            if (!effectName.StartsWith(Prefix, System.StringComparison.Ordinal)) return false;
-            if (!int.TryParse(effectName.Substring(Prefix.Length), NumberStyles.Integer,
+            if (!effectName.StartsWith(Prefix, StringComparison.Ordinal)) return false;
+            if (!int.TryParse(effectName.AsSpan(Prefix.Length), NumberStyles.Integer,
                     CultureInfo.InvariantCulture, out instanceId)) return false;
 
             var slash = value.IndexOf('/');
-            var counted = slash < 0 ? value : value.Substring(0, slash);
+            var counted = slash < 0 ? value.AsSpan() : value.AsSpan(0, slash);
             if (!int.TryParse(counted.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out progress) ||
                 progress < 0)
             {
