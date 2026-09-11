@@ -53,9 +53,20 @@ $pluginSource = Get-Content (Join-Path $root "src/SephPlanner.Plugin/Plugin.cs")
 if ($pluginSource -notmatch [regex]::Escape("[BepInPlugin(PluginGuid, ""SephPlanner"", ""$version"")]")) {
     throw "[BepInPlugin] 의 버전이 $version 이 아닙니다. Plugin.cs 를 맞추세요."
 }
-if ((Get-Content (Join-Path $root "CHANGELOG.md")) -notcontains "## $version") {
+$changelog = Get-Content (Join-Path $root "CHANGELOG.md")
+if ($changelog -notcontains "## $version") {
     throw "CHANGELOG.md 에 '## $version' 절이 없습니다."
 }
+
+# 릴리스 본문은 CHANGELOG 의 해당 절을 그대로 뽑는다. 손으로 옮겨 적으면 두 벌이 되고,
+# 한쪽만 고친 채 나가면 배포된 본문과 저장소가 갈라진다.
+$start = $changelog.IndexOf("## $version") + 1
+$end = $start
+while ($end -lt $changelog.Count -and $changelog[$end] -notlike "## *") { $end++ }
+# $start -eq $end 면 아래 범위가 거꾸로 돌아 엉뚱한 줄을 집는다. 먼저 붙잡는다.
+if ($end -le $start) { throw "CHANGELOG.md 의 '## $version' 절이 비어 있습니다." }
+$notes = ($changelog[$start..($end - 1)] -join "`n").Trim()
+if (-not $notes) { throw "CHANGELOG.md 의 '## $version' 절이 비어 있습니다." }
 
 # manifest 에 적는 커밋이 곧 태그가 가리켜야 할 커밋이다. 태그를 나중에 달면 zip 을 만든
 # 커밋과 태그가 갈라져, 어느 소스에서 나온 zip 인지 되짚을 수 없다.
@@ -148,7 +159,12 @@ try {
         $archive.Dispose()
     }
 
+    $notesPath = Join-Path $artifacts "release-notes-v$version.md"
+    Set-Content -Path $notesPath -Value $notes -Encoding utf8NoBOM
+
     Write-Host "완성: $zip"
+    Write-Host "릴리스 본문: $notesPath"
+    Write-Host "  gh release create v$version `"$zip`" -R nyabi-gh/SephPlanner-Release --notes-file `"$notesPath`""
 }
 finally {
     if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }

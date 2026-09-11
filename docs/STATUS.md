@@ -3,7 +3,7 @@
 2026-09-11. `v0.2.8`을 기준으로 필요한 수정만 가져온 결과가 `main`에 있다. 제품 버전은 0.3.3,
 카탈로그 형식은 20이며 DPS 중심 추천과 0.3.x 설정 화면은 포함하지 않는다.
 0.3.3은 Pre-release로 배포됐고 실기 검증은 아직이다. 릴리스 페이지의 Latest는 여전히 0.2.8이다.
-[기준과 패치 계획](BASELINE-0.2.8-PLAN.md)에 범위와 검증 결과를 기록한다.
+[기준과 패치 계획](BASELINE.md)에 범위와 검증 결과를 기록한다.
 아래 표는 0.2.8의 구현 범위이며 이후 버전의 감사 문서와 혼동하지 않는다.
 
 ## 구현 범위
@@ -54,14 +54,14 @@ DataTool·Plugin Release 빌드까지 통과한다. 실패·건너뛴 테스트�
 지금 설치된 바이트가 곧 이 저장소의 현재 소스다. 그 위에서의 실기는 아직 하지 않았다.
 위 검사는 자동 배치·멀티플레이·게임 내 대기 시간 검증을 대신하지 않는다.
 
-관련 문서: [배치 목표와 검증](PLACEMENT-OBJECTIVE.md), [아티팩트 선호도와 사용 유지](ARTIFACT-PREFERENCES.md),
-[계획 재현](REPRODUCTION.md), [예측 가능성](EFFECT-PREDICTION-FEASIBILITY.md),
-[효과 감사와 후속 수정](EFFECT-AUDIT-2026-09-09.md), [계산 지연 측정](PERFORMANCE-0.2.7.md),
+관련 문서: [배치 평가·선호도·사용 유지](PLACEMENT-OBJECTIVE.md),
+[계획 재현](REPRODUCTION.md), [예측 가능성](notes/EFFECT-PREDICTION-FEASIBILITY.md),
+[효과 감사와 후속 수정](notes/EFFECT-AUDIT-2026-09-09.md), [계산 지연 측정](notes/PERFORMANCE-0.2.7.md),
 [과거 측정·백로그](ROADMAP.md).
 
-제보에서 시작한 수정의 경위: [F2 콤보·친타마니](FEEDBACK-2026-09-06.md),
-[북향의 침·합작 추천](NORTH-NEEDLE-MIXER-REPORTS-2026-09-10.md), [가치 평가 점검](VALUE-AUDIT-2026-09-06.md).
-검토 보고서: [0.2.6 회귀 검토](REVIEW-0.2.6.md), [2026-09-05 전체 검토](REVIEW-2026-09-05.md).
+제보에서 시작한 수정의 경위: [F2 콤보·친타마니](notes/FEEDBACK-2026-09-06.md),
+[북향의 침·합작 추천](notes/NORTH-NEEDLE-MIXER-REPORTS-2026-09-10.md), [가치 평가 점검](notes/VALUE-AUDIT-2026-09-06.md).
+검토 보고서: [0.2.6 회귀 검토](notes/REVIEW-0.2.6.md), [2026-09-05 전체 검토](notes/REVIEW-2026-09-05.md).
 전체 검토는 그 시점의 기록이며 항목별 처리 상태를 담지 않는다. 무엇이 닫혔는지는
 [백로그](ROADMAP.md)의 "2026-09-05 2차 개선"과 [변경 기록](../CHANGELOG.md)에 나뉘어 있다.
 
