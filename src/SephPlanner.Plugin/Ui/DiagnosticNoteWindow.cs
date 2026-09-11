@@ -17,7 +17,9 @@ namespace SephPlanner.Plugin.Ui
     /// </summary>
     internal sealed class DiagnosticNoteWindow : PlannerWindow
     {
+        /// <summary>보낼 메모. <c>null</c> 이면 이번 진단을 보내지 않는다.</summary>
         private readonly Action<DiagnosticNote> _done;
+        private readonly Action _cancel;
         private readonly List<(DiagnosticCategory Category, TextMeshProUGUI Label)> _buttons =
             new List<(DiagnosticCategory, TextMeshProUGUI)>();
         private TMP_InputField _input;
@@ -25,7 +27,11 @@ namespace SephPlanner.Plugin.Ui
         private string _selected = "";
         private bool _sent;
 
-        public DiagnosticNoteWindow(Action<DiagnosticNote> done) { _done = done; }
+        public DiagnosticNoteWindow(Action<DiagnosticNote> done, Action cancel)
+        {
+            _done = done;
+            _cancel = cancel;
+        }
 
         protected override string Title => "F10 진단 메모";
         protected override float WidthRatio => 34f;
@@ -43,7 +49,7 @@ namespace SephPlanner.Plugin.Ui
         protected override void BuildBody(RectTransform content)
         {
             var ask = Widgets.Paragraph("Ask", content, Skin, S(0.85f), NativeSkin.Text);
-            ask.text = "무엇이 이상했는지 알려 주시면 훨씬 빨리 찾습니다. 둘 다 건너뛰어도 진단은 그대로 전송됩니다.";
+            ask.text = "무엇이 이상했는지 알려 주시면 훨씬 빨리 찾습니다. 적지 않고 보내도 되고, 취소하면 이번 진단은 보내지 않고 이 PC에만 남습니다.";
             Widgets.FitHeight(ask, Widgets.Fixed(ask.rectTransform, S(1f)), S(WidthRatio - 2f));
 
             BuildCategories(content);
@@ -63,9 +69,9 @@ namespace SephPlanner.Plugin.Ui
             var send = Widgets.Clickable("Send", row, Skin, S(0.85f), NativeSkin.Mint, Send);
             send.text = "보내기 (Enter)";
             Widgets.Fixed(send.rectTransform, S(1.8f), S(13f));
-            var skip = Widgets.Clickable("Skip", row, Skin, S(0.85f), NativeSkin.Text, SendWithoutNote);
-            skip.text = "메모 없이 보내기";
-            Widgets.Fixed(skip.rectTransform, S(1.8f), S(13f));
+            var cancel = Widgets.Clickable("Cancel", row, Skin, S(0.85f), NativeSkin.Text, Cancel);
+            cancel.text = "취소 (ESC)";
+            Widgets.Fixed(cancel.rectTransform, S(1.8f), S(13f));
 
             UpdateCount();
         }
@@ -124,25 +130,39 @@ namespace SephPlanner.Plugin.Ui
             if (_input != null) _input.ActivateInputField();
         }
 
-        /// <summary>ESC 는 메모를 포기하는 것이지 진단을 포기하는 것이 아니다.</summary>
+        /// <summary>ESC 는 취소다. 보내기 전에 그만둘 길이 없으면 전송을 되돌릴 수 없다.</summary>
         protected override bool HandleEscape()
         {
-            SendWithoutNote();
+            Cancel();
             return true;
         }
 
+        /// <summary>메모를 비운 채 보내는 것이 곧 "메모 없이 보내기"다.</summary>
         private void Send() => Finish(DiagnosticNote.Create(_selected, _input == null ? "" : _input.text));
 
-        private void SendWithoutNote() => Finish(DiagnosticNote.None);
+        private void Cancel() => Finish(null);
 
         private void Finish(DiagnosticNote note)
         {
-            // 버튼과 Enter, ESC 가 겹쳐 들어와도 진단이 두 번 가면 안 된다.
+            // 버튼과 Enter, ESC 가 겹쳐 들어와도 두 번 처리하면 안 된다.
             if (_sent) return;
             _sent = true;
             if (_input != null) _input.DeactivateInputField();
             Close();
-            _done(note);
+            if (note is null) _cancel();
+            else _done(note);
+        }
+
+        /// <summary>
+        /// 우리 단추가 아닌 이유로 닫혔으면(게임이 위에 다른 창을 올리는 등) 취소로 본다.
+        /// 붙잡고 있던 진단을 여기서 매듭지어야 설명 파일 없이 남지 않는다.
+        /// </summary>
+        protected override void Closed()
+        {
+            base.Closed();
+            if (_sent) return;
+            _sent = true;
+            _cancel();
         }
 
         protected override void Cleared()

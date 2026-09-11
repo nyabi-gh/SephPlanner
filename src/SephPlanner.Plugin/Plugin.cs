@@ -78,8 +78,8 @@ namespace SephPlanner.Plugin
             _prefs = PluginPreferences.Load(Logger.LogWarning);
             _window = new SettingsWindow(_settings.Rows);
             _build = new BuildWindow(_prefs, CurrentBuild);
-            _diagnosticWindow = new DiagnosticConsentWindow(ChooseDiagnosticConsent);
-            _noteWindow = new DiagnosticNoteWindow(FinishDiagnostic);
+            _diagnosticWindow = new DiagnosticConsentWindow(ChooseDiagnosticConsent, CancelDiagnostic);
+            _noteWindow = new DiagnosticNoteWindow(FinishDiagnostic, CancelDiagnostic);
             _diagnosticLog = new DiagnosticText(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Paths.GameRootPath);
             _diagnosticClient = new DiagnosticUploadClient();
             _settings.DiagnosticConsent.SettingChanged += (_, _) =>
@@ -341,9 +341,11 @@ namespace SephPlanner.Plugin
                 });
                 _pendingDiagnostic = capture;
 
-                // 보낼 수 있는 상황에서만 메모를 묻는다. 로컬에만 남길 자료에 메모를 받아 두면
-                // 읽을 사람이 없는데 창만 뜬다.
-                if (WillSendDiagnostic()) OpenDiagnosticNote();
+                // 동의를 먼저 묻고 그다음에 메모를 받는다. 보낼지도 정하지 않았는데 무슨 일이
+                // 있었는지부터 적게 하면, 안 보내기로 한 사람은 헛수고를 한 셈이 된다.
+                // 로컬에만 남길 자료에는 읽을 사람이 없으므로 아예 묻지 않는다.
+                if (_settings.DiagnosticUploadAllowed) OpenDiagnosticNote();
+                else if (ConsentPending()) OpenDiagnosticConsent(capture);
                 else FinishDiagnostic(DiagnosticNote.None);
             }
             catch (Exception ex)
@@ -356,15 +358,14 @@ namespace SephPlanner.Plugin
         private void CaptureOwnLog(object sender, BepInEx.Logging.LogEventArgs args) =>
             _diagnosticLog.Append(DateTime.UtcNow.ToString("O") + " [" + args.Level + "] " + args.Data);
 
-        /// <summary>이번 진단이 서버로 갈 수 있는 상태인가. 동의를 아직 묻지 않은 경우도 포함한다.</summary>
-        private bool WillSendDiagnostic() =>
-            _settings.DiagnosticUploadAllowed ||
+        /// <summary>아직 전송 동의를 묻거나 다시 물어야 하는 상태인가.</summary>
+        private bool ConsentPending() =>
             !_settings.DiagnosticChoiceMade.Value || _settings.DiagnosticConsent.Value.Length > 0;
 
         private void OpenDiagnosticNote()
         {
             _noteWindow.Reset();
-            if (!_noteWindow.IsOpen) _noteWindow.Toggle("ESC: 메모 없이 보내기");
+            if (!_noteWindow.IsOpen) _noteWindow.Toggle("Enter: 보내기 · ESC: 취소");
             if (_noteWindow.Blocker.Length == 0) return;
 
             // 창을 못 열었다고 진단을 버리지 않는다. 메모 없이 하던 대로 보낸다.
@@ -372,24 +373,46 @@ namespace SephPlanner.Plugin
             FinishDiagnostic(DiagnosticNote.None);
         }
 
-        /// <summary>메모가 정해진 뒤에 설명 파일을 쓰고 전송 또는 로컬 보관으로 넘긴다.</summary>
-        private void FinishDiagnostic(DiagnosticNote note)
+        /// <summary>설명 파일을 쓴다. 실패하면 화면에 알리고 거짓을 돌려준다.</summary>
+        private bool WriteDiagnostic(DiagnosticCapture capture, DiagnosticNote note)
         {
-            var capture = _pendingDiagnostic;
-            _pendingDiagnostic = null;
-            if (capture == null) return;
             try
             {
                 capture.Finish(PluginIdentity.Describe(),
                     ReplayPreferences.From(_prefs.ToPreferences(_settings.Recommendations.Value)), note);
                 Logger.LogInfo("이번 진단 보관 위치: " + capture.DirectoryPath);
+                return true;
             }
             catch (Exception ex)
             {
                 Logger.LogError("진단 설명 저장 실패: " + ex);
                 ReportDiagnostic("진단 설명을 저장하지 못했습니다. BepInEx 로그를 확인하세요.");
-                return;
+                return false;
             }
+        }
+
+        /// <summary>
+        /// 보내지 않기로 했다. 수집한 자료는 그대로 로컬에 남긴다 - 취소는 전송을 그만두는 것이지
+        /// 진단을 버리는 것이 아니다. 전송을 시작하지 않으므로 전송 간격 제한도 쓰지 않는다.
+        /// </summary>
+        private void CancelDiagnostic()
+        {
+            var cancelled = _pendingDiagnostic;
+            _pendingDiagnostic = null;
+            if (cancelled == null || !WriteDiagnostic(cancelled, DiagnosticNote.None)) return;
+
+            ReportDiagnostic(cancelled.HasFailures
+                ? "이번 진단은 보내지 않았습니다. 저장한 자료와 실패 기록은 이 PC에만 있습니다."
+                : "이번 진단은 보내지 않았습니다. 자료는 이 PC에만 있습니다.");
+        }
+
+        /// <summary>메모가 정해진 뒤에 설명 파일을 쓰고 전송 또는 로컬 보관으로 넘긴다.</summary>
+        private void FinishDiagnostic(DiagnosticNote note)
+        {
+            var capture = _pendingDiagnostic;
+            _pendingDiagnostic = null;
+            if (capture == null || !WriteDiagnostic(capture, note)) return;
+
             if (_settings.DiagnosticUploadAllowed) StartDiagnosticUpload(capture);
             else if (!_settings.DiagnosticChoiceMade.Value || _settings.DiagnosticConsent.Value.Length > 0) OpenDiagnosticConsent(capture);
             else ReportDiagnostic(capture.HasFailures
@@ -414,15 +437,26 @@ namespace SephPlanner.Plugin
             catch (Exception ex)
             {
                 Logger.LogError("진단 전송 설정 저장 실패: " + ex);
+                var stranded = _pendingDiagnostic;
+                _pendingDiagnostic = null;
+                if (stranded != null) WriteDiagnostic(stranded, DiagnosticNote.None);
                 ReportDiagnostic("전송 설정을 저장하지 못했습니다. 이번 진단은 로컬에 보관합니다.");
                 return;
             }
+            _window.Refresh();
+
+            // 이제 보내도 된다는 답을 받았으니 무슨 일이 있었는지 묻는다. 전송은 그 뒤다.
+            if (allowed && _pendingDiagnostic != null)
+            {
+                OpenDiagnosticNote();
+                return;
+            }
+
             var capture = _pendingDiagnostic;
             _pendingDiagnostic = null;
-            if (allowed && capture != null) StartDiagnosticUpload(capture);
-            else ReportDiagnostic(allowed ? "이후 F10 진단을 비공개 서버로 전송합니다." :
+            if (capture != null && !WriteDiagnostic(capture, DiagnosticNote.None)) return;
+            ReportDiagnostic(allowed ? "이후 F10 진단을 비공개 서버로 전송합니다." :
                 capture?.HasFailures == true ? "진단 일부 저장에 실패했습니다. 실패 기록은 로컬에 보관합니다." : "진단은 로컬에만 저장합니다.");
-            _window.Refresh();
         }
 
         private void StartDiagnosticUpload(DiagnosticCapture capture)

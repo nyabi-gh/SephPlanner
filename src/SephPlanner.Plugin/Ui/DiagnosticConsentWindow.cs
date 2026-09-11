@@ -7,9 +7,15 @@ namespace SephPlanner.Plugin.Ui
     internal sealed class DiagnosticConsentWindow : PlannerWindow
     {
         private readonly Action<bool> _choose;
+        private readonly Action _dismissed;
         private TextMeshProUGUI _local;
+        private bool _answered;
 
-        public DiagnosticConsentWindow(Action<bool> choose) { _choose = choose; }
+        public DiagnosticConsentWindow(Action<bool> choose, Action dismissed)
+        {
+            _choose = choose;
+            _dismissed = dismissed;
+        }
         protected override string Title => "F10 진단 전송";
         protected override float WidthRatio => 34f;
         protected override GameObject DefaultFocus => _local == null ? null : _local.gameObject;
@@ -37,8 +43,20 @@ namespace SephPlanner.Plugin.Ui
 
         private void Select(bool allowed)
         {
+            _answered = true;
             Close();
             _choose(allowed);
+        }
+
+        /// <summary>
+        /// ESC 로 닫은 것은 "이번에는 전송하지 않기"다. 설정은 그대로 두되, 붙잡고 있던 진단은
+        /// 여기서 매듭지어야 한다 - 그러지 않으면 수집한 자료가 설명 파일 없이 남는다.
+        /// </summary>
+        protected override void Closed()
+        {
+            base.Closed();
+            if (_answered) return;
+            _dismissed();
         }
 
         protected override void Cleared() { _local = null; }
