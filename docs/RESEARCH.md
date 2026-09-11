@@ -208,6 +208,28 @@ public void Swap(sbyte xLeft, sbyte yLeft, sbyte xRight, sbyte yRight)
 여므로, **우리 Permission 스코프 안에서 Swap 을 부르면 권한 중복으로 터진다.** 이동과 회전을
 분리한 이유다.
 
+`GetPermission` 은 이미 권한이 있으면 오류만 남기고 **설정하지 않는데**, 안쪽 `Dispose` 는 그대로
+`ReleasePermission` 을 불러 바깥 스코프의 권한을 먼저 푼다. 중첩이 조용히 깨지는 것이 아니라
+바깥의 재계산 시점을 앗아가는 모양이다.
+
+**각도만 쓰면 화면이 따라오지 않는다(2026-09-11).** 게임의 `StoneTablet.Rotate` 는 두 가지를 한다.
+
+```
+Networkrotation = rotation + 1;
+NetworkInventory.SendMessageTabletRotated(this, rotation);
+```
+
+둘째가 `RpcSendMessageTabletRotated`(ClientRpc, includeOwner) → `OnTabletRotatedClientside` →
+`UI_CharacterStatusPanel.HandleTabletRotated` → `OnItemSelected` 로 이어지고, 거기서 석판의 범위
+테두리(`stoneTabletFrame.SetActivePlaced`)를 다시 그린다. `Networkrotation` 은 SyncVar 라 값 자체는
+퍼지지만 **테두리는 이 알림을 받아야 갱신된다.** 우리가 첫째만 하던 동안 옛 각도의 테두리가 남았고
+가방을 다시 열어야 사라졌다. 참가자 경로는 `DoClickAction` → `Rotate` 라 처음부터 해당이 없었다.
+
+**이동 뒤에도 게임은 화면을 다시 잡는다.** 드래그로 옮기는 자리는 `Swap` 다음에
+`OnItemSelected(icon, -1)` 을 부르는데, 그 첫 동작이 모든 `stoneTabletFrame` 과 `dependencyFrame`
+을 끄는 것이다. 우리는 부르지 않으므로 같은 부류의 잔상이 남을 수 있다. 고치려면 게임의 선택
+상태를 우리가 운전해야 해서 아직 손대지 않았다.
+
 **참가자로 접속한 세션에서는 `Networkrotation` 을 쓸 수 없다.** SyncVar 라 클라이언트에서 써 봐야
 서버 값이 덮는다. 대신 우클릭이 타는 길이 있다:
 
