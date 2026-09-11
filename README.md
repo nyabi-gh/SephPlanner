@@ -111,6 +111,10 @@ dotnet run --project src/SephPlanner.DataTool -- --measure
 아티팩트 하나하나의 값어치가 어디까지 측정됐는지 보고, 아직 레어도 어림값에 기대고 있는 것들을
 손으로 채울 초안으로 뽑는다. 채우는 법은 [data/values/README.md](data/values/README.md) 참고.
 
+**레벨이 올라도 값어치가 내려가는 아티팩트도 함께 적는다.** 그런 구간이 있으면 낮은 레벨 칸이
+정답이 되어 "왜 이걸 낮은 자리에 두느냐"는 제보가 온다. 원인이 된 능력치와 그 수치 변화까지
+적으므로 환산율을 어디서 다시 재야 하는지가 바로 나온다.
+
 ```powershell
 dotnet run --project src/SephPlanner.DataTool -- --values
 ```

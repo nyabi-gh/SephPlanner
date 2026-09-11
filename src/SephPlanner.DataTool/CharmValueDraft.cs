@@ -57,8 +57,16 @@ public static class CharmValueDraft
         var floors = new List<CharmDefinition>();
         var blank = new List<CharmDefinition>();
         var handWritten = 0;
+        var noEffect = 0;
         foreach (var charm in charms)
         {
+            // 자체 활성 효과가 없는 것은 값어치 0 이 답이라 채울 몫이 아니다. 측정한 것과 같은
+            // 칸에 세면 "잰 것"이 한 종 부풀고 아래 분포의 표본 수와도 어긋난다.
+            if (charm.HasNoActivationEffect)
+            {
+                noEffect++;
+                continue;
+            }
             switch (CharmWorth.Resolve(charm, curated.Of(charm)).Source)
             {
                 case CharmWorthSource.Curated: handWritten++; break;
@@ -72,6 +80,7 @@ public static class CharmValueDraft
         Console.WriteLine($"  잰 값이 값어치 전부  {measured.Count,4}종  (능력치만 주는 아티팩트)");
         Console.WriteLine($"  측정과 어림값 병용   {floors.Count,4}종  (미환산 능력치 또는 고유 효과가 있다)");
         Console.WriteLine($"  레어도 어림값뿐      {blank.Count,4}종  <- 손으로 채울 몫");
+        Console.WriteLine($"  자체 활성 효과 없음  {noEffect,4}종  (값어치 0 이 답이다)");
         Console.WriteLine();
 
         Quantiles(measured);
@@ -88,6 +97,8 @@ public static class CharmValueDraft
                 Console.WriteLine($"  {Name(charm),-22} 신뢰 {charm.StatWorthConfidence:0.00}");
             Console.WriteLine();
         }
+
+        Curves(charms, curated);
 
         // 142종을 순서 없이 늘어놓으면 어디부터 손대야 할지 알 수 없다. 실제로 자주 만나는
         // 것부터 오도록, 도감 밖 경로로만 들어오는 아티팩트를 뒤로 미루고 레어도 높은 순으로 둔다.
@@ -146,6 +157,35 @@ public static class CharmValueDraft
     {
         public int Version { get; set; }
         public List<DraftEntry> Charms { get; set; } = new();
+    }
+
+    /// <summary>
+    /// 레벨이 올라도 값어치가 내려가는 아티팩트. 솔버는 값어치가 큰 배치를 고르므로 그런 구간이
+    /// 있으면 낮은 레벨 칸이 정답이 되고, 사용자에게는 "왜 낮은 자리에 박아 두느냐"로 보인다.
+    /// 여기 오르는 것이 같은 제보가 올 자리의 목록이다.
+    /// </summary>
+    private static void Curves(List<CharmDefinition> charms, CharmValueBook curated)
+    {
+        var found = charms
+            .Select(charm => (Charm: charm, Drops: WorthCurveReview.Of(charm, curated.Of(charm))))
+            .Where(row => row.Drops.Count > 0)
+            .OrderBy(row => row.Drops.Min(drop => drop.Delta))
+            .ToList();
+        if (found.Count == 0) return;
+
+        Console.WriteLine($"레벨이 올라도 값어치가 내려가는 것 {found.Count}종 - 낮은 칸이 정답이 되는 자리다");
+        foreach (var (charm, drops) in found)
+            foreach (var drop in drops)
+            {
+                var cause = drop.Cause.Length == 0
+                    ? ""
+                    : $"  {drop.Cause} {drop.CauseFromAmount} -> {drop.CauseToAmount}";
+                Console.WriteLine($"  {Name(charm),-22} 레벨 {drop.FromLevel} -> {drop.ToLevel}  "
+                                  + $"{drop.Delta,6:0.00}{cause}");
+            }
+        Console.WriteLine("  고칠 곳은 솔버가 아니라 능력치 환산율이나 charms.json 이다.");
+        Console.WriteLine("  비단조 자체는 금지하지 않는다(docs/PLACEMENT-OBJECTIVE.md 의 \"탐색과 최적성\").");
+        Console.WriteLine();
     }
 
     /// <summary>

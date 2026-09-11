@@ -19,8 +19,11 @@ public static class PriceProxy
 
     public static void Report(IReadOnlyList<CharmDefinition> charms)
     {
+        // 자체 활성 효과가 없는 아티팩트도 값어치를 "안다"는 쪽으로 분류되지만 능력치 표가 없다.
+        // 표를 요구하지 않으면 마음의 짐에서 터진다.
         var samples = charms
-            .Where(c => CharmWorth.Resolve(c).Source == CharmWorthSource.Measured)
+            .Where(c => c.StatWorthByLevel.Count > 0 &&
+                        CharmWorth.Resolve(c).Source == CharmWorthSource.Measured)
             .Select(c => new Sample(
                 c.Names.TryGetValue("current", out var name) ? name : c.Id,
                 c.StatWorthByLevel[^1], c.Cost, c.SapphirePrice, c.Rarity))
