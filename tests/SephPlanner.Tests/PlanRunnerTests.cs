@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
+using SephPlanner.Core.Solver;
 
 namespace SephPlanner.Tests;
 
@@ -19,7 +20,7 @@ public class PlanRunnerTests
         var cancelled = false;
         PlanBuildOperation build = (
             GameSnapshot _, ICatalog _, PlanPreferences _,
-            out PlanBlocker blocker, Plan? _, CancellationToken cancellation) =>
+            out PlanBlocker blocker, Plan? _, LayoutCache _2, CancellationToken cancellation) =>
         {
             blocker = PlanBlocker.None;
             Interlocked.Increment(ref calls);
@@ -51,7 +52,7 @@ public class PlanRunnerTests
         var calls = new ConcurrentQueue<int>();
         PlanBuildOperation build = (
             GameSnapshot snapshot, ICatalog _, PlanPreferences _,
-            out PlanBlocker blocker, Plan? _, CancellationToken _) =>
+            out PlanBlocker blocker, Plan? _, LayoutCache _2, CancellationToken _3) =>
         {
             blocker = PlanBlocker.None;
             var storage = snapshot.Inventory!.Storage;
@@ -81,7 +82,7 @@ public class PlanRunnerTests
         var calls = 0;
         PlanBuildOperation build = (
             GameSnapshot snapshot, ICatalog _, PlanPreferences _,
-            out PlanBlocker blocker, Plan? _, CancellationToken _) =>
+            out PlanBlocker blocker, Plan? _, LayoutCache _2, CancellationToken _3) =>
         {
             blocker = PlanBlocker.None;
             var call = Interlocked.Increment(ref calls);
@@ -110,7 +111,7 @@ public class PlanRunnerTests
         var calls = 0;
         PlanBuildOperation build = (
             GameSnapshot snapshot, ICatalog _, PlanPreferences _,
-            out PlanBlocker blocker, Plan? _, CancellationToken _) =>
+            out PlanBlocker blocker, Plan? _, LayoutCache _2, CancellationToken _3) =>
         {
             blocker = PlanBlocker.None;
             if (Interlocked.Increment(ref calls) == 2) throw new InvalidOperationException("broken");
@@ -138,7 +139,7 @@ public class PlanRunnerTests
     {
         PlanBuildOperation build = (
             GameSnapshot _, ICatalog _, PlanPreferences _,
-            out PlanBlocker blocker, Plan? _, CancellationToken _) =>
+            out PlanBlocker blocker, Plan? _, LayoutCache _2, CancellationToken _3) =>
         {
             blocker = PlanBlocker.None;
             return new Plan();
@@ -167,7 +168,7 @@ public class PlanRunnerTests
         var calls = 0;
         PlanBuildOperation build = (
             GameSnapshot _, ICatalog _, PlanPreferences _,
-            out PlanBlocker blocker, Plan? _, CancellationToken cancellation) =>
+            out PlanBlocker blocker, Plan? _, LayoutCache _2, CancellationToken cancellation) =>
         {
             blocker = PlanBlocker.None;
             if (Interlocked.Increment(ref calls) == 1)

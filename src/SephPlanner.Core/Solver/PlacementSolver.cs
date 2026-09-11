@@ -11,10 +11,17 @@ namespace SephPlanner.Core.Solver
     public static class PlacementSolver
     {
         private const double PlanBonus = 2e-8;
-        public static Arrangement Solve(PlacementProblem problem, SolverOptions? options = null)
+
+        /// <param name="layouts">
+        /// 빔 탐색을 받아 올 자리. <see cref="ImproveTablets"/>가 private 이라 밖에서는 이 순서를
+        /// 다시 엮을 수 없어 여기서 받는다.
+        /// </param>
+        public static Arrangement Solve(
+            PlacementProblem problem, SolverOptions? options = null, LayoutCache? layouts = null)
         {
             options ??= new SolverOptions();
-            return ImproveTablets(problem, EvaluateLayouts(problem, SearchLayouts(problem, options), options), options);
+            var candidates = layouts is null ? SearchLayouts(problem, options) : layouts.Of(problem, options);
+            return ImproveTablets(problem, EvaluateLayouts(problem, candidates, options), options);
         }
 
         internal static void CaptureProtectedActivation(PlacementProblem problem)
@@ -80,19 +87,41 @@ namespace SephPlanner.Core.Solver
             PlacementProblem problem, SolverOptions? options = null)
         {
             options ??= new SolverOptions();
+            return WithCurrentAndPlanned(problem, SearchBeam(problem, options));
+        }
+
+        /// <summary>
+        /// 빔이 찾아낸 것만. <b>캐시에 들어가는 것은 여기까지다.</b>
+        ///
+        /// 돌려주는 배치들은 석판 수가 서로 같다 - 한 석판을 놓는 단계마다 빔을 통째로 갈아
+        /// 끼우므로, 놓을 자리가 모자라 도중에 멈추면 남은 것은 전부 같은 수까지만 놓은 배치다.
+        /// <see cref="WithCurrentAndPlanned"/>가 완전한 배치만 고르는 근거다.
+        /// </summary>
+        internal static List<List<TabletPlacement>> SearchBeam(
+            PlacementProblem problem, SolverOptions options)
+        {
             CaptureProtectedActivation(problem);
 
             var cells = Cells(problem);
             var model = BuildEstimateModel(problem);
-            var searched = SearchTabletLayouts(problem, cells, options, model);
+            return SearchTabletLayouts(problem, cells, options, model)
+                .Take(options.ExactCandidates)
+                .ToList();
+        }
 
+        /// <summary>
+        /// 빔의 후보에 지금 배치와 직전 계획의 배치를 얹는다. 그 둘은 폴링마다 달라지므로
+        /// 캐시에 담지 않고 부를 때마다 이 판에서 다시 짓는다.
+        /// </summary>
+        internal static List<List<TabletPlacement>> WithCurrentAndPlanned(
+            PlacementProblem problem, List<List<TabletPlacement>> beam)
+        {
             // 놓을 자리가 모자라면 탐색이 석판 일부를 뺀 배치를 내놓는다. 그런 배치를 그대로
             // 채점하면 존재하는 석판을 무시한 점수를 최적이라고 말하게 되므로, 완전한 배치가
             // 하나라도 있으면 불완전한 것은 버린다.
-            var candidates = searched
-                .Where(layout => layout.Count == problem.Tablets.Count)
-                .Take(options.ExactCandidates)
-                .ToList();
+            var candidates = new List<List<TabletPlacement>>(beam.Count + 2);
+            foreach (var layout in beam)
+                if (layout.Count == problem.Tablets.Count) candidates.Add(layout);
 
             // 탐색이 현재 배치를 후보에서 떨어뜨리면, 이미 최적인 배치를 두고도 옮기라고 하게 된다.
             var asIs = Layout(problem, problem.CurrentTablets);
@@ -100,13 +129,12 @@ namespace SephPlanner.Core.Solver
 
             // 직전 제안의 배치도 마찬가지다. 빔이 떨어뜨리면 같은 점수의 다른 배치로 갈아타
             // 따라가던 계획이 통째로 다시 쓰인다.
-            var asPlanned = PlannedLayout(problem, cells, model);
+            var asPlanned = PlannedLayout(problem);
             if (asPlanned != null) candidates.Insert(0, asPlanned);
 
             // 완전한 배치가 아예 없으면(석판이 열린 칸보다 많은 극단) 놓을 수 있는 만큼이라도
             // 평가하되, Describe 가 빠진 수를 UnplacedTablets 로 남겨 호출자가 알 수 있게 한다.
-            if (candidates.Count == 0)
-                candidates = searched.Take(options.ExactCandidates).ToList();
+            if (candidates.Count == 0) candidates.AddRange(beam);
 
             return candidates;
         }
@@ -370,10 +398,11 @@ namespace SephPlanner.Core.Solver
         /// 두고 새 것만 남는 칸에서 탐욕으로 앉힌다 - 새 석판이 올 때마다 앵커가 통째로 사라지면,
         /// 정확히 개편이 가장 큰 그 순간에 계획이 다시 쓰인다(실측 녹화에서 그랬다).
         /// </summary>
-        private static List<TabletPlacement>? PlannedLayout(
-            PlacementProblem problem, List<GridPos> cells, EstimateModel model)
+        private static List<TabletPlacement>? PlannedLayout(PlacementProblem problem)
         {
             if (problem.Tablets.Count == 0 || problem.PlannedTablets.Count == 0) return null;
+
+            var cells = Cells(problem);
 
             // 직전 계획은 그때의 상황에서 나온 것이라 지금은 실행할 수 없을 수 있다. 그 사이에
             // 회전이 잠겼거나(저주) 가방이 줄어 칸이 닫혔으면, 그 석판만 계획에서 떼어 아래 탐욕
@@ -398,6 +427,10 @@ namespace SephPlanner.Core.Solver
 
             // 후보 배치는 problem.Tablets 순서를 지켜야 한다. Describe 와 Targets 가 같은
             // 순번끼리 짝짓는다.
+            //
+            // 어림 모델은 계획에서 빠진 석판이 있을 때만 짓는다. 빔을 돌려 쓰면 탐색을 건너뛰고도
+            // 이 자리는 호출마다 지나가기 때문이다.
+            EstimateModel? model = null;
             var layout = new List<TabletPlacement>(problem.Tablets.Count);
             foreach (var slot in problem.Tablets)
             {
@@ -407,6 +440,7 @@ namespace SephPlanner.Core.Solver
                     continue;
                 }
 
+                model ??= BuildEstimateModel(problem);
                 var rotations = DistinctRotations(slot, CurrentRotation(problem, slot));
 
                 List<TabletPlacement>? grown = null;
@@ -579,7 +613,7 @@ namespace SephPlanner.Core.Solver
         /// 나온다 - 실제 세션에서 관측됐다.
         /// </summary>
         /// <summary>지금 돌아가 있는 각도. 아직 집지 않은 석판은 0 이다.</summary>
-        private static int CurrentRotation(PlacementProblem problem, TabletSlot slot) =>
+        internal static int CurrentRotation(PlacementProblem problem, TabletSlot slot) =>
             problem.CurrentTablets.TryGetValue(slot.InstanceId, out var spot) ? spot.Rotation : 0;
 
         private static List<int> DistinctRotations(TabletSlot slot, int currentRotation)

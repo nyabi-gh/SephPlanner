@@ -62,6 +62,9 @@ namespace SephPlanner.Core.Planning
         /// 직전에 내놓은 계획. 동점 배치 사이에서 저번에 말한 쪽을 고르는 앵커로만 쓰이고,
         /// 점수가 실제로 나은 배치를 이기지는 못한다.
         /// </param>
+        /// <param name="layouts">
+        /// 계획 사이에 빔 탐색을 돌려 쓸 자리. <c>PlanRunner</c>가 들고 넘긴다.
+        /// </param>
         /// <param name="cancellation">
         /// 이 계획이 이미 쓸모없어졌다는 신호. 켜지면 풀이가 그 자리에서
         /// <see cref="OperationCanceledException"/> 을 던지고, 여기서 그것을 <c>null</c> 로 바꾼다 -
@@ -70,12 +73,12 @@ namespace SephPlanner.Core.Planning
         /// </param>
         public static Plan? Build(
             GameSnapshot snapshot, ICatalog catalog, PlanPreferences? preferences,
-            out PlanBlocker blocker, Plan? previous = null,
+            out PlanBlocker blocker, Plan? previous = null, LayoutCache? layouts = null,
             CancellationToken cancellation = default)
         {
             try
             {
-                return Attempt(snapshot, catalog, preferences, out blocker, previous, cancellation);
+                return Attempt(snapshot, catalog, preferences, out blocker, previous, layouts, cancellation);
             }
             catch (OperationCanceledException)
             {
@@ -86,10 +89,16 @@ namespace SephPlanner.Core.Planning
 
         private static Plan? Attempt(
             GameSnapshot snapshot, ICatalog catalog, PlanPreferences? preferences,
-            out PlanBlocker blocker, Plan? previous, CancellationToken cancellation)
+            out PlanBlocker blocker, Plan? previous, LayoutCache? layouts, CancellationToken cancellation)
         {
             blocker = PlanBlocker.None;
             preferences ??= PlanPreferences.None;
+
+            // 기준 배치와 두 조언이 같은 탐색을 나눠 쓴다. 따로 풀면 같은 탐색을 두 번 돌리는
+            // 셈이고, 그 한 번이 실측에서 백 밀리초대다. 부르는 쪽이 들고 있으면 그 나눠 쓰기가
+            // 계획 사이까지 이어진다.
+            layouts ??= new LayoutCache();
+            layouts.BeginPlan();
             var values = preferences.CharmValues;
             var inventory = snapshot.Inventory;
             if (inventory is null || inventory.Storage <= 0)
@@ -210,7 +219,7 @@ namespace SephPlanner.Core.Planning
 
             var current = PlacementSolver.Score(problem, layout, positions);
             var verification = Verify(inventory, current, grid);
-            var best = PlacementSolver.Solve(problem, new SolverOptions { Cancellation = cancellation });
+            var best = PlacementSolver.Solve(problem, new SolverOptions { Cancellation = cancellation }, layouts);
 
             // 조건부 배정은 수렴하지 않을 수 있으므로 현재 배치도 같은 우선순위로 비교한다.
             if (PriorityComboPlacement.Compare(best, current) < 0) best = current;
@@ -221,10 +230,6 @@ namespace SephPlanner.Core.Planning
             var discards = new List<DiscardAdvice>();
             if (preferences.Recommendations)
             {
-                // 두 조언이 같은 기준 배치를 쓴다. 따로 풀면 같은 탐색을 두 번 돌리는 셈이고,
-                // 그 한 번이 실측에서 백 밀리초대다.
-                var layouts = new LayoutCache();
-
                 // 합성기를 이미 썼으면 이 층에서는 더 권할 것이 없다.
                 if (snapshot.Mixer is { Used: false } mixer)
                 {

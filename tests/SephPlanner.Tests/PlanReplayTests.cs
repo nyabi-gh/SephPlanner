@@ -88,14 +88,14 @@ public sealed class PlanReplayTests : IDisposable
         using var release = new ManualResetEventSlim();
         var calls = 0;
         PlanBuildOperation build = (GameSnapshot input, ICatalog source, PlanPreferences prefs,
-            out PlanBlocker blocker, Plan? previous, CancellationToken cancellation) =>
+            out PlanBlocker blocker, Plan? previous, LayoutCache layouts, CancellationToken cancellation) =>
         {
             if (Interlocked.Increment(ref calls) > 1)
             {
                 entered.Set();
                 Assert.True(release.Wait(TimeSpan.FromSeconds(10), CancellationToken.None));
             }
-            return PlanBuilder.Build(input, source, prefs, out blocker, previous, cancellation);
+            return PlanBuilder.Build(input, source, prefs, out blocker, previous, layouts, cancellation);
         };
         using var runner = new PlanRunner(catalog, build);
         runner.Submit(snapshot, preferences, "saved");
@@ -127,11 +127,11 @@ public sealed class PlanReplayTests : IDisposable
     {
         var (catalog, snapshot, preferences) = Inputs();
         PlanBuildOperation build = (GameSnapshot input, ICatalog source, PlanPreferences prefs,
-            out PlanBlocker blocker, Plan? previous, CancellationToken cancellation) =>
+            out PlanBlocker blocker, Plan? previous, LayoutCache layouts, CancellationToken cancellation) =>
         {
             blocker = PlanBlocker.None;
             if (input.Run!.Gold == 0) throw new InvalidOperationException("합성 실패");
-            return PlanBuilder.Build(input, source, prefs, out blocker, previous, cancellation);
+            return PlanBuilder.Build(input, source, prefs, out blocker, previous, layouts, cancellation);
         };
         using var runner = new PlanRunner(catalog, build);
         runner.Submit(snapshot, preferences, "saved");

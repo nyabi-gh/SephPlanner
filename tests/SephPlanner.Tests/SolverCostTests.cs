@@ -1,5 +1,6 @@
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
+using SephPlanner.Core.Runtime;
 using SephPlanner.Core.Solver;
 using SephPlanner.Core.Tablets;
 
@@ -215,5 +216,102 @@ public class SolverCostTests
         Assert.Equal(problem.Tablets.Count, baseline.Tablets.Count);
         Assert.Equal(problem.Charms.Count, baseline.CharmPositions.Count);
         Assert.Equal(1, warm.Searches);
+    }
+
+    /// <summary>
+    /// <see cref="FullBag"/>와 같은 모양을 스냅샷으로. 빔을 계획 사이에 돌려 쓰는 자리가
+    /// <see cref="PlanBuilder"/>라 여기서는 판이 아니라 스냅샷이어야 한다. 검증이 통과해야
+    /// 계획이 목표를 내놓고, 그래야 다음 계획이 직전 계획을 앵커로 받는다.
+    /// </summary>
+    private static (GameSnapshot Snapshot, Catalog Catalog) Board()
+    {
+        const int tablets = 3;
+        const int charms = 11;
+        var grid = new GridSpec(6, 7, tablets + charms);
+        var queries = new[] { "RIGHT 1", "HORIZONTAL 2", "UP 1" };
+
+        var tabletDefinitions = new List<TabletDefinition>
+        {
+            new() { Id = "mixed", EntityId = TabletMix.ResultEntityId },
+            new() { Id = "ot", EntityId = 400, Query = "RIGHT 2" },
+        };
+        var charmDefinitions = new List<CharmDefinition>
+        {
+            new() { Id = "oc", EntityId = 300, MaxLevel = 5, Rarity = Rarity.Rare },
+        };
+        var inventory = new InventoryState { Width = grid.Width, Height = grid.Height, Storage = grid.Storage };
+
+        for (var i = 0; i < tablets; i++)
+        {
+            tabletDefinitions.Add(new TabletDefinition { Id = "t" + i, EntityId = 700 + i, Query = queries[i] });
+            inventory.Tablets.Add(new PlacedTablet
+            {
+                DefinitionId = 700 + i,
+                InstanceId = 900 + i,
+                Position = grid.ToPosition(i),
+            });
+        }
+        for (var i = 0; i < charms; i++)
+        {
+            charmDefinitions.Add(new CharmDefinition { Id = "c" + i, EntityId = 200 + i, MaxLevel = 5 });
+            inventory.Items.Add(new PlacedItem
+            {
+                DefinitionId = 200 + i,
+                InstanceId = i,
+                Position = grid.ToPosition(tablets + i),
+            });
+        }
+
+        var snapshot = new GameSnapshot
+        {
+            Inventory = inventory,
+            Run = new RunState { Gold = 1000 },
+            Mixer = new MixerState { Cost = 0 },
+        };
+        snapshot.Offers.Add(new OfferedItem { DefinitionId = 300, Kind = "charm", SlotIndex = 0 });
+        snapshot.Offers.Add(new OfferedItem { DefinitionId = 400, Kind = "tablet", SlotIndex = 1 });
+
+        var catalog = new Catalog(tabletDefinitions, charmDefinitions);
+        var probe = PlanBuilder.Build(snapshot, catalog, new PlanPreferences { Recommendations = false })!;
+        inventory.LevelMatrix = probe.Current.CellLevels.ToDictionary(p => $"{p.Key.X},{p.Key.Y}", p => p.Value);
+        inventory.DisabledCells = probe.Current.DisabledCells.Select(c => $"{c.X},{c.Y}").ToList();
+        foreach (var item in inventory.Items)
+        {
+            item.EffectiveLevel = probe.Current.Levels.TryGetValue(item.Position, out var level) ? level : 0;
+            item.IsActive = !probe.Current.DisabledCells.Contains(item.Position);
+        }
+        foreach (var tablet in inventory.Tablets)
+            tablet.IsApplied = probe.Current.AppliedTablets.TryGetValue(tablet.InstanceId, out var applied) && applied;
+        return (snapshot, catalog);
+    }
+
+    /// <summary>
+    /// 같은 스냅샷을 다시 풀면 빔은 한 번도 다시 돌지 않고, 나오는 계획도 새로 탐색한 것과 같다.
+    ///
+    /// 캐시가 계획 하나보다 오래 살면서 생긴 약속이다. 돌려 쓰기가 듣는지는 탐색 횟수가, 답이
+    /// 같은지는 재현 결과 대조가 말한다 - 둘 중 하나만 보면 "아무것도 안 하고 빨라졌다"를
+    /// 놓친다.
+    /// </summary>
+    [Fact]
+    public void ResolvingTheSameSnapshotSearchesNothingAndPlansTheSame()
+    {
+        var (snapshot, catalog) = Board();
+        var preferences = new PlanPreferences();
+
+        var warm = new LayoutCache();
+        var first = PlanBuilder.Build(snapshot, catalog, preferences, out _, null, warm)!;
+        Assert.True(first.Verification.Passed, first.Verification.Reason);
+        Assert.NotEmpty(first.Targets);
+
+        // 직전 계획이 처음 붙는 판까지가 입력이 달라지는 구간이다. 여기부터가 평소다.
+        PlanBuilder.Build(snapshot, catalog, preferences, out _, first, warm);
+        var searched = warm.Searches;
+        Assert.True(searched > 0);
+
+        var cached = PlanBuilder.Build(snapshot, catalog, preferences, out _, first, warm)!;
+        var fresh = PlanBuilder.Build(snapshot, catalog, preferences, out _, first, new LayoutCache())!;
+
+        Assert.Equal(searched, warm.Searches);
+        Assert.Empty(ReplayResult.From(fresh).Differences(ReplayResult.From(cached)));
     }
 }

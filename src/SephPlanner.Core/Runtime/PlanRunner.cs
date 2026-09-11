@@ -1,12 +1,13 @@
 using System;
 using System.Threading;
 using SephPlanner.Core.Planning;
+using SephPlanner.Core.Solver;
 
 namespace SephPlanner.Core.Runtime
 {
     public delegate Plan? PlanBuildOperation(
         GameSnapshot snapshot, ICatalog catalog, PlanPreferences preferences,
-        out PlanBlocker blocker, Plan? previous, CancellationToken cancellation);
+        out PlanBlocker blocker, Plan? previous, LayoutCache layouts, CancellationToken cancellation);
 
     public sealed class PlanRunState
     {
@@ -52,6 +53,15 @@ namespace SephPlanner.Core.Runtime
         private readonly ICatalog _catalog;
         private readonly PlanBuildOperation _build;
         private readonly TimeSpan _retryDelay;
+
+        /// <summary>
+        /// 계획 사이에 돌려 쓰는 빔 탐색. 아티팩트를 하나 옮기기만 해도 판이 다시 풀리는데 석판이
+        /// 그대로면 빔은 같은 것을 다시 찾을 뿐이고, 평소 재계산의 여덟 할이 그 한 번이다.
+        /// 계획 맥락(카탈로그 세대와 설정)이 바뀌면 값어치 표와 배치 조건이 함께 달라지므로,
+        /// 열쇠에 세는 대신 캐시를 통째로 새로 짓는다.
+        /// </summary>
+        private LayoutCache _layouts = new LayoutCache();
+        private string _layoutsContext = "";
 
         private Request? _running;
         private Request? _pending;
@@ -152,8 +162,8 @@ namespace SephPlanner.Core.Runtime
 
         private static Plan? Build(
             GameSnapshot snapshot, ICatalog catalog, PlanPreferences preferences,
-            out PlanBlocker blocker, Plan? previous, CancellationToken cancellation) =>
-            PlanBuilder.Build(snapshot, catalog, preferences, out blocker, previous, cancellation);
+            out PlanBlocker blocker, Plan? previous, LayoutCache layouts, CancellationToken cancellation) =>
+            PlanBuilder.Build(snapshot, catalog, preferences, out blocker, previous, layouts, cancellation);
 
         public PlanReplay? CaptureReplay()
         {
@@ -196,6 +206,8 @@ namespace SephPlanner.Core.Runtime
                 _replaySnapshot = null;
                 _replayPreferences = null;
                 _replayPreviousTargets = null;
+                _layouts = new LayoutCache();
+                _layoutsContext = "";
                 _publishedGeneration = 0;
             }
         }
@@ -208,6 +220,17 @@ namespace SephPlanner.Core.Runtime
 
         private void Execute(Request request)
         {
+            LayoutCache layouts;
+            lock (_gate)
+            {
+                if (_layoutsContext != request.PlanningContextFingerprint)
+                {
+                    _layouts = new LayoutCache();
+                    _layoutsContext = request.PlanningContextFingerprint;
+                }
+                layouts = _layouts;
+            }
+
             Plan? plan = null;
             var blocker = PlanBlocker.None;
             Exception? failure = null;
@@ -215,7 +238,7 @@ namespace SephPlanner.Core.Runtime
             {
                 plan = _build(
                     request.Snapshot, _catalog, request.Preferences, out blocker, request.Previous,
-                    request.Cancellation.Token);
+                    layouts, request.Cancellation.Token);
                 if (plan is not null)
                 {
                     plan.RequestGeneration = request.Generation;
