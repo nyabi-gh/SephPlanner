@@ -323,6 +323,7 @@ namespace SephPlanner.Plugin
                             tablet.Networkrotation = turn.Rotation;
                         }
                     }
+                    Announce(original);
                     return null;
                 }
                 catch (Exception ex)
@@ -333,11 +334,41 @@ namespace SephPlanner.Plugin
                         {
                             foreach (var pair in original) pair.Key.Networkrotation = pair.Value;
                         }
+                        Announce(original);
                         return $"회전 중 오류가 나 원래 각도로 되돌렸습니다({ex.Message}).";
                     }
                     catch (Exception restore)
                     {
                         return $"회전 중 오류가 났고 되돌리기도 실패했습니다({ex.Message} / {restore.Message}).";
+                    }
+                }
+            }
+
+            /// <summary>
+            /// 게임이 <c>StoneTablet.Rotate</c> 끝에 보내는 알림을 우리도 보낸다.
+            ///
+            /// 각도만 바꾸면 <c>Networkrotation</c> 이 SyncVar 라 값 자체는 퍼지지만, 화면의 석판
+            /// 범위 테두리는 이 알림을 받아야 다시 그려진다
+            /// (<c>OnTabletRotatedClientside</c> → <c>UI_CharacterStatusPanel.HandleTabletRotated</c> →
+            /// <c>OnItemSelected</c>). 빠뜨리면 가방을 열어 둔 채 자동 배치했을 때 옛 각도의
+            /// 테두리가 화면에 남고, 가방을 닫았다 열어야 사라진다.
+            ///
+            /// 참가자 경로는 <c>DoClickAction</c> 이 게임의 <c>Rotate</c> 를 그대로 타므로 해당 없다.
+            /// 되돌린 뒤에도 보낸다 - 그때는 되돌아간 각도가 화면에 맞아야 한다.
+            /// </summary>
+            private void Announce(IReadOnlyList<KeyValuePair<StoneTablet, int>> rotated)
+            {
+                foreach (var pair in rotated)
+                {
+                    if (pair.Key == null) continue;
+                    try
+                    {
+                        _inventory.SendMessageTabletRotated(pair.Key, pair.Key.rotation);
+                    }
+                    catch (Exception ex)
+                    {
+                        // 알림이 실패해도 각도는 이미 맞다. 화면만 낡은 채로 두고 넘어간다.
+                        UnityEngine.Debug.LogWarning("석판 회전 알림 실패: " + ex.Message);
                     }
                 }
             }
