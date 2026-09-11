@@ -70,11 +70,17 @@ public class DiscardAdvisorTests
         Assert.Contains(advice, a => !a.IsTablet && a.ReducesComboCount && a.Activated.Contains("자물쇠"));
     }
 
+    /// <summary>
+    /// 취소되면 절반짜리 목록이 아니라 아무것도 돌아오지 않는다. 돌려주면 그것을 캐시하거나
+    /// 화면에 올릴 자리가 생기는데, 중간까지 본 후보 목록은 "이만큼이 전부"라는 뜻이 아니다.
+    /// </summary>
     [Fact]
     public void ACancelledSearchDoesNotPublishPartialAdvice()
     {
         var problem = Problem();
-        Assert.Empty(DiscardAdvisor.Rank(problem, PlacementSolver.Solve(problem), new CancellationToken(true)));
+        var baseline = PlacementSolver.Solve(problem);
+        Assert.Throws<OperationCanceledException>(
+            () => DiscardAdvisor.Rank(problem, baseline, new CancellationToken(true)));
     }
 
     [Fact]

@@ -164,7 +164,7 @@ namespace SephPlanner.Core.Solver
             foreach (var candidate in candidates)
             {
                 // 버릴 것이 정해진 풀이다. 남은 후보를 마저 보는 것은 그대로 낭비다.
-                if (cancellation.IsCancellationRequested) break;
+                cancellation.ThrowIfCancellationRequested();
 
                 var candidateId = nextInstanceId--;
                 var outcome = BestTrial(problem, candidate, candidateId, values, layouts, faster);

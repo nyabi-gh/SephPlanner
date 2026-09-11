@@ -81,8 +81,9 @@ namespace SephPlanner.Core.Solver
             var mixedDefinition = TabletMix.Definition(catalog.Tablet(TabletMix.ResultEntityId));
 
             var advice = new List<MixAdvice>();
-            for (var i = 0; i < materials.Count && !cancellation.IsCancellationRequested; i++)
+            for (var i = 0; i < materials.Count; i++)
             {
+                cancellation.ThrowIfCancellationRequested();
                 for (var j = i + 1; j < materials.Count; j++)
                 {
                     var best = Best(

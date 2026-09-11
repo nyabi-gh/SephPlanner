@@ -39,7 +39,7 @@ namespace SephPlanner.Core.Solver
             var remaining = options.TabletRefinementTrials;
             for (var pass = 0; pass < options.PolishPasses && remaining > 0; pass++)
             {
-                if (options.Cancellation.IsCancellationRequested) break;
+                options.Cancellation.ThrowIfCancellationRequested();
                 var candidates = new List<(List<TabletPlacement> Layout, PlacementQuality Quality)>();
                 for (var index = 0; index < problem.Tablets.Count; index++)
                 {
@@ -48,7 +48,7 @@ namespace SephPlanner.Core.Solver
                     var rotations = DistinctRotations(slot, CurrentRotation(problem, slot));
                     foreach (var cell in cells)
                     {
-                        if (options.Cancellation.IsCancellationRequested) return best;
+                        options.Cancellation.ThrowIfCancellationRequested();
                         foreach (var rotation in rotations)
                         {
                             if (cell == origin.Position && rotation == origin.Rotation) continue;
@@ -132,7 +132,7 @@ namespace SephPlanner.Core.Solver
             var evaluated = new List<(List<TabletPlacement> Layout, Arrangement Result)>();
             foreach (var layout in layouts)
             {
-                if (best != null && options.Cancellation.IsCancellationRequested) break;
+                options.Cancellation.ThrowIfCancellationRequested();
 
                 var arrangement = Evaluate(problem, cells, layout, options);
                 evaluated.Add((layout, arrangement));
@@ -145,8 +145,9 @@ namespace SephPlanner.Core.Solver
 
             // 다듬기는 이긴 배치에만 건다. 후보마다 걸면 O(아티팩트^3)가 후보 수만큼 곱해져
             // 실시간 폴링이 못 따라온다 - 재어 보면 풀이 시간이 두 자릿수 배로 뛴다.
-            if (bestLayout != null && options.PolishPasses > 0 && !options.Cancellation.IsCancellationRequested)
+            if (bestLayout != null && options.PolishPasses > 0)
             {
+                options.Cancellation.ThrowIfCancellationRequested();
                 var polished = Evaluate(problem, cells, bestLayout, options, polish: true);
                 if (PriorityComboPlacement.Compare(polished, best) > 0) best = polished;
             }
@@ -171,7 +172,8 @@ namespace SephPlanner.Core.Solver
                         var empty = new HashSet<GridPos> { cell.Offset(-1, 0), cell.Offset(1, 0) };
                         if (cell.X <= 0 || cell.X >= problem.Grid.Width - 1 || occupied.Contains(cell) ||
                             empty.Any(c => !problem.Grid.Contains(c) || occupied.Contains(c))) continue;
-                        if (budget-- <= 0 || options.Cancellation.IsCancellationRequested) return best;
+                        if (budget-- <= 0) return best;
+                        options.Cancellation.ThrowIfCancellationRequested();
                         var trial = Evaluate(problem, cells, candidate.Layout, options,
                             reservedEmpty: empty, forcedCharm: charm.InstanceId, forcedCell: cell);
                         if (PriorityComboPlacement.Compare(trial, best) > 0) best = trial;
@@ -445,7 +447,7 @@ namespace SephPlanner.Core.Solver
 
                 // 이 풀이를 버릴 것이 이미 정해졌으면 여기서 그만둔다. 석판 한 장을 놓는 단계마다
                 // 보는 것으로 충분하다 - 비용이 거기에 몰려 있다.
-                if (options.Cancellation.IsCancellationRequested) break;
+                options.Cancellation.ThrowIfCancellationRequested();
 
                 // 돌릴 수 없는 석판은 지금 돌아가 있는 각도 그대로만 쓴다. 0으로 고정하면
                 // 이미 돌아간 채로 잠긴 석판(저주 등)에 불가능한 회전을 제안하게 된다.
@@ -817,7 +819,7 @@ namespace SephPlanner.Core.Solver
 
             for (var pass = 0; pass < options.PolishPasses; pass++)
             {
-                if (options.Cancellation.IsCancellationRequested) return;
+                options.Cancellation.ThrowIfCancellationRequested();
 
                 var moved = false;
                 foreach (var charm in problem.Charms)
@@ -880,7 +882,7 @@ namespace SephPlanner.Core.Solver
                     HashSet<CharmSlot>? connected = null;
                     foreach (var cell in free)
                     {
-                        if (options.Cancellation.IsCancellationRequested) return moved;
+                        options.Cancellation.ThrowIfCancellationRequested();
                         var targetCell = cell.Offset(support.X, support.Y);
                         if (cell == targetCell || !available.Contains(targetCell)) continue;
                         if (positions[helper.InstanceId] == cell && positions[target.InstanceId] == targetCell) continue;

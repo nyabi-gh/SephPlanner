@@ -80,7 +80,8 @@ namespace SephPlanner.Core.Solver
         internal static Arrangement Improve(PlacementProblem problem, Arrangement best, SolverOptions options)
         {
             var cancellation = options.Cancellation;
-            if (problem.PriorityCategories.Count == 0 || cancellation.IsCancellationRequested) return best;
+            if (problem.PriorityCategories.Count == 0) return best;
+            cancellation.ThrowIfCancellationRequested();
             var flexible = problem.Charms.Where(charm => !charm.IsFiller && Applies(charm.Definition))
                 .OrderBy(charm => charm.InstanceId).ToList();
             if (flexible.Count == 0 || best.UnplacedTablets > 0 || best.CharmPositions.Count != problem.Charms.Count)
@@ -119,7 +120,7 @@ namespace SephPlanner.Core.Solver
                     var trials = 0;
                     foreach (var targets in Targets(problem, seed, charm, cells))
                     {
-                        if (cancellation.IsCancellationRequested) return best;
+                        cancellation.ThrowIfCancellationRequested();
                         if (trials++ >= perItem) break;
                         if (remaining-- <= 0) return best;
                         var trial = Place(problem, seed, targets);

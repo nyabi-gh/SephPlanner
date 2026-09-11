@@ -63,14 +63,30 @@ namespace SephPlanner.Core.Planning
         /// 점수가 실제로 나은 배치를 이기지는 못한다.
         /// </param>
         /// <param name="cancellation">
-        /// 이 계획이 이미 쓸모없어졌다는 신호. 켜지면 도중에 그만두고 <c>null</c> 을 돌려준다 -
-        /// 중간까지 푼 것은 쓰지 않는다. 폴링이 풀이보다 빠를 때 버릴 답을 끝까지 계산하지
-        /// 않으려는 것이다.
+        /// 이 계획이 이미 쓸모없어졌다는 신호. 켜지면 풀이가 그 자리에서
+        /// <see cref="OperationCanceledException"/> 을 던지고, 여기서 그것을 <c>null</c> 로 바꾼다 -
+        /// 중간까지 푼 것은 애초에 돌아오지 않는다. 폴링이 풀이보다 빠를 때 버릴 답을 끝까지
+        /// 계산하지 않으려는 것이다.
         /// </param>
         public static Plan? Build(
             GameSnapshot snapshot, ICatalog catalog, PlanPreferences? preferences,
             out PlanBlocker blocker, Plan? previous = null,
             CancellationToken cancellation = default)
+        {
+            try
+            {
+                return Attempt(snapshot, catalog, preferences, out blocker, previous, cancellation);
+            }
+            catch (OperationCanceledException)
+            {
+                blocker = PlanBlocker.None;
+                return null;
+            }
+        }
+
+        private static Plan? Attempt(
+            GameSnapshot snapshot, ICatalog catalog, PlanPreferences? preferences,
+            out PlanBlocker blocker, Plan? previous, CancellationToken cancellation)
         {
             blocker = PlanBlocker.None;
             preferences ??= PlanPreferences.None;
@@ -195,7 +211,6 @@ namespace SephPlanner.Core.Planning
             var current = PlacementSolver.Score(problem, layout, positions);
             var verification = Verify(inventory, current, grid);
             var best = PlacementSolver.Solve(problem, new SolverOptions { Cancellation = cancellation });
-            if (cancellation.IsCancellationRequested) return null;
 
             // 조건부 배정은 수렴하지 않을 수 있으므로 현재 배치도 같은 우선순위로 비교한다.
             if (PriorityComboPlacement.Compare(best, current) < 0) best = current;
@@ -223,7 +238,6 @@ namespace SephPlanner.Core.Planning
                     problem, candidates, snapshot.Run?.Gold ?? int.MaxValue,
                     inventory.ComboCounts, catalog.Combo, preferences.PriorityCategories,
                     preferences.PresetCharms, values, layouts, cancellation);
-                if (cancellation.IsCancellationRequested) return null;
 
                 // 후보마다 이미 배치를 다 풀어 두었다. 그 결과를 버리지 않고 화면이 쓸 모양으로
                 // 옮겨 두면, 증가분이라는 숫자 하나 대신 무엇이 어떻게 달라지는지 보여줄 수 있다.
@@ -231,7 +245,6 @@ namespace SephPlanner.Core.Planning
                 if (offers.Count > 0)
                     FillPreviews(offers, problem, layouts.Baseline(problem, SolverOptions.ForAdvice(cancellation)));
                 if (verification.Passed) discards = DiscardAdvisor.Rank(problem, best, cancellation);
-                if (cancellation.IsCancellationRequested) return null;
             }
 
             var moves = Moves(problem, current, best, out var manualMovesAvailable);

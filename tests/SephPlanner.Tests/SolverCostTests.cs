@@ -181,4 +181,39 @@ public class SolverCostTests
             $"쌍이 {Tablets * (Tablets - 1) / 2}개인데 배치 탐색이 {cache.Searches}번 돌았다. " +
             "보여줄 것만 다시 푸는 규약이 깨졌다.");
     }
+
+    /// <summary>
+    /// 취소된 탐색은 캐시에 남지 않는다.
+    ///
+    /// 예전에는 취소 검사마다 <b>중간까지 푼 것을 돌려주었다.</b> 석판 몇 장만 놓은 빔과 첫 배치만
+    /// 채점한 결과가 그대로 캐시에 들어갔고, 빌드마다 캐시를 새로 지었기 때문에만 안전했다.
+    /// 캐시가 한 번의 계획보다 오래 살면 그 뒤의 모든 계획이 <b>석판을 한 장도 옮기지 말라</b>고
+    /// 하게 된다. 입구는 셋이므로(<c>Of</c>·<c>Baseline</c>·<c>Yardstick</c>) 셋 다 본다.
+    /// </summary>
+    [Fact]
+    public void ACancelledSearchLeavesNothingInTheCache()
+    {
+        var problem = FullBag(charmCount: 12, spare: 6);
+        var stopped = SolverOptions.ForAdvice(new CancellationToken(true));
+        var live = SolverOptions.ForAdvice(default);
+
+        // 빔부터 취소된 경우. 열쇠에는 취소 신호가 없으므로 다음 빌드가 같은 칸을 들여다본다.
+        var cold = new LayoutCache();
+        Assert.Throws<OperationCanceledException>(() => cold.Of(problem, stopped));
+
+        var layouts = cold.Of(problem, live);
+        Assert.Equal(0, cold.Reuses);
+        Assert.All(layouts, layout => Assert.Equal(problem.Tablets.Count, layout.Count));
+
+        // 빔은 성한데 채점이 취소된 경우. 여기를 지나면 기준 배치와 잣대가 문다.
+        var warm = new LayoutCache();
+        warm.Of(problem, live);
+        Assert.Throws<OperationCanceledException>(() => warm.Baseline(problem, stopped));
+        Assert.Throws<OperationCanceledException>(() => warm.Yardstick(problem, stopped));
+
+        var baseline = warm.Baseline(problem, live);
+        Assert.Equal(problem.Tablets.Count, baseline.Tablets.Count);
+        Assert.Equal(problem.Charms.Count, baseline.CharmPositions.Count);
+        Assert.Equal(1, warm.Searches);
+    }
 }

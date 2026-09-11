@@ -24,8 +24,8 @@ namespace SephPlanner.Core.Solver
         public static List<DiscardAdvice> Rank(PlacementProblem problem, Arrangement baseline, CancellationToken cancellation = default)
         {
             var advice = new List<DiscardAdvice>();
-            if (problem.Charms.Count == 0 || baseline.UnplacedTablets > 0 || cancellation.IsCancellationRequested)
-                return advice;
+            if (problem.Charms.Count == 0 || baseline.UnplacedTablets > 0) return advice;
+            cancellation.ThrowIfCancellationRequested();
 
             var options = SolverOptions.ForAdvice(cancellation);
             options.EmptySideTrials = 12;
@@ -40,7 +40,7 @@ namespace SephPlanner.Core.Solver
 
             foreach (var candidate in candidates)
             {
-                if (cancellation.IsCancellationRequested) return new List<DiscardAdvice>();
+                cancellation.ThrowIfCancellationRequested();
                 var trial = OfferAdvisor.Clone(problem);
                 string name;
                 var yardstick = layouts;
@@ -68,7 +68,7 @@ namespace SephPlanner.Core.Solver
                 var remainingCounts = Counts(trial, trial.CurrentCharms);
                 trial.ComboCounts = Adjust(problem.ComboCounts, currentCounts, remainingCounts);
                 var solved = PlacementSolver.EvaluateLayouts(trial, yardstick, options);
-                if (cancellation.IsCancellationRequested) return new List<DiscardAdvice>();
+                cancellation.ThrowIfCancellationRequested();
                 if (!ActivationPolicy.AllowsTransition(baseline, solved) || solved.UnretainedCharms.Count > 0 || solved.UnplacedTablets > 0 || solved.CharmPositions.Count != trial.Charms.Count ||
                     solved.Score <= baseline.Score + 0.001 || PriorityComboPlacement.Compare(solved, baseline) <= 0)
                     continue;
