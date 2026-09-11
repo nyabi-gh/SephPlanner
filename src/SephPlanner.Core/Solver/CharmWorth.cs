@@ -72,17 +72,31 @@ namespace SephPlanner.Core.Solver
         public static double ApplyWeight(double value, double weight) =>
             Math.Max(0, value) * weight + Math.Min(0, value);
 
+        /// <summary>
+        /// 선호도 배수를 걸었을 때의 값어치. 배수는 이득에만 걸리고 측정한 패널티는 그대로 남는다.
+        ///
+        /// <b>하한과 측정값은 각자의 규칙으로 가중한 뒤 큰 쪽을 쓴다.</b> 하한(레어도 어림값)은
+        /// 환산하지 못한 효과를 대신하는 이득 추정이라 <see cref="ApplyWeight"/>로 가중하고, 측정한
+        /// 표는 이득에만 배수를 걸고 패널티를 더한다. 둘 중 큰 쪽이라는 것은 <see cref="At"/>가
+        /// 하는 일과 같고, 배수가 1이면 그 값과 같아진다.
+        ///
+        /// 예전에는 하한에서 측정 순가치를 뺀 차이를 이득에 더했다. 그 차이에 <b>측정한 패널티가
+        /// 부호를 바꿔 섞여 들어가</b> 배수를 함께 받았고, 결과는 패널티가 클수록 점수가 높아지는
+        /// 것이었다 - 실드 메이트(★★★)가 레벨 2(103.5)를 레벨 3(88.0)보다 좋게 보고 낮은 칸에
+        /// 머물렀다. 패널티가 레벨이 오르며 줄어드는 아티팩트는 전부 이 모양이 된다.
+        /// </summary>
         public double WeightedAt(int level, double weight)
         {
-            var net = At(level);
+            if (level < 0) level = 0;
             if (ByLevel is null || BenefitByLevel is null || PenaltyByLevel is null ||
                 ByLevel.Count == 0 || BenefitByLevel.Count != ByLevel.Count || PenaltyByLevel.Count != ByLevel.Count)
-                return ApplyWeight(net, weight);
+                return ApplyWeight(At(level), weight);
 
-            var index = Math.Min(Math.Max(0, level), ByLevel.Count - 1);
-            // 누락 효과의 추정 하한은 이득에 보충하고, 측정한 패널티는 그대로 남긴다.
-            var benefit = BenefitByLevel[index] + Math.Max(0, net - ByLevel[index]);
-            return benefit * weight + PenaltyByLevel[index];
+            var index = Math.Min(level, ByLevel.Count - 1);
+            var measured = BenefitByLevel[index] * weight + PenaltyByLevel[index];
+            if (!ByLevelIsFloor) return measured;
+
+            return Math.Max(measured, ApplyWeight(Base + PerLevel * level, weight));
         }
 
         public double At(int level)

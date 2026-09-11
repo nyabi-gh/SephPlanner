@@ -82,7 +82,33 @@ public class PreferenceRegressionTests
             PenaltyByLevel = new[] { -6d }
         };
         Assert.Equal(2, worth.WeightedAt(0, 1));
-        Assert.Equal(74, worth.WeightedAt(0, 10));
+
+        // 같은 능력치의 하한 없는 경우(위 Theory)와 같은 값이어야 한다. 하한은 아래를 받쳐 주는
+        // 것이라 배수를 만나 이득을 불릴 근거가 되지 못한다.
+        Assert.Equal(34, worth.WeightedAt(0, 10));
+    }
+
+    /// <summary>
+    /// 실드 메이트의 모양 - 이득은 오르고 패널티는 줄어들며, 환산하지 못한 효과 때문에 레어도
+    /// 하한이 함께 걸린다. 하한 보충이 패널티를 이득 쪽으로 옮기면 배수가 그것을 불려, 패널티가
+    /// 가장 큰 낮은 레벨이 가장 높은 점수를 받는다. 그러면 ★★★ 를 걸어도 낮은 칸에 머문다.
+    /// </summary>
+    [Fact]
+    public void EstimatedFloorDoesNotTurnShrinkingPenaltiesIntoGains()
+    {
+        var worth = new CharmWorth
+        {
+            Base = 1.45,
+            PerLevel = 1.45,
+            ByLevelIsFloor = true,
+            ByLevel = new[] { -6.051, -5.436, -4.821, -0.564, 2.026 },
+            BenefitByLevel = new[] { 0.615, 1.231, 1.846, 2.769, 3.692 },
+            PenaltyByLevel = new[] { -6.667, -6.667, -6.667, -3.333, -1.667 }
+        };
+
+        for (var level = 1; level < 5; level++)
+            Assert.True(worth.WeightedAt(level, 10) > worth.WeightedAt(level - 1, 10),
+                $"레벨 {level} 이 {level - 1} 보다 낮게 평가됐다");
     }
 
     private static PlacementProblem RetentionBoard(int storage = 2)
