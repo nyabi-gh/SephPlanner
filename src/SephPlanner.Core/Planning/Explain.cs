@@ -36,6 +36,11 @@ namespace SephPlanner.Core.Planning
 
             // 점수는 진행한 만큼 올라가는데 쪽지에 이유가 없으면, 같은 아티팩트가 왜 다르게
             // 매겨지는지 알 길이 없다. 진행도는 인스턴스마다 달라 여기서 숫자를 적지는 못한다.
+            if (ScalesPosition.IsSideBound(definition))
+                lines.Add("가방의 어느 편에 있느냐로 주는 것이 달라집니다. 왼쪽은 1~3열, 오른쪽은 4열 "
+                          + "이후이며 지금 놓인 쪽을 유지합니다. 바꾸려면 직접 반대쪽으로 옮기세요. "
+                          + "좌우 중 어느 쪽이 나은지는 비교하지 않습니다.");
+
             if (definition.GrowthQuestGoal > 0)
                 lines.Add("다 키우면 다른 아티팩트가 됩니다. 얼마나 키웠는지에 따라 값어치를 그쪽으로 끌어올려 평가합니다.");
 
@@ -65,7 +70,30 @@ namespace SephPlanner.Core.Planning
                 lines.Add("효과의 일부만 측정되어 레어도 어림값을 함께 사용합니다. 실제 전투 효과와 다를 수 있습니다.");
             if (definition.StatEffects.Count > 0 && worth.Source != CharmWorthSource.Curated)
                 lines.Add("능력치 표의 환산값입니다. 확인된 마법 지원 능력치는 주력 선호를 반영하지만 실제 사용률·전투 피해량은 추정하지 않습니다.");
+            lines.AddRange(Circular(definition, worth));
 
+            return lines;
+        }
+
+        /// <summary>
+        /// 환산율이 이 아티팩트 자신에게서 나온 경우. 그 능력치를 주는 아티팩트가 이것뿐이면
+        /// "레벨 하나 = 이 아티팩트의 한 걸음"이라는 동어반복이라, 다른 아티팩트와 견줄 때 쓸
+        /// 수 있는 값이 아니다. 1.0.31 에서 잰 값 173종 중 43종이 여기 해당한다.
+        ///
+        /// 잰 값이라는 것만 말하고 근거의 두께를 안 말하면, 짐작에 가까운 숫자가 실측과 같은
+        /// 무게로 보인다.
+        /// </summary>
+        private static List<string> Circular(CharmDefinition definition, CharmWorth worth)
+        {
+            var lines = new List<string>();
+            if (definition.StatEffects.Count == 0 || worth.Source == CharmWorthSource.Curated) return lines;
+            if (worth.Confidence >= 0.5) return lines;
+
+            lines.Add(worth.Confidence <= 0
+                ? "다만 이 능력치를 주는 아티팩트가 이것뿐이라 환산율이 자기 자신에서 나왔습니다. "
+                  + "다른 아티팩트와 견주는 근거로는 약합니다."
+                : "다만 환산율의 근거가 얇은 능력치가 섞여 있습니다. 다른 아티팩트와 견줄 때 "
+                  + "그만큼 덜 믿을 값입니다.");
             return lines;
         }
 

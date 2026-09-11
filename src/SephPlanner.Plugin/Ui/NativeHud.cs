@@ -679,8 +679,6 @@ namespace SephPlanner.Plugin.Ui
 
                 // 첫 줄은 쪽지의 제목으로 올라간다.
                 lines.RemoveAt(0);
-                if (definition?.Behavior == "Charm_FireIce")
-                    lines.Add("대립의 천칭은 현재 놓인 쪽을 유지합니다. 왼쪽은 1~3열, 오른쪽은 4열 이후입니다. 방향을 바꾸려면 직접 반대쪽으로 옮기세요. 좌우 능력치의 전투 효율은 비교하지 않습니다.");
                 if (definition?.HasNoActivationEffect == true)
                     lines.Add("자체 활성 효과가 없어 감점 칸을 활용할 수 있습니다. 사용 유지·고정과 주변 효과는 계속 고려합니다.");
                 if (pinned > 0)
