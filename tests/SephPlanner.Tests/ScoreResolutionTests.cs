@@ -1,0 +1,65 @@
+using SephPlanner.Core.Solver;
+
+namespace SephPlanner.Tests;
+
+/// <summary>
+/// 점수를 견줄 때의 해상도. 환산율에서 나온 점수는 잰 값이라 오차가 있고, 그 오차보다 작은
+/// 차이가 아래 단계를 눌러서는 안 된다.
+/// </summary>
+public class ScoreResolutionTests
+{
+    private static PlacementQuality Quality(double value, int unsafeEmpty = 0, double familiarity = 0) =>
+        new PlacementQuality(0, 0, 0, 0, 0, value, unsafeEmpty, 0, familiarity);
+
+    /// <summary>
+    /// 눈금보다 작은 점수 차이는 감점 빈칸 정리를 이기지 못한다. 이 자리가 원래 문제였다 -
+    /// 0.05 짜리 차이로도 빈칸 정리와 자리 유지가 전부 밀렸다.
+    /// </summary>
+    [Fact]
+    public void ScoreNoiseNoLongerOutranksClearingPenaltyCells()
+    {
+        var noisierButTidy = Quality(10.02, unsafeEmpty: 0);
+        var noisierAndMessy = Quality(10.07, unsafeEmpty: 1);
+
+        Assert.True(noisierButTidy.CompareTo(noisierAndMessy) > 0);
+    }
+
+    /// <summary>
+    /// 실제 레벨 한 칸의 차이는 그대로 이긴다. 카탈로그에서 가장 작은 이웃 레벨 차이가
+    /// 0.1677(얼음 날개 레벨 2→3)이고 눈금은 그보다 작다.
+    /// </summary>
+    [Fact]
+    public void ARealLevelStepStillWinsOverATidierBoard()
+    {
+        var better = Quality(10.02 + 0.1677, unsafeEmpty: 1);
+        var tidier = Quality(10.02, unsafeEmpty: 0);
+
+        Assert.True(better.CompareTo(tidier) > 0);
+    }
+
+    /// <summary>
+    /// 눈금으로 끊는 이유. 허용 오차(<c>|a-b| &lt; 0.1</c>)였다면 a≈b, b≈c 인데 a&lt;c 가 되어
+    /// 같은 후보 목록도 비교 순서에 따라 다르게 정렬된다.
+    /// </summary>
+    [Fact]
+    public void TiesStayTransitive()
+    {
+        var a = Quality(10.02);
+        var b = Quality(10.09);
+        var c = Quality(10.16);
+
+        Assert.Equal(0, a.CompareTo(b));
+        Assert.True(b.CompareTo(c) < 0);
+        Assert.True(a.CompareTo(c) < 0);
+    }
+
+    /// <summary>점수가 같은 칸에 들어가면 그다음 단계가 답을 낸다.</summary>
+    [Fact]
+    public void WithinOneStepTheLowerStagesDecide()
+    {
+        var stayPut = Quality(10.02, familiarity: 1);
+        var moved = Quality(10.09, familiarity: 0);
+
+        Assert.True(stayPut.CompareTo(moved) > 0);
+    }
+}

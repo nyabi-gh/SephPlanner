@@ -91,6 +91,32 @@ namespace SephPlanner.Core.Planning
             if (level > effective)
                 lines.Add($"칸 레벨 {level}, 이 아티팩트는 {effective}까지만 반영됩니다");
 
+            lines.AddRange(LevelCosts(definition, effective, values));
+            return lines;
+        }
+
+        /// <summary>
+        /// 여기서 한 칸 더 올리면 값어치가 내려가는 아티팩트인지. 내려가지 않으면 빈 목록이다.
+        ///
+        /// 레벨이 올라도 값어치가 내려가는 아티팩트가 있다 - 이득보다 손해가 빨리 자라는 것들이고,
+        /// 도마뱀 판금 갑옷은 모든 구간이 그렇다. 솔버는 값어치가 큰 배치를 고르므로 그런 것은
+        /// 낮은 칸에 남는데, 말해 주지 않으면 "왜 여기에 박아 두느냐"로 보인다(2026-09-11 제보).
+        /// 모델이 틀린 것이 아니라 게임이 실제로 그런 맞교환이므로, 점수로 덮지 않고 설명한다
+        /// (docs/PLACEMENT-OBJECTIVE.md 의 "탐색과 최적성").
+        /// </summary>
+        private static List<string> LevelCosts(CharmDefinition? definition, int effective, CharmValueBook? values)
+        {
+            var lines = new List<string>();
+            if (definition is null || effective < 0) return lines;
+
+            foreach (var drop in WorthCurveReview.Of(definition, (values ?? CharmValueBook.Empty).Of(definition)))
+            {
+                if (drop.FromLevel != effective) continue;
+
+                lines.Add($"레벨 {drop.ToLevel}로 올리면 늘어나는 손해가 이득보다 커서 값어치가 내려갑니다. "
+                          + "더 높은 칸을 비워 둔 것은 그 때문이며, 올리고 싶으면 직접 옮기세요.");
+                break;
+            }
             return lines;
         }
 

@@ -1,4 +1,6 @@
+using SephPlanner.Core.Charms;
 using SephPlanner.Core.Model;
+using SephPlanner.Core.Planning;
 using SephPlanner.Core.Solver;
 
 namespace SephPlanner.Tests;
@@ -62,6 +64,39 @@ public class WorthCurveReviewTests
         definition.MaxLevel = 1;
 
         Assert.Empty(WorthCurveReview.Of(definition));
+    }
+
+    /// <summary>
+    /// 낮은 칸에 남는 이유를 칸 설명이 말해 준다. 점수로 덮지 않기로 했으므로 설명이 답이다.
+    /// </summary>
+    [Fact]
+    public void TheCellSaysWhyRaisingTheLevelWouldCostMoreThanItGains()
+    {
+        var definition = Helmet();
+
+        var held = Explain.Cell("토끼마을 경비병 투구", 1, 1, CharmInactiveReason.None, definition, null);
+
+        Assert.Contains(held, line => line.Contains("레벨 2로 올리면") && line.Contains("값어치가 내려갑니다"));
+    }
+
+    [Fact]
+    public void ACellWithNothingToLoseByLevellingSaysNothingAboutIt()
+    {
+        var definition = Helmet();
+
+        foreach (var effective in new[] { 0, 2, 3 })
+            Assert.DoesNotContain(
+                Explain.Cell("토끼마을 경비병 투구", effective, effective, CharmInactiveReason.None, definition, null),
+                line => line.Contains("값어치가 내려갑니다"));
+    }
+
+    /// <summary>꺼져 있는 칸은 이유가 따로 있다. 레벨 이야기를 겹쳐 하지 않는다.</summary>
+    [Fact]
+    public void AnInactiveCellExplainsWhyItIsOffInsteadOfTheLevelCurve()
+    {
+        var lines = Explain.Cell("토끼마을 경비병 투구", 1, 1, CharmInactiveReason.Weapon, Helmet(), null);
+
+        Assert.DoesNotContain(lines, line => line.Contains("값어치가 내려갑니다"));
     }
 
     private static CharmDefinition Helmet() => new CharmDefinition
