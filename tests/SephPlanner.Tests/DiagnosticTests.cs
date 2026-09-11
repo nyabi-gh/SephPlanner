@@ -129,6 +129,29 @@ public sealed class DiagnosticTests
         Assert.Empty(next.Files);
     }
 
+    [Fact]
+    public void UserNoteIsWrittenIntoTheReportAndOmittedWhenEmpty()
+    {
+        using var directory = new DiagnosticTestDirectory();
+        var preferences = ReplayPreferences.From(new PlanPreferences());
+
+        var withNote = new DiagnosticCapture(new DiagnosticText(), _ => { }, directory.Path);
+        withNote.Finish("검증용", preferences, DiagnosticNote.Create("score", "점수가 0으로 나옵니다"));
+        using (var metadata = JsonDocument.Parse(withNote.Files["report.json"]))
+        {
+            var note = metadata.RootElement.GetProperty("Note");
+            Assert.Equal("score", note.GetProperty("Category").GetString());
+            Assert.Equal("점수·추천이 이상함", note.GetProperty("CategoryLabel").GetString());
+            Assert.Equal("점수가 0으로 나옵니다", note.GetProperty("Text").GetString());
+        }
+
+        // 메모를 적지 않았는데 빈 메모가 실리면, 읽는 쪽이 사용자가 무언가 말했다고 읽는다.
+        var without = new DiagnosticCapture(new DiagnosticText(), _ => { }, directory.Path);
+        without.Finish("검증용", preferences);
+        using (var metadata = JsonDocument.Parse(without.Files["report.json"]))
+            Assert.Equal(JsonValueKind.Null, metadata.RootElement.GetProperty("Note").ValueKind);
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("0|https://sephplanner.nyabi.me/api/v1/reports")]

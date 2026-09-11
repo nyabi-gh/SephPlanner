@@ -51,6 +51,12 @@ namespace SephPlanner.Plugin.Ui
         protected virtual GameObject DefaultFocus => null;
         protected virtual bool HandleEscape() => false;
         protected virtual void Closed() { }
+
+        /// <summary>
+        /// 게임이 이 창에 조작을 넘긴 순간. 입력 칸에 커서를 넣을 곳이다 - 게임의
+        /// <c>UI_ChatInput</c>도 같은 자리에서 <c>ActivateInputField</c>를 부른다.
+        /// </summary>
+        protected virtual void ControlEnabled() { }
         protected void SetHint(string hint)
         {
             if (_hint != null) _hint.text = hint;
@@ -158,6 +164,7 @@ namespace SephPlanner.Plugin.Ui
             _panel = go.AddComponent<PlannerPanel>();
             _panel.EscapeHandler = HandleEscape;
             _panel.Closed = Closed;
+            _panel.ControlEnabled = ControlEnabled;
             _panel.hasControl = true;
             _panel.canCloseControlWithESC = true;
 
@@ -214,10 +221,17 @@ namespace SephPlanner.Plugin.Ui
         private bool _paused;
         public System.Func<bool> EscapeHandler;
         public System.Action Closed;
+        public System.Action ControlEnabled;
 
         public override void CloseFromEsc()
         {
             if (EscapeHandler?.Invoke() != true) base.CloseFromEsc();
+        }
+
+        protected override void OnControlEnabled()
+        {
+            base.OnControlEnabled();
+            ControlEnabled?.Invoke();
         }
 
         // 도감처럼 타입 이름으로 찾는 게임 UI 목록에 우리 것을 끼워 넣을 이유가 없다.

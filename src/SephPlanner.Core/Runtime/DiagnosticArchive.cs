@@ -68,6 +68,30 @@ namespace SephPlanner.Core.Runtime
             return files;
         }
 
+        /// <summary>
+        /// 설명 파일 하나만 꺼낸다. 목록을 그릴 때 자료 전체를 메모리에 펴지 않으려는 것이다.
+        /// 검사는 <see cref="Read"/>와 같다 - 허용한 이름과 크기 제한을 그대로 건다.
+        /// </summary>
+        public static string ReadReport(Stream input)
+        {
+            if (!input.CanSeek || input.Length > MaximumArchiveBytes) throw new InvalidDataException("진단 압축 파일 크기가 올바르지 않습니다.");
+            using var archive = new ZipArchive(input, ZipArchiveMode.Read, true);
+            var entry = archive.GetEntry("report.json") ?? throw new InvalidDataException("진단 설명 파일이 없습니다.");
+            if (entry.Length > MaximumExpandedBytes) throw new InvalidDataException("진단 내용이 크기 제한을 넘었습니다.");
+            using var source = entry.Open();
+            using var content = new MemoryStream();
+            var buffer = new byte[8192];
+            long total = 0;
+            int read;
+            while ((read = source.Read(buffer, 0, buffer.Length)) != 0)
+            {
+                total += read;
+                if (total > MaximumExpandedBytes) throw new InvalidDataException("진단 내용이 크기 제한을 넘었습니다.");
+                content.Write(buffer, 0, read);
+            }
+            return new UTF8Encoding(false, true).GetString(content.ToArray());
+        }
+
         public static string Hash(byte[] content)
         {
             using var algorithm = SHA256.Create();

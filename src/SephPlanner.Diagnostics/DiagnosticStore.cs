@@ -5,7 +5,13 @@ using SephPlanner.Core.Runtime;
 namespace SephPlanner.Diagnostics;
 
 public enum DiagnosticSaveResult { Created, Duplicate, Conflict, Full }
-public sealed record DiagnosticStoredReport(string ReportId, DateTime ReceivedUtc, long Bytes);
+/// <summary>
+/// 목록 한 줄. <paramref name="Category"/>와 <paramref name="Note"/>는 사용자가 F10 에서 직접
+/// 적어 보낸 것이며, 적지 않았으면 빈 문자열이다. 압축을 풀지 않고도 무슨 제보인지 읽으려고
+/// 목록에 함께 싣는다.
+/// </summary>
+public sealed record DiagnosticStoredReport(
+    string ReportId, DateTime ReceivedUtc, long Bytes, string Category = "", string Note = "");
 
 public sealed class DiagnosticStore : IDisposable
 {
@@ -81,7 +87,12 @@ public sealed class DiagnosticStore : IDisposable
         {
             DeleteExpired();
             return StoredFiles().OrderByDescending(file => file.LastWriteTimeUtc).ThenBy(file => file.Name, StringComparer.Ordinal)
-                .Skip(offset).Take(100).Select(file => new DiagnosticStoredReport(Path.GetFileNameWithoutExtension(file.Name), file.LastWriteTimeUtc, file.Length)).ToArray();
+                .Skip(offset).Take(100).Select(file =>
+                {
+                    var (category, note) = ReadNote(file);
+                    return new DiagnosticStoredReport(
+                        Path.GetFileNameWithoutExtension(file.Name), file.LastWriteTimeUtc, file.Length, category, note);
+                }).ToArray();
         }
         finally { _gate.Release(); }
     }
@@ -117,6 +128,30 @@ public sealed class DiagnosticStore : IDisposable
         try { DeleteExpired(); }
         finally { _gate.Release(); }
     }
+
+    /// <summary>
+    /// 설명 파일에서 사용자 메모만 꺼낸다. 목록을 그리다가 자료 하나가 상했다고 목록 전체가
+    /// 실패하면 나머지 제보까지 못 본다. 읽지 못한 줄은 메모 없이 보여 준다.
+    /// </summary>
+    private static (string Category, string Note) ReadNote(FileInfo file)
+    {
+        try
+        {
+            using var stream = file.OpenRead();
+            using var document = JsonDocument.Parse(DiagnosticArchive.ReadReport(stream));
+            if (document.RootElement.ValueKind != JsonValueKind.Object ||
+                !document.RootElement.TryGetProperty("Note", out var note) || note.ValueKind != JsonValueKind.Object)
+                return ("", "");
+            return (Text(note, "CategoryLabel"), Text(note, "Text"));
+        }
+        catch (Exception exception) when (exception is IOException or InvalidDataException or JsonException)
+        {
+            return ("", "");
+        }
+    }
+
+    private static string Text(JsonElement element, string name) =>
+        element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? "" : "";
 
     private string PathFor(Guid id) => Path.Combine(_options.StorageDirectory, id.ToString("N") + ".zip");
     private IEnumerable<FileInfo> StoredFiles() => new DirectoryInfo(_options.StorageDirectory).EnumerateFiles("*.zip")

@@ -40,6 +40,7 @@ namespace SephPlanner.Plugin
         private PlanRunner _runner;
         private GameSnapshot _lastSnapshot;
         private DiagnosticConsentWindow _diagnosticWindow;
+        private DiagnosticNoteWindow _noteWindow;
         private DiagnosticCapture _pendingDiagnostic;
         private DiagnosticText _diagnosticLog;
         private DiagnosticUploadClient _diagnosticClient;
@@ -78,6 +79,7 @@ namespace SephPlanner.Plugin
             _window = new SettingsWindow(_settings.Rows);
             _build = new BuildWindow(_prefs, CurrentBuild);
             _diagnosticWindow = new DiagnosticConsentWindow(ChooseDiagnosticConsent);
+            _noteWindow = new DiagnosticNoteWindow(FinishDiagnostic);
             _diagnosticLog = new DiagnosticText(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Paths.GameRootPath);
             _diagnosticClient = new DiagnosticUploadClient();
             _settings.DiagnosticConsent.SettingChanged += (_, _) =>
@@ -192,7 +194,7 @@ namespace SephPlanner.Plugin
 
                 // 커서를 읽기만 한다. 그려 둔 사각형과 겹치는지 우리가 세므로 raycastTarget 을
                 // 켤 필요가 없고, HUD 가 게임 입력을 가져가지 않는다는 보장이 그대로 남는다.
-                _hud.UpdateHover(Cursor(), !_hidden && !_moving && !_window.IsOpen && !_build.IsOpen && !_diagnosticWindow.IsOpen);
+                _hud.UpdateHover(Cursor(), !_hidden && !_moving && !_window.IsOpen && !_build.IsOpen && !_diagnosticWindow.IsOpen && !_noteWindow.IsOpen);
             }
 
             // 리소스는 부팅 직후 준비되므로 첫 프레임에 확인한다.
@@ -310,7 +312,7 @@ namespace SephPlanner.Plugin
 
         private void DumpInventory()
         {
-            if (_diagnosticTask != null || _diagnosticWindow.IsOpen)
+            if (_diagnosticTask != null || _diagnosticWindow.IsOpen || _noteWindow.IsOpen)
             {
                 Report("진단을 처리 중입니다. 전송 또는 선택이 끝난 뒤 다시 눌러 주세요.");
                 return;
@@ -337,13 +339,12 @@ namespace SephPlanner.Plugin
                     PlanReplayFile.Write(path, Newtonsoft.Json.JsonConvert.SerializeObject(replay, Newtonsoft.Json.Formatting.Indented));
                     return path;
                 });
-                capture.Finish(PluginIdentity.Describe(), ReplayPreferences.From(_prefs.ToPreferences(_settings.Recommendations.Value)));
-                Logger.LogInfo("이번 진단 보관 위치: " + capture.DirectoryPath);
-                if (_settings.DiagnosticUploadAllowed) StartDiagnosticUpload(capture);
-                else if (!_settings.DiagnosticChoiceMade.Value || _settings.DiagnosticConsent.Value.Length > 0) OpenDiagnosticConsent(capture);
-                else ReportDiagnostic(capture.HasFailures
-                    ? "진단 일부 저장에 실패했습니다. 저장한 자료와 실패 기록은 로컬에 보관했습니다."
-                    : "진단을 로컬에 저장했습니다. F3에서 진단 전송을 켤 수 있습니다.");
+                _pendingDiagnostic = capture;
+
+                // 보낼 수 있는 상황에서만 메모를 묻는다. 로컬에만 남길 자료에 메모를 받아 두면
+                // 읽을 사람이 없는데 창만 뜬다.
+                if (WillSendDiagnostic()) OpenDiagnosticNote();
+                else FinishDiagnostic(DiagnosticNote.None);
             }
             catch (Exception ex)
             {
@@ -354,6 +355,47 @@ namespace SephPlanner.Plugin
 
         private void CaptureOwnLog(object sender, BepInEx.Logging.LogEventArgs args) =>
             _diagnosticLog.Append(DateTime.UtcNow.ToString("O") + " [" + args.Level + "] " + args.Data);
+
+        /// <summary>이번 진단이 서버로 갈 수 있는 상태인가. 동의를 아직 묻지 않은 경우도 포함한다.</summary>
+        private bool WillSendDiagnostic() =>
+            _settings.DiagnosticUploadAllowed ||
+            !_settings.DiagnosticChoiceMade.Value || _settings.DiagnosticConsent.Value.Length > 0;
+
+        private void OpenDiagnosticNote()
+        {
+            _noteWindow.Reset();
+            if (!_noteWindow.IsOpen) _noteWindow.Toggle("ESC: 메모 없이 보내기");
+            if (_noteWindow.Blocker.Length == 0) return;
+
+            // 창을 못 열었다고 진단을 버리지 않는다. 메모 없이 하던 대로 보낸다.
+            Logger.LogWarning("진단 메모 창을 열지 못했습니다: " + _noteWindow.Blocker);
+            FinishDiagnostic(DiagnosticNote.None);
+        }
+
+        /// <summary>메모가 정해진 뒤에 설명 파일을 쓰고 전송 또는 로컬 보관으로 넘긴다.</summary>
+        private void FinishDiagnostic(DiagnosticNote note)
+        {
+            var capture = _pendingDiagnostic;
+            _pendingDiagnostic = null;
+            if (capture == null) return;
+            try
+            {
+                capture.Finish(PluginIdentity.Describe(),
+                    ReplayPreferences.From(_prefs.ToPreferences(_settings.Recommendations.Value)), note);
+                Logger.LogInfo("이번 진단 보관 위치: " + capture.DirectoryPath);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("진단 설명 저장 실패: " + ex);
+                ReportDiagnostic("진단 설명을 저장하지 못했습니다. BepInEx 로그를 확인하세요.");
+                return;
+            }
+            if (_settings.DiagnosticUploadAllowed) StartDiagnosticUpload(capture);
+            else if (!_settings.DiagnosticChoiceMade.Value || _settings.DiagnosticConsent.Value.Length > 0) OpenDiagnosticConsent(capture);
+            else ReportDiagnostic(capture.HasFailures
+                ? "진단 일부 저장에 실패했습니다. 저장한 자료와 실패 기록은 로컬에 보관했습니다."
+                : "진단을 로컬에 저장했습니다. F3에서 진단 전송을 켤 수 있습니다.");
+        }
 
         private void OpenDiagnosticConsent(DiagnosticCapture capture)
         {
@@ -1109,6 +1151,7 @@ namespace SephPlanner.Plugin
             _window.Destroy();
             _build.Destroy();
             _diagnosticWindow.Destroy();
+            _noteWindow.Destroy();
         }
     }
 }

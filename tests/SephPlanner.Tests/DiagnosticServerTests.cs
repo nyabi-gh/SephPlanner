@@ -130,6 +130,39 @@ public sealed class DiagnosticServerTests
         ["report.json"] = JsonSerializer.Serialize(new { Version = DiagnosticArchive.SchemaVersion, ReportId = id.ToString("N") }),
         ["sephplanner.log"] = log,
     });
+
+    [Fact]
+    public async Task ListingCarriesTheUserNoteAndSurvivesReportsWithout()
+    {
+        await using var server = await DiagnosticTestServer.StartAsync();
+        var withNote = Guid.NewGuid();
+        var note = DiagnosticNote.Create("placement", "자물쇠가 F8 마다 자리를 옮깁니다");
+        using (var response = await server.Upload(withNote, DiagnosticArchive.Create(new Dictionary<string, string>
+        {
+            ["report.json"] = JsonSerializer.Serialize(new
+            {
+                Version = DiagnosticArchive.SchemaVersion,
+                ReportId = withNote.ToString("N"),
+                Note = new { note.Category, note.CategoryLabel, note.Text },
+            }),
+        })))
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var without = Guid.NewGuid();
+        using (var response = await server.Upload(without, Payload(without)))
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        server.Authorize();
+        using var list = await server.Client.GetAsync("/admin/reports");
+        using var json = JsonDocument.Parse(await list.Content.ReadAsStringAsync());
+        var rows = json.RootElement.EnumerateArray()
+            .ToDictionary(row => row.GetProperty("reportId").GetString()!, row => row);
+
+        Assert.Equal("배치가 이상함", rows[withNote.ToString("N")].GetProperty("category").GetString());
+        Assert.Equal("자물쇠가 F8 마다 자리를 옮깁니다", rows[withNote.ToString("N")].GetProperty("note").GetString());
+        Assert.Equal("", rows[without.ToString("N")].GetProperty("category").GetString());
+        Assert.Equal("", rows[without.ToString("N")].GetProperty("note").GetString());
+    }
 }
 
 internal sealed class DiagnosticTestServer : IAsyncDisposable

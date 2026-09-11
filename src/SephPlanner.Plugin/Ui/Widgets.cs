@@ -119,6 +119,62 @@ namespace SephPlanner.Plugin.Ui
         }
 
         /// <summary>
+        /// 글자를 받는 칸.
+        ///
+        /// <b>게임이 채팅에 쓰는 길 그대로다.</b> <c>UI_ChatInput</c>이 <c>TMP_InputField</c>를
+        /// 두고 조작을 넘겨받는 순간 <c>ActivateInputField</c>를 부른다. 그 길이라 한글 IME 도
+        /// 채팅과 똑같이 동작한다 - 우리가 조합 규칙을 흉내 내지 않는다.
+        ///
+        /// <see cref="Clickable"/>과 같은 이유로 플레이어가 일부러 연 창에서만 쓴다. 여기서도
+        /// <c>raycastTarget</c>이 켜지므로 HUD 에는 두지 않는다.
+        /// </summary>
+        public static TMP_InputField Input(
+            string name, Transform parent, NativeSkin skin, float size, int characterLimit, float padding)
+        {
+            var rect = Rect(name, parent);
+            var background = rect.gameObject.AddComponent<Image>();
+            background.color = NativeSkin.EmptyFill;
+
+            var viewport = Rect("Viewport", rect);
+            Stretch(viewport, padding);
+            viewport.gameObject.AddComponent<RectMask2D>();
+
+            var text = Label("Text", viewport, skin, size, NativeSkin.TextBright, TextAlignmentOptions.TopLeft);
+            text.textWrappingMode = TextWrappingModes.Normal;
+            text.overflowMode = TextOverflowModes.Overflow;
+            Stretch(text.rectTransform, 0f);
+
+            var placeholder = Label("Placeholder", viewport, skin, size, NativeSkin.TextDim, TextAlignmentOptions.TopLeft);
+            placeholder.textWrappingMode = TextWrappingModes.Normal;
+            placeholder.overflowMode = TextOverflowModes.Overflow;
+            Stretch(placeholder.rectTransform, 0f);
+
+            var field = rect.gameObject.AddComponent<TMP_InputField>();
+            field.textViewport = viewport;
+            field.textComponent = text;
+            field.placeholder = placeholder;
+            field.targetGraphic = background;
+            field.characterLimit = characterLimit;
+
+            // 여러 줄로 접히되 Enter 는 보내기다. 게임 채팅과 같은 약속이라 따로 배울 것이 없다.
+            field.lineType = TMP_InputField.LineType.MultiLineSubmit;
+            field.customCaretColor = true;
+            field.caretColor = NativeSkin.TextBright;
+            field.selectionColor = new Color(NativeSkin.Mint.r, NativeSkin.Mint.g, NativeSkin.Mint.b, 0.35f);
+            field.restoreOriginalTextOnEscape = false;
+            field.text = "";
+            return field;
+        }
+
+        private static void Stretch(RectTransform rect, float padding)
+        {
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = new Vector2(padding, padding);
+            rect.offsetMax = new Vector2(-padding, -padding);
+        }
+
+        /// <summary>
         /// 누를 수 있는 한 줄. 이름과 값이 따로 있는 목록에서는 글자 하나가 아니라 줄 전체가
         /// 눌려야 하므로, 줄의 바탕칠 자체를 버튼의 그래픽으로 삼는다. 안에 넣는 글자는
         /// <see cref="Label"/>로 만들어 <c>raycastTarget</c>이 꺼져 있으니 클릭이 뒤로 통과한다.
