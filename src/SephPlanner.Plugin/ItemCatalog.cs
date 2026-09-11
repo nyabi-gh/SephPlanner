@@ -231,6 +231,31 @@ namespace SephPlanner.Plugin
                 }
             }
 
+            // 능력치 표를 안 쓰고 자기 코드로 올려 주는 아티팩트를 더한다. 표 쪽 이름을 먼저
+            // 모아 두어야 같은 능력치를 다른 이름으로 두 번 세지 않는다.
+            var known = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var table in measurement.CharmStats) known.Add(table.StatusId);
+            CharmStatCode.Align(known);
+
+            var already = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var table in measurement.CharmStats)
+                already.Add(table.EntityId.ToString(CultureInfo.InvariantCulture) + "/" + table.StatusId);
+
+            foreach (var entity in Items())
+            {
+                if (entity.type != EItemType.Charm) continue;
+                if (entity.activeType == EItemActiveType.Disabled) continue;
+                if (entity.resourcePrefab == null) continue;
+
+                foreach (var table in CharmStatCode.TablesOf(entity.resourcePrefab, entity.id))
+                {
+                    var key = table.EntityId.ToString(CultureInfo.InvariantCulture) + "/" + table.StatusId;
+                    if (!already.Add(key)) continue;
+
+                    measurement.CharmStats.Add(table);
+                }
+            }
+
             foreach (var category in Categories())
             {
                 if (!category.isEnabled || category.comboEffectPrefab == null) continue;

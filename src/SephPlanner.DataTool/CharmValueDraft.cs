@@ -50,7 +50,11 @@ public static class CharmValueDraft
         var report = CharmStatWorth.Apply(charms, measurement);
         var curated = LoadCurated(repoRoot);
 
+        var fromCode = measurement.CharmStats.Where(table => table.FromCode).ToList();
         Console.WriteLine($"아티팩트 {charms.Count}종, 능력치 표가 있는 것 {report.ByEntity.Count}종");
+        if (fromCode.Count > 0)
+            Console.WriteLine($"  그중 {fromCode.Select(t => t.EntityId).Distinct().Count()}종은 "
+                              + "능력치 표가 아니라 아티팩트 코드에서 읽었다");
         Console.WriteLine();
 
         var measured = new List<CharmDefinition>();

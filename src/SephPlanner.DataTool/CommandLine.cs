@@ -16,6 +16,7 @@ public static class CommandLine
           --prediction-probe                       효과 갱신 순서의 합성 반례 검사
           --measure                                능력치 환산율과 콤보 가치
           --values                                 가치 평가 현황과 초안
+          --charm-stats [게임 폴더]                 능력치를 코드로 올려 주는 아티팩트 조사
           --help                                   이 도움말
 
         한 번에 명령 하나만 실행합니다.
@@ -34,6 +35,7 @@ public static class CommandLine
             "--check" or "--replay" => args.Length == 2 && PathArgument(args[1]),
             "--churn" => args.Length is 2 or 3 && PathArgument(args[1]) &&
                          (args.Length == 2 || int.TryParse(args[2], out var rounds) && rounds > 0),
+            "--charm-stats" => args.Length is 1 or 2 && (args.Length == 1 || PathArgument(args[1])),
             "--reproduce" => args.Length is 2 or 3 && PathArgument(args[1]) &&
                              (args.Length == 2 || args[2] == "--allow-model-change"),
             _ => false,

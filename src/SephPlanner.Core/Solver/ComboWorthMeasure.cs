@@ -9,6 +9,14 @@ namespace SephPlanner.Core.Solver
         public int EntityId { get; set; }
         public string StatusId { get; set; } = "";
         public List<int> ValuesByLevel { get; set; } = new List<int>();
+
+        /// <summary>
+        /// 능력치 표가 아니라 아티팩트 코드에서 읽어 온 것인가. 그쪽은 조건이 붙어 있을 수
+        /// 있어(가드 중에만, 피격하면 꺼짐) 얼마나 받는지는 우리가 모른다. 그 아티팩트의
+        /// 값어치에는 쓰되 <b>환산율을 정하는 표본에서는 뺀다</b> - 조건부 값이 섞이면
+        /// 능력치 하나의 환산율이 통째로 흔들린다.
+        /// </summary>
+        public bool FromCode { get; set; }
     }
 
     /// <summary>콤보가 임계값에서 주는 능력치 하나. 게임 <c>ComboEffectBase.addStatByCombo</c>.</summary>

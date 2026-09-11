@@ -330,7 +330,7 @@ public sealed class PlanReplayTests : IDisposable
         replay.Catalog.Charms[0].HasNoActivationEffect = true;
         var restored = RoundTrip(replay);
         Assert.Equal(9, restored.Version);
-        Assert.Equal(21, restored.CatalogVersion);
+        Assert.Equal(PlannerData.CatalogVersion, restored.CatalogVersion);
         Assert.True(restored.Catalog!.Restore().Charm(1)!.CannotDiscard);
         Assert.True(restored.Catalog.Restore().Charm(1)!.HasNoActivationEffect);
     }

@@ -270,6 +270,8 @@ namespace SephPlanner.Core.Solver
                 {
                     foreach (var table in byEntity[entity])
                     {
+                        if (table.FromCode) continue;
+
                         var rise = RisePerLevel(table, tops[entity]);
                         if (rise <= 0) continue;
 
@@ -294,6 +296,8 @@ namespace SephPlanner.Core.Solver
                     var covered = true;
                     foreach (var table in byEntity[entity])
                     {
+                        if (table.FromCode) { covered = false; break; }
+
                         if (!design.Seed.ContainsKey(table.StatusId))
                         {
                             if (table.ValuesByLevel.Any(value => value != 0)) covered = false;

@@ -52,8 +52,10 @@ namespace SephPlanner.Core.Runtime
         /// v13: 방향별 마법 지원 종류·비용 표와 실제 공격 가능한 마법의 판정을 담는다.
         /// v14: 수량·행별 능력치와 종이의 일치 조건을 담는다.
         /// v15: 능력치별 원본·환산 근거와 마법 치명타 적용 여부를 담는다.
+        /// v22: 능력치 표 없이 아티팩트 코드가 올려 주는 능력치를 함께 담는다. 없으면 그쪽
+        ///      아티팩트들이 레어도 어림값으로만 평가된다.
         /// </summary>
-        public const int CatalogVersion = 21;
+        public const int CatalogVersion = 22;
 
         /// <summary>플러그인이 생성하고 진단 도구가 읽는 데이터 위치.</summary>
         public static string DataDirectory =>

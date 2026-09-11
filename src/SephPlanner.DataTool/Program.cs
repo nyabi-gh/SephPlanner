@@ -37,6 +37,19 @@ if (args.Contains("--measure"))
 if (args.Contains("--values"))
     return CharmValueDraft.Run(FindRepoRoot());
 
+// 능력치 표 없이 자기 코드로 능력치를 올려 주는 아티팩트를 게임 IL 에서 찾는다.
+var surveyIndex = Array.IndexOf(args, "--charm-stats");
+if (surveyIndex >= 0)
+{
+    var directory = surveyIndex + 1 < args.Length ? args[surveyIndex + 1] : GameLocator.Find();
+    if (directory is null)
+    {
+        Console.Error.WriteLine("세피리아 설치 경로를 찾지 못했습니다. 경로를 인자로 넘기세요.");
+        return 1;
+    }
+    return CharmStatSurvey.Run(directory);
+}
+
 // 녹화해 둔 스냅샷들을 순서대로 다시 풀어 흔들림과 풀이 시간을 잰다.
 var replayIndex = Array.IndexOf(args, "--replay");
 if (replayIndex >= 0)

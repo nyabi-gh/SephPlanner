@@ -67,6 +67,7 @@ namespace SephPlanner.Plugin
 
             // 아티팩트가 레벨마다 실제로 주는 값어치를 콤보와 같은 환산율로 재어 정의에 실어 둔다.
             var worth = CharmStatWorth.Apply(charms, measurement);
+            report(CharmStatCode.Summary(measurement));
             yield return null;
 
             WriteJson(PlannerData.TabletDbFile, tablets);
