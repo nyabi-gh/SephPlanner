@@ -34,6 +34,11 @@ namespace SephPlanner.Core.Planning
 
             if (worth.Source == CharmWorthSource.Curated && entry is { Note.Length: > 0 }) lines.Add(entry.Note);
 
+            // 점수는 진행한 만큼 올라가는데 쪽지에 이유가 없으면, 같은 아티팩트가 왜 다르게
+            // 매겨지는지 알 길이 없다. 진행도는 인스턴스마다 달라 여기서 숫자를 적지는 못한다.
+            if (definition.GrowthQuestGoal > 0)
+                lines.Add("다 키우면 다른 아티팩트가 됩니다. 얼마나 키웠는지에 따라 값어치를 그쪽으로 끌어올려 평가합니다.");
+
             if (definition.ContextStats.Count > 0 && worth.Source != CharmWorthSource.Curated)
             {
                 lines.Add("배치의 아이템 수량·행에 따른 능력치를 함께 평가합니다. 점수는 능력치 환산값이며 실제 DPS가 아닙니다.");
