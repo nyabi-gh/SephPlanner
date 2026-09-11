@@ -60,11 +60,31 @@ public class CharmStatScanTests
         public byte[] Done() => _bytes.ToArray();
     }
 
-    private static CharmStatScanReport Scan(string typeName, byte[] il)
+    private static CharmStatScanReport Scan(string typeName, byte[] il, string method = CharmStatScan.EnableHook)
     {
         var assembly = new FakeAssembly();
-        assembly.Bodies.Add(new CharmMethodBody { TypeName = typeName, MethodName = "OnEnabledEffect", Il = il });
+        assembly.Bodies.Add(new CharmMethodBody { TypeName = typeName, MethodName = method, Il = il });
         return CharmStatScan.Run(assembly);
+    }
+
+    private static byte[] PlainGrant() => new Emitter()
+        .Op(OpCodes.Ldarg_0)
+        .Op(OpCodes.Ldc_I4_7)
+        .Op(OpCodes.Ldarg_0).Op(OpCodes.Ldfld, ArrayToken)
+        .Op(OpCodes.Ldc_I4_0)
+        .Op(OpCodes.Ldelem_I4)
+        .Op(OpCodes.Callvirt, AddCustomStat)
+        .Op(OpCodes.Ret)
+        .Done();
+
+    [Fact]
+    public void AStatGivenOutsideTheEnableHookIsNotCounted()
+    {
+        // 가드 중에만, 피격 전까지만 받는 것을 늘 받는 것으로 세면 크게 부풀려진다.
+        // 인공정령 이피엘의 MP 재생 50 은 OnUpdate 에서 나온다.
+        Assert.Empty(Scan("Charm_IncreaseMpRegenOnGuard", PlainGrant(), "OnUpdate").Grants);
+        Assert.Empty(Scan("Charm_FireFly", PlainGrant(), "Avatar_OnDamagedServerside").Grants);
+        Assert.Single(Scan("Charm_IncreaseAttackSpeed", PlainGrant()).Grants);
     }
 
     [Fact]
