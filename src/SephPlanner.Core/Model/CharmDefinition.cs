@@ -131,6 +131,15 @@ namespace SephPlanner.Core.Model
         /// <summary>값어치로 환산하지 못한 능력치. 표본 신뢰도와 별개로 측정의 누락을 나타낸다.</summary>
         public List<string> StatWorthUnconverted { get; set; } = new List<string>();
 
+        /// <summary>
+        /// 조건을 채우면 다른 아티팩트로 바뀌는 것(<c>Charm_GrowthStatusInstance</c>)의 목표 횟수.
+        /// 0 이면 성장하지 않는다. 진행도 자체는 인스턴스마다 다르므로 스냅샷에서 읽는다.
+        /// </summary>
+        public int GrowthQuestGoal { get; set; }
+
+        /// <summary>성장이 끝나면 그 자리에 남는 아티팩트. 0 이면 확인되지 않았다.</summary>
+        public int GrowthRewardEntityId { get; set; }
+
         public List<string> Categories { get; set; } = new List<string>();
         public Dictionary<string, string> Names { get; set; } = new Dictionary<string, string>();
     }

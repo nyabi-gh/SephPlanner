@@ -92,6 +92,19 @@ namespace SephPlanner.Core.Runtime
 
         /// <summary>인챈트로 붙은 고정 레벨. 자리를 옮겨도 따라다닌다.</summary>
         public int Enchant { get; set; }
+
+        /// <summary>
+        /// 성장 아티팩트가 목표까지 얼마나 왔는지. <c>null</c> 은 읽지 못했다는 뜻이며 0 과 다르다.
+        ///
+        /// 게임은 이 값을 서버에만 두고 소유자 화면에는 문자열로만 보낸다(<c>SetEffectHUDValue</c>).
+        /// 그래서 참가자 세션에서는 읽을 길이 없어 <c>null</c> 로 남는다. 0 으로 적으면 아직
+        /// 아무것도 못 채운 것과 구분되지 않으므로 그렇게 하지 않는다.
+        ///
+        /// <b>계획 지문에는 넣지 않는다</b>(<see cref="PlanFingerprint"/>). 이 값은 가드나 패링
+        /// 한 번마다 올라가므로 지문에 넣으면 싸울 때마다 계획을 다시 풀게 된다. 아직 배치 계산이
+        /// 쓰지 않는 값이라 넣을 이유도 없다. 쓰기 시작하면 그때 지문도 함께 본다.
+        /// </summary>
+        public int? GrowthProgress { get; set; }
     }
 
     public sealed class PlacedTablet

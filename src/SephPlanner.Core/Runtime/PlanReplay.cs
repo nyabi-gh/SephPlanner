@@ -19,6 +19,18 @@ namespace SephPlanner.Core.Runtime
 
         public int Version { get; set; }
         public int CatalogVersion { get; set; }
+
+        /// <summary>
+        /// 지금 재생할 수 있는 카탈로그 형식.
+        ///
+        /// 형식이 올라갔다고 해서 옛 자료가 곧바로 못 읽는 것은 아니다. 더한 것뿐이면 빠진 항목은
+        /// 수집하지 않은 것으로 읽히므로 그때의 결과가 그대로 나온다. 카탈로그 형식 검사는
+        /// <c>--allow-model-change</c> 로도 넘을 수 없는 문턱이라, 여기서 빼면 그 버전으로 모은
+        /// 제보가 영영 재생되지 않는다. 20 은 0.3.3·0.3.4 가 쓴 형식이다.
+        ///
+        /// 읽던 값의 뜻이 바뀌거나 사라지는 변경이면 여기에 남기지 말고 잘라낸다.
+        /// </summary>
+        private static readonly int[] SupportedCatalogVersions = { PlannerData.CatalogVersion, 20 };
         public string CoreBuild { get; set; } = "";
         public string Producer { get; set; } = "";
         public string CapturedUtc { get; set; } = "";
@@ -36,7 +48,7 @@ namespace SephPlanner.Core.Runtime
         public Plan Rebuild(bool allowModelChange = false)
         {
             var legacy = Version == 1 && CatalogVersion == 15;
-            if (!legacy && (Version != CurrentVersion || CatalogVersion != PlannerData.CatalogVersion))
+            if (!legacy && (Version != CurrentVersion || !SupportedCatalogVersions.Contains(CatalogVersion)))
                 throw new InvalidDataException("지원하지 않는 재현 자료 또는 카탈로그 형식입니다.");
             if (CoreBuild.Length == 0 || (!allowModelChange && CoreBuild != CurrentCoreBuild))
                 throw new InvalidDataException("계산 코드가 저장 당시와 다릅니다. 변경 전후 비교에는 --allow-model-change를 지정하세요.");

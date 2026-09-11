@@ -204,6 +204,7 @@ namespace SephPlanner.Plugin
                         ? (bool?)(instance.Charm is IAttackableCharm attackable && attackable.IsAttackableCharm())
                         : null,
                     Enchant = EnchantOf(instance.InstanceID),
+                    GrowthProgress = GrowthProgressOf(instance.Charm),
                 });
             }
 
@@ -305,6 +306,28 @@ namespace SephPlanner.Plugin
             return int.TryParse(dungeon.GetGlobalItemStatValue(instanceId, "Enchant"), out var enchant)
                 ? enchant
                 : 0;
+        }
+
+        private static readonly System.Reflection.FieldInfo GrowthCounter =
+            typeof(Charm_GrowthStatusInstance).GetField(
+                "questCounter",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        /// <summary>
+        /// 성장 아티팩트가 목표까지 얼마나 왔는지. 읽지 못하면 <c>null</c> 이다.
+        ///
+        /// 게임은 이 값을 <c>protected</c> 필드에 두고 SyncVar 로 내보내지 않는다. 소유자 화면에는
+        /// <c>SetEffectHUDValue</c> 로 문자열만 가므로 <b>참가자 세션에서는 읽을 길이 없다</b> -
+        /// 그 자리에서 필드를 읽으면 서버의 진짜 값이 아니라 초기값이 나온다. 0 으로 적으면
+        /// 아직 아무것도 못 채운 것과 구분되지 않으므로 모를 때는 비워 둔다.
+        /// </summary>
+        private static int? GrowthProgressOf(Charm_Basic charm)
+        {
+            if (charm is not Charm_GrowthStatusInstance growth || !growth.hasGrowthQuest) return null;
+            if (!Mirror.NetworkServer.active || GrowthCounter == null) return null;
+
+            var value = GrowthCounter.GetValue(growth);
+            return value is int counter ? counter : (int?)null;
         }
 
         private static PlacedTablet Describe(StoneTablet tablet) => new PlacedTablet

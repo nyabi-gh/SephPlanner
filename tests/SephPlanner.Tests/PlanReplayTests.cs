@@ -225,8 +225,19 @@ public sealed class PlanReplayTests : IDisposable
         oldSchema.Version = 0;
         Assert.Throws<InvalidDataException>(() => oldSchema.Rebuild(true));
         var oldCatalog = RoundTrip(original);
-        oldCatalog.CatalogVersion--;
+        oldCatalog.CatalogVersion = 19;
         Assert.Throws<InvalidDataException>(() => oldCatalog.Rebuild(true));
+    }
+
+    [Fact]
+    public void CatalogVersion20StillReplaysAfterTheGrowthFieldsWereAdded()
+    {
+        // 카탈로그 형식 검사는 --allow-model-change 로도 못 넘는다. 20 을 빼면 0.3.3·0.3.4 로
+        // 모은 제보가 영영 재생되지 않으므로, 더하기만 한 변경에서는 계속 받아야 한다.
+        var replay = RoundTrip(Capture());
+        replay.CatalogVersion = 20;
+        var plan = replay.Rebuild(true);
+        Assert.Empty(replay.Expected!.Differences(ReplayResult.From(plan)));
     }
 
     [Fact]
@@ -319,7 +330,7 @@ public sealed class PlanReplayTests : IDisposable
         replay.Catalog.Charms[0].HasNoActivationEffect = true;
         var restored = RoundTrip(replay);
         Assert.Equal(9, restored.Version);
-        Assert.Equal(20, restored.CatalogVersion);
+        Assert.Equal(21, restored.CatalogVersion);
         Assert.True(restored.Catalog!.Restore().Charm(1)!.CannotDiscard);
         Assert.True(restored.Catalog.Restore().Charm(1)!.HasNoActivationEffect);
     }
