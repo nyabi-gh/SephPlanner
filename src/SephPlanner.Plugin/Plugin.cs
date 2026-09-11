@@ -737,18 +737,15 @@ namespace SephPlanner.Plugin
                 return;
             }
 
-            if (state == null || !state.IsCurrent)
-            {
-                _hud.RenderNotice(Waiting(state));
-                return;
-            }
-
-            var plan = state.Latest;
+            // 다시 푸는 동안에도 직전 계획을 그대로 둔다. 낡은 계획을 적용할 걱정은 없다 -
+            // AutoPlacePolicy 가 배치 지문이 어긋나면 이미 자동 배치를 거절한다.
+            var plan = state?.Latest;
             if (plan == null)
             {
                 _hud.RenderNotice(Waiting(state));
                 return;
             }
+            var stale = !state.IsCurrent;
 
             var mixerOpen = _settings.Recommendations.Value && GameReader.IsMixerOpen();
             AutoExpand(plan, mixerOpen);
@@ -756,7 +753,7 @@ namespace SephPlanner.Plugin
             var preview = PreviewName(plan);
             try
             {
-                Render(plan, preview, state, mixerOpen);
+                Render(plan, preview, state, mixerOpen, stale);
             }
             catch (Exception ex)
             {
@@ -771,7 +768,7 @@ namespace SephPlanner.Plugin
             }
         }
 
-        private void Render(Plan plan, string preview, PlanRunState state, bool mixerOpen)
+        private void Render(Plan plan, string preview, PlanRunState state, bool mixerOpen, bool stale)
         {
             _hud.Render(new HudFrame
             {
@@ -790,6 +787,7 @@ namespace SephPlanner.Plugin
                 Hint = Hint(plan, preview, state),
                 HintIsPreview = preview != null,
                 PreviewKey = _previewKey,
+                Stale = stale,
             });
         }
 
@@ -974,7 +972,8 @@ namespace SephPlanner.Plugin
         /// </summary>
         private string Guide(PlanRunState state)
         {
-            var plan = state != null && state.IsCurrent ? state.Latest : null;
+            // 화면이 그리는 계획을 그대로 본다. 낡았을 때도 후보 목록과 미리보기는 살아 있다.
+            var plan = state?.Latest;
             var offers = plan != null && plan.Offers.Count > 0;
             var autoPlace = AutoPlaceAvailability(
                 _lastSnapshot, state, _currentPlacementFingerprint, _currentCatalogGeneration).Allowed;

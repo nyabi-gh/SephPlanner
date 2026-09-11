@@ -460,7 +460,7 @@ namespace SephPlanner.Plugin.Ui
 
             var warning = Warning(
                 snapshot, plan, frame.MultiplayerAutoPlace, frame.QueryVerified,
-                frame.RuntimeVerification, frame.RuntimeVerificationReason);
+                frame.RuntimeVerification, frame.RuntimeVerificationReason, frame.Stale);
             _notice.text = warning;
             Widgets.FitHeight(_notice, _noticeSize, inner);
             Widgets.SetActive(_notice, warning.Length > 0);
@@ -558,9 +558,14 @@ namespace SephPlanner.Plugin.Ui
         /// </summary>
         private static string Warning(
             GameSnapshot snapshot, Plan plan, bool multiplayerAutoPlace, bool queryVerified,
-            PlanVerificationStatus runtimeVerification, string runtimeVerificationReason)
+            PlanVerificationStatus runtimeVerification, string runtimeVerificationReason, bool stale)
         {
             var warnings = new List<string>();
+
+            // 아래 경고들이 전부 이 계획을 근거로 하므로 낡았다는 것이 먼저 와야 한다.
+            if (stale)
+                warnings.Add("갱신 중 - 가방이 바뀌어 다시 계산하고 있습니다. 아래는 직전 계획입니다.");
+
             if (!queryVerified)
                 warnings.Add("석판 질의 검증이 끝나지 않았거나 실패해 자동 배치를 껐습니다. F9로 다시 만드세요.");
 

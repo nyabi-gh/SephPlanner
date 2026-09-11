@@ -29,6 +29,9 @@ namespace SephPlanner.Plugin.Ui
         /// <summary>안내 줄이 지금 미리보기를 설명하고 있는가. 그때는 색이 달라야 눈에 든다.</summary>
         public bool HintIsPreview;
 
+        /// <summary>보여주는 계획이 지금 가방보다 낡았는가. 다시 푸는 동안 직전 계획을 그대로 둔다.</summary>
+        public bool Stale;
+
         /// <summary>보고 있는 후보의 <see cref="OfferAdvice.Key"/>. 빈 문자열이면 미리보기가 없다.</summary>
         public string PreviewKey = "";
 
@@ -60,6 +63,7 @@ namespace SephPlanner.Plugin.Ui
         private readonly bool _queryVerified;
         private readonly bool _hintIsPreview;
         private readonly bool _multiplayerAutoPlace;
+        private readonly bool _stale;
 
         public HudFrameKey(HudFrame frame)
         {
@@ -83,6 +87,9 @@ namespace SephPlanner.Plugin.Ui
 
             // 멀티 동의 안내가 이 값으로 갈린다. 빠뜨리면 설정을 바꾼 직후 옛 문구가 남는다.
             _multiplayerAutoPlace = frame.MultiplayerAutoPlace;
+
+            // 계획 객체는 그대로인 채 이 표시만 켜지고 꺼진다.
+            _stale = frame.Stale;
         }
 
         public bool Matches(in HudFrameKey other) =>
@@ -98,6 +105,7 @@ namespace SephPlanner.Plugin.Ui
             _queryVerified == other._queryVerified &&
             _hintIsPreview == other._hintIsPreview &&
             _multiplayerAutoPlace == other._multiplayerAutoPlace &&
+            _stale == other._stale &&
             string.Equals(_hint, other._hint, StringComparison.Ordinal) &&
             string.Equals(_reason, other._reason, StringComparison.Ordinal) &&
             string.Equals(_previewKey, other._previewKey, StringComparison.Ordinal);
