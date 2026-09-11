@@ -184,6 +184,53 @@ public class SolverCostTests
     }
 
     /// <summary>
+    /// <b>빔 열쇠에는 채점 강도가 없다.</b>
+    ///
+    /// 빔이 <c>SolverOptions</c>에서 읽는 것은 폭 셋뿐인데 열쇠가 다듬기 횟수와 탐색 예산까지
+    /// 세고 있었다. 그래서 <see cref="DiscardAdvisor"/>가 <c>ForAdvice</c>의 예산 둘을 덮어쓰는
+    /// 것만으로 칸이 갈려, 같은 빔을 두 번 찾았다. 열쇠를 도로 합치면 이 테스트가 잡는다.
+    /// </summary>
+    [Fact]
+    public void TheBeamKeyIgnoresScoringStrength()
+    {
+        var problem = FullBag(charmCount: 12, spare: 6);
+        var cache = new LayoutCache();
+
+        cache.Of(problem, SolverOptions.ForAdvice(default));
+
+        var cheaper = SolverOptions.ForAdvice(default);
+        cheaper.EmptySideTrials = 12;
+        cheaper.PriorityComboTrials = 24;
+        cheaper.PolishPasses = 1;
+        cheaper.FixpointIterations = 1;
+        cache.Of(problem, cheaper);
+        Assert.Equal(1, cache.Searches);
+
+        // 폭은 빔이 읽는 값이다. 그쪽이 달라지면 다시 찾아야 한다.
+        cache.Of(problem, new SolverOptions { BeamWidth = 32 });
+        Assert.Equal(2, cache.Searches);
+    }
+
+    /// <summary>
+    /// 열쇠를 나눠도 <b>잣대는 강도마다 따로</b>여야 한다. 빔은 나눠 쓰되 채점 결과는 아니라는
+    /// 것이 2번에서 세운 선이고, 그 선이 이 둘 사이를 지난다.
+    /// </summary>
+    [Fact]
+    public void TheYardstickStillSplitsByScoringStrength()
+    {
+        var problem = FullBag(charmCount: 12, spare: 6);
+        var cache = new LayoutCache();
+        var cheaper = SolverOptions.ForAdvice(default);
+        cheaper.PolishPasses = 1;
+
+        var first = cache.Yardstick(problem, SolverOptions.ForAdvice(default));
+
+        Assert.Same(first, cache.Yardstick(problem, SolverOptions.ForAdvice(default)));
+        Assert.NotSame(first, cache.Yardstick(problem, cheaper));
+        Assert.Equal(1, cache.Searches);
+    }
+
+    /// <summary>
     /// 취소된 탐색은 캐시에 남지 않는다.
     ///
     /// 예전에는 취소 검사마다 <b>중간까지 푼 것을 돌려주었다.</b> 석판 몇 장만 놓은 빔과 첫 배치만

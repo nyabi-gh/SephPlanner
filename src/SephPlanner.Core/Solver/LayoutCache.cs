@@ -30,6 +30,11 @@ namespace SephPlanner.Core.Solver
     /// 달라지므로, 빔에 붙이는 그 둘은 <see cref="PlacementSolver.WithCurrentAndPlanned"/>가
     /// 부를 때마다 다시 짓고 채점 결과는 <see cref="BeginPlan"/>이 버린다.
     ///
+    /// <b>열쇠가 둘이다.</b> 빔이 <c>SolverOptions</c> 에서 읽는 것은 폭 셋뿐이라, 다듬기 횟수나
+    /// 탐색 예산까지 한 열쇠에 묶으면 <b>같은 빔을 찾는 조언들이 칸을 나눠 갖는다</b> -
+    /// <see cref="DiscardAdvisor"/>가 <c>ForAdvice</c>의 예산 둘을 덮어쓰기 때문에 실제로 그랬다.
+    /// 그래서 빔은 빔 열쇠로, 기준 배치와 잣대는 그것을 품은 채점 열쇠로 찾는다.
+    ///
     /// <b>"쓸 수 있다"이지 "같다"가 아니다.</b> 빔도 석판 구성만의 함수는 아니다 -
     /// <c>Estimate</c>가 현재·직전 자리를 동률 가르기에 읽는다. 보장하는 것은 모든 후보가 그
     /// 판으로 정확히 채점되고 지금 배치와 직전 계획이 매번 다시 붙는다는 것까지다.
@@ -45,12 +50,15 @@ namespace SephPlanner.Core.Solver
 
         private sealed class Entry
         {
-            public List<List<TabletPlacement>>? Beam;
-            public List<List<TabletPlacement>>? Yardstick;
+            public List<List<TabletPlacement>>? Value;
             public long Used;
         }
 
-        private readonly Dictionary<string, Entry> _entries = new Dictionary<string, Entry>(StringComparer.Ordinal);
+        /// <summary>빔 열쇠로 찾는 탐색 결과. 계획을 넘어 산다.</summary>
+        private readonly Dictionary<string, Entry> _beams = new Dictionary<string, Entry>(StringComparer.Ordinal);
+
+        /// <summary>채점 열쇠로 찾는 잣대. <see cref="BeginPlan"/>가 계획마다 버린다.</summary>
+        private readonly Dictionary<string, Entry> _yardsticks = new Dictionary<string, Entry>(StringComparer.Ordinal);
         private long _clock;
 
         private PlacementProblem? _baselineProblem;
@@ -72,7 +80,7 @@ namespace SephPlanner.Core.Solver
             _baseline = null;
             _baselineProblem = null;
             _baselineKey = "";
-            foreach (var entry in _entries.Values) entry.Yardstick = null;
+            _yardsticks.Clear();
         }
 
         /// <summary>
@@ -90,7 +98,7 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         public Arrangement Baseline(PlacementProblem problem, SolverOptions options)
         {
-            var key = Key(problem, options);
+            var key = ScoringKey(problem, options);
             if (_baseline is not null && ReferenceEquals(_baselineProblem, problem) && _baselineKey == key)
             {
                 Reuses++;
@@ -111,14 +119,14 @@ namespace SephPlanner.Core.Solver
 
         public List<List<TabletPlacement>> Of(PlacementProblem problem, SolverOptions options)
         {
-            var key = Key(problem, options);
-            var beam = Find(key)?.Beam;
+            var key = BeamKey(problem, options);
+            var beam = Find(_beams, key)?.Value;
             if (beam is not null) Reuses++;
             else
             {
                 Searches++;
                 beam = PlacementSolver.SearchBeam(problem, options);
-                Reserve(key).Beam = beam;
+                Reserve(_beams, key).Value = beam;
             }
             return PlacementSolver.WithCurrentAndPlanned(problem, beam);
         }
@@ -134,8 +142,8 @@ namespace SephPlanner.Core.Solver
         public IReadOnlyList<List<TabletPlacement>> Yardstick(
             PlacementProblem problem, SolverOptions options)
         {
-            var key = Key(problem, options);
-            var cached = Find(key)?.Yardstick;
+            var key = ScoringKey(problem, options);
+            var cached = Find(_yardsticks, key)?.Value;
             if (cached is not null)
             {
                 Reuses++;
@@ -144,46 +152,46 @@ namespace SephPlanner.Core.Solver
 
             var best = PlacementSolver.EvaluateLayouts(problem, Of(problem, options), options);
             var one = new List<List<TabletPlacement>> { new List<TabletPlacement>(best.Tablets) };
-            Reserve(key).Yardstick = one;
+            Reserve(_yardsticks, key).Value = one;
             return one;
         }
 
-        private Entry? Find(string key)
+        private Entry? Find(Dictionary<string, Entry> map, string key)
         {
-            if (!_entries.TryGetValue(key, out var entry)) return null;
+            if (!map.TryGetValue(key, out var entry)) return null;
             entry.Used = ++_clock;
             return entry;
         }
 
-        private Entry Reserve(string key)
+        private Entry Reserve(Dictionary<string, Entry> map, string key)
         {
-            if (_entries.TryGetValue(key, out var entry))
+            if (map.TryGetValue(key, out var entry))
             {
                 entry.Used = ++_clock;
                 return entry;
             }
 
-            if (_entries.Count >= Limit) DropOldest();
+            if (map.Count >= Limit) DropOldest(map);
             entry = new Entry { Used = ++_clock };
-            _entries.Add(key, entry);
+            map.Add(key, entry);
             return entry;
         }
 
-        private void DropOldest()
+        private static void DropOldest(Dictionary<string, Entry> map)
         {
             var oldest = "";
             var used = long.MaxValue;
-            foreach (var pair in _entries)
+            foreach (var pair in map)
             {
                 if (pair.Value.Used >= used) continue;
                 used = pair.Value.Used;
                 oldest = pair.Key;
             }
-            _entries.Remove(oldest);
+            map.Remove(oldest);
         }
 
         /// <summary>
-        /// 탐색 결과를 가르는 것 전부. 석판 슬롯과 격자, 각인, 그리고 탐색 강도다.
+        /// 빔 탐색이 읽는 것 전부. 석판 슬롯과 격자, 각인, 그리고 <b>탐색 폭</b>이다.
         ///
         /// 인스턴스 번호만으로는 모자란다. 합성 추천은 합쳐진 석판을 늘 번호 -1 로 넣고 회전
         /// 조합마다 질의가 다르기 때문에, 질의까지 세지 않으면 서로 다른 합성이 한 칸을 나눠 쓰게 된다.
@@ -193,19 +201,40 @@ namespace SephPlanner.Core.Solver
         /// 각도가 달라지면 후보에 담기는 회전값 자체가 달라진다), <b>각인과 고정 칸 효과</b>(옮길
         /// 수는 없어도 효과는 내고, 신비 각인은 콤보 수를 따라 런 중에 질의가 바뀐다), 그리고
         /// <b>한 부모의 몫</b>(빔에 무엇을 남길지를 가른다)이다.
+        ///
+        /// <b>채점 강도는 여기 없다.</b> <c>SearchBeam</c> 이 <c>SolverOptions</c> 에서 읽는 것은
+        /// <c>BeamWidth</c>·<c>ExactCandidates</c>·<c>ParentQuota</c> 뿐이고, 다듬기 횟수나 수렴
+        /// 반복, 탐색 예산은 <c>Evaluate</c> 쪽에서만 쓰인다. 우선 카테고리도 마찬가지로
+        /// <c>PriorityComboPlacement</c> 가 채점할 때만 본다. 그것들을 빔 열쇠에 두면 강도만 다른
+        /// 조언들이 같은 빔을 두 번 찾는다 - <see cref="DiscardAdvisor"/> 가 <c>ForAdvice</c> 의
+        /// 예산 둘을 덮어쓰기 때문에 실제로 그랬다.
         /// </summary>
-        private static string Key(PlacementProblem problem, SolverOptions options)
+        private static string BeamKey(PlacementProblem problem, SolverOptions options) =>
+            Key(problem, options, new StringBuilder());
+
+        /// <summary>
+        /// 빔 열쇠에 채점을 가르는 것을 더한 열쇠. 기준 배치와 잣대가 이것으로 찾는다.
+        /// 빔 열쇠를 통째로 품으므로 채점 열쇠가 같으면 빔 열쇠도 반드시 같다.
+        /// </summary>
+        private static string ScoringKey(PlacementProblem problem, SolverOptions options)
         {
             var builder = new StringBuilder();
+            builder.Append(options.FixpointIterations)
+                   .Append('/').Append(options.PolishPasses)
+                   .Append('/').Append(options.PriorityComboTrials)
+                   .Append('/').Append(options.EmptySideTrials).Append(';');
+            foreach (var category in problem.PriorityCategories.OrderBy(value => value, StringComparer.Ordinal))
+                builder.Append("priority:").Append(category.Length).Append(':').Append(category).Append(';');
+            return Key(problem, options, builder);
+        }
+
+        private static string Key(PlacementProblem problem, SolverOptions options, StringBuilder builder)
+        {
             builder.Append(problem.Grid.Width).Append('x').Append(problem.Grid.Height)
                    .Append('/').Append(problem.Grid.Storage)
                    .Append('/').Append(options.BeamWidth)
                    .Append('/').Append(options.ExactCandidates)
-                   .Append('/').Append(options.ParentQuota)
-                   .Append('/').Append(options.FixpointIterations)
-                   .Append('/').Append(options.PolishPasses)
-                   .Append('/').Append(options.PriorityComboTrials)
-                   .Append('/').Append(options.EmptySideTrials).Append(';');
+                   .Append('/').Append(options.ParentQuota).Append(';');
 
             foreach (var slot in problem.Tablets)
             {
@@ -229,8 +258,6 @@ namespace SephPlanner.Core.Solver
             foreach (var charm in problem.Charms.Where(charm => ScalesPosition.Required(problem, charm)).OrderBy(charm => charm.InstanceId))
                 builder.Append("scales:").Append(charm.InstanceId).Append(':')
                     .Append(ScalesPosition.IsLeft(problem.CurrentCharms[charm.InstanceId]) ? 'L' : 'R').Append(';');
-            foreach (var category in problem.PriorityCategories.OrderBy(value => value, StringComparer.Ordinal))
-                builder.Append("priority:").Append(category.Length).Append(':').Append(category).Append(';');
             return builder.ToString();
         }
     }
