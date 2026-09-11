@@ -47,10 +47,10 @@ public class ExplainWorthTests
     }
 
     [Fact]
-    public void APreferenceOnADormantCharmIsReportedAsIgnored()
+    public void AStarOnADormantCharmSaysWhyTheScoreDoesNotMove()
     {
-        // 꺼진 아티팩트는 어느 칸에서든 값어치가 0 이라 배수를 곱해도 0 이다. 별 셋을 줘도
-        // 남는 칸으로 밀리는데, 말해 주지 않으면 지정이 무시당한 것으로만 보인다.
+        // 자리는 지정대로 잡아 주지만 지금 점수에는 한 푼도 안 들어간다. 말하지 않으면
+        // 점수가 왜 그대로인지 알 수 없다.
         var definition = new CharmDefinition { EntityId = 1, Behavior = "Charm_StatusInstance" };
         definition.Names["current"] = "실드 메이트";
         var problem = new PlacementProblem
@@ -62,10 +62,10 @@ public class ExplainWorthTests
             },
         };
 
-        var warnings = PlanBuilder.IgnoredPreferences(problem);
+        var warnings = PlanBuilder.DormantPreferences(problem);
 
         Assert.Contains("실드 메이트", Assert.Single(warnings));
-        Assert.Contains("강화 우선", warnings[0]);
+        Assert.Contains("무기를 바꾸면", warnings[0]);
     }
 
     [Fact]

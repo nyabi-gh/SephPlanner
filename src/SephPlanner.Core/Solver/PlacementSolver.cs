@@ -1101,7 +1101,8 @@ namespace SephPlanner.Core.Solver
         {
             if (charm.IsFiller) return 0;
             var inactive = Reason(charm, cell, result, problem.Grid, occupancy) != CharmInactiveReason.None;
-            if (inactive && !PositionalWorth.IsNeedle(charm.Definition)) return 0;
+            if (inactive && !PositionalWorth.IsNeedle(charm.Definition))
+                return DormantPreference(problem, charm, cell, result, occupancy);
 
             var level = result.EffectiveLevel(cell, charm.Enchant);
             var effective = inactive ? 0 : Math.Min(charm.Definition.MaxLevel, level);
@@ -1200,6 +1201,38 @@ namespace SephPlanner.Core.Solver
              DirectedCharmSupport.IsConnected(charm, cell, result, problem.Grid, occupancy, neighbors));
 
         /// <summary>
+        /// <summary>
+        /// 연동 무기를 안 들어 꺼져 있는데 사용자가 강화 우선을 지정한 아티팩트의 자리 값어치.
+        ///
+        /// 꺼진 아티팩트는 지금 어느 칸에서도 주는 것이 없으므로 배수를 곱해도 0 이고, 그래서
+        /// 별을 셋 줘도 남는 칸으로 밀렸다. 그런데 <b>별은 우리가 추정한 값이 아니라 사용자가
+        /// 넣은 바깥 정보다</b> - 꺼진 것에 굳이 별을 주는 이유는 무기를 바꿀 생각이기 때문이다.
+        /// 그래서 무기를 바꿨을 때 받게 될 값어치로 자리를 다투게 한다.
+        ///
+        /// <b>이 값은 점수에 넣지 않는다</b>(<see cref="Earned"/>). 지금 실제로 받는 것은 여전히
+        /// 0 이고, 화면 점수가 그 사실을 말해야 한다. 자리만 잡아 주고 점수는 정직하게 둔다.
+        ///
+        /// 칸이 죽어 있거나 배치 조건을 못 맞추면 0 이다 - 무기를 바꿔도 켜지지 않는 자리다.
+        /// </summary>
+        private static double DormantPreference(
+            PlacementProblem problem, CharmSlot charm, GridPos cell,
+            SimulationResult result, GridOccupancy occupancy)
+        {
+            if (!charm.IsDormant || charm.Weight <= 1 || charm.IsFiller) return 0;
+            if (ReasonIgnoringWeapon(charm, cell, result, problem.Grid, occupancy) != CharmInactiveReason.None)
+                return 0;
+
+            var level = Math.Max(0, Math.Min(charm.Definition.MaxLevel, result.EffectiveLevel(cell, charm.Enchant)));
+            return charm.Worth.WeightedAt(level, charm.Weight);
+        }
+
+        /// <summary>화면에 나가는 점수. 자리 선호로만 쓰는 몫은 빼고 실제로 받는 것만 센다.</summary>
+        private static double Earned(
+            PlacementProblem problem, CharmSlot charm, GridPos cell,
+            SimulationResult result, GridOccupancy occupancy, Dictionary<GridPos, CharmSlot>? neighbors) =>
+            Value(problem, charm, cell, result, occupancy, neighbors)
+            - DormantPreference(problem, charm, cell, result, occupancy);
+
         /// 효과가 꺼졌다면 그 이유. 게임의 <c>Charm_Basic.RefreshCharm</c>이 보는 조건과 같고,
         /// 자리를 옮겨서는 풀 수 없는 무기 불일치를 먼저 본다.
         /// </summary>
@@ -1207,6 +1240,13 @@ namespace SephPlanner.Core.Solver
             CharmSlot charm, GridPos cell, SimulationResult result, GridSpec grid, GridOccupancy occupancy)
         {
             if (charm.IsDormant) return CharmInactiveReason.Weapon;
+            return ReasonIgnoringWeapon(charm, cell, result, grid, occupancy);
+        }
+
+        /// <summary>무기를 뺀 나머지 조건. 무기를 바꾸면 켜질 자리인지 보는 데 쓴다.</summary>
+        private static CharmInactiveReason ReasonIgnoringWeapon(
+            CharmSlot charm, GridPos cell, SimulationResult result, GridSpec grid, GridOccupancy occupancy)
+        {
             if (result.IsDisabled(cell)) return CharmInactiveReason.Disabled;
             if (result.EffectiveLevel(cell, charm.Enchant) < 0) return CharmInactiveReason.NegativeLevel;
 
@@ -1325,13 +1365,13 @@ namespace SephPlanner.Core.Solver
                     arrangement.EffectiveLevels[position] = 0;
                     arrangement.InactiveCells[position] = reason;
                     arrangement.InactiveCharms.Add(charm.InstanceId);
-                    var residual = Value(problem, charm, position, result, occupancy, neighbors);
+                    var residual = Earned(problem, charm, position, result, occupancy, neighbors);
                     arrangement.Score += residual;
                     continue;
                 }
 
                 arrangement.EffectiveLevels[position] = Math.Max(0, Math.Min(charm.Definition.MaxLevel, level));
-                var value = Value(problem, charm, position, result, occupancy, neighbors);
+                var value = Earned(problem, charm, position, result, occupancy, neighbors);
                 arrangement.Score += value;
             }
 

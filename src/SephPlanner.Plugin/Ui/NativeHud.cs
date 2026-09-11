@@ -687,7 +687,7 @@ namespace SephPlanner.Plugin.Ui
                         $"강화 우선 {new string('★', pinned)} - 이득을 " +
                         $"{PlanPreferences.WeightOf(pinned):0.##}배로 칩니다. 패널티는 그대로 반영합니다." +
                         (reason == CharmInactiveReason.Weapon
-                            ? " 지금은 꺼져 있어 이 지정이 배치에 반영되지 않습니다."
+                            ? " 지금은 꺼져 있어 점수에는 들어가지 않지만, 자리는 이 지정대로 잡습니다."
                             : ""));
                 }
                 else if (pinned < 0)
