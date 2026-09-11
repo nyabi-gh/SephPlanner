@@ -130,8 +130,10 @@ scripts/make-release.ps1
 
 zip은 릴리스 전용 공개 저장소 [nyabi-gh/SephPlanner-Release](https://github.com/nyabi-gh/SephPlanner-Release)의
 Releases에 올린다. 이 저장소는 비공개라 여기 Releases는 링크가 공개되지 않는다. 그쪽에는 소스
-없이 zip과 Issues(제보 창구)만 둔다. 변경 기록은 이 저장소의 CHANGELOG.md가 정본이고 릴리스 노트에 옮겨 적는다. 커뮤니티 글에는 그 링크를 걸고 zip을 직접
-첨부하지 않는다 - 첨부하면 옛 버전이 돌아다닌다.
+없이 zip과 Issues(제보 창구)만 둔다. 변경 기록은 이 저장소의 CHANGELOG.md가 정본이고 릴리스
+노트에 옮겨 적는다. 옮겨 적은 것은 `docs/RELEASE-NOTES-<버전>.md`에 남겨 릴리스 본문과 저장소가
+갈라지지 않게 한다. 커뮤니티 글에는 그 링크를 걸고 zip을 직접 첨부하지 않는다 - 첨부하면 옛
+버전이 돌아다닌다.
 
 **태그를 먼저 달고 zip을 만든다.** manifest에 적히는 커밋이 곧 태그가 가리켜야 할 커밋이라,
 나중에 달면 zip을 만든 커밋과 태그가 갈라져 어느 소스에서 나온 zip인지 되짚을 수 없다.
@@ -140,14 +142,15 @@ CHANGELOG의 해당 절도 함께 확인한다.
 
 ## 문서
 
-- [docs/STATUS.md](docs/STATUS.md) — 현재 구현·추정·실기 미검증 범위와 다음 작업
+- [docs/STATUS.md](docs/STATUS.md) — 현재 구현·추정·실기 미검증 범위와 다음 작업. 설계·감사·제보 문서는 여기서 잇는다
+- [docs/BASELINE-0.2.8-PLAN.md](docs/BASELINE-0.2.8-PLAN.md) — 0.3.3이 왜 0.2.8 기준인지와 이식 범위. [선별 결과](docs/RELEASE-BACKPORT-REVIEW.md)가 항목별 판단이다
 - [docs/REPRODUCTION.md](docs/REPRODUCTION.md) — F10 계획 재현 자료와 진단 도구 사용법
 - [docs/DIAGNOSTIC-UPLOAD.md](docs/DIAGNOSTIC-UPLOAD.md) — F10 비공개 진단 전송과 서버 배포 인계
 
 - [docs/INSTALL.txt](docs/INSTALL.txt) — 사용자용 설치 안내. 메모장에서 그대로 읽히도록 마크다운 없이 평문으로 쓰고, 배포 zip에 `설치안내.txt`로 들어간다
 - [docs/RESEARCH.md](docs/RESEARCH.md) — 게임 내부 구조 조사 결과
 - [docs/LEGAL.md](docs/LEGAL.md) — 약관·저작권 검토와 그에 따른 설계 제약
-- [docs/ROADMAP.md](docs/ROADMAP.md) — 남은 작업과 백로그, 측정 기준선, 고치지 않기로 한 것
+- [docs/ROADMAP.md](docs/ROADMAP.md) — 백로그, 측정 기준선, 고치지 않기로 한 것. 날짜가 붙은 확인·릴리스 표는 0.2.x 시절의 과거 기록이므로 지금 할 일은 STATUS를 본다
 - [CHANGELOG.md](CHANGELOG.md) — 버전별 사용자 영향 변경 사항
 - [docs/VALUE-AUDIT-2026-09-06.md](docs/VALUE-AUDIT-2026-09-06.md) — 299종 가치 평가 점검과 부분 측정 처리
 - [LICENSE](LICENSE) — 배포 조건. 독점 라이선스이고 소스는 공개하지 않는다
