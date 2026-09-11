@@ -47,6 +47,28 @@ public class ExplainWorthTests
     }
 
     [Fact]
+    public void APreferenceOnADormantCharmIsReportedAsIgnored()
+    {
+        // 꺼진 아티팩트는 어느 칸에서든 값어치가 0 이라 배수를 곱해도 0 이다. 별 셋을 줘도
+        // 남는 칸으로 밀리는데, 말해 주지 않으면 지정이 무시당한 것으로만 보인다.
+        var definition = new CharmDefinition { EntityId = 1, Behavior = "Charm_StatusInstance" };
+        definition.Names["current"] = "실드 메이트";
+        var problem = new PlacementProblem
+        {
+            Charms =
+            {
+                new CharmSlot { InstanceId = 1, Definition = definition, IsDormant = true, Weight = 10 },
+                new CharmSlot { InstanceId = 2, Definition = definition, IsDormant = true, Weight = 1 },
+            },
+        };
+
+        var warnings = PlanBuilder.IgnoredPreferences(problem);
+
+        Assert.Contains("실드 메이트", Assert.Single(warnings));
+        Assert.Contains("강화 우선", warnings[0]);
+    }
+
+    [Fact]
     public void BothSideBoundCharmsSayTheyKeepTheirSide()
     {
         // 게임에서 XIdx <= 2 로 편을 가르는 클래스는 둘뿐인데 오래도록 하나만 지켜 왔다.

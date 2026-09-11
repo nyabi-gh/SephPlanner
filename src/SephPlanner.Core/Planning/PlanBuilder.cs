@@ -267,7 +267,8 @@ namespace SephPlanner.Core.Planning
                         (best.CharmPositions.TryGetValue(charm.InstanceId, out var cell) && best.InactiveCells.TryGetValue(cell, out var reason)
                             ? Explain.InactiveReason(reason) : "놓을 자리가 부족합니다.") +
                         (unapprovedDeactivation ? " 끄기 허용 없이 새로 비활성화하는 배치는 적용하지 않습니다." : ""))
-                    .Concat(best.WrongSideCharms.Select(_ => "대립의 천칭: 현재 놓인 쪽을 유지하는 배치를 찾지 못했습니다. 직접 원하는 쪽으로 옮긴 뒤 다시 계산하세요.")).ToList(),
+                    .Concat(best.WrongSideCharms.Select(_ => "대립의 천칭: 현재 놓인 쪽을 유지하는 배치를 찾지 못했습니다. 직접 원하는 쪽으로 옮긴 뒤 다시 계산하세요."))
+                    .Concat(IgnoredPreferences(problem)).ToList(),
                 ManualMoveInstructionsAvailable = manualMovesAvailable,
                 HasPlacementChanges = hasPlacementChanges,
                 InventoryWidth = inventory.Width,
@@ -293,6 +294,21 @@ namespace SephPlanner.Core.Planning
             return Naming.Of(charm.Definition.Names, charm.Definition.Id, "아티팩트") +
                 ": 사용 유지 배치를 찾지 못했습니다. " + reason;
         }
+
+        /// <summary>
+        /// 지정해 둔 강화 우선·양보가 아무 일도 하지 못하는 자리. 꺼져 있는 아티팩트는 어느 칸에
+        /// 두든 값어치가 0 이라 배수를 곱해도 0 이고, 그래서 별을 셋 줘도 남는 칸으로 밀린다.
+        /// 말해 주지 않으면 지정이 무시당한 것으로만 보인다 - 연동 무기가 안 맞는 아티팩트가
+        /// 견고 쪽에 몰려 있어 그쪽을 쓰는 사람이 특히 자주 만난다.
+        /// </summary>
+        internal static List<string> IgnoredPreferences(PlacementProblem problem) =>
+            problem.Charms
+                .Where(charm => charm.IsDormant && !charm.IsFiller && charm.Weight != 1)
+                .Select(charm => Naming.Of(charm.Definition.Names, charm.Definition.Id, "아티팩트") + ": " +
+                    "연동된 무기를 들고 있지 않아 꺼져 있어 " +
+                    (charm.Weight > 1 ? "강화 우선(★)" : "양보") +
+                    " 지정이 배치에 반영되지 않습니다. 꺼진 아티팩트는 어느 칸에 두든 값어치가 같습니다.")
+                .ToList();
 
         private static List<string> ComboPlacementWarnings(PlacementProblem problem, Arrangement best)
         {
