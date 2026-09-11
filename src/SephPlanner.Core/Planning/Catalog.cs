@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Runtime;
+using SephPlanner.Core.Solver;
 
 namespace SephPlanner.Core.Planning
 {
@@ -16,6 +17,9 @@ namespace SephPlanner.Core.Planning
 
         /// <summary>카테고리 식별자로 콤보 정의를 찾는다. 콤보가 없는 카테고리는 null.</summary>
         ComboDefinition? Combo(string categoryId);
+
+        /// <summary>이 카탈로그에서 잰 점수 눈금.</summary>
+        WorthScale Scale { get; }
     }
 
     /// <summary>이미 메모리에 있는 정의 목록으로 만든 카탈로그.</summary>
@@ -25,11 +29,15 @@ namespace SephPlanner.Core.Planning
         private readonly Dictionary<int, CharmDefinition> _charms;
         private readonly Dictionary<string, ComboDefinition> _combos;
 
+        public WorthScale Scale { get; }
+
         public Catalog(
             IEnumerable<TabletDefinition> tablets,
             IEnumerable<CharmDefinition> charms,
-            IEnumerable<ComboDefinition>? combos = null)
+            IEnumerable<ComboDefinition>? combos = null,
+            WorthScale? scale = null)
         {
+            Scale = scale ?? WorthScale.Default;
             _tablets = ToMap(tablets, definition => definition.EntityId);
             _charms = ToMap(charms, definition => definition.EntityId);
             _combos = new Dictionary<string, ComboDefinition>();
@@ -53,6 +61,7 @@ namespace SephPlanner.Core.Planning
             Tablets = new List<TabletDefinition>(_tablets.Values),
             Charms = new List<CharmDefinition>(_charms.Values),
             Combos = new List<ComboDefinition>(_combos.Values),
+            Scale = Scale,
         };
 
         // 같은 번호가 두 번 나오면 먼저 나온 것을 쓴다. 덤프에 중복이 있어도 터지지 않아야 한다.

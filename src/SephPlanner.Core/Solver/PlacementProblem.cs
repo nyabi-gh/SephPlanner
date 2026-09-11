@@ -95,6 +95,9 @@ namespace SephPlanner.Core.Solver
     public sealed class PlacementProblem
     {
         public GridSpec Grid { get; set; } = GridSpec.WithStorage(GridSpec.DefaultWidth * GridSpec.DefaultHeight);
+
+        /// <summary>이 판을 풀 때 쓰는 점수 눈금. 카탈로그에서 재어 온다.</summary>
+        public WorthScale Scale { get; set; } = WorthScale.Default;
         public List<CharmSlot> Charms { get; set; } = new List<CharmSlot>();
         public List<TabletSlot> Tablets { get; set; } = new List<TabletSlot>();
 
@@ -211,6 +214,9 @@ namespace SephPlanner.Core.Solver
 
     public sealed class Arrangement
     {
+        /// <summary>이 배치를 견줄 때 쓰는 점수 눈금. 판의 <see cref="PlacementProblem.Scale"/>에서 온다.</summary>
+        public double ScoreStep { get; set; } = WorthScale.Default.ScoreStep;
+
         public int PriorityComboMatches { get; set; }
         public double PriorityComboProgress { get; set; }
         public List<int> UnmatchedComboCharms { get; } = new List<int>();

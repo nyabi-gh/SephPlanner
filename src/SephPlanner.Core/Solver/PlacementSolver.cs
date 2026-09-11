@@ -685,7 +685,7 @@ namespace SephPlanner.Core.Solver
                         (ScalesPosition.Accepts(problem, charm, cell) ? 0 : 1),
                         model.Preserved[rank] && !active ? 1 : 0, held ? 0 : 1, 0, 0, value,
                         entry.Unsafe ? -1 : 0, charm.IsFiller || charm.IsDormant ? 0 : Math.Max(0, level - charm.Definition.MaxLevel),
-                        (index == current ? 1 : 0) + (index == planned ? PlanBonus : 0));
+                        (index == current ? 1 : 0) + (index == planned ? PlanBonus : 0), problem.Scale.ScoreStep);
                     if (best.HasValue)
                     {
                         var order = quality.CompareTo(best.Value);
@@ -712,7 +712,8 @@ namespace SephPlanner.Core.Solver
             }
             for (var index = 0; index < cells.Count; index++)
                 if (!used[index] && groups[model.GroupByCell[index]].Unsafe) unsafeEmpty++;
-            return new PlacementQuality(missing, unpreserved, unheld, 0, 0, total, unsafeEmpty, waste, familiarity);
+            return new PlacementQuality(
+                missing, unpreserved, unheld, 0, 0, total, unsafeEmpty, waste, familiarity, problem.Scale.ScoreStep);
         }
 
         private static Arrangement Evaluate(
@@ -732,7 +733,7 @@ namespace SephPlanner.Core.Solver
             var bestOccupancy = occupancy;
             var bestResult = result;
             var bestScore = new PlacementQuality(int.MaxValue, int.MaxValue, int.MaxValue,
-                0, 0, double.NegativeInfinity, int.MaxValue, int.MaxValue, 0);
+                0, 0, double.NegativeInfinity, int.MaxValue, int.MaxValue, 0, problem.Scale.ScoreStep);
 
             for (var iteration = 0; iteration < options.FixpointIterations; iteration++)
             {
@@ -977,7 +978,9 @@ namespace SephPlanner.Core.Solver
             var familiarity = Familiarity(problem, layout);
             double score = 0;
             int missing = 0, unpreserved = 0, unheld = 0, waste = 0, unsafeEmpty = 0;
-            var combo = problem.PriorityCategories.Count == 0 ? null : new Arrangement();
+            var combo = problem.PriorityCategories.Count == 0
+                ? null
+                : new Arrangement { ScoreStep = problem.Scale.ScoreStep };
             foreach (var charm in problem.Charms)
             {
                 if (!positions.TryGetValue(charm.InstanceId, out var position))
@@ -1012,7 +1015,7 @@ namespace SephPlanner.Core.Solver
             }
             if (combo is not null && neighbors is not null) PriorityComboPlacement.Describe(problem, combo, neighbors);
             return new PlacementQuality(missing, unpreserved, unheld, combo?.PriorityComboMatches ?? 0,
-                combo?.PriorityComboProgress ?? 0, score, unsafeEmpty, waste, familiarity);
+                combo?.PriorityComboProgress ?? 0, score, unsafeEmpty, waste, familiarity, problem.Scale.ScoreStep);
         }
 
         internal static bool Preserve(CharmSlot charm) => !charm.IsFiller && !charm.IsDormant && !charm.Definition.HasNoActivationEffect && !charm.AllowDeactivation;
@@ -1118,7 +1121,8 @@ namespace SephPlanner.Core.Solver
                 value = ContextStatWorth.Value(problem, charm, cell, effective, neighbors, result: result, occupancy: occupancy);
 
             if (charm.Definition.Behavior == "Charm_NearLevelDamage")
-                value += CharmWorth.ApplyWeight(NearLevelDamageWorth(charm, cell, effective, result, neighbors), charm.Weight);
+                value += CharmWorth.ApplyWeight(
+                    NearLevelDamageWorth(problem, charm, cell, effective, result, neighbors), charm.Weight);
 
             // 자리가 대상을 정하는 것들. 무엇이 걸리는지는 정의가 답한다.
             value += CharmWorth.ApplyWeight(PositionalWorth.ComboWorth(problem, charm, cell, neighbors), charm.Weight);
@@ -1160,7 +1164,7 @@ namespace SephPlanner.Core.Solver
         /// 주위로 다시 모으는 탐색까지는 하지 못하고 이미 모여 있는 자리를 찾아간다.
         /// </summary>
         private static double NearLevelDamageWorth(
-            CharmSlot charm, GridPos cell, int ownLevel,
+            PlacementProblem problem, CharmSlot charm, GridPos cell, int ownLevel,
             SimulationResult result, Dictionary<GridPos, CharmSlot>? neighbors)
         {
             var table = charm.Definition.NeighborLevelBonus;
@@ -1185,7 +1189,7 @@ namespace SephPlanner.Core.Solver
                 sum += Math.Min(
                     result.EffectiveLevel(spot, neighbor.Enchant), neighbor.Definition.MaxLevel);
             }
-            return Math.Floor(perLevel * sum) * Worth.DamageBonus;
+            return Math.Floor(perLevel * sum) * problem.Scale.DamageBonus;
         }
 
         private static bool CanUse(
@@ -1280,7 +1284,7 @@ namespace SephPlanner.Core.Solver
             PlacementProblem problem, List<TabletPlacement> layout, Dictionary<int, GridPos> positions,
             GridOccupancy occupancy, SimulationResult result)
         {
-            var arrangement = new Arrangement();
+            var arrangement = new Arrangement { ScoreStep = problem.Scale.ScoreStep };
             arrangement.Tablets.AddRange(layout);
             arrangement.UnplacedTablets = problem.Tablets.Count - layout.Count;
             arrangement.Preference = Familiarity(problem, layout);

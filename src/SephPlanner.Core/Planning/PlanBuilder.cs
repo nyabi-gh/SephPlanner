@@ -86,6 +86,7 @@ namespace SephPlanner.Core.Planning
             var problem = new PlacementProblem
             {
                 Grid = grid,
+                Scale = catalog.Scale,
                 DeactivationAllowed = new HashSet<int>(preferences.DeactivationAllowed),
                 PinnedCharms = new Dictionary<int, int>(preferences.PinnedCharms),
                 RetainedCharms = new HashSet<int>(preferences.RetainedCharms),

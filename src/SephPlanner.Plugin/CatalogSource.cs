@@ -37,10 +37,11 @@ namespace SephPlanner.Plugin
                 var combos = ItemCatalog.LoadCombos();
 
                 // 아티팩트가 레벨마다 주는 값어치를 실어 레어도 어림값으로 물러서지 않게 한다.
-                CharmStatWorth.Apply(charms, ItemCatalog.LoadStatMeasurement());
+                var measurement = ItemCatalog.LoadStatMeasurement();
+                CharmStatWorth.Apply(charms, measurement);
 
                 LastError = "";
-                _catalog = new Catalog(tablets, charms, combos);
+                _catalog = new Catalog(tablets, charms, combos, WorthScale.Measure(measurement, charms));
 
                 // 다 지었으니 리소스 목록을 놓아준다. 기다리는 동안만 들고 있으면 된다.
                 ItemCatalog.Release();

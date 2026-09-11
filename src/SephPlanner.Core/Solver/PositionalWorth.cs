@@ -88,7 +88,8 @@ namespace SephPlanner.Core.Solver
                 var combo = problem.Combos(category);
                 if (combo is null) continue;
 
-                worth += Worth.OfComboStep(combo, ComboCounting.CountFor(problem, charm, category, neighbors), out _, out _);
+                worth += problem.Scale.OfComboStep(
+                    combo, ComboCounting.CountFor(problem, charm, category, neighbors), out _, out _);
             }
             return worth;
         }

@@ -82,10 +82,16 @@ public static class ComboMeasure
         Console.WriteLine();
 
         Console.WriteLine($"환산된 임계값 {report.ConvertedCount}건, 못 한 것 {report.UnconvertedCount}건");
-        Console.WriteLine($"중앙값 {report.MedianLevels:0.##} 레벨  (지금 Worth.ComboThreshold = {Worth.ComboThreshold})");
-        if (exchange.TryConvert("FINAL_DAMAGE", 1, out var damageBonus))
-            Console.WriteLine($"전체 피해 보너스 1점 = {damageBonus:0.###} 레벨  "
-                              + $"(지금 Worth.DamageBonus = {Worth.DamageBonus})");
+        Console.WriteLine();
+
+        // 눈금은 카탈로그를 지을 때 재어 실린다. 여기서는 그 값과, 잴 수 없을 때 쓰는 기본값을
+        // 나란히 보여 준다 - 둘이 크게 벌어지면 기본값이 낡았다는 뜻이다.
+        var scale = WorthScale.Measure(measurement, charms);
+        Console.WriteLine("점수 눈금 - 이 카탈로그에서 잰 값 / 잴 수 없을 때 쓰는 기본값");
+        Console.WriteLine($"  콤보 한 단계          {scale.ComboThreshold,8:0.####} / {WorthScale.Default.ComboThreshold:0.####}");
+        Console.WriteLine($"  콤보 한 걸음          {scale.ComboProgress,8:0.####} / {WorthScale.Default.ComboProgress:0.####}");
+        Console.WriteLine($"  전체 피해 보너스 1점  {scale.DamageBonus,8:0.####} / {WorthScale.Default.DamageBonus:0.####}");
+        Console.WriteLine($"  점수 비교 눈금        {scale.ScoreStep,8:0.####} / {WorthScale.Default.ScoreStep:0.####}");
         Console.WriteLine();
 
         Shrinkage(measurement, profiles);

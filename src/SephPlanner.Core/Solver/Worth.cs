@@ -16,7 +16,7 @@ namespace SephPlanner.Core.Solver
         /// 환산한 뒤 임계값 63건의 중앙값을 썼다(못 옮긴 11건 제외).
         /// 방법과 결과는 docs/RESEARCH.md 의 "콤보 가중치" 절.
         /// </summary>
-        public const double ComboThreshold = 2.59;
+        public static double ComboThreshold => WorthScale.Default.ComboThreshold;
 
         /// <summary>
         /// 아직 임계값에 못 미치지만 한 걸음 다가가는 가치.
@@ -25,7 +25,7 @@ namespace SephPlanner.Core.Solver
         /// 정적 데이터로는 답이 안 나온다. 그래서 <see cref="ComboThreshold"/>에 대한 비율
         /// (1/8)만 예전 그대로 두고 크기만 함께 옮겼다.
         /// </summary>
-        public const double ComboProgress = 0.32;
+        public static double ComboProgress => WorthScale.Default.ComboProgress;
 
         /// <summary>
         /// 전체 피해 보너스(<c>ECustomStat.AllDamageBonus</c>) 1점을 점수(레벨) 단위로 환산하는 값.
@@ -35,7 +35,7 @@ namespace SephPlanner.Core.Solver
         /// 능력치를 더하므로 `FINAL_DAMAGE`가 그대로 다리가 된다. 측정된 레벨당 증가분이 3.80이라
         /// 1점은 레벨 0.26 값어치다.
         /// </summary>
-        public const double DamageBonus = 0.26;
+        public static double DamageBonus => WorthScale.Default.DamageBonus;
 
         /// <summary>
         /// 아무 근거가 없을 때 쓰는 마지막 어림값. 능력치를 주지 않아 잴 수 없고 손으로도 채우지
@@ -60,21 +60,7 @@ namespace SephPlanner.Core.Solver
         /// 지금 개수에서 카테고리 하나를 더 모으는 것의 가치. <paramref name="goal"/>은 그때
         /// 노리게 되는 임계값이다. 임계값을 이미 다 넘겼으면 0.
         /// </summary>
-        public static double OfComboStep(ComboDefinition combo, int currentCount, out bool completes, out int goal)
-        {
-            completes = false;
-            goal = 0;
-
-            var reached = currentCount + 1;
-            foreach (var threshold in combo.Thresholds)
-            {
-                if (threshold < reached) continue;
-                if (goal == 0 || threshold < goal) goal = threshold;
-            }
-            if (goal == 0) return 0;
-
-            completes = goal == reached;
-            return completes ? ComboThreshold : ComboProgress;
-        }
+        public static double OfComboStep(ComboDefinition combo, int currentCount, out bool completes, out int goal) =>
+            WorthScale.Default.OfComboStep(combo, currentCount, out completes, out goal);
     }
 }

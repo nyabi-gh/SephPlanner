@@ -75,6 +75,9 @@ namespace SephPlanner.Core.Runtime
         public List<CharmDefinition>? Charms { get; set; }
         public List<ComboDefinition>? Combos { get; set; }
 
+        /// <summary>저장 당시의 점수 눈금. 옛 재현 자료에는 없으므로 그때는 기본값을 쓴다.</summary>
+        public WorthScale? Scale { get; set; }
+
         public Catalog Restore()
         {
             if (Tablets is null || Charms is null || Combos is null ||
@@ -84,7 +87,7 @@ namespace SephPlanner.Core.Runtime
                 Charms.Select(item => item.EntityId).Distinct().Count() != Charms.Count ||
                 Combos.Select(item => item.Id).Distinct().Count() != Combos.Count)
                 throw new InvalidDataException("재현 카탈로그에 중복 식별자가 있습니다.");
-            return new Catalog(Tablets, Charms, Combos);
+            return new Catalog(Tablets, Charms, Combos, Scale);
         }
     }
 

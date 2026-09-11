@@ -8,8 +8,11 @@ namespace SephPlanner.Tests;
 /// </summary>
 public class ScoreResolutionTests
 {
+    /// <summary>이 검사의 눈금. 카탈로그에서 재어 온 값이 무엇이든 규칙은 같아야 한다.</summary>
+    private const double Step = 0.05;
+
     private static PlacementQuality Quality(double value, int unsafeEmpty = 0, double familiarity = 0) =>
-        new PlacementQuality(0, 0, 0, 0, 0, value, unsafeEmpty, 0, familiarity);
+        new PlacementQuality(0, 0, 0, 0, 0, value, unsafeEmpty, 0, familiarity, Step);
 
     /// <summary>
     /// 눈금보다 작은 점수 차이는 감점 빈칸 정리를 이기지 못한다. 이 자리가 원래 문제였다 -
@@ -25,13 +28,13 @@ public class ScoreResolutionTests
     }
 
     /// <summary>
-    /// 실제 레벨 한 칸의 차이는 그대로 이긴다. 카탈로그에서 가장 작은 이웃 레벨 차이가
-    /// 0.0912 이고 눈금은 그보다 작다.
+    /// 실제 레벨 한 칸의 차이는 눈금보다 크므로 그대로 이긴다. 눈금은 카탈로그에서 가장 작은
+    /// 이웃 레벨 차이의 절반이라 언제나 그렇다.
     /// </summary>
     [Fact]
     public void ARealLevelStepStillWinsOverATidierBoard()
     {
-        var better = Quality(10.01 + 0.0912, unsafeEmpty: 1);
+        var better = Quality(10.01 + Step * 2, unsafeEmpty: 1);
         var tidier = Quality(10.01, unsafeEmpty: 0);
 
         Assert.True(better.CompareTo(tidier) > 0);
