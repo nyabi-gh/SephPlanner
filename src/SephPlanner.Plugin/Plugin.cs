@@ -530,7 +530,7 @@ namespace SephPlanner.Plugin
 
         private void PollGameState()
         {
-            var started = FrameCost.Now;
+            var started = FrameCost.BeginPoll();
             try
             {
                 var step = FrameCost.Now;
@@ -555,7 +555,7 @@ namespace SephPlanner.Plugin
                 Logger.LogError("스냅샷 생성 실패: " + ex);
                 _nextPoll = Time.unscaledTime + 5f;
             }
-            FrameCost.Poll.Add(started);
+            FrameCost.FinishPoll(started);
         }
 
         /// <summary>
