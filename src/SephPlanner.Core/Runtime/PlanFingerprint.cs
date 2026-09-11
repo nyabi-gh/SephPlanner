@@ -81,6 +81,15 @@ namespace SephPlanner.Core.Runtime
                 Add(builder, "itemLevel", item.EffectiveLevel);
                 Add(builder, "itemActive", item.IsActive);
                 Add(builder, "itemEnchant", item.Enchant);
+
+                // 진행도를 그대로 넣으면 가드 한 번마다 계획이 낡는다. 점수가 보는 것과 같은
+                // 칸만 넣어, 값어치가 실제로 달라질 때만 다시 풀게 한다.
+                //
+                // 성장하는 아이템이 있을 때만 더한다. 무조건 넣으면 이 항목이 없던 시절의 F10
+                // 재현 자료가 전부 지문 불일치로 거부된다 - 그 가방에는 성장 아이템이 없었으므로
+                // 넣지 않는 것이 그때의 사실과도 같다.
+                if (item.GrowthGoal > 0)
+                    Add(builder, "itemGrowth", Solver.GrowthWorth.Bucket(item.GrowthProgress, item.GrowthGoal));
                 Add(builder, "itemAttackable", item.IsAttackable.HasValue ? (item.IsAttackable.Value ? "1" : "0") : "unknown");
                 Add(builder, "categoriesKnown", item.ObservedCategories is not null);
                 foreach (var category in item.ObservedCategories?.OrderBy(value => value, StringComparer.Ordinal) ?? Enumerable.Empty<string>())

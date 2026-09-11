@@ -52,9 +52,9 @@ public sealed class GrowthCharmTests
     }
 
     [Fact]
-    public void ProgressStaysOutOfThePlanFingerprint()
+    public void TheFingerprintFollowsTheBucketAndNotEveryGuard()
     {
-        // 가드 한 번마다 올라가는 값이라 지문에 들어가면 싸우는 내내 계획을 다시 푼다.
+        // 진행도를 그대로 넣으면 가드 한 번마다 계획이 낡는다. 점수가 보는 칸이 바뀔 때만 낡아야 한다.
         static GameSnapshot Snapshot(int? progress) => new GameSnapshot
         {
             Inventory = new InventoryState
@@ -62,14 +62,54 @@ public sealed class GrowthCharmTests
                 Width = 3,
                 Height = 3,
                 Storage = 9,
-                Items = { new PlacedItem { DefinitionId = 1313, InstanceId = 7, Position = new GridPos(0, 0), GrowthProgress = progress } },
+                Items =
+                {
+                    new PlacedItem
+                    {
+                        DefinitionId = 1313, InstanceId = 7, Position = new GridPos(0, 0),
+                        GrowthProgress = progress, GrowthGoal = 50,
+                    },
+                },
             },
         };
 
-        var none = PlanFingerprint.Placement(Snapshot(null), PlanPreferences.None, "catalog");
-        var started = PlanFingerprint.Placement(Snapshot(0), PlanPreferences.None, "catalog");
-        var nearly = PlanFingerprint.Placement(Snapshot(49), PlanPreferences.None, "catalog");
-        Assert.Equal(none, started);
-        Assert.Equal(none, nearly);
+        static string Print(int? progress) =>
+            PlanFingerprint.Placement(Snapshot(progress), PlanPreferences.None, "catalog");
+
+        // 같은 칸 안에서 오르내리는 것은 계획을 낡게 만들지 않는다.
+        Assert.Equal(Print(null), Print(0));
+        Assert.Equal(Print(0), Print(9));
+        Assert.Equal(Print(40), Print(49));
+
+        // 칸이 바뀌면 값어치가 달라지므로 다시 풀어야 한다.
+        Assert.NotEqual(Print(9), Print(10));
+        Assert.NotEqual(Print(49), Print(50));
+    }
+
+    [Fact]
+    public void BagsWithoutGrowthItemsFingerprintExactlyAsBefore()
+    {
+        // 이 항목이 없던 시절의 F10 자료는 성장 아이템이 없던 가방이다. 그 가방의 지문이
+        // 달라지면 예전 제보가 전부 지문 불일치로 거부된다.
+        static GameSnapshot Snapshot(int? progress) => new GameSnapshot
+        {
+            Inventory = new InventoryState
+            {
+                Width = 3,
+                Height = 3,
+                Storage = 9,
+                Items =
+                {
+                    new PlacedItem
+                    {
+                        DefinitionId = 1000, InstanceId = 7, Position = new GridPos(0, 0),
+                        GrowthProgress = progress, GrowthGoal = 0,
+                    },
+                },
+            },
+        };
+
+        var plain = PlanFingerprint.Placement(Snapshot(null), PlanPreferences.None, "catalog");
+        Assert.Equal(plain, PlanFingerprint.Placement(Snapshot(40), PlanPreferences.None, "catalog"));
     }
 }

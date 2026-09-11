@@ -208,6 +208,8 @@ namespace SephPlanner.Plugin
                         : null,
                     Enchant = EnchantOf(instance.InstanceID),
                     GrowthProgress = GrowthProgressOf(instance.InstanceID, instance.Charm),
+                    GrowthGoal = instance.Charm is Charm_GrowthStatusInstance goal && goal.hasGrowthQuest
+                        ? goal.growthQuestGoal : 0,
                 });
             }
 

@@ -105,6 +105,12 @@ namespace SephPlanner.Core.Runtime
         /// 쓰지 않는 값이라 넣을 이유도 없다. 쓰기 시작하면 그때 지문도 함께 본다.
         /// </summary>
         public int? GrowthProgress { get; set; }
+
+        /// <summary>
+        /// 성장이 끝나는 횟수. 0 이면 성장하지 않는 아티팩트다. 카탈로그에도 같은 값이 있지만,
+        /// 계획 지문이 카탈로그를 보지 않고도 진행도를 칸으로 끊을 수 있어야 해서 여기에도 싣는다.
+        /// </summary>
+        public int GrowthGoal { get; set; }
     }
 
     public sealed class PlacedTablet

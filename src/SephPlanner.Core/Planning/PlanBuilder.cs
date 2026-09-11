@@ -34,6 +34,25 @@ namespace SephPlanner.Core.Planning
     /// <summary>스냅샷과 카탈로그를 합쳐 현재 배치를 채점하고 더 나은 배치를 찾는다.</summary>
     public static class PlanBuilder
     {
+        /// <summary>
+        /// 다 키우면 다른 아티팩트가 되는 것은 그만큼 값어치를 끌어올린다. 목표치는 스냅샷에 적힌
+        /// 관측값을 먼저 믿고, 없으면 카탈로그의 정의를 쓴다.
+        /// </summary>
+        private static CharmWorth ProjectGrowth(
+            CharmWorth worth, CharmDefinition definition, PlacedItem item, ICatalog catalog, CharmValueBook values)
+        {
+            var goal = item.GrowthGoal > 0 ? item.GrowthGoal : definition.GrowthQuestGoal;
+            var bucket = GrowthWorth.Bucket(item.GrowthProgress, goal);
+            if (bucket <= 0 || definition.GrowthRewardEntityId == 0) return worth;
+
+            var grown = catalog.Charm(definition.GrowthRewardEntityId);
+            if (grown is null) return worth;
+
+            return GrowthWorth.Project(
+                worth, CharmWorth.Resolve(grown, values.Of(grown)), bucket,
+                Math.Max(definition.MaxLevel, grown.MaxLevel));
+        }
+
         public static Plan? Build(
             GameSnapshot snapshot, ICatalog catalog, PlanPreferences? preferences = null,
             Plan? previous = null) =>
@@ -143,7 +162,11 @@ namespace SephPlanner.Core.Planning
                     Retained = definition is not null && preferences.RetainedCharms.Contains(item.DefinitionId),
                     AllowDeactivation = definition is not null && preferences.DeactivationAllowed.Contains(item.DefinitionId),
                 };
-                if (definition is not null) slot.Worth = CharmWorth.Resolve(definition, values.Of(definition));
+                if (definition is not null)
+                {
+                    var worth = CharmWorth.Resolve(definition, values.Of(definition));
+                    slot.Worth = ProjectGrowth(worth, definition, item, catalog, values);
+                }
                 problem.Charms.Add(slot);
                 positions[item.InstanceId] = item.Position;
                 problem.CurrentCharms[item.InstanceId] = item.Position;
