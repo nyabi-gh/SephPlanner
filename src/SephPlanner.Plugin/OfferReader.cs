@@ -22,9 +22,13 @@ namespace SephPlanner.Plugin
         /// 것이라, 목록을 들고 있어도 여는 순간이 늦어지지 않는다. 늦어질 수 있는 것은 새로
         /// 떨어진 꾸러미뿐이고 그것도 이 간격만큼이다.
         /// </summary>
-        private static readonly SceneCache<GridInventory> Inventories =
-            new SceneCache<GridInventory>(1f, FindObjectsInactive.Exclude,
-                FrameCost.ChestAlive, FrameCost.ChestFind);
+        /// <summary>
+        /// 등록부로 바꾼 것이 무언가를 놓치는지 <b>가끔 확인만</b> 한다. 옛 방식(씬 전수 탐색)이
+        /// 6ms 라 폴링마다 돌릴 수는 없지만, 아주 가끔이면 값이 없고 어긋남은 반드시 잡힌다.
+        /// 한 세션 내내 0 이면 이 대조를 걷어낸다.
+        /// </summary>
+        private const float CrossCheckInterval = 10f;
+        private static float _crossCheckedAt = float.NegativeInfinity;
 
         /// <summary>
         /// 세피라이트는 <b>보상 창이 열려 있을 때만</b> 찾는다. 후보가 될 수 있는 것은 그 창이
@@ -47,7 +51,10 @@ namespace SephPlanner.Plugin
             FrameCost.Sephirites.Add(step);
 
             step = FrameCost.Now;
-            var found = Inventories.Get();
+            var walking = FrameCost.Now;
+            var found = NetworkedInventories.All();
+            FrameCost.ChestAlive.Add(walking);
+            CrossCheck(found);
 
             var filtering = FrameCost.Now;
             var shown = ShownInventory();
@@ -71,8 +78,37 @@ namespace SephPlanner.Plugin
             foreach (var inventory in nearby) Collect(snapshot.Offers, inventory, player);
             FrameCost.ChestCollect.Add(collecting);
 
-            FrameCost.CountInventories(Inventories.Count, nearby.Count);
+            FrameCost.CountInventories(found.Count, nearby.Count);
             FrameCost.Chests.Add(step);
+        }
+
+        /// <summary>
+        /// 등록부가 찾은 것과 옛 씬 전수 탐색이 찾은 것을 견준다. 어긋나면 그 수를 덤프에 남긴다 -
+        /// 바닥 꾸러미가 풀에서 나올 때 Mirror 에 등록되지 않는다면 여기서 드러난다.
+        /// </summary>
+        private static void CrossCheck(List<GridInventory> registry)
+        {
+            if (Time.unscaledTime - _crossCheckedAt < CrossCheckInterval) return;
+            _crossCheckedAt = Time.unscaledTime;
+
+            var at = FrameCost.Now;
+            var scanned = Object.FindObjectsByType<GridInventory>(
+                FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            FrameCost.ChestFind.Add(at);
+
+            var missing = 0;
+            GridInventory first = null;
+            foreach (var inventory in scanned)
+            {
+                if (inventory == null || registry.Contains(inventory)) continue;
+                missing++;
+                if (first == null) first = inventory;
+            }
+            FrameCost.CountRegistryCheck(
+                registry.Count, scanned.Length,
+                missing == 0
+                    ? $"등록부 {registry.Count} 대 탐색 {scanned.Length}"
+                    : $"등록부에 없는 것 {missing}개, 예: {first.name} netId={first.netId}");
         }
 
         /// <summary>
