@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using Mirror;
-using UnityEngine;
 
 namespace SephPlanner.Plugin
 {
@@ -16,19 +15,21 @@ namespace SephPlanner.Plugin
     /// <b>캐시가 필요 없어졌다.</b> 간격 캐시는 탐색이 비싸서 있던 것이라, 새로 생긴 것이 그
     /// 간격만큼 늦게 떴다. 폴링마다 새로 읽으므로 그 지연이 사라진다.
     ///
-    /// <b>스스로 대조한다.</b> Mirror 를 거치지 않고 씬에 올라오는 것이 있으면 놓치므로, 옛
-    /// 방식을 가끔 돌려 견주고 어긋난 수를 덤프에 남긴다.
+    /// <b>옛 방식과의 대조는 걷어냈다.</b> Mirror 를 거치지 않고 씬에 올라오는 것이 있으면
+    /// 놓치므로 한동안 옛 <c>FindObjectsByType</c> 를 10초마다 돌려 견줬다. 제보
+    /// <c>09b4a20d</c>(75분 세션, 대조 939회: 상자 ~452·합성기 ~452·세피라이트 ~35)에서 셋 다
+    /// <b>어긋남 0</b> 이었고, 그 대조가 한 번에 5.15ms 로 폴링 시간의 삼분의 일을 쓰고 있었다
+    /// (최악 10.68ms - 60fps 한 프레임이 통째로 밀리는 값이다).
+    ///
+    /// <b>다시 열 조건.</b> 화면에 있어야 할 상자·세피라이트·합성기가 후보에 안 뜬다는 제보가
+    /// 오면 그때 이 대조를 되살려 확인한다. 지운 코드는 <c>fa32859</c> 까지의 이력에 있다.
     /// </summary>
     internal static class NetworkRegistry
     {
         private static class Bucket<T> where T : NetworkBehaviour
         {
             internal static readonly List<T> Found = new List<T>();
-            internal static float CheckedAt = float.NegativeInfinity;
         }
-
-        /// <summary>대조 간격(초). 옛 방식이 5~6ms 라 폴링마다는 못 돌리지만 가끔이면 값이 없다.</summary>
-        private const float CrossCheckInterval = 10f;
 
         /// <param name="includeInactive">
         /// 꺼져 있는 것까지 셀지. 세피라이트는 창이 열리는 동안 본체가 잠시 꺼지므로 켜야 한다.
@@ -58,36 +59,7 @@ namespace SephPlanner.Plugin
                 }
             }
 
-            CrossCheck(found, includeInactive);
             return found;
-        }
-
-        /// <summary>
-        /// 등록부가 놓친 것이 있는지 옛 방식으로 가끔 확인한다. 한 세션 내내 어긋남이 0 이면
-        /// 이 대조를 걷어낸다.
-        /// </summary>
-        private static void CrossCheck<T>(List<T> registry, bool includeInactive) where T : NetworkBehaviour
-        {
-            if (Time.unscaledTime - Bucket<T>.CheckedAt < CrossCheckInterval) return;
-            Bucket<T>.CheckedAt = Time.unscaledTime;
-
-            var at = FrameCost.Now;
-            var scanned = Object.FindObjectsByType<T>(
-                includeInactive ? FindObjectsInactive.Include : FindObjectsInactive.Exclude,
-                FindObjectsSortMode.None);
-            FrameCost.RegistryCheck.Add(at);
-
-            var missing = 0;
-            T first = null;
-            foreach (var item in scanned)
-            {
-                if (item == null || registry.Contains(item)) continue;
-                missing++;
-                if (first == null) first = item;
-            }
-            FrameCost.CountRegistryCheck(
-                missing,
-                missing == 0 ? "" : $"{typeof(T).Name} {missing}개 놓침, 예: {first.name} netId={first.netId}");
         }
     }
 }

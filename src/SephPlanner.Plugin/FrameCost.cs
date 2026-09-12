@@ -82,8 +82,6 @@ namespace SephPlanner.Plugin
         /// </summary>
         public static readonly Step ChestAlive = new Step("      등록부 훑기");
 
-        /// <summary>셋(상자·세피라이트·합성기)의 대조 탐색을 한데 모아 잰다.</summary>
-        public static readonly Step RegistryCheck = new Step("  등록부 대조(옛 씬 탐색)");
         public static readonly Step ChestFilter = new Step("      거리·보임 판정");
         public static readonly Step ChestCollect = new Step("      내용 담기");
 
@@ -95,23 +93,6 @@ namespace SephPlanner.Plugin
         public static int InventoriesHeldMost { get; private set; }
         public static int InventoriesNear { get; private set; }
         public static int InventoriesNearMost { get; private set; }
-
-        /// <summary>
-        /// 등록부가 찾은 것과 씬 전수 탐색이 찾은 것이 어긋난 횟수. <b>0 이 아니면 등록부로
-        /// 바꾼 것이 무언가를 놓치고 있다는 뜻이다</b> - 특히 풀에서 나온 바닥 꾸러미가 Mirror 에
-        /// 등록되지 않는 경우가 그렇다. 대조는 가끔만 돌므로 이 수는 그 대조 안에서만 는다.
-        /// </summary>
-        public static int RegistryMismatches { get; private set; }
-        public static int RegistryChecks { get; private set; }
-        public static string RegistryFirstMismatch { get; private set; } = "";
-
-        public static void CountRegistryCheck(int missing, string detail)
-        {
-            RegistryChecks++;
-            if (missing == 0) return;
-            RegistryMismatches++;
-            if (RegistryFirstMismatch.Length == 0) RegistryFirstMismatch = detail;
-        }
 
         public static void CountInventories(int held, int near)
         {
@@ -193,19 +174,19 @@ namespace SephPlanner.Plugin
                 CultureInfo.InvariantCulture,
                 "메인 스레드 부담 - 폴링 {0}회 평균 {1:0.00}ms/최악 {2:0.00}ms(폴링 {15}) " +
                 "(가방 {3:0.00} 합성기 {4:0.00} 세피라이트 {5:0.00} 상자 {6:0.00} " +
-                "대조 {7:0.00} 지문 {8:0.00}), " +
+                "시뮬 {7:0.00} 지문 {8:0.00}), " +
                 "화면 평균 {9:0.000}ms, 프레임 {10}회 중 다시 그린 것 {11}회, " +
                 "카탈로그 짓기 {12}회 합계 {13:0.0}ms (시도 {14}회), " +
                 "0세대 수집 {16}회(최악 폴링 안에서 {17}회), " +
-                "상자 = 등록부 {18:0.00} 판정 {20:0.00} 담기 {21:0.00} (인벤토리 {22}개), 대조 {19:0.00}ms 어긋남 {23}/{24}",
+                "상자 = 등록부 {18:0.00} 판정 {19:0.00} 담기 {20:0.00} (인벤토리 {21}개)",
                 Poll.Count, Poll.AverageMs, Poll.WorstMs,
                 Inventory.AverageMs, Mixer.AverageMs, Sephirites.AverageMs, Chests.AverageMs,
                 Simulation.AverageMs, Feed.AverageMs,
                 Panel.AverageMs, Frames, Draws,
                 Catalog.Count, Catalog.TotalMs, CatalogSource.Attempts,
                 Poll.WorstPoll, Collections, WorstPollCollections,
-                ChestAlive.AverageMs, RegistryCheck.AverageMs, ChestFilter.AverageMs, ChestCollect.AverageMs,
-                InventoriesHeld, RegistryMismatches, RegistryChecks) + PlanSummary();
+                ChestAlive.AverageMs, ChestFilter.AverageMs, ChestCollect.AverageMs,
+                InventoriesHeld) + PlanSummary();
 
         /// <summary>
         /// 풀이와 게시를 요약한 꼬리. 폴링 비용만으로는 "계산이 안 끝난다" 를 설명할 수 없어
@@ -275,13 +256,6 @@ namespace SephPlanner.Plugin
                     CultureInfo.InvariantCulture,
                     "      인벤토리 - 등록부 {0}개(최대 {1}), 사정거리 안 {2}개(최대 {3})",
                     InventoriesHeld, InventoriesHeldMost, InventoriesNear, InventoriesNearMost));
-            text.AppendLine("  " + RegistryCheck.Describe());
-            text.AppendLine(
-                string.Format(
-                    CultureInfo.InvariantCulture,
-                    "  등록부 대조 - {0}회 중 어긋남 {1}회{2}",
-                    RegistryChecks, RegistryMismatches,
-                    RegistryFirstMismatch.Length == 0 ? "" : " (" + RegistryFirstMismatch + ")"));
             text.AppendLine("  " + Simulation.Describe());
             text.AppendLine("  " + Feed.Describe());
             text.AppendLine("  " + Panel.Describe());
