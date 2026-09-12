@@ -1,0 +1,284 @@
+# 응답성 계획 (2026-09-12)
+
+`PERFORMANCE-PLAN.md` 가 **풀이 한 번의 비용**을 깎는 순서였다면, 이 문서는 **무엇을 언제
+게시하느냐**의 구조를 고치는 순서다. 제보 `4c1efa35` 가 보여 준 "F10 을 눌렀는데 계산이 안
+끝난다" 는 풀이가 느려서가 아니라, 배치와 조언이 한 덩어리로 묶여 있고 제안이 바뀔 때마다 그
+덩어리를 통째로 버리기 때문이다. 앞으로 작업 순서는 이 문서를 따르고, 풀이 비용 항목(계획서
+3b·5·6·7)은 그대로 계획서에 둔다. 인계 문서의 열린 버그 셋도 여기로 옮겨 닫는다.
+
+무엇을 / 왜 / 어떻게 / 끝나는 조건 / 재는 법만 적는다. 들어간 것은 `CHANGELOG.md` 에 적는다.
+
+## 0. 지금 값 - 전부 이 세션에서 직접 잰 것
+
+### 제보 `4c1efa35` 의 판 (석판 9 / 아티팩트 29 / 38칸 / 안 쓴 합성기)
+
+`PlanBuilder.Build` 를 .NET 10 에서 직접 부른 값이다. cold 는 새 `LayoutCache`, warm 은 같은
+캐시와 직전 계획을 넘긴 두 번째 이후(세 번 평균). 게임의 Mono 는 계획서 7번의 실측대로
+**4.4~5.6배** 느리다고 보되, 아래 Mono 열은 그 배율로 환산한 어림값이지 인게임 측정이 아니다.
+
+| 조건 | cold | warm | warm 할당 | Mono warm 어림 |
+|---|---|---|---|---|
+| 제보 그대로 (합성기 있음) | 3,407 ms | **589 ms** | 836 MB | ≈ 2.6~3.3 s |
+| `snapshot.Mixer = null` | 1,073 ms | **178 ms** | 239 MB | ≈ 0.8~1.0 s |
+
+같은 방법으로 잰 다른 제보: `74e0d686`(석판 7, 합성기 있음) warm 210 → 52 ms, `3fc4d9ac`(석판
+13, 합성기 없음) cold 1,983 / warm 99 ms, `6c41c965` 571 / 151 ms, `8a7728df` 363 / 83 ms.
+
+**인계 문서 1절의 ms 는 전부 warm 값이다.** 그 조건이 적혀 있지 않아 cold 가 10~20배라는 것을
+모르고 읽게 된다. 이 문서의 숫자는 cold/warm 을 항상 나눠 적는다.
+
+### 왜 F10 순간 계산이 안 끝나 있었나
+
+재현 자료에 **게시 199 / 요청 204** 가 적혀 있다. F10 직전 1분에 세피라이트 보상 창이 다섯 번
+열리고 닫혔다(09:55:43·48·53·55·56). 창이 열리면 `OfferReader` 가 후보 6개를 넣고 닫히면 0개가
+되는데, `PlanFingerprint.Full` 은 후보를 지문에 넣으므로 **여닫을 때마다 새 지문**이고,
+`PlanRunner.Submit` 은 새 지문이 오면 **돌던 풀이를 취소하고 결과를 버린다.** warm 한 번이
+Mono 로 3초쯤인 판에서 5초마다 취소가 오니 어느 요청도 끝을 못 본다.
+
+세 가지가 한 구조에서 나온다.
+
+1. **조언이 배치와 한 번에 계산된다.** `PlanBuilder.Attempt` 가 `Solve` 뒤에 `TabletMixAdvisor`
+   ·`OfferAdvisor`·`DiscardAdvisor` 를 이어 돌리고 `Plan` 하나를 만든다. 배치는 178 ms 에 나와
+   있는데 합성 추천 410 ms 가 끝날 때까지 게시되지 않는다.
+2. **전부 아니면 무.** 취소된 풀이의 배치는 버려진다(`Execute` 의 "취소된 요청의 결과는 쓸 수
+   없다"). 옳은 규칙이지만, 배치와 조언을 같이 버릴 이유는 없다.
+3. **제안이 바뀌면 배치까지 다시 요청한다.** 배치 지문(`PlanFingerprint.Placement`)은 그대로인데
+   전체 지문이 바뀌었다는 이유로 배치 풀이가 다시 돈다. 빔 캐시 덕에 warm 이라 싸지만, 1·2 때문에
+   그 요청이 취소의 방아쇠가 된다.
+
+F8 은 이 상태에서도 된다 - `AutoPlacePolicy` 는 `IsCurrent` 가 아니라 배치 지문과 게시 세대를
+보기 때문이다. 대신 화면은 내내 "갱신 중" 이고 합성·후보 조언은 영영 새로 뜨지 않는다.
+
+### 진짜 한계 - 이 문서가 못 고치는 것
+
+- **석판이 바뀐 뒤의 첫 풀이는 cold 다.** `LayoutCache.Key` 에 석판 현재 회전이 들어가므로
+  석판을 줍거나 돌리면(F8 의 회전 포함) 빔이 다시 돈다. 이 판에서 합성기 없이 1.07 s(.NET)다.
+  탐색 폭이나 시간 예산으로 깎을 수는 있어도 없앨 수는 없다. 계획서 7번(사이드카)의 몫이다.
+- **Mono 자체.** 같은 코드가 .NET 에서 5배 빠르다. 계획서 7·8번의 판단은 그대로다.
+
+## 1. 배치를 먼저 게시하고 조언은 뒤에 붙인다 ★
+
+**무엇을.** `PlanRunner` 가 계획을 두 단계로 게시한다. 1단계 **배치**는 `Solve` 와 검증·이동
+목록·목표까지고, 2단계 **조언**은 합성·후보·제거 셋이다. 배치 지문이 바뀌면 둘 다 새로 풀고,
+전체 지문만 바뀌면(후보·합성기·소지금) **조언만** 다시 푼다. 조언 취소는 배치를 건드리지 않는다.
+
+**왜.** 0절의 셋을 한 번에 없앤다. 사용자가 보는 응답은 warm 배치 시간(이 판 178 ms, Mono
+어림 1초)으로 내려가고, 세피라이트 창을 여닫아도 배치는 그대로 남으며 "갱신 중" 은 조언 칸에만
+붙는다. 인계 문서의 ①(합성기 거리)만 하면 조언 한 종류의 비용은 줄지만 이 밀림은 남는다.
+
+**어떻게.**
+
+- `SephPlanner.Core/Planning/PlanBuilder.cs`
+  - `Attempt` 를 둘로 가른다. `BuildPlacement(snapshot, catalog, preferences, out blocker,
+    previous, layouts, cancellation)` 는 지금의 `Solve` 까지와 `Moves`·`Targets`·경고·`Names`·
+    `Charms` 를 만들어 `Plan` 을 돌려주되 `Offers`·`Mixes`·`Discards` 는 비운다.
+    `BuildAdvice(placement, snapshot, catalog, preferences, layouts, cancellation)` 는 지금의
+    `if (preferences.Recommendations)` 블록이다.
+  - 2단계가 쓰는 `problem`·`best`·`verification`·`weapon`·`values` 는 지금 `Attempt` 의 지역
+    변수다. 문제를 다시 짓지 않도록 1단계가 그것을 `PlacementWork`(internal) 에 담아 `Plan` 에
+    붙여 준다(직렬화하지 않는다, `[JsonIgnore]`). 2단계는 그 객체에서 꺼내 쓴다.
+  - `Build(...)` 는 두 단계를 이어 부르는 래퍼로 남긴다. `DataTool --reproduce`, `PlanReplay.Rebuild`,
+    667개 테스트가 그 서명을 쓴다. **래퍼의 결과가 지금과 바이트 단위로 같아야 한다** - 아래
+    재는 법.
+- `SephPlanner.Core/Planning/Plan.cs`
+  - `AdviceStatus { NotRequested, Pending, Ready }` 와 `AdviceGeneration` 을 더한다. 추천을 끈
+    세션은 `NotRequested`, 켜면 배치 게시 직후 `Pending`.
+- `SephPlanner.Core/Runtime/PlanRunner.cs`
+  - 요청을 둘로 나눈다. `PlacementRequest`(배치 지문 + 맥락 지문) 와 `AdviceRequest`(전체 지문,
+    대상 배치의 세대). `Submit` 은 두 지문을 다 만들어, 배치 지문이 달라졌으면 둘 다 취소하고
+    배치를 시작하고, 전체 지문만 달라졌으면 도는 조언만 취소하고 게시된 배치에 대한 조언을 시작한다.
+  - **한 번에 한 작업만 돈다.** `LayoutCache` 는 스레드 안전하지 않고, 지금도 `_pending` 하나로
+    직렬화하고 있다. 대기열을 "배치 대기 1개 + 조언 대기 1개" 로 늘리되, 작업이 끝나는 자리
+    (`Execute` 끝의 자물쇠 안)에서 **배치 대기가 조언 대기보다 먼저** 시작된다. 취소는 협조적이라
+    조언 스레드가 캐시를 만지는 중일 수 있으므로, 배치는 조언 스레드가 실제로 빠져나온 뒤에만
+    시작한다 - 지금 `_running = null` 을 세우는 그 자리다.
+  - 조언이 끝나면 대상 배치의 세대가 아직 게시된 것인지 확인하고, 맞으면 `Offers`·`Mixes`·
+    `Discards`·`SkippedOffers` 를 채운 **새 `Plan` 객체**를 게시한다(게시된 객체를 제자리에서
+    고치지 않는다 - 화면이 프레임마다 읽는다). 아니면 버린다.
+  - `PlanRunState` 에 `AdviceIsCurrent`·`AdviceBusy` 를 더한다. `IsCurrent` 는 **배치 기준**으로
+    뜻을 좁힌다. `AutoPlacePolicy` 는 지금도 `Latest` 와 게시 세대만 보므로 바뀌지 않는다.
+  - `CaptureReplay` 는 `Expected` 에 조언 상태를 같이 적는다(아래).
+- `SephPlanner.Core/Runtime/PlanReplay.cs`, `ReplayResult.cs`
+  - 재현 자료에 `AdviceComplete`(bool, 기본 true) 를 더한다. F10 이 조언 `Pending` 인 배치를
+    잡으면 false 로 적고, `Differences` 는 그때 후보·합성·제거 항목을 견주지 않는다. 옛 자료는
+    항목이 없어 true 로 읽히고 지금과 같이 동작한다. `CurrentVersion` 은 올리지 않는다.
+- `SephPlanner.Plugin/Plugin.cs`, `Ui/NativeHud.cs`
+  - `Stale` 을 둘로 나눈다. 배치가 낡으면 지금처럼 경고 맨 앞, 조언만 낡으면 조언 칸 머리에
+    "조언 갱신 중" 한 줄. 합성기 창이 열려 있는데 `Mixes` 가 비고 `AdviceStatus == Pending` 이면
+    "계산 중" 으로 적는다(지금은 "추천 조합 없음" 이라 거짓말이 된다).
+  - `CurrentPlan()`(빌드 창·미리보기용)은 배치 기준 `IsCurrent` 로 충분하다.
+
+**끝나는 조건.**
+
+- `PlanRunnerTests` 에 넷을 더해 통과한다. 후보만 바뀌면 배치 세대는 그대로이고 조언만 새 세대
+  (`OfferChangeKeepsThePlacementPublished`), 배치가 바뀌면 도는 조언이 취소되고 조언 결과가
+  붙지 않는다(`PlacementChangeDropsTheAdviceInFlight`), 옛 배치의 조언은 게시되지 않는다
+  (`AdviceOfAnOlderPlacementIsNeverPublished`), 배치 대기가 조언 대기보다 먼저 돈다.
+- `PlanBuilderTests` 에서 `Build` 와 `BuildPlacement + BuildAdvice` 가 `ReplayResult` 로 같다.
+- `reports/` 의 제보 여섯을 `--reproduce` 로 다시 풀어 **한 자리도 다르지 않다.**
+- 인게임: 세피라이트 창을 여닫는 층에서 F10 을 받아 `[perf]` 의 새 항목(7번)이 **배치 게시
+  지연 0 세대**를 보인다. 조언은 밀려도 된다.
+
+**위험.** 중간 이상. 실행기의 동시성이 늘어나고 `Plan` 을 두 번 게시한다. 래퍼를 남기고 재현
+자료 대조로 묶어 두는 것이 안전장치다. 한 번에 한 작업만 돈다는 규칙을 깨면 캐시가 깨진다.
+
+## 2. 조언의 비용을 줄인다
+
+1번 뒤에도 조언 한 번은 이 판에서 warm 410 ms(.NET), 할당 600 MB 다. 조언은 배치를 막지는
+않지만 CPU 와 GC 를 그만큼 먹고, 그 GC 는 메인 스레드도 세운다(계획서 5번).
+
+### 2a. 합성 추천은 합성기 가까이에서만 (인계 문서 ①)
+
+- **무엇을.** `GameReader.ReadMixer` 가 `MixerState` 에 `Near`(플레이어와의 거리가 문턱 안)를
+  더한다. 거리는 `OfferReader.CollectSephirites` 가 하는 `Vector3.Distance(origin, ...)` 와 같은
+  방법이다. `PlanFingerprint.Full` 에 `mixerNear` 를 넣고, `BuildAdvice` 는 `Near` 일 때만
+  `TabletMixAdvisor.Rank` 를 돌린다. 표시는 `f713995` 의 창 기준 그대로.
+- **문턱.** 후보 반경(`OfferRadius`, 기본 12)보다 넓어야 걸어가는 동안 준비된다. 시작값은
+  반경의 3배로 두고, 인게임에서 "창을 열었을 때 이미 떠 있는가" 로 맞춘다. 문턱을 넘을 때 한 번
+  재계산이 도는 것은 정상이다.
+- **끝나는 조건.** 합성기가 있는 층에서 멀리 있을 때 조언 한 번이 합성기 없는 판과 같다(이
+  판 warm 178 ms 안쪽, 할당 239 MB). 가까이 가면 한 번 다시 풀리고, 창을 열었을 때 `Mixes` 가
+  이미 차 있다. 합성기를 쓴 뒤(`Used`)는 지금처럼 돌지 않는다.
+
+### 2b. 같은 후보를 두 번 풀지 않는다 (조건부)
+
+세피라이트 창은 6 → 0 → 6 으로 여닫히고 그때마다 후보 조언이 처음부터 돈다. 후보 지문 →
+조언 결과를 한두 개 기억하면 같은 창을 다시 열 때 즉시 뜬다. **1·2a 뒤에 `[perf]` 에서 조언
+재계산 횟수가 여전히 여닫는 횟수를 따라가면 그때 한다.** 그 전에는 안 한다.
+
+### 2c. 할당
+
+계획서 5번을 그대로 잇는다(`PolishSupportPairs` 의 `OccupancyFrom` + `Run`, `OfferAdvisor.Clone`,
+배정 행렬). 1번 뒤에는 조언 단계만 재면 되므로 잴 자리가 좁아진다.
+
+## 3. F8 뒤에는 다시 풀지 않는다 (인계 문서 (다))
+
+- **무엇을.** 자동 배치가 검증까지 통과하고 끝나면, 다음 폴링의 스냅샷이 그 계획의 목표와
+  일치할 때 풀지 않고 **적용된 계획을 새 배치로 게시**한다.
+- **왜.** 지문에 아이템 자리와 석판 회전이 들어가므로 F8 뒤 재계산은 맞는 동작이지만 답을 이미
+  안다. 게다가 회전이 바뀌면 빔 캐시 열쇠가 바뀌어 그 재계산은 **cold** 다 - 이 판에서 합성기
+  없이 1.07 s(.NET), Mono 는 초 단위. 꽉 찬 판일수록 F8 직후가 가장 비싸다.
+- **어떻게.**
+  - `ApplyPlanRoutine` 은 이미 끝에서 `TargetDrift()`(목표마다 그 칸에 그 인스턴스) 와
+    `LevelDrift()`(칸별 레벨이 `ExpectedCellLevels` 와 같음) 를 본다. **둘 다 비었을 때만** 이
+    길을 탄다. 서버 반영이 불확실한 경우(`RequiresResync`, `UncertainMessage`)는 타지 않는다.
+  - 플러그인의 `AutoPlaceFinished` 가 성공을 실행기에 알린다: `_runner.MarkApplied(plan)`.
+    실행기는 그 계획과 목표를 `_applied` 로 들고 있다가, 다음 `Submit` 에서 스냅샷의 모든
+    아이템·석판이 목표 자리·회전에 있고 `LevelMatrix` 가 `Best.CellLevels` 와 같으면 `_build`
+    대신 `PlanBuilder.AfterApply(plan, snapshot)` 를 부른다. 그것은 `PlacementSolver.Score` 로
+    현재 배치만 다시 매기고(ms 단위) `Current = Best`, `Moves` 비움, `Targets` 는 `From == To`,
+    지문은 새 스냅샷 것으로 채운 계획이다. 조언은 1번의 규칙대로 뒤에 붙는다.
+  - 한 번만 쓴다. 조건이 하나라도 어긋나면 `_applied` 를 버리고 평소대로 푼다.
+  - 선택: 빔 캐시에 적용된 배치를 새 열쇠(새 회전)로 심어 두면(`LayoutCache.Seed`) 그 다음
+    아티팩트 하나를 주웠을 때의 풀이도 warm 이 된다. 1차에는 넣지 않고 `[perf]` 로 필요를 본다.
+- **끝나는 조건.** `PlanRunnerTests.AnAppliedPlanIsRepublishedWithoutSolving` - 가짜 `_build`
+  가 F8 성공 뒤 첫 `Submit` 에서 불리지 않는다. `ApplyPlanRoutineTests` 에 드리프트가 있으면
+  표시가 남지 않는 경우. 인게임: F8 직후 "옮길 것이 없습니다" 가 즉시 뜨고 `[perf]` 의 배치
+  풀이 횟수가 F8 마다 늘지 않는다.
+
+## 4. 동행 증표가 있으면 F8 이 안 되는 것 (인계 문서 (가))
+
+**사실.** 제보 `6961d1a0` 덤프에 `entity=5007 instance=0` 이 있고 로그에 "적용 도중 인벤토리가
+바뀌어" 가 세 번이다. `IInventoryPort.InstanceAt` 계약이 "비어 있으면 0" 이라 `ApplySwaps` 가
+그 칸을 빈 칸으로 세고, 계획의 그 목표를 못 찾아 즉시 중단한다. 메시지도 사실이 아니다.
+
+**방향 A - 제자리 고정.** 번호 없는 아이템은 지금 칸에 못 박고 나머지를 그 주위로 푼다.
+
+- **읽기.** `GameReader`/`InventoryDiagnostics` 가 `InstanceID == 0` 인 아이템에 **칸에서 만든
+  음수 번호**(`-(index + 1)`) 를 주고 `PlacedItem.Immovable = true` 로 표시한다. 0 을 그대로
+  두면 둘 이상일 때 `positions[instance]`·지문에서 서로를 덮어쓴다. 못 옮기므로 칸이 곧
+  정체성이고 지문도 안정적이다.
+- **솔버.** `CharmSlot.Immovable`. 손댈 자리를 하나씩 확인한다 - 배정(`HungarianAssignment`
+  의 후보에서 제외하고 그 칸은 점유), `Polish` 와 `PolishSupportPairs` 의 교환 후보에서 제외,
+  석판 배치 탐색이 그 칸을 쓸 수 없게, `Targets` 는 `From == To` 하나, `Moves` 에서 제외.
+  석판 조건 판정("그 칸에 아티팩트가 있다")은 그대로 참이어야 한다 - C 안을 버린 이유다.
+- **적용기.** `IInventoryPort` 에 `bool Occupied(GridPos cell)` 를 더한다(`InstanceAt` 의
+  계약은 그대로 둔다). `ApplySwaps` 는 `occupants` 를 `Occupied` 로 채우고, 이동 목적지가
+  번호 없는 점유 칸이면 "그 칸의 아이템은 옮길 수 없습니다" 로 멈춘다. 계획이 옳으면 그 길은
+  타지 않는다.
+- **메시지.** 계획의 아이템이 가방에 없을 때는 "계획에 있는 아이템을 가방에서 찾지 못했습니다"
+  로 가른다. "인벤토리가 바뀌어" 는 실제로 바뀌었을 때만.
+- **끝나는 조건.** `PlanBuilderTests`(못 옮기는 아이템이 제자리, 나머지는 배치됨),
+  `PlanFingerprintTests`(번호 없는 아이템 둘이 구별됨), `ApplyPlanRoutineTests`(가짜 포트에
+  번호 없는 칸이 있어도 나머지가 적용됨). 이 PC 의 로컬 제보 `6961d1a0` 재현 자료로 계획을
+  만들면 5007 의 목표가 `From == To` 다.
+
+## 5. 메모 창에서 스페이스가 전송되는 것 (인계 문서 (나))
+
+**사실.** 게임의 `globalgamemanagers` 를 읽으니 `Submit` 축이 둘이고 두 번째에 `enter` 와
+`space` 가 같이 있다. `TMP_InputField` 는 `ISubmitHandler` 라 EventSystem 의 Submit 이
+`onSubmit` 을 부르고, `DiagnosticNoteWindow` 는 `onSubmit` 에 `Send` 를 묶어 두었다.
+
+- **어떻게.** `onSubmit` 리스너를 뗀다. `HandleEscape()` 와 같은 자리에서 Enter 를 직접 본다:
+  `Input.GetKeyDown(KeyCode.Return) || KeypadEnter` 이고 입력 칸이 **이번 프레임이나 직전
+  프레임에** 포커스였으면 `Send`. 직전 프레임까지 보는 것은 `MultiLineSubmit` 의 TMP 가 같은
+  Enter 로 칸을 비활성화한 뒤에 우리 검사가 돌 수 있어서다. `LineType` 은 그대로 둔다 -
+  줄바꿈은 지금도 없고 그 결정은 이 수정과 무관하다.
+- **끝나는 조건.** 유닛 테스트로는 못 잰다. 실기에서 셋을 본다 - 스페이스는 공백을 넣고,
+  Enter 는 보내고, ESC 는 취소한다. 포커스가 칸 밖(분류 단추)에 있을 때 Enter 가 보내는지도
+  적어 둔다.
+
+## 6. 등록부 대조 걷어내기 (인계 문서 ②)
+
+`5672b3b` 는 오늘 19:06 에 재시작한 게임에서 돌고 있다(로그 형식이 새 것). 첫 5분 집계는
+합성기 0.18 ms, 대조 어긋남 0/58 이다. **10분 넘게 논 세션의 덤프에서 세 종류 모두 어긋남 0
+이면** `NetworkRegistry.CrossCheck` 와 `FrameCost.RegistryCheck`, `[perf]` 의 그 줄을 지운다.
+상자는 이미 152·233·289회 어긋남 0 이다. 언제든 그 덤프가 오면 한다.
+
+## 7. 계측 - 1·3번보다 먼저
+
+`[perf]` 에는 폴링 비용만 있고 **풀이 자체의 시간과 게시 지연이 없다.** 제보 `4c1efa35` 에서
+밀림을 읽은 것은 재현 자료의 세대 수 하나뿐이었다. 1·3번의 전후를 인게임에서 견주려면 먼저
+넣어야 한다.
+
+- `PlanRunner` 에 `Stats`(잠금 안에서 복사) 를 더한다: 배치 풀이 횟수·평균·최악·취소 횟수,
+  조언 풀이 같은 넷, 요청에서 게시까지의 지연(최근·최악), 지금 밀린 세대 수. `Core` 라 Unity
+  없이 `Stopwatch` 로 잰다.
+- 플러그인이 5분 집계 로그와 `[perf]` 절에 한 줄씩 적는다. 시작할 때 첫 풀이의 JIT 도 여기
+  잡히므로 최악값은 폴링 번호처럼 "몇 번째 풀이" 를 같이 적는다.
+- **끝나는 조건.** 인계 문서 2절의 그 판을 다시 열어 F10 을 받으면 "배치 게시 지연 N 세대" 가
+  0 이 아닌 것으로 지금 상태가 찍힌다. 그것이 1번의 전 값이다.
+
+## 순서와 기대값
+
+| | 하는 것 | 크기 | 위험 | 이 판(4c1efa35)에서 기대하는 것 | 근거 |
+|---|---|---|---|---|---|
+| **7** | 풀이·게시 계측 | 작음 | 없음 | 전 값이 찍힌다 | - |
+| **5** | 메모 창 Enter | 아주 작음 | 없음 | 스페이스가 안 보낸다 | 설정 파일 확인 |
+| **1** | 배치·조언 2단계 게시 | 큼 | 중간 이상 | 배치 게시 warm **589 → ≤ 178 ms**(.NET), 후보 여닫음에 밀림 0 | 측정 |
+| **3** | F8 뒤 재계산 생략 | 중간 | 중간 | F8 직후 cold **1,073 ms → ≈ 0** | 측정(cold 값) |
+| **2a** | 합성 추천 거리 켜기 | 작음 | 낮음 | 조언 warm **410 ms → 합성기 없는 값**, 할당 836 → 239 MB | 측정 |
+| **4** | 동행 증표 제자리 고정 | 중간 | 중간 | 증표가 있어도 F8 이 된다 | 제보 `6961d1a0` |
+| **6** | 등록부 대조 제거 | 작음 | 낮음 | 폴링당 대조 0 | 덤프 대기 |
+| 2b | 후보 조언 기억 | 작음 | 낮음 | 조건부 | `[perf]` 뒤 |
+
+7 이 먼저인 것은 전후 비교 때문이고, 5 는 몇 줄이라 같이 간다. **1 이 이 문서의 이유다.** 3 은
+1 의 실행기 구조 위에 얹는 것이라 1 뒤가 싸다. 2a 는 1 없이도 되지만 1 뒤에는 조언 단계만
+재면 되어 확인이 쉽다. 4 는 독립이고 사용자와 A 로 좁혀 두었다. 6 은 덤프가 오는 대로.
+
+기대값의 ms 는 전부 .NET 10 이고 Mono 는 5배쯤으로 읽는다. 인게임 값은 7번이 넣는 항목으로만
+확인한다. 하나를 끝낼 때마다 제보 `[perf]` 로 재고, 기대와 어긋나면 다음으로 가기 전에 이
+문서를 고친다.
+
+## 재는 법
+
+- **개발 PC.** 스크래치 콘솔 하나면 된다(이 세션에서 쓴 것, 약 40줄). `PlanReplayFile.Read` →
+  `JsonSerializer.Deserialize<PlanReplay>` → `Preferences.Restore()`·`Catalog.Restore()` →
+  `PlanBuilder.Build(snapshot, catalog, preferences, out _, previous, layouts, token)` 를
+  **cold 1회 + warm 3회**, `snapshot.Mixer = null` 로 한 번 더. `GC.GetTotalAllocatedBytes(true)`
+  로 할당. 판은 `reports/` 의 `4c1efa35`(가장 큼)·`74e0d686`·`3fc4d9ac`·`6c41c965`·`8a7728df`.
+- **결과가 안 바뀌었다** 는 `--reproduce --allow-model-change` 로 제보 여섯이 "일치" 인 것으로
+  증명한다. 1번은 래퍼 `Build` 가 이것을 지킨다.
+- **인게임은 `[perf]` 만 믿는다.** 7번의 항목으로 배치 게시 지연과 풀이 시간을 읽는다. 기계
+  편차가 10% 넘으므로 절대값은 같은 세션의 전후로만 견준다.
+- **제보는 남의 기계 것일 수 있다.** 로그의 제보 번호가 `%LocalAppData%\SephPlanner\reports`
+  에 없으면 이 PC 것이 아니다. 멀티 세션에서는 양쪽에서 F10 이 12초 차이로 온 적이 있다.
+
+## 배경 - 이 문서를 쓰며 바로잡은 것
+
+1. 인계 문서 1절의 솔버 ms 는 warm 값이다(위 0절).
+2. 인계 문서 ④ "카탈로그 재시도가 계속 는다" 는 근거가 없다. 이 PC 제보를 시간순으로 보면
+   16·16·18·18·29·20·18·22·24·24·68·68·70·70 으로 세션마다 다른 값이고 같은 세션 안에서는
+   같은 수를 반복한다. 게임 자료가 설 때까지 폴링마다 다시 짓는 횟수라 로딩 길이를 잰 것이다.
+   `ROADMAP.md` §1 의 판단(세 번째 사람에게서 나오면 본다)을 그대로 둔다.
+3. 인계 문서 2절 "아직 안 돌았다" 는 19:06 재시작으로 끝났다(6번).
