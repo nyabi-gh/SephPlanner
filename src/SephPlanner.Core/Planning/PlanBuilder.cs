@@ -172,8 +172,9 @@ namespace SephPlanner.Core.Planning
 
             var mixes = new List<MixAdvice>();
 
-            // 합성기를 이미 썼으면 이 층에서는 더 권할 것이 없다.
-            if (snapshot.Mixer is { Used: false } mixer)
+            // 합성기를 이미 썼으면 이 층에서는 더 권할 것이 없고, 멀리 있으면 아직 권할 때가
+            // 아니다. 재지 않은(null) 자료는 전처럼 돈다.
+            if (snapshot.Mixer is { Used: false } mixer && mixer.Near != false)
             {
                 mixes = TabletMixAdvisor.Rank(
                     problem, catalog, mixer.Cost, snapshot.Run?.Gold ?? int.MaxValue,

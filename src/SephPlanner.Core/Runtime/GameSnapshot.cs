@@ -36,6 +36,16 @@ namespace SephPlanner.Core.Runtime
 
         /// <summary>내가 이미 이 층에서 썼는지. 썼으면 더 권할 것이 없다.</summary>
         public bool Used { get; set; }
+
+        /// <summary>
+        /// 플레이어가 이 합성기 가까이에 있는지. 합성 추천은 조언 한 번의 값을 세 배로 만드는
+        /// 가장 비싼 계산인데, 층에 합성기가 있기만 하면 계속 돌고 있었다. 걸어가는 동안 준비될
+        /// 만큼 넉넉한 거리에서만 돌린다.
+        ///
+        /// <c>null</c> 은 재지 않았다는 뜻이며 그때는 전처럼 돈다 - 이 값이 없던 시절의 F10
+        /// 재현 자료가 그렇다. 거짓으로 두면 그 자료들이 합성 추천을 잃는다.
+        /// </summary>
+        public bool? Near { get; set; }
     }
 
     public sealed class RunState

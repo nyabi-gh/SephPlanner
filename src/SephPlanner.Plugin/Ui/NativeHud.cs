@@ -862,7 +862,9 @@ namespace SephPlanner.Plugin.Ui
                     _mixes.Add("계산 중", "합성 추천을 계산하고 있습니다.", NativeSkin.TextDim);
                 else
                     _mixes.Add("추천 조합 없음", mixer == null ? "합성기 정보를 읽는 중입니다." :
-                        mixer.Used ? "이 합성기는 이미 사용했습니다." : "현재 석판에서 추천할 수 있는 조합을 찾지 못했습니다.", NativeSkin.TextDim);
+                        mixer.Used ? "이 합성기는 이미 사용했습니다." :
+                        mixer.Near == false ? "합성기에서 떨어져 있어 아직 계산하지 않았습니다. 가까이 가면 계산합니다." :
+                        "현재 석판에서 추천할 수 있는 조합을 찾지 못했습니다.", NativeSkin.TextDim);
             }
             _mixes.End();
 

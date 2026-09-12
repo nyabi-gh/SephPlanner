@@ -42,7 +42,7 @@ namespace SephPlanner.Plugin
             if (includeRecommendations)
             {
                 step = FrameCost.Now;
-                snapshot.Mixer = ReadMixer();
+                snapshot.Mixer = ReadMixer(avatar.transform.position, offerRadius * MixerReach);
                 FrameCost.Mixer.Add(step);
 
                 OfferReader.Fill(snapshot, avatar, offerRadius);
@@ -133,24 +133,38 @@ namespace SephPlanner.Plugin
             return panel != null && panel.IsOpened;
         }
 
-        private static MixerState ReadMixer()
+        /// <summary>
+        /// 합성 추천을 계산하기 시작할 거리. 후보 반경의 배수다 - 걸어가는 동안 준비되어야
+        /// 창을 열었을 때 이미 떠 있다. 문턱을 넘는 순간 한 번 다시 푸는 것은 정상이다.
+        /// </summary>
+        private const float MixerReach = 3f;
+
+        private static MixerState ReadMixer(Vector3 origin, float reach)
         {
-            // 쓸 수 있는 것을 찾으면서 아무거나 하나를 함께 기억해 두면, 다 썼을 때를 위해
-            // 목록을 다시 훑지 않아도 된다.
+            // 아무거나 하나를 함께 기억해 두면, 다 썼을 때를 위해 목록을 다시 훑지 않아도 된다.
             TabletMix any = null;
+            MixerState unused = null;
             foreach (var mixer in NetworkRegistry.All<TabletMix>())
             {
                 if (mixer == null) continue;
 
-                // 여럿이면 아직 쓸 수 있는 쪽이 답이다.
-                if (!mixer.LocalUsed) return new MixerState { Cost = mixer.mixCost, Used = false };
-
                 // 유니티 객체에는 ?? 를 쓰지 않는다. 파괴된 객체를 null 로 보는 것은 유니티가
                 // 덮어쓴 == 뿐이라, ?? 로는 이미 파괴된 것을 붙들게 된다.
-                if (any == null) any = mixer;
+                if (mixer.LocalUsed)
+                {
+                    if (any == null) any = mixer;
+                    continue;
+                }
+
+                // 여럿이면 아직 쓸 수 있는 쪽이, 그중에서도 가까운 쪽이 답이다. 먼 것 때문에
+                // 바로 앞 합성기의 추천을 미루면 안 된다.
+                var near = Vector3.Distance(origin, mixer.transform.position) <= reach;
+                if (unused == null || near && unused.Near == false)
+                    unused = new MixerState { Cost = mixer.mixCost, Used = false, Near = near };
             }
 
-            return any == null ? null : new MixerState { Cost = any.mixCost, Used = true };
+            if (unused != null) return unused;
+            return any == null ? null : new MixerState { Cost = any.mixCost, Used = true, Near = false };
         }
 
         private static RunState ReadRun(PlayerAvatar avatar)

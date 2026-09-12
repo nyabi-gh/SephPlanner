@@ -26,6 +26,10 @@ namespace SephPlanner.Core.Runtime
             var gold = snapshot.Run?.Gold ?? 0;
 
             Add(builder, "mixer", snapshot.Mixer is not null);
+
+            // 가까워지면 합성 추천이 새로 도므로 지문이 그 순간을 잡아야 한다. 재지 않은 옛
+            // 자료에서는 이 줄 자체가 없어야 그때의 지문과 같다.
+            if (snapshot.Mixer?.Near is bool near) Add(builder, "mixerNear", near);
             Add(builder, "mixerCost", snapshot.Mixer?.Cost ?? 0);
             Add(builder, "mixerUsed", snapshot.Mixer?.Used ?? false);
             Add(builder, "mixerAffordable", (snapshot.Mixer?.Cost ?? 0) <= gold);

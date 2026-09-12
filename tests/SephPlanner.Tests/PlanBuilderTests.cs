@@ -96,6 +96,32 @@ public class PlanBuilderTests
         Assert.Equal(AdviceStatus.Pending, placement.AdviceStatus);
     }
 
+    /// <summary>
+    /// 합성 추천은 조언 한 번의 값을 몇 배로 만드는 가장 비싼 계산이다. 층에 합성기가 있기만
+    /// 하면 계속 돌던 것을 가까이 갔을 때만 돌린다. 재지 않은 옛 재현 자료(<c>null</c>)는
+    /// 전처럼 돌아야 한다 - 거짓으로 읽으면 그 자료들이 합성 추천을 잃는다.
+    /// </summary>
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public void MixAdviceWaitsUntilTheMixerIsClose(bool? near, bool expected)
+    {
+        var snapshot = Snapshot();
+        snapshot.Inventory!.Tablets.Add(new PlacedTablet
+        {
+            DefinitionId = TabletEntity,
+            InstanceId = 2,
+            Position = new GridPos(3, 0),
+            IsApplied = true,
+        });
+        snapshot.Mixer = new MixerState { Cost = 1, Near = near };
+
+        var plan = PlanBuilder.Build(snapshot, Catalog())!;
+
+        Assert.Equal(expected, plan.Mixes.Count > 0);
+    }
+
     [Fact]
     public void TurningRecommendationsOffSkipsOffersButKeepsPlacement()
     {
