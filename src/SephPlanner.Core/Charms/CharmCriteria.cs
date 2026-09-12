@@ -49,6 +49,19 @@ namespace SephPlanner.Core.Charms
             return CharmCriteriaKind.None;
         }
 
+        /// <summary>
+        /// 이 조건이 <b>다른 칸의 점유를 읽는지</b>. 안 읽으면 제 좌표와 격자 모양만으로 정해지므로,
+        /// 옆 칸이 어떻게 달라져도 판정이 그대로다. 다듬기가 아티팩트를 다시 채점할지 가리는 데 쓴다.
+        ///
+        /// <b>여기와 <see cref="IsSatisfied"/>는 함께 고쳐야 한다.</b> 점유를 읽는 조건을 새로
+        /// 더하면서 이 목록을 빼먹으면 조용히 낡은 점수가 나온다.
+        /// </summary>
+        public static bool ReadsNeighbors(CharmCriteriaKind kind) =>
+            kind == CharmCriteriaKind.BothSideCharm ||
+            kind == CharmCriteriaKind.BothSidesAreEmpty ||
+            kind == CharmCriteriaKind.NeighborsAreFull ||
+            kind == CharmCriteriaKind.Near8MagicBook;
+
         public static bool IsSatisfied(
             CharmCriteriaKind kind, GridPos pos, GridSpec grid, GridOccupancy occupancy)
         {

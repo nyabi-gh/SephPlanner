@@ -82,6 +82,52 @@ public class PolishIncrementTests
     }
 
     /// <summary>
+    /// 이웃을 읽는 배치 조건들. 하나라도 "제 칸만 읽는다"로 잘못 분류되면 대조가 잡는다.
+    /// </summary>
+    private static readonly string[] Criteria =
+    {
+        "", "", "", "CharmActivateCriteria_BothSideCharm", "CharmActivateCriteria_BothSidesAreEmpty",
+        "CharmActivateCriteria_NeighborsAreFull", "CharmActivateCriteria_Near8MagicBook",
+        "CharmActivateCriteria_TopInInventory",
+    };
+
+    /// <summary>
+    /// 이웃·판 전체를 읽는 성질을 얹는다. 조화의 수정(이웃 여덟), 이웃 강화, 동료 혼돈(같은 줄),
+    /// 그리고 다른 아티팩트의 자리를 훑는 마법 치명타 가중치다. <b>증분 채점이 건너뛰면 안 되는
+    /// 것들이라, 무작위 판에 이것이 없으면 대조가 헛돈다.</b>
+    /// </summary>
+    private static void Season(CharmDefinition definition, Random random)
+    {
+        switch (random.Next(8))
+        {
+            case 0:
+                definition.Behavior = "Charm_NearLevelDamage";
+                definition.NeighborLevelBonus = new List<double> { 1, 1, 2, 2 };
+                break;
+            case 1:
+                definition.NeighborEnhanceCategory = "GLACIER";
+                break;
+            case 2:
+                definition.Behavior = "Charm_CompanionChaos";
+                break;
+            case 3:
+                definition.StatEffects.Add(new CharmStatEffect
+                {
+                    StatusId = "MAGIC_CRITICAL",
+                    WorthPerUnit = 0.5,
+                    AmountByLevel = new List<int> { 1, 2, 3, 4 },
+                });
+                definition.UsesMagicCritical = true;
+                definition.IsAttackable = true;
+                break;
+            case 4:
+                definition.IsCompanion = true;
+                definition.Categories.Add("GLACIER");
+                break;
+        }
+    }
+
+    /// <summary>
     /// 조건이 걸린 석판과 필러·마법 아티팩트를 섞는다. 셋이 섞여야 교환이 점유의 세 갈래
     /// (아이템·아티팩트·마법 아티팩트)를 모두 흔들고, 그래야 판정이 실제로 뒤집힌다.
     /// </summary>
@@ -112,19 +158,23 @@ public class PolishIncrementTests
         var charms = Math.Max(1, storage - tablets - random.Next(3));
         for (var index = 0; index < charms; index++)
         {
-            var filler = random.Next(5) == 0;
+            var filler = random.Next(6) == 0;
+            var definition = new CharmDefinition
+            {
+                Id = "c" + index,
+                EntityId = 200 + index,
+                MaxLevel = 3,
+                IsMagic = random.Next(3) == 0,
+                CriteriaType = Criteria[random.Next(Criteria.Length)],
+            };
+            Season(definition, random);
             problem.Charms.Add(new CharmSlot
             {
                 InstanceId = index,
                 IsFiller = filler,
                 Enchant = random.Next(-1, 2),
-                Definition = new CharmDefinition
-                {
-                    Id = "c" + index,
-                    EntityId = 200 + index,
-                    MaxLevel = 3,
-                    IsMagic = random.Next(3) == 0,
-                },
+                Weight = random.Next(4) == 0 ? 2 : 1,
+                Definition = definition,
                 Worth = new CharmWorth { ByLevel = Enumerable.Range(0, 4).Select(_ => (double)random.Next(-2, 9)).ToArray() },
             });
         }

@@ -348,6 +348,116 @@ namespace SephPlanner.Core.Solver
         }
 
         /// <summary>
+        /// 교환 하나가 아티팩트 전부를 다시 채점하던 것을 멈춘다.
+        ///
+        /// <b>거의 모든 아티팩트는 제 칸만 읽는다.</b> 이웃을 읽는 것은 정의가 그렇게 말하는
+        /// 것들뿐이다 - 조화의 수정(이웃 여덟), 이웃 강화, 동료 혼돈(같은 줄), 침·마법서(방향),
+        /// 하얀 종이, 행 카테고리, 맥락 능력치, 이웃을 보는 배치 조건, 그리고 다른 아티팩트의
+        /// 자리를 보는 마법 치명타·MP 재생 가중치다. 받아 둔 제보 다섯에서 그런 것은 아티팩트
+        /// <b>0~8%</b> 였고 나머지 92~100% 는 제 칸만 봤다.
+        ///
+        /// 그래서 둘로만 가른다 - <b>제 칸만 읽는 것</b>과 <b>언제나 다시 재는 것</b>이다. 애매한
+        /// 것은 전부 뒤쪽에 넣는다. 읽는 범위를 정교하게 좁히는 것이 아니라 <b>확실한 것만
+        /// 건너뛰는</b> 쪽이라, 잘못 짚어 조용히 틀릴 자리가 좁다.
+        /// </summary>
+        private sealed class PolishScoring
+        {
+            private readonly PlacementProblem _problem;
+            private readonly CharmScore[] _cached;
+            private readonly GridPos[] _at;
+            private readonly bool[] _everywhere;
+            private bool _primed;
+            private bool _all;
+            private bool _keep;
+            private GridPos _left, _right;
+
+            public PolishScoring(PlacementProblem problem)
+            {
+                _problem = problem;
+                _cached = new CharmScore[problem.Charms.Count];
+                _at = new GridPos[problem.Charms.Count];
+                _everywhere = new bool[problem.Charms.Count];
+                for (var index = 0; index < problem.Charms.Count; index++)
+                    _everywhere[index] = !ReadsOnlyItsOwnCell(problem.Charms[index]);
+            }
+
+            /// <summary>
+            /// 이번 시도가 고친 두 칸. 효과 행렬까지 달라졌으면 전부 다시 재고 <b>기억하지도
+            /// 않는다</b> - 기억해 둔 것은 정착한 행렬로 잰 것이어야 하기 때문이다.
+            /// </summary>
+            public void Begin(GridPos left, GridPos right, bool matrixChanged)
+            {
+                _left = left;
+                _right = right;
+                _all = matrixChanged;
+                _keep = !matrixChanged;
+            }
+
+            /// <summary>처음 한 번은 전부 재서 기억한다.</summary>
+            public void Prime()
+            {
+                _all = true;
+                _keep = true;
+            }
+
+            /// <summary>바깥이 배치를 통째로 고쳤다. 들고 있던 것을 전부 버린다.</summary>
+            public void Forget() => _primed = false;
+
+            /// <summary>기억해 둔 몫을 그대로 써도 되는지.</summary>
+            public bool Reuse(int index, Dictionary<int, GridPos> positions, out CharmScore score)
+            {
+                score = _cached[index];
+                if (!_primed || _all || _everywhere[index]) return false;
+                if (!positions.TryGetValue(_problem.Charms[index].InstanceId, out var position))
+                    return !score.Placed;
+                return score.Placed && position == _at[index] && position != _left && position != _right;
+            }
+
+            public void Store(int index, Dictionary<int, GridPos> positions, CharmScore score)
+            {
+                if (!_keep) return;
+                _cached[index] = score;
+                _at[index] = positions.TryGetValue(_problem.Charms[index].InstanceId, out var position)
+                    ? position : default;
+                if (index == _problem.Charms.Count - 1) _primed = true;
+            }
+
+            /// <summary>
+            /// 이 아티팩트의 몫이 <b>제 칸만으로</b> 정해지는지. 하나라도 걸리면 언제나 다시 잰다.
+            /// <see cref="Value"/>·<see cref="ScoreCharm"/>이 부르는 것 가운데 다른 칸을 보는 길을
+            /// 전부 여기서 막는다 - 새 길이 생기면 여기도 늘어야 한다.
+            /// </summary>
+            private static bool ReadsOnlyItsOwnCell(CharmSlot charm)
+            {
+                var definition = charm.Definition;
+                return !CharmCriteria.ReadsNeighbors(charm.Criteria) &&
+                    definition.NeighborEnhanceCategory.Length == 0 &&
+                    definition.Behavior != "Charm_NearLevelDamage" &&
+                    definition.Behavior != "Charm_CompanionChaos" &&
+                    definition.Behavior != "Charm_WhitePaper" &&
+                    definition.MagicSupport is null &&
+                    !PositionalWorth.IsNeedle(definition) &&
+                    definition.LineCategories.Count == 0 &&
+                    definition.ContextStats.Count == 0 &&
+                    !ReadsOtherCharms(charm);
+            }
+
+            /// <summary>
+            /// 마법 치명타·MP 재생을 올려 주는 아티팩트는 <c>BuildStatWorth.Weight</c>에서 <b>판에
+            /// 놓인 다른 아티팩트를 전부 훑는다</b> - 더 무겁게 지정된 대상이 실제로 켜져 있는지
+            /// 보기 때문이다. 그래서 이쪽은 제 칸만으로 정해지지 않는다.
+            /// </summary>
+            private static bool ReadsOtherCharms(CharmSlot charm)
+            {
+                if (charm.Weight < 1 || charm.Worth.Source == CharmWorthSource.Curated) return false;
+                foreach (var effect in charm.Definition.StatEffects)
+                    if (effect.WorthPerUnit.HasValue && effect.AmountByLevel.Count > 0 &&
+                        (effect.StatusId == "MAGIC_CRITICAL" || effect.StatusId == "MP_REGEN")) return true;
+                return false;
+            }
+        }
+
+        /// <summary>
         /// 교환 하나가 실제로 바꾸는 것만 다시 보는 자리.
         ///
         /// <b>왜.</b> <see cref="Polish"/>는 시도마다 <see cref="OccupancyFrom"/>으로 해시셋 셋을
@@ -398,6 +508,9 @@ namespace SephPlanner.Core.Solver
 
             public GridOccupancy Occupancy => _occupancy;
 
+            /// <summary>마지막 <see cref="Swap"/>이 효과 행렬을 다시 만들었는지.</summary>
+            public bool MatrixChanged { get; private set; }
+
             /// <summary>지금 배치를 그대로 옮겨 담는다. 바깥이 배치를 고친 뒤에는 이것부터 부른다.</summary>
             public void Reset(List<TabletPlacement> layout, Dictionary<int, GridPos> positions)
             {
@@ -420,6 +533,7 @@ namespace SephPlanner.Core.Solver
                 var leaving = PolishOccupancy.StateOf(occupant);
                 var arriving = PolishOccupancy.StateOf(charm);
                 var changed = Put(from, leaving) | Put(to, arriving);
+                MatrixChanged = changed;
                 if (changed) TabletSimulator.RunInto(_all, _occupancy, _trial, _problem.FixedEffects);
 
                 var used = changed ? _trial : _settled;
@@ -1044,6 +1158,9 @@ namespace SephPlanner.Core.Solver
             // 교환마다 새로 짓던 점유와 효과 행렬을 여기 한 벌만 두고 바뀐 칸만 고쳐 쓴다.
             var scratch = new PolishScratch(problem, layout, options.VerifyIncrementalPolish);
             scratch.Reset(layout, positions);
+            var scoring = new PolishScoring(problem);
+            scoring.Prime();
+            score = ScoreOf(problem, layout, positions, occupancy, result, byCell, familiarity, scoring);
 
             for (var pass = 0; pass < options.PolishPasses; pass++)
             {
@@ -1062,13 +1179,19 @@ namespace SephPlanner.Core.Solver
                         Move(positions, byCell, charm, from, occupant, to);
 
                         var trialResult = scratch.Swap(from, occupant, to, charm, layout, positions);
-                        var trial = ScoreOf(problem, layout, positions, scratch.Occupancy, trialResult, byCell, familiarity);
+                        scoring.Begin(from, to, scratch.MatrixChanged);
+                        var trial = ScoreOf(
+                            problem, layout, positions, scratch.Occupancy, trialResult, byCell, familiarity, scoring);
+                        if (options.VerifyIncrementalPolish) VerifyScoring(
+                            problem, layout, positions, scratch.Occupancy, trialResult, byCell, familiarity, trial);
                         if (trial.CompareTo(score) > 0)
                         {
                             // 호출자에게 넘기는 것은 작업 공간이 아니라 새로 지은 것이다.
                             occupancy = OccupancyFrom(layout, positions, problem);
                             result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid, problem.FixedEffects);
                             scratch.Accept();
+                            // 정착한 행렬이 달라졌을 수 있다. 기억해 둔 것은 통째로 버린다.
+                            scoring.Forget();
                             score = trial;
                             moved = true;
                             from = to;
@@ -1082,8 +1205,10 @@ namespace SephPlanner.Core.Solver
                 {
                     moved = true;
                     byCell = CharmsByCell(problem, positions);
-                    score = ScoreOf(problem, layout, positions, occupancy, result, byCell, familiarity);
                     scratch.Reset(layout, positions);
+                    scoring.Forget();
+                    scoring.Prime();
+                    score = ScoreOf(problem, layout, positions, occupancy, result, byCell, familiarity, scoring);
                 }
                 if (!moved) return;
             }
@@ -1211,7 +1336,7 @@ namespace SephPlanner.Core.Solver
         private static PlacementQuality ScoreOf(
             PlacementProblem problem, List<TabletPlacement> layout, Dictionary<int, GridPos> positions,
             GridOccupancy occupancy, SimulationResult result, Dictionary<GridPos, CharmSlot>? neighbors,
-            double? layoutFamiliarity = null)
+            double? layoutFamiliarity = null, PolishScoring? reuse = null)
         {
             var familiarity = layoutFamiliarity ?? Familiarity(problem, layout);
             double score = 0;
@@ -1219,31 +1344,28 @@ namespace SephPlanner.Core.Solver
             var combo = problem.PriorityCategories.Count == 0
                 ? null
                 : new Arrangement { ScoreStep = problem.Scale.ScoreStep };
-            foreach (var charm in problem.Charms)
+            for (var index = 0; index < problem.Charms.Count; index++)
             {
-                if (!positions.TryGetValue(charm.InstanceId, out var position))
+                var charm = problem.Charms[index];
+                if (reuse is null || !reuse.Reuse(index, positions, out var part))
                 {
-                    if (RequiresUse(problem, charm) && !charm.IsFiller) missing++;
-                    if (ScalesPosition.Required(problem, charm)) missing++;
-                    if (Preserve(charm)) unpreserved++;
-                    if (charm.Held && !charm.IsFiller) unheld++;
-                    continue;
+                    part = ScoreCharm(problem, charm, positions, result, occupancy, neighbors);
+                    reuse?.Store(index, positions, part);
                 }
-                if (!ScalesPosition.Accepts(problem, charm, position)) missing++;
-                if (!CanUse(problem, charm, position, result, occupancy, neighbors))
-                {
-                    if (RequiresUse(problem, charm) && !charm.IsFiller) missing++;
-                    if (Preserve(charm)) unpreserved++;
-                }
-                if (charm.Held && !charm.IsFiller && result.IgnoreCriteriaAt(position) <= 0) unheld++;
-                score += Value(problem, charm, position, result, occupancy, neighbors);
-                familiarity += Anchors(problem, charm, position);
-                waste += Waste(charm, position, result);
+
+                missing += part.Missing;
+                unpreserved += part.Unpreserved;
+                unheld += part.Unheld;
+                if (!part.Placed) continue;
+
+                score += part.Value;
+                familiarity += part.Anchors;
+                waste += part.Waste;
                 if (combo is not null)
                 {
+                    var position = positions[charm.InstanceId];
                     combo.CharmPositions[charm.InstanceId] = position;
-                    if (Reason(charm, position, result, problem.Grid, occupancy) != CharmInactiveReason.None)
-                        combo.InactiveCharms.Add(charm.InstanceId);
+                    if (part.Inactive) combo.InactiveCharms.Add(charm.InstanceId);
                 }
             }
             for (var index = 0; index < problem.Grid.Storage; index++)
@@ -1254,6 +1376,85 @@ namespace SephPlanner.Core.Solver
             if (combo is not null && neighbors is not null) PriorityComboPlacement.Describe(problem, combo, neighbors);
             return new PlacementQuality(missing, unpreserved, unheld, combo?.PriorityComboMatches ?? 0,
                 combo?.PriorityComboProgress ?? 0, score, unsafeEmpty, waste, familiarity, problem.Scale.ScoreStep);
+        }
+
+        /// <summary>
+        /// 기억해 쓴 채점이 아티팩트를 전부 다시 잰 것과 같은지 본다. <see cref="SolverOptions"/>의
+        /// 테스트 전용 스위치가 켰을 때만 돈다 - 여기서 한 자리만 어긋나도 추천이 조용히 달라진다.
+        /// </summary>
+        private static void VerifyScoring(
+            PlacementProblem problem, List<TabletPlacement> layout, Dictionary<int, GridPos> positions,
+            GridOccupancy occupancy, SimulationResult result, Dictionary<GridPos, CharmSlot>? neighbors,
+            double familiarity, PlacementQuality used)
+        {
+            var full = ScoreOf(problem, layout, positions, occupancy, result, neighbors, familiarity);
+            if (full.RetentionFailures == used.RetentionFailures &&
+                full.ActivationFailures == used.ActivationFailures &&
+                full.HoldFailures == used.HoldFailures && full.ComboMatches == used.ComboMatches &&
+                full.UnsafeEmpty == used.UnsafeEmpty && full.Waste == used.Waste &&
+                full.ComboProgress.Equals(used.ComboProgress) && full.Value.Equals(used.Value) &&
+                full.Familiarity.Equals(used.Familiarity)) return;
+
+            throw new InvalidOperationException(
+                $"기억해 쓴 채점이 다시 잰 것과 다릅니다: 점수 {used.Value} 대 {full.Value}, " +
+                $"유지 {used.RetentionFailures}/{full.RetentionFailures}, " +
+                $"활성 {used.ActivationFailures}/{full.ActivationFailures}");
+        }
+
+        /// <summary>아티팩트 하나가 <see cref="ScoreOf"/>에 보태는 몫 전부.</summary>
+        private readonly struct CharmScore
+        {
+            public readonly int Missing, Unpreserved, Unheld, Waste;
+            public readonly double Value, Anchors;
+            public readonly bool Placed, Inactive;
+
+            public CharmScore(int missing, int unpreserved, int unheld, int waste,
+                double value, double anchors, bool placed, bool inactive)
+            {
+                Missing = missing;
+                Unpreserved = unpreserved;
+                Unheld = unheld;
+                Waste = waste;
+                Value = value;
+                Anchors = anchors;
+                Placed = placed;
+                Inactive = inactive;
+            }
+        }
+
+        private static CharmScore ScoreCharm(
+            PlacementProblem problem, CharmSlot charm, Dictionary<int, GridPos> positions,
+            SimulationResult result, GridOccupancy occupancy, Dictionary<GridPos, CharmSlot>? neighbors)
+        {
+            if (!positions.TryGetValue(charm.InstanceId, out var position))
+                return new CharmScore(
+                    (RequiresUse(problem, charm) && !charm.IsFiller ? 1 : 0) +
+                    (ScalesPosition.Required(problem, charm) ? 1 : 0),
+                    Preserve(charm) ? 1 : 0,
+                    charm.Held && !charm.IsFiller ? 1 : 0,
+                    0, 0, 0, placed: false, inactive: false);
+
+            // 조건 판정은 아래에서 셋이 함께 쓴다. 예전에는 CanUse 와 콤보 기록이 따로 물었다.
+            var reason = Reason(charm, position, result, problem.Grid, occupancy);
+            var usable = reason == CharmInactiveReason.None &&
+                (!DirectedCharmSupport.HasConnection(charm) ||
+                 DirectedCharmSupport.IsConnected(charm, position, result, problem.Grid, occupancy, neighbors));
+
+            var missing = ScalesPosition.Accepts(problem, charm, position) ? 0 : 1;
+            var unpreserved = 0;
+            if (!usable)
+            {
+                if (RequiresUse(problem, charm) && !charm.IsFiller) missing++;
+                if (Preserve(charm)) unpreserved++;
+            }
+            return new CharmScore(
+                missing, unpreserved,
+                charm.Held && !charm.IsFiller && result.IgnoreCriteriaAt(position) <= 0 ? 1 : 0,
+                Waste(charm, position, result),
+                Value(problem, charm, position, result, occupancy, neighbors),
+                Anchors(problem, charm, position),
+                placed: true,
+                inactive: reason != CharmInactiveReason.None);
         }
 
         internal static bool Preserve(CharmSlot charm) => !charm.IsFiller && !charm.IsDormant && !charm.Definition.HasNoActivationEffect && !charm.AllowDeactivation;
