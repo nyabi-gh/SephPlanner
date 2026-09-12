@@ -294,6 +294,8 @@ namespace SephPlanner.Core.Planning
                     Enchant = definition is null ? 0 : item.Enchant,
                     IsFiller = definition is null,
                     Immovable = item.Immovable,
+                    LevelCap = definition is not null &&
+                               preferences.LevelCaps.TryGetValue(item.DefinitionId, out var cap) ? cap : 0,
                     IsDormant = definition is not null && WeaponMatch.IsDormant(definition, weapon),
                     Weight = definition is not null &&
                              preferences.PinnedCharms.TryGetValue(item.DefinitionId, out var pin)

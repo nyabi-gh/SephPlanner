@@ -38,6 +38,12 @@ namespace SephPlanner.Plugin
         /// </summary>
         public List<int> PinnedCharms { get; set; } = new List<int>();
 
+        /// <summary>
+        /// 아티팩트별 레벨 제한. 엔티티 번호 → 레벨이고, 없으면 제한이 없다
+        /// (<see cref="PlanPreferences.LevelCaps"/>).
+        /// </summary>
+        public Dictionary<int, int> LevelCaps { get; set; } = new Dictionary<int, int>();
+
         /// <summary>제한 해제 칸 고정. 엔티티 번호 목록이다(<see cref="PlanPreferences.HeldCharms"/>).</summary>
         public List<int> HeldCharms { get; set; } = new List<int>();
         public List<int> RetainedCharms { get; set; } = new List<int>();
@@ -134,6 +140,25 @@ namespace SephPlanner.Plugin
             Changed();
         }
 
+        public int LevelCap(int entityId) =>
+            entityId != 0 && LevelCaps.TryGetValue(entityId, out var level) ? level : 0;
+
+        /// <summary>
+        /// 레벨 제한을 한 단계 옮긴다. 없음 → 1 → 2 → … → <paramref name="maxLevel"/> 직전까지
+        /// 돌고 다시 없음이다. 상한과 같은 제한은 제한이 아니므로 목록에 두지 않는다.
+        /// </summary>
+        public void StepLevelCap(int entityId, int direction, int maxLevel)
+        {
+            if (entityId == 0 || direction == 0) return;
+
+            var highest = Math.Max(1, maxLevel - 1);
+            var next = LevelCap(entityId) + Math.Sign(direction);
+            if (next < 0) next = highest;
+            if (next <= 0 || next > highest) LevelCaps.Remove(entityId);
+            else LevelCaps[entityId] = next;
+            Changed();
+        }
+
         public void TogglePriority(string categoryId)
         {
             if (string.IsNullOrEmpty(categoryId)) return;
@@ -186,6 +211,7 @@ namespace SephPlanner.Plugin
             SuppressedPresetCategories.Clear();
             PinnedLevels.Clear();
             PinnedCharms.Clear();
+            LevelCaps.Clear();
             HeldCharms.Clear();
             RetainedCharms.Clear();
             DeactivationAllowed.Clear();
@@ -216,6 +242,7 @@ namespace SephPlanner.Plugin
             Recommendations = recommendations,
             PriorityCategories = EffectivePriorityCategories(),
             PinnedCharms = new Dictionary<int, int>(PinnedLevels),
+            LevelCaps = new Dictionary<int, int>(LevelCaps),
             HeldCharms = new HashSet<int>(HeldCharms),
             RetainedCharms = new HashSet<int>(RetainedCharms),
             DeactivationAllowed = new HashSet<int>(DeactivationAllowed),
@@ -267,6 +294,7 @@ namespace SephPlanner.Plugin
                         loaded.SuppressedPresetCategories = loaded.SuppressedPresetCategories ?? new List<string>();
                         loaded.PinnedCharms = loaded.PinnedCharms ?? new List<int>();
                         loaded.PinnedLevels = loaded.PinnedLevels ?? new Dictionary<int, int>();
+                        loaded.LevelCaps = loaded.LevelCaps ?? new Dictionary<int, int>();
                         loaded.HeldCharms = loaded.HeldCharms ?? new List<int>();
                         loaded.RetainedCharms = loaded.RetainedCharms ?? new List<int>();
                         loaded.DeactivationAllowed = loaded.DeactivationAllowed ?? new List<int>();

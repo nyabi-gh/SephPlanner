@@ -87,7 +87,8 @@ namespace SephPlanner.Plugin.Ui
             var list = Widgets.Rect("List", content);
             Widgets.Column(list, S(0.15f));
             for (var i = 0; i < RowsPerPage; i++)
-                _rows.Add(new Row(list, Skin, Base, entry => Toggle(entry, 1), ToggleHold, ToggleRetain, ToggleDeactivation));
+                _rows.Add(new Row(
+                    list, Skin, Base, entry => Toggle(entry, 1), ToggleHold, ToggleRetain, ToggleDeactivation, StepCap));
 
             BuildPager(content);
         }
@@ -248,7 +249,9 @@ namespace SephPlanner.Plugin.Ui
             {
                 if (row.Entry == null || !Under(row.Rect, cursor)) continue;
 
-                Toggle(row.Entry, -1);
+                // 제한 단추 위에서는 그 제한을 내린다. 줄 전체의 우클릭은 지금처럼 ★ 를 내린다.
+                if (Under(row.CapRect, cursor)) StepCap(row.Entry, -1);
+                else Toggle(row.Entry, -1);
                 return;
             }
         }
@@ -288,6 +291,19 @@ namespace SephPlanner.Plugin.Ui
         {
             if (entry == null || entry.EntityId == 0) return;
             _prefs.ToggleDeactivation(entry.EntityId);
+            Refresh();
+        }
+
+        /// <summary>
+        /// 레벨 제한을 한 단계 옮긴다. 상한은 카탈로그의 값이라 아티팩트마다 다르고, 상한과 같은
+        /// 제한은 제한이 아니므로 그 직전까지만 돈다.
+        /// </summary>
+        private void StepCap(Entry entry, int direction)
+        {
+            if (entry == null || entry.EntityId == 0) return;
+
+            var definition = _context.Catalog?.Charm(entry.EntityId);
+            _prefs.StepLevelCap(entry.EntityId, direction, definition?.MaxLevel ?? 5);
             Refresh();
         }
 
@@ -393,7 +409,7 @@ namespace SephPlanner.Plugin.Ui
                 note.Append(Marks(level)).Append(' ')
                     .Append(PlanPreferences.WeightOf(level).ToString("0.##")).Append("배 → ");
             }
-            return note.Append("해제로 강화 칸을 양보합니다. 기본은 활성 보존이며, 끄기 허용을 켠 아이템만 점수 이득을 위해 끕니다. 사용 유지는 끄기 허용보다 우선하고 지원 연결·빼기·교체도 보호합니다. 고정은 배치 조건을 무시하는 칸을 요구합니다.").ToString();
+            return note.Append("해제로 강화 칸을 양보합니다. 기본은 활성 보존이며, 끄기 허용을 켠 아이템만 점수 이득을 위해 끕니다. 사용 유지는 끄기 허용보다 우선하고 지원 연결·빼기·교체도 보호합니다. 고정은 배치 조건을 무시하는 칸을 요구합니다. 레벨 제한은 그 레벨까지만 값으로 쳐서 남는 레벨을 다른 아티팩트에 돌립니다(우클릭으로 되돌림).").ToString();
         }
 
         /// <summary>단계를 기호로. 양수는 ★, 음수는 양보 표시를 단계 수만큼.</summary>
@@ -464,6 +480,7 @@ namespace SephPlanner.Plugin.Ui
                         Held = _prefs.IsHeld(entityId),
                         Retained = _prefs.IsRetained(entityId),
                         AllowDeactivation = _prefs.IsDeactivationAllowed(entityId),
+                        LevelCap = _prefs.LevelCap(entityId),
                     };
                     found[entityId] = entry;
                     order.Add(entityId);
@@ -474,7 +491,8 @@ namespace SephPlanner.Plugin.Ui
             // 가져온 빌드의 아티팩트도 같이 보인다 - 무엇을 아직 못 모았는지가 곧 살 목록이다.
             var favorites = new HashSet<int>(_prefs.Preset()?.FavoriteCharms ?? new List<int>());
             var listed = _prefs.PinnedLevels.Keys.Concat(_prefs.HeldCharms).Concat(_prefs.RetainedCharms)
-                .Concat(_prefs.DeactivationAllowed).Concat(favorites).Distinct().ToList();
+                .Concat(_prefs.DeactivationAllowed).Concat(_prefs.LevelCaps.Keys).Concat(favorites)
+                .Distinct().ToList();
             foreach (var entityId in listed)
             {
                 if (found.ContainsKey(entityId)) continue;
@@ -492,6 +510,7 @@ namespace SephPlanner.Plugin.Ui
                     Held = _prefs.IsHeld(entityId),
                     Retained = _prefs.IsRetained(entityId),
                     AllowDeactivation = _prefs.IsDeactivationAllowed(entityId),
+                    LevelCap = _prefs.LevelCap(entityId),
                 };
                 order.Add(entityId);
             }
@@ -573,6 +592,7 @@ namespace SephPlanner.Plugin.Ui
 
             /// <summary>제한 해제 칸에 고정돼 있는가. 아티팩트 줄에만 뜻이 있다.</summary>
             public bool Held;
+            public int LevelCap;
             public bool Retained;
             public bool AllowDeactivation;
         }
@@ -583,6 +603,7 @@ namespace SephPlanner.Plugin.Ui
             private readonly TextMeshProUGUI _name;
             private readonly TextMeshProUGUI _detail;
             private readonly TextMeshProUGUI _hold;
+            private readonly TextMeshProUGUI _cap;
             private readonly TextMeshProUGUI _retain;
             private readonly TextMeshProUGUI _deactivation;
             private readonly Image _background;
@@ -590,7 +611,7 @@ namespace SephPlanner.Plugin.Ui
 
             public Row(
                 RectTransform parent, NativeSkin skin, float b, Action<Entry> onClick, Action<Entry> onHold,
-                Action<Entry> onRetain, Action<Entry> onDeactivation)
+                Action<Entry> onRetain, Action<Entry> onDeactivation, Action<Entry, int> onCap)
             {
                 _background = Widgets.ClickableRow(
                     "Entry", parent, NativeSkin.SlotFill, () => onClick(_entry));
@@ -614,6 +635,8 @@ namespace SephPlanner.Plugin.Ui
                 _deactivation = Widgets.Clickable("Deactivation", rect, skin, b * 0.8f, NativeSkin.TextDim, () => onDeactivation(_entry));
                 _deactivation.text = "끄기 허용";
                 Widgets.Fixed(_deactivation.rectTransform, b * 1.5f, b * 4.2f);
+                _cap = Widgets.Clickable("Cap", rect, skin, b * 0.8f, NativeSkin.TextDim, () => onCap(_entry, 1));
+                Widgets.Fixed(_cap.rectTransform, b * 1.5f, b * 4.2f);
                 _hold = Widgets.Clickable("Hold", rect, skin, b * 0.8f, NativeSkin.TextDim, () => onHold(_entry));
                 _hold.text = "고정";
                 _hold.alignment = TextAlignmentOptions.MidlineRight;
@@ -622,6 +645,9 @@ namespace SephPlanner.Plugin.Ui
 
             public Entry Entry => _entry;
             public RectTransform Rect => _background.rectTransform;
+
+            /// <summary>레벨 제한 단추의 자리. 우클릭을 여기서 받아 한 단계 내린다.</summary>
+            public RectTransform CapRect => _cap.rectTransform;
 
             public void Show(Entry entry)
             {
@@ -633,6 +659,9 @@ namespace SephPlanner.Plugin.Ui
                 Widgets.SetActive(_retain, entry.EntityId != 0);
                 _deactivation.color = entry.AllowDeactivation ? NativeSkin.Mint : NativeSkin.TextDim;
                 Widgets.SetActive(_deactivation, entry.EntityId != 0);
+                _cap.text = entry.LevelCap > 0 ? "레벨 " + entry.LevelCap : "레벨 제한";
+                _cap.color = entry.LevelCap > 0 ? NativeSkin.Mint : NativeSkin.TextDim;
+                Widgets.SetActive(_cap, entry.EntityId != 0);
                 _hold.color = entry.Held ? NativeSkin.Mint : NativeSkin.TextDim;
                 Widgets.SetActive(_hold, entry.EntityId != 0);
                 Widgets.SetActive(_background, true);

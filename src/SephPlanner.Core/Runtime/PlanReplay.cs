@@ -108,6 +108,9 @@ namespace SephPlanner.Core.Runtime
         public HashSet<int>? HeldCharms { get; set; }
         public HashSet<int>? RetainedCharms { get; set; }
         public HashSet<int>? DeactivationAllowed { get; set; }
+
+        /// <summary>없던 시절의 자료에는 이 항목이 없다. 그때는 제한을 건 것이 없다는 뜻이다.</summary>
+        public Dictionary<int, int>? LevelCaps { get; set; }
         public HashSet<int>? PresetCharms { get; set; }
         public CharmValueFile? CharmValues { get; set; }
         public bool? Recommendations { get; set; }
@@ -119,6 +122,7 @@ namespace SephPlanner.Core.Runtime
             HeldCharms = new HashSet<int>(preferences.HeldCharms),
             RetainedCharms = new HashSet<int>(preferences.RetainedCharms),
             DeactivationAllowed = new HashSet<int>(preferences.DeactivationAllowed),
+            LevelCaps = new Dictionary<int, int>(preferences.LevelCaps),
             PresetCharms = new HashSet<int>(preferences.PresetCharms),
             CharmValues = preferences.CharmValues.Export(),
             Recommendations = preferences.Recommendations,
@@ -136,6 +140,9 @@ namespace SephPlanner.Core.Runtime
                 HeldCharms = new HashSet<int>(HeldCharms),
                 RetainedCharms = new HashSet<int>(RetainedCharms),
                 DeactivationAllowed = new HashSet<int>(DeactivationAllowed),
+                LevelCaps = LevelCaps is null
+                    ? new Dictionary<int, int>()
+                    : new Dictionary<int, int>(LevelCaps),
                 PresetCharms = new HashSet<int>(PresetCharms),
                 CharmValues = new CharmValueBook(CharmValues),
                 Recommendations = Recommendations.Value,

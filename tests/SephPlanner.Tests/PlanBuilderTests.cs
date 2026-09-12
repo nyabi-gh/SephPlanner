@@ -164,6 +164,60 @@ public class PlanBuilderTests
         Assert.Equal(expected, plan.Mixes.Count > 0);
     }
 
+    /// <summary>
+    /// 레벨 제한은 "이 아티팩트는 N레벨까지만 값으로 친다" 는 사용자 선호다. 제한을 걸면 남는
+    /// 높은 칸이 다른 아티팩트에게 돌아간다 - ★ 로는 "누가 먼저 갖느냐" 만 말할 수 있고
+    /// "얼마나 높은 칸이냐" 는 말할 수 없어서 넣었다.
+    /// </summary>
+    [Fact]
+    public void ALevelCapSendsTheSpareLevelsToAnotherArtifact()
+    {
+        var catalog = new Catalog(
+            new[] { new TabletDefinition { Id = "T", EntityId = TabletEntity, Query = "RIGHT 2" } },
+            new[]
+            {
+                new CharmDefinition { Id = "A", EntityId = CharmEntity, MaxLevel = 5 },
+                new CharmDefinition { Id = "B", EntityId = CharmEntity + 1, MaxLevel = 5 },
+            });
+
+        // 석판이 (1,0) 만 2레벨로 올린다. 아티팩트 둘 중 하나만 그 칸을 가질 수 있다.
+        var snapshot = Snapshot();
+        snapshot.Inventory!.Items.Clear();
+        snapshot.Inventory.LevelMatrix.Clear();
+        snapshot.Inventory.Items.Add(new PlacedItem
+        { DefinitionId = CharmEntity, InstanceId = 10, Position = new GridPos(1, 0), EffectiveLevel = 2, IsActive = true });
+        snapshot.Inventory.Items.Add(new PlacedItem
+        { DefinitionId = CharmEntity + 1, InstanceId = 11, Position = new GridPos(2, 0), IsActive = true });
+        snapshot.Inventory.LevelMatrix["1,0"] = 2;
+
+        var free = PlanBuilder.Build(snapshot, catalog)!;
+        Assert.Equal(new GridPos(1, 0), free.Best.CharmPositions[10]);
+
+        var capped = PlanBuilder.Build(snapshot, catalog, new PlanPreferences
+        {
+            LevelCaps = { [CharmEntity] = 1 },
+        })!;
+
+        // 1레벨까지만 쳐 주므로 2레벨 칸은 제한이 없는 쪽이 받는다.
+        Assert.Equal(new GridPos(1, 0), capped.Best.CharmPositions[11]);
+        Assert.NotEqual(new GridPos(1, 0), capped.Best.CharmPositions[10]);
+    }
+
+    /// <summary>제한을 걸지 않으면 지문이 그대로여야 한다. 옛 재현 자료가 거부되면 안 된다.</summary>
+    [Fact]
+    public void ALevelCapOnlyEntersTheFingerprintWhenItIsSet()
+    {
+        var snapshot = Snapshot();
+        var none = PlanFingerprint.Full(snapshot, new PlanPreferences(), "catalog");
+        var empty = PlanFingerprint.Full(
+            snapshot, new PlanPreferences { LevelCaps = new Dictionary<int, int>() }, "catalog");
+        var set = PlanFingerprint.Full(
+            snapshot, new PlanPreferences { LevelCaps = { [CharmEntity] = 2 } }, "catalog");
+
+        Assert.Equal(none, empty);
+        Assert.NotEqual(none, set);
+    }
+
     [Fact]
     public void TurningRecommendationsOffSkipsOffersButKeepsPlacement()
     {

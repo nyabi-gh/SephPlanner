@@ -668,10 +668,10 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         private static double RankValue(PlacementProblem problem, CharmSlot charm, int level) =>
             charm.Definition.ContextStats.Count > 0
-                ? ContextStatWorth.Value(problem, charm, default, Math.Min(charm.Definition.MaxLevel, level), null, true) :
+                ? ContextStatWorth.Value(problem, charm, default, Math.Min(charm.WorthLevelCap, level), null, true) :
             charm.Definition.MagicSupport is not null
                 ? DirectedCharmSupport.Estimate(problem, charm, level)
-                : BuildStatWorth.Value(problem, charm, Math.Min(charm.Definition.MaxLevel, level));
+                : BuildStatWorth.Value(problem, charm, Math.Min(charm.WorthLevelCap, level));
 
         private static EstimateModel BuildEstimateModel(PlacementProblem problem)
         {
@@ -1046,7 +1046,7 @@ namespace SephPlanner.Core.Solver
                     var quality = new PlacementQuality((model.Required[rank] && !active ? 1 : 0) +
                         (ScalesPosition.Accepts(problem, charm, cell) ? 0 : 1),
                         model.Preserved[rank] && !active ? 1 : 0, held ? 0 : 1, 0, 0, value,
-                        entry.Unsafe ? -1 : 0, charm.IsFiller || charm.IsDormant ? 0 : Math.Max(0, level - charm.Definition.MaxLevel),
+                        entry.Unsafe ? -1 : 0, charm.IsFiller || charm.IsDormant ? 0 : Math.Max(0, level - charm.WorthLevelCap),
                         (index == current ? 1 : 0) + (index == planned ? PlanBonus : 0), problem.Scale.ScoreStep);
                     if (best.HasValue)
                     {
@@ -1491,7 +1491,7 @@ namespace SephPlanner.Core.Solver
             result.IsDisabled(cell) || result.EffectiveLevel(cell, 0) < 0;
 
         private static int Waste(CharmSlot charm, GridPos cell, SimulationResult result) =>
-            charm.IsFiller || charm.IsDormant ? 0 : Math.Max(0, result.EffectiveLevel(cell, charm.Enchant) - charm.Definition.MaxLevel);
+            charm.IsFiller || charm.IsDormant ? 0 : Math.Max(0, result.EffectiveLevel(cell, charm.Enchant) - charm.WorthLevelCap);
 
         private static Dictionary<GridPos, CharmSlot> CharmsByCell(
             PlacementProblem problem, Dictionary<int, GridPos> positions)
@@ -1584,7 +1584,10 @@ namespace SephPlanner.Core.Solver
                 return DormantPreference(problem, charm, cell, result, occupancy);
 
             var level = result.EffectiveLevel(cell, charm.Enchant);
-            var effective = inactive ? 0 : Math.Min(charm.Definition.MaxLevel, level);
+
+            // 게임 상한과 사용자가 건 제한 중 낮은 쪽까지만 센다. 제한 위의 레벨은 그 사람에게는
+            // 값이 아니므로, 솔버가 그 칸을 이 아티팩트에게 줄 이유도 없어진다.
+            var effective = inactive ? 0 : Math.Min(charm.WorthLevelCap, level);
             if (charm.Definition.MagicSupport is not null)
                 return DirectedCharmSupport.Value(problem, charm, cell, effective, result, occupancy, neighbors);
 
@@ -1701,7 +1704,7 @@ namespace SephPlanner.Core.Solver
             if (ReasonIgnoringWeapon(charm, cell, result, problem.Grid, occupancy) != CharmInactiveReason.None)
                 return 0;
 
-            var level = Math.Max(0, Math.Min(charm.Definition.MaxLevel, result.EffectiveLevel(cell, charm.Enchant)));
+            var level = Math.Max(0, Math.Min(charm.WorthLevelCap, result.EffectiveLevel(cell, charm.Enchant)));
             return charm.Worth.WeightedAt(level, charm.Weight);
         }
 

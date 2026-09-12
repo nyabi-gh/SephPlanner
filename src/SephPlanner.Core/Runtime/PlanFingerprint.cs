@@ -171,6 +171,13 @@ namespace SephPlanner.Core.Runtime
                 Add(builder, "pinned", pin.Key);
                 Add(builder, "pinLevel", pin.Value);
             }
+            // 제한을 건 것이 하나도 없으면 이 줄 자체가 없어야 한다. 무조건 넣으면 이 기능이
+            // 없던 시절의 F10 재현 자료가 전부 지문 불일치로 거부된다(성장 항목이 같은 이유로 조건부다).
+            foreach (var cap in preferences.LevelCaps.OrderBy(pair => pair.Key))
+            {
+                Add(builder, "levelCap", cap.Key);
+                Add(builder, "levelCapLevel", cap.Value);
+            }
             foreach (var retained in preferences.RetainedCharms.OrderBy(value => value))
                 Add(builder, "retained", retained);
             foreach (var allowed in preferences.DeactivationAllowed.OrderBy(value => value))

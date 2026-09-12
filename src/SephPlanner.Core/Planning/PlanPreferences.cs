@@ -65,6 +65,23 @@ namespace SephPlanner.Core.Planning
         /// </summary>
         public HashSet<int> HeldCharms { get; set; } = new HashSet<int>();
 
+        /// <summary>
+        /// 사용자가 정한 레벨 제한. 엔티티 번호 → 레벨이고, 그 아티팩트는 <b>그 레벨까지만 값을
+        /// 쳐 준다.</b> 게임의 상한(<see cref="Model.CharmDefinition.MaxLevel"/>)을 개인적으로 더
+        /// 낮추는 것과 같아서, 상한 위를 낭비로 세는 기계가 그대로 일한다.
+        ///
+        /// <b>왜 필요한가.</b> "이 아티팩트는 3레벨이면 충분하니 남는 레벨은 다른 것에 주라" 는
+        /// 말을 ★ 로는 할 수 없다 - ★ 는 누가 좋은 칸을 먼저 갖느냐이지 얼마나 높은 칸이냐가
+        /// 아니다. 게임에는 레벨을 직접 올리는 행동이 없고 칸이 레벨을 정하므로, 이 제한은
+        /// 실제로는 "그 레벨 넘는 칸에 두어 봐야 나에게는 값이 없다" 는 뜻이다.
+        ///
+        /// <b>부드러운 제한이다.</b> 못 가게 막지 않는다 - 아무도 원하지 않는 높은 칸이면 거기
+        /// 놓일 수 있고, 그래도 손해는 없다. 막는 쪽은 계획이 아예 안 나오는 상태를 만든다.
+        ///
+        /// ★ 와 마찬가지로 점수도 이 기준으로 매겨지므로, 제한을 걸면 화면의 점수가 달라진다.
+        /// </summary>
+        public Dictionary<int, int> LevelCaps { get; set; } = new Dictionary<int, int>();
+
         /// <summary>소유한 해당 종류의 아티팩트 전부를 활성 상태로 유지한다.</summary>
         public HashSet<int> RetainedCharms { get; set; } = new HashSet<int>();
         public HashSet<int> DeactivationAllowed { get; set; } = new HashSet<int>();
