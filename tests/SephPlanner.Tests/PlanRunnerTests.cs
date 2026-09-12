@@ -20,7 +20,7 @@ public class PlanRunnerTests
         var cancelled = false;
         PlanBuildOperation build = (
             GameSnapshot _, ICatalog _, PlanPreferences _,
-            out PlanBlocker blocker, Plan? _, LayoutCache _2, CancellationToken cancellation) =>
+            out PlanBlocker blocker, Plan? _, LayoutCache _2, bool settled, CancellationToken cancellation) =>
         {
             blocker = PlanBlocker.None;
             Interlocked.Increment(ref calls);
@@ -52,7 +52,7 @@ public class PlanRunnerTests
         var calls = new ConcurrentQueue<int>();
         PlanBuildOperation build = (
             GameSnapshot snapshot, ICatalog _, PlanPreferences _,
-            out PlanBlocker blocker, Plan? _, LayoutCache _2, CancellationToken _3) =>
+            out PlanBlocker blocker, Plan? _, LayoutCache _2, bool settled, CancellationToken _3) =>
         {
             blocker = PlanBlocker.None;
             var storage = snapshot.Inventory!.Storage;
@@ -82,7 +82,7 @@ public class PlanRunnerTests
         var calls = 0;
         PlanBuildOperation build = (
             GameSnapshot snapshot, ICatalog _, PlanPreferences _,
-            out PlanBlocker blocker, Plan? _, LayoutCache _2, CancellationToken _3) =>
+            out PlanBlocker blocker, Plan? _, LayoutCache _2, bool settled, CancellationToken _3) =>
         {
             blocker = PlanBlocker.None;
             var call = Interlocked.Increment(ref calls);
@@ -111,7 +111,7 @@ public class PlanRunnerTests
         var calls = 0;
         PlanBuildOperation build = (
             GameSnapshot snapshot, ICatalog _, PlanPreferences _,
-            out PlanBlocker blocker, Plan? _, LayoutCache _2, CancellationToken _3) =>
+            out PlanBlocker blocker, Plan? _, LayoutCache _2, bool settled, CancellationToken _3) =>
         {
             blocker = PlanBlocker.None;
             if (Interlocked.Increment(ref calls) == 2) throw new InvalidOperationException("broken");
@@ -145,7 +145,7 @@ public class PlanRunnerTests
         var advices = 0;
         PlanBuildOperation build = (
             GameSnapshot _, ICatalog _, PlanPreferences _,
-            out PlanBlocker blocker, Plan? _, LayoutCache _2, CancellationToken _3) =>
+            out PlanBlocker blocker, Plan? _, LayoutCache _2, bool settled, CancellationToken _3) =>
         {
             blocker = PlanBlocker.None;
             Interlocked.Increment(ref builds);
@@ -183,7 +183,7 @@ public class PlanRunnerTests
         var advices = 0;
         PlanBuildOperation build = (
             GameSnapshot _, ICatalog _, PlanPreferences _,
-            out PlanBlocker blocker, Plan? _, LayoutCache _2, CancellationToken _3) =>
+            out PlanBlocker blocker, Plan? _, LayoutCache _2, bool settled, CancellationToken _3) =>
         {
             blocker = PlanBlocker.None;
             Interlocked.Increment(ref builds);
@@ -223,7 +223,7 @@ public class PlanRunnerTests
         var advices = 0;
         PlanBuildOperation build = (
             GameSnapshot _, ICatalog _, PlanPreferences _,
-            out PlanBlocker blocker, Plan? _, LayoutCache _2, CancellationToken _3) =>
+            out PlanBlocker blocker, Plan? _, LayoutCache _2, bool settled, CancellationToken _3) =>
         {
             blocker = PlanBlocker.None;
             Interlocked.Increment(ref builds);
@@ -269,7 +269,7 @@ public class PlanRunnerTests
     {
         PlanBuildOperation build = (
             GameSnapshot _, ICatalog _, PlanPreferences _,
-            out PlanBlocker blocker, Plan? _, LayoutCache _2, CancellationToken _3) =>
+            out PlanBlocker blocker, Plan? _, LayoutCache _2, bool settled, CancellationToken _3) =>
         {
             blocker = PlanBlocker.None;
             return new Plan();
@@ -303,7 +303,7 @@ public class PlanRunnerTests
         var calls = 0;
         PlanBuildOperation build = (
             GameSnapshot _, ICatalog _, PlanPreferences _,
-            out PlanBlocker blocker, Plan? _, LayoutCache _2, CancellationToken cancellation) =>
+            out PlanBlocker blocker, Plan? _, LayoutCache _2, bool settled, CancellationToken cancellation) =>
         {
             blocker = PlanBlocker.None;
             if (Interlocked.Increment(ref calls) == 1)
@@ -339,7 +339,7 @@ public class PlanRunnerTests
         var calls = 0;
         PlanBuildOperation build = (
             GameSnapshot _, ICatalog _, PlanPreferences _,
-            out PlanBlocker blocker, Plan? _, LayoutCache _2, CancellationToken _3) =>
+            out PlanBlocker blocker, Plan? _, LayoutCache _2, bool settled, CancellationToken _3) =>
         {
             blocker = PlanBlocker.None;
             if (Interlocked.Increment(ref calls) == 1)
@@ -374,6 +374,85 @@ public class PlanRunnerTests
 
         // 게시된 배치마다 조언이 한 번 뒤따른다.
         Assert.True(SpinWait.SpinUntil(() => runner.Stats.Advice.Count == 1, TimeSpan.FromSeconds(5)));
+    }
+
+    /// <summary>
+    /// 자동 배치가 끝나면 지금 놓인 것이 곧 그 계획이다. 그것을 다시 푸는 것은 답을 아는 문제를
+    /// 다시 푸는 일이고, 하필 회전이 바뀐 탓에 빔 캐시도 못 쓰는 가장 비싼 한 번이다.
+    /// </summary>
+    [Fact]
+    public void AnAppliedPlanIsRepublishedWithoutSolving()
+    {
+        var settledCalls = new List<bool>();
+        var runner = AppliedRunner(settledCalls);
+
+        runner.Submit(Board(new GridPos(0, 0)), PlanPreferences.None, "catalog");
+        Assert.True(SpinWait.SpinUntil(() => runner.State.IsCurrent, TimeSpan.FromSeconds(5)));
+        runner.MarkApplied(runner.State.Latest!);
+
+        runner.Submit(Board(new GridPos(1, 0)), PlanPreferences.None, "catalog");
+        Assert.True(SpinWait.SpinUntil(() => settledCalls.Count == 2, TimeSpan.FromSeconds(5)));
+
+        Assert.Equal(new[] { false, true }, settledCalls.ToArray());
+        Assert.Equal(2, runner.State.RequestedGeneration);
+        Assert.True(runner.State.IsCurrent);
+    }
+
+    /// <summary>
+    /// 계획대로 놓이지 않은 판에는 이 길을 타면 안 된다. 그때는 답을 모르는 문제다.
+    /// </summary>
+    [Fact]
+    public void ABoardThatIsNotTheAppliedPlanIsSolvedAsUsual()
+    {
+        var settledCalls = new List<bool>();
+        var runner = AppliedRunner(settledCalls);
+
+        runner.Submit(Board(new GridPos(0, 0)), PlanPreferences.None, "catalog");
+        Assert.True(SpinWait.SpinUntil(() => runner.State.IsCurrent, TimeSpan.FromSeconds(5)));
+        runner.MarkApplied(runner.State.Latest!);
+
+        // 목표는 (1,0) 인데 (2,0) 에 있다.
+        runner.Submit(Board(new GridPos(2, 0)), PlanPreferences.None, "catalog");
+        Assert.True(SpinWait.SpinUntil(() => settledCalls.Count == 2, TimeSpan.FromSeconds(5)));
+
+        Assert.Equal(new[] { false, false }, settledCalls.ToArray());
+    }
+
+    /// <summary>아티팩트 하나가 (0,0) 에서 (1,0) 으로 가는 계획을 내놓는 실행기.</summary>
+    private static PlanRunner AppliedRunner(List<bool> settledCalls)
+    {
+        PlanBuildOperation build = (
+            GameSnapshot _, ICatalog _, PlanPreferences _,
+            out PlanBlocker blocker, Plan? _1, LayoutCache _2, bool settled, CancellationToken _3) =>
+        {
+            blocker = PlanBlocker.None;
+            lock (settledCalls) settledCalls.Add(settled);
+            return new Plan
+            {
+                Targets =
+                {
+                    new PlanTarget { InstanceId = 10, From = new GridPos(0, 0), To = new GridPos(1, 0) },
+                },
+            };
+        };
+        PlanAdviceOperation advise = (
+            Plan placement, GameSnapshot _, ICatalog _1, PlanPreferences _2,
+            LayoutCache _3, CancellationToken _4) => placement;
+        return new PlanRunner(EmptyCatalog, build, TimeSpan.Zero, advise);
+    }
+
+    /// <summary>아티팩트 하나가 그 칸에 있는 판.</summary>
+    private static GameSnapshot Board(GridPos cell)
+    {
+        var snapshot = Snapshot(6);
+        snapshot.Inventory!.Items.Add(new PlacedItem
+        {
+            DefinitionId = 1,
+            InstanceId = 10,
+            Position = cell,
+            IsActive = true,
+        });
+        return snapshot;
     }
 
     private static GameSnapshot Snapshot(int storage) => new()

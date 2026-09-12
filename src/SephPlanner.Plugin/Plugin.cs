@@ -1079,7 +1079,8 @@ namespace SephPlanner.Plugin
 
                 var plan = state.Latest;
                 StartCoroutine(PlanApplier.Apply(
-                    plan.CreateApplyCommand(), _settings.MultiplayerAutoPlace.Value, AutoPlaceFinished));
+                    plan.CreateApplyCommand(), _settings.MultiplayerAutoPlace.Value,
+                    (result, settled) => AutoPlaceFinished(result, settled ? plan : null)));
             }
             catch (Exception ex)
             {
@@ -1089,9 +1090,15 @@ namespace SephPlanner.Plugin
             }
         }
 
-        private void AutoPlaceFinished(string result)
+        /// <param name="applied">
+        /// 계획대로 다 놓였으면 그 계획. 실행기가 그것으로 다음 재계산을 건너뛴다 - 자동 배치
+        /// 직후의 재계산은 답을 이미 아는 문제를 다시 푸는 일이고, 회전이 바뀐 탓에 빔 캐시도
+        /// 못 써서 세션에서 가장 비싸다.
+        /// </param>
+        private void AutoPlaceFinished(string result, Plan applied)
         {
             Logger.LogInfo(result);
+            if (applied != null) _runner?.MarkApplied(applied);
 
             // 자동 배치 결과는 다른 안내보다 오래 띄운다. 실패하면 "손으로 정리한 뒤 다시
             // 시도하세요" 같은 긴 문장이 오는데, 전투 중이면 여섯 초로는 읽다 만다.

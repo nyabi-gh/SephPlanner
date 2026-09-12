@@ -57,17 +57,21 @@ namespace SephPlanner.Plugin
         /// 물러서면 아무것도 바꾸지 않은 상태다. 적용 도중 실패하면 확인된 걸음만 안전하게 되돌린다.
         /// 미확정 쓰기나 외부 변경 때문에 복구하지 못하면 중간 상태를 알리고 필요한 경우 재접속을 안내한다.
         /// </summary>
+        /// <param name="report">
+        /// 사람이 읽을 한 줄과, 계획대로 다 놓였는지. 두 번째가 참일 때만 지금 가방이 곧 그
+        /// 계획이므로, 부르는 쪽이 그것으로 다음 재계산을 건너뛴다.
+        /// </param>
         public static IEnumerator Apply(
-            ApplyPlanCommand command, bool allowMultiplayer, Action<string> report)
+            ApplyPlanCommand command, bool allowMultiplayer, Action<string, bool> report)
         {
             if (RecoveryRequired)
             {
-                report(RecoveryMessage);
+                report(RecoveryMessage, false);
                 yield break;
             }
             if (InProgress)
             {
-                report("이전 자동 배치가 아직 끝나지 않았습니다. 잠시 뒤 다시 누르세요.");
+                report("이전 자동 배치가 아직 끝나지 않았습니다. 잠시 뒤 다시 누르세요.", false);
                 yield break;
             }
 
@@ -78,7 +82,7 @@ namespace SephPlanner.Plugin
                 var setup = Prepare(command, allowMultiplayer);
                 if (setup.Failure != null)
                 {
-                    report(setup.Failure);
+                    report(setup.Failure, false);
                     yield break;
                 }
                 inventory = setup.Inventory;
@@ -96,7 +100,7 @@ namespace SephPlanner.Plugin
                     _uncertainInventory = _routine.RequiresResync ? inventory : null;
                     yield return run.Current;
                 }
-                report(_routine.Result);
+                report(_routine.Result, _routine.Settled);
             }
             finally
             {

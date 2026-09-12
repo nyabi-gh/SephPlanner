@@ -5,9 +5,13 @@ using SephPlanner.Core.Solver;
 
 namespace SephPlanner.Core.Runtime
 {
+    /// <param name="settled">
+    /// 지금 놓여 있는 것이 이미 최선이라고 실행기가 아는 경우(자동 배치 직후). 탐색을 건너뛴다.
+    /// </param>
     public delegate Plan? PlanBuildOperation(
         GameSnapshot snapshot, ICatalog catalog, PlanPreferences preferences,
-        out PlanBlocker blocker, Plan? previous, LayoutCache layouts, CancellationToken cancellation);
+        out PlanBlocker blocker, Plan? previous, LayoutCache layouts, bool settled,
+        CancellationToken cancellation);
 
     /// <summary>
     /// 2단계. 게시된 배치에 조언을 붙인 <b>새 계획</b>을 낸다. 취소되면 <c>null</c> 이고 그때
@@ -74,6 +78,9 @@ namespace SephPlanner.Core.Runtime
             /// <summary>조언이 붙을 계획. 배치 단계에서는 <c>null</c> 이다.</summary>
             public Plan? Placement;
 
+            /// <summary>지금 배치가 이미 최선이다. 자동 배치가 방금 끝나 그대로 들어온 경우다.</summary>
+            public bool Settled;
+
             public GameSnapshot Snapshot = new GameSnapshot();
             public PlanPreferences Preferences = PlanPreferences.None;
             public string Fingerprint = "";
@@ -129,6 +136,16 @@ namespace SephPlanner.Core.Runtime
         private string _contextFingerprint = "";
         private string _placementFingerprint = "";
         private string _fullFingerprint = "";
+
+        /// <summary>
+        /// 자동 배치가 검증까지 통과하고 끝났다. 그 결과가 그대로 들어오면 다시 풀지 않는다.
+        /// 한 번 확인하면 버린다 - 그 뒤로는 무엇이든 달라질 수 있다.
+        /// </summary>
+        private Plan? _applied;
+        private GameSnapshot? _appliedBefore;
+
+        /// <summary>이번 배치 요청이 그 적용 결과인가.</summary>
+        private bool _settled;
 
         private long _placementGeneration;
         private long _placementStarted;
@@ -241,6 +258,12 @@ namespace SephPlanner.Core.Runtime
 
                 if (placementFingerprint != _placementFingerprint)
                 {
+                    // 자동 배치가 끝나고 처음 들어온 판이다. 그 계획 그대로면 답을 이미 안다.
+                    _settled = _applied is not null && AppliedPlacement.Settled(
+                        _applied, _appliedBefore!, snapshot, placementFingerprint, contextFingerprint);
+                    _applied = null;
+                    _appliedBefore = null;
+
                     _placementFingerprint = placementFingerprint;
                     _fullFingerprint = fingerprint;
                     NewPlacementLocked();
@@ -302,13 +325,30 @@ namespace SephPlanner.Core.Runtime
 
         private static Plan? Build(
             GameSnapshot snapshot, ICatalog catalog, PlanPreferences preferences,
-            out PlanBlocker blocker, Plan? previous, LayoutCache layouts, CancellationToken cancellation) =>
-            PlanBuilder.BuildPlacement(snapshot, catalog, preferences, out blocker, previous, layouts, cancellation);
+            out PlanBlocker blocker, Plan? previous, LayoutCache layouts, bool settled,
+            CancellationToken cancellation) =>
+            PlanBuilder.BuildPlacement(
+                snapshot, catalog, preferences, out blocker, previous, layouts, settled, cancellation);
 
         private static Plan? Advise(
             Plan placement, GameSnapshot snapshot, ICatalog catalog, PlanPreferences preferences,
             LayoutCache layouts, CancellationToken cancellation) =>
             PlanBuilder.BuildAdvice(placement, snapshot, catalog, preferences, layouts, cancellation);
+
+        /// <summary>
+        /// 자동 배치가 검증까지 통과했다고 알린다. 다음 판이 그 계획 그대로면 탐색을 건너뛴다.
+        /// 실패했거나 서버 반영이 불확실한 적용에는 부르지 않는다 - 그때는 무엇이 놓였는지 모른다.
+        /// </summary>
+        public void MarkApplied(Plan plan)
+        {
+            lock (_gate)
+            {
+                if (_disposed || plan is null || _replaySnapshot is null) return;
+
+                _applied = plan;
+                _appliedBefore = _replaySnapshot;
+            }
+        }
 
         public PlanReplay? CaptureReplay()
         {
@@ -351,6 +391,8 @@ namespace SephPlanner.Core.Runtime
                 _running?.Cancellation.Cancel();
                 _latest = null;
                 _snapshot = null;
+                _applied = null;
+                _appliedBefore = null;
                 _replaySnapshot = null;
                 _replayPreferences = null;
                 _replayPreviousTargets = null;
@@ -387,6 +429,7 @@ namespace SephPlanner.Core.Runtime
                     CatalogGeneration = _catalogGeneration,
                     Previous = _latest,
                     RequestedAt = _placementRequestedAt,
+                    Settled = _settled,
                 });
                 return;
             }
@@ -443,7 +486,7 @@ namespace SephPlanner.Core.Runtime
                 {
                     plan = _build(
                         request.Snapshot, _catalog, request.Preferences, out blocker, request.Previous,
-                        layouts, request.Cancellation.Token);
+                        layouts, request.Settled, request.Cancellation.Token);
                     if (plan is not null)
                     {
                         plan.RequestGeneration = request.Generation;

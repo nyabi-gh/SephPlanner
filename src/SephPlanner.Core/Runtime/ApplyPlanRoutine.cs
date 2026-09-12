@@ -62,6 +62,13 @@ namespace SephPlanner.Core.Runtime
         /// <summary>이미 보낸 쓰기의 반영 여부가 불명확하다. 같은 인벤토리에 추가 쓰기를 보내면 안 된다.</summary>
         public bool RequiresResync { get; private set; }
 
+        /// <summary>
+        /// 계획대로 다 놓였고 레벨까지 예상과 같다. <b>이때만</b> 부르는 쪽이 "지금 놓인 것이 곧
+        /// 그 계획" 이라고 믿어도 된다 - 실행기가 그것으로 다음 재계산을 건너뛴다. 중간에 멈췄거나
+        /// 서버 반영이 불확실하면 무엇이 놓였는지 우리가 모르므로 거짓이다.
+        /// </summary>
+        public bool Settled { get; private set; }
+
         private const string UncertainMessage =
             "서버 반영 여부를 확인하지 못했습니다. 늦게 적용될 수 있어 추가 이동과 되돌리기를 멈췄습니다. " +
             "자동 배치를 다시 쓰려면 방에 재접속하세요.";
@@ -131,8 +138,10 @@ namespace SephPlanner.Core.Runtime
             var settle = _now() + (_port.WritesLandImmediately ? 0 : SyncTimeout);
             while (LevelDrift().Length > 0 && _now() < settle) yield return null;
 
-            Result = TargetDrift() ??
-                     $"자동 배치 완료 - 이동 {moves.Count}건, 회전 {rotations.Count}건" + LevelDrift();
+            var drift = TargetDrift();
+            var levels = drift is null ? LevelDrift() : "";
+            Settled = drift is null && levels.Length == 0 && !RequiresResync;
+            Result = drift ?? $"자동 배치 완료 - 이동 {moves.Count}건, 회전 {rotations.Count}건" + levels;
         }
 
         private string? TargetDrift()

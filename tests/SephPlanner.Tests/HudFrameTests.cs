@@ -74,4 +74,35 @@ public sealed class HudFrameTests
         Assert.False(stale.Matches(new HudFrameKey(frame)));
         Assert.True(fresh.Matches(new HudFrameKey(frame)));
     }
+
+    /// <summary>
+    /// 조언은 배치 뒤에 붙는다. 계획 객체가 그대로인 채 "조언 계산 중" 만 켜지고 꺼지므로,
+    /// 그것이 열쇠에 없으면 화면이 "추천 조합 없음" 에 멈춰 있다.
+    /// </summary>
+    [Fact]
+    public void TheAdviceCatchingUpRedrawsEvenThoughThePlanIsTheSame()
+    {
+        var plan = new Plan();
+        var frame = new HudFrame
+        {
+            Snapshot = new(),
+            Plan = plan,
+            Catalog = new Catalog([], []),
+            Prefs = new(),
+            Values = CharmValueBook.Empty,
+            Expanded = true,
+            RuntimeVerification = PlanVerificationStatus.Passed,
+            RuntimeVerificationReason = "",
+            Hint = "",
+            PreviewKey = "",
+            AdviceBusy = true,
+        };
+
+        var busy = new HudFrameKey(frame);
+        frame.AdviceBusy = false;
+        var ready = new HudFrameKey(frame);
+
+        Assert.False(busy.Matches(ready));
+        Assert.True(ready.Matches(new HudFrameKey(frame)));
+    }
 }

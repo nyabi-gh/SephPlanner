@@ -91,7 +91,8 @@ namespace SephPlanner.Core.Planning
             CancellationToken cancellation = default)
         {
             layouts ??= new LayoutCache();
-            var placement = BuildPlacement(snapshot, catalog, preferences, out blocker, previous, layouts, cancellation);
+            var placement = BuildPlacement(
+                snapshot, catalog, preferences, out blocker, previous, layouts, cancellation: cancellation);
             return placement is null ? null : BuildAdvice(placement, snapshot, catalog, preferences, layouts, cancellation);
         }
 
@@ -103,14 +104,20 @@ namespace SephPlanner.Core.Planning
         /// 묶여 있어서, 판이 조금만 커도 다 끝날 때까지 화면이 갱신되지 않았다. 게다가 세피라이트
         /// 창을 여닫기만 해도 조언 쪽 지문이 바뀌어 그 덩어리가 통째로 취소됐다.
         /// </summary>
+        /// <param name="settled">
+        /// 지금 놓여 있는 것이 이미 최선이라고 부르는 쪽이 아는 경우. 자동 배치가 방금 끝나
+        /// 그 결과가 그대로 들어왔을 때가 그렇다(<see cref="AppliedPlacement"/>). 그때는 탐색을
+        /// 건너뛰고 지금 배치를 채점해 그대로 쓴다 - 같은 문제를 다시 풀어 같은 답을 얻는 일이다.
+        /// 채점·검증·경고는 그대로 도므로 게임이 우리 모델과 다르면 여전히 검증에서 걸린다.
+        /// </param>
         public static Plan? BuildPlacement(
             GameSnapshot snapshot, ICatalog catalog, PlanPreferences? preferences,
             out PlanBlocker blocker, Plan? previous = null, LayoutCache? layouts = null,
-            CancellationToken cancellation = default)
+            bool settled = false, CancellationToken cancellation = default)
         {
             try
             {
-                return Attempt(snapshot, catalog, preferences, out blocker, previous, layouts, cancellation);
+                return Attempt(snapshot, catalog, preferences, out blocker, previous, layouts, settled, cancellation);
             }
             catch (OperationCanceledException)
             {
@@ -194,7 +201,8 @@ namespace SephPlanner.Core.Planning
 
         private static Plan? Attempt(
             GameSnapshot snapshot, ICatalog catalog, PlanPreferences? preferences,
-            out PlanBlocker blocker, Plan? previous, LayoutCache? layouts, CancellationToken cancellation)
+            out PlanBlocker blocker, Plan? previous, LayoutCache? layouts, bool settled,
+            CancellationToken cancellation)
         {
             blocker = PlanBlocker.None;
             preferences ??= PlanPreferences.None;
@@ -324,7 +332,12 @@ namespace SephPlanner.Core.Planning
 
             var current = PlacementSolver.Score(problem, layout, positions);
             var verification = Verify(inventory, current, grid);
-            var best = PlacementSolver.Solve(problem, new SolverOptions { Cancellation = cancellation }, layouts);
+
+            // 이미 최선인 것을 아는 경우(자동 배치 직후)에는 탐색을 건너뛴다. 답을 아는 문제를
+            // 다시 푸는 일이고, 하필 그 한 번이 회전이 바뀐 탓에 빔 캐시를 못 쓰는 cold 다.
+            var best = settled
+                ? current
+                : PlacementSolver.Solve(problem, new SolverOptions { Cancellation = cancellation }, layouts);
 
             // 조건부 배정은 수렴하지 않을 수 있으므로 현재 배치도 같은 우선순위로 비교한다.
             if (PriorityComboPlacement.Compare(best, current) < 0) best = current;
