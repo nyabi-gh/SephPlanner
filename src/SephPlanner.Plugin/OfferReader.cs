@@ -18,27 +18,13 @@ namespace SephPlanner.Plugin
     internal static class OfferReader
     {
         /// <summary>
-        /// 상자·상점·시체의 인벤토리. 뚜껑이 열리는 것은 이미 씬에 있던 것의 상태가 바뀌는
-        /// 것이라, 목록을 들고 있어도 여는 순간이 늦어지지 않는다. 늦어질 수 있는 것은 새로
-        /// 떨어진 꾸러미뿐이고 그것도 이 간격만큼이다.
-        /// </summary>
-        /// <summary>
-        /// 등록부로 바꾼 것이 무언가를 놓치는지 <b>가끔 확인만</b> 한다. 옛 방식(씬 전수 탐색)이
-        /// 6ms 라 폴링마다 돌릴 수는 없지만, 아주 가끔이면 값이 없고 어긋남은 반드시 잡힌다.
-        /// 한 세션 내내 0 이면 이 대조를 걷어낸다.
-        /// </summary>
-        private const float CrossCheckInterval = 10f;
-        private static float _crossCheckedAt = float.NegativeInfinity;
-
-        /// <summary>
-        /// 세피라이트는 <b>보상 창이 열려 있을 때만</b> 찾는다. 후보가 될 수 있는 것은 그 창이
-        /// 지금 보여주는 하나뿐이므로, 닫혀 있으면 아무리 찾아도 후보가 나올 수 없다.
+        /// 상자·상점·시체의 인벤토리와 세피라이트를 담는다. 둘 다 씬을 훑지 않고
+        /// <see cref="NetworkRegistry"/>에서 읽는다 - 셋 다 <c>NetworkBehaviour</c> 다.
         ///
-        /// 비활성까지 뒤지는 것은 여는 동안 본체가 잠시 꺼지기 때문인데, 그 순간이 바로 창이
-        /// 열려 있는 때다. 그래서 정확히 필요한 동안에만 가장 비싼 탐색을 한다.
+        /// 세피라이트는 <b>보상 창이 열려 있을 때만</b> 찾는다. 후보가 될 수 있는 것은 그 창이
+        /// 지금 보여주는 하나뿐이므로, 닫혀 있으면 아무리 찾아도 후보가 나올 수 없다. 그때는
+        /// 꺼져 있는 것까지 세는데, 창이 열리는 동안 본체가 잠시 꺼지기 때문이다.
         /// </summary>
-        private static readonly SceneCache<Sephirite> Sephirites =
-            new SceneCache<Sephirite>(1f, FindObjectsInactive.Include);
         public static void Fill(GameSnapshot snapshot, PlayerAvatar player, float radius)
         {
             var playerInventory = player.Inventory;
@@ -52,9 +38,8 @@ namespace SephPlanner.Plugin
 
             step = FrameCost.Now;
             var walking = FrameCost.Now;
-            var found = NetworkedInventories.All();
+            var found = NetworkRegistry.All<GridInventory>();
             FrameCost.ChestAlive.Add(walking);
-            CrossCheck(found);
 
             var filtering = FrameCost.Now;
             var shown = ShownInventory();
@@ -80,35 +65,6 @@ namespace SephPlanner.Plugin
 
             FrameCost.CountInventories(found.Count, nearby.Count);
             FrameCost.Chests.Add(step);
-        }
-
-        /// <summary>
-        /// 등록부가 찾은 것과 옛 씬 전수 탐색이 찾은 것을 견준다. 어긋나면 그 수를 덤프에 남긴다 -
-        /// 바닥 꾸러미가 풀에서 나올 때 Mirror 에 등록되지 않는다면 여기서 드러난다.
-        /// </summary>
-        private static void CrossCheck(List<GridInventory> registry)
-        {
-            if (Time.unscaledTime - _crossCheckedAt < CrossCheckInterval) return;
-            _crossCheckedAt = Time.unscaledTime;
-
-            var at = FrameCost.Now;
-            var scanned = Object.FindObjectsByType<GridInventory>(
-                FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            FrameCost.ChestFind.Add(at);
-
-            var missing = 0;
-            GridInventory first = null;
-            foreach (var inventory in scanned)
-            {
-                if (inventory == null || registry.Contains(inventory)) continue;
-                missing++;
-                if (first == null) first = inventory;
-            }
-            FrameCost.CountRegistryCheck(
-                registry.Count, scanned.Length,
-                missing == 0
-                    ? $"등록부 {registry.Count} 대 탐색 {scanned.Length}"
-                    : $"등록부에 없는 것 {missing}개, 예: {first.name} netId={first.netId}");
         }
 
         /// <summary>
@@ -193,9 +149,8 @@ namespace SephPlanner.Plugin
             // 열어 두고 온 세피라이트도 생성된 채 남아 있다. 화면에 보이는 것만 후보다.
             var showing = ShownSephirite();
 
-            // 창이 닫혀 있으면 후보가 될 수 있는 것이 하나도 없다. 그런데도 씬을 뒤지면 실기에서
-            // 폴링마다 7ms 를 그냥 버린다(비활성까지 뒤지는 가장 비싼 형태다). 가까이 있는
-            // 세피라이트의 상태가 궁금할 때는 F10 덤프가 따로 훑어 준다.
+            // 창이 닫혀 있으면 후보가 될 수 있는 것이 하나도 없으므로 등록부도 돌지 않는다.
+            // 가까이 있는 세피라이트의 상태가 궁금할 때는 F10 덤프가 따로 훑어 준다.
             if (showing == null)
             {
                 LastSephiriteReport = "보상 창 닫힘";
@@ -203,7 +158,7 @@ namespace SephPlanner.Plugin
             }
 
             var report = new StringBuilder();
-            foreach (var sephirite in Sephirites.Get())
+            foreach (var sephirite in NetworkRegistry.All<Sephirite>(includeInactive: true))
             {
                 if (sephirite == null) continue;
 

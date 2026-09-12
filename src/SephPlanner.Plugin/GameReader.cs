@@ -126,12 +126,6 @@ namespace SephPlanner.Plugin
         ///
         /// <c>LocalUsed</c>는 나 자신이 썼는지다. 합성기는 사람마다 층에 한 번씩 쓸 수 있다.
         /// </summary>
-        /// <summary>
-        /// 합성기는 층에 붙박인 고정물이라 자주 찾을 이유가 없다. 층이 바뀌면 파괴되므로
-        /// <see cref="SceneCache{T}"/> 가 그때 알아서 다시 찾는다. 쓰였는지 여부는 들고 있는
-        /// 오브젝트에서 매번 새로 읽으므로 지연되지 않는다.
-        /// </summary>
-        private static readonly SceneCache<TabletMix> Mixers = new SceneCache<TabletMix>(5f);
 
         internal static bool IsMixerOpen()
         {
@@ -144,7 +138,7 @@ namespace SephPlanner.Plugin
             // 쓸 수 있는 것을 찾으면서 아무거나 하나를 함께 기억해 두면, 다 썼을 때를 위해
             // 목록을 다시 훑지 않아도 된다.
             TabletMix any = null;
-            foreach (var mixer in Mixers.Get())
+            foreach (var mixer in NetworkRegistry.All<TabletMix>())
             {
                 if (mixer == null) continue;
 

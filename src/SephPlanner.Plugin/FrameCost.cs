@@ -75,14 +75,14 @@ namespace SephPlanner.Plugin
         public static readonly Step Chests = new Step("    상자·상점 찾기(씬 탐색)");
 
         /// <summary>
-        /// <c>상자·상점 찾기</c>를 셋으로 가른 것. 계획서 4번이 짚은 자리가 셋인데 고칠 곳이
-        /// 저마다 다르다 - 들고 있는 목록을 폴링마다 훑는 것(<see cref="ChestAlive"/>)은 캐시가
-        /// 살아 있는지 보는 값이고, 씬 전수 탐색(<see cref="ChestFind"/>)은 네 번에 한 번 도는
-        /// 것이며, 거리·보임 판정(<see cref="ChestFilter"/>)은 인벤토리마다 계층을 걷는 것이다.
-        /// 어느 쪽인지 모르고 고치면 또 짐작이 되므로 먼저 가른다.
+        /// <c>상자·상점 찾기</c>를 가른 것. 이렇게 갈라 재서 4번의 답이 나왔다 - 셋 중
+        /// <c>FindObjectsByType</c> 하나가 99% 였고 나머지 둘은 합쳐서 1% 였다. 지금은 씬을 훑지
+        /// 않으므로 <see cref="ChestAlive"/>가 <see cref="NetworkRegistry"/> 순회 비용이다.
         /// </summary>
         public static readonly Step ChestAlive = new Step("      등록부 훑기");
-        public static readonly Step ChestFind = new Step("      씬 전수 탐색(대조용)");
+
+        /// <summary>셋(상자·세피라이트·합성기)의 대조 탐색을 한데 모아 잰다.</summary>
+        public static readonly Step RegistryCheck = new Step("  등록부 대조(옛 씬 탐색)");
         public static readonly Step ChestFilter = new Step("      거리·보임 판정");
         public static readonly Step ChestCollect = new Step("      내용 담기");
 
@@ -104,10 +104,10 @@ namespace SephPlanner.Plugin
         public static int RegistryChecks { get; private set; }
         public static string RegistryFirstMismatch { get; private set; } = "";
 
-        public static void CountRegistryCheck(int registry, int scan, string detail)
+        public static void CountRegistryCheck(int missing, string detail)
         {
             RegistryChecks++;
-            if (registry == scan) return;
+            if (missing == 0) return;
             RegistryMismatches++;
             if (RegistryFirstMismatch.Length == 0) RegistryFirstMismatch = detail;
         }
@@ -190,14 +190,14 @@ namespace SephPlanner.Plugin
                 "화면 평균 {9:0.000}ms, 프레임 {10}회 중 다시 그린 것 {11}회, " +
                 "카탈로그 짓기 {12}회 합계 {13:0.0}ms (시도 {14}회), " +
                 "0세대 수집 {16}회(최악 폴링 안에서 {17}회), " +
-                "상자 = 등록부 {18:0.00} 대조탐색 {19:0.00} 판정 {20:0.00} 담기 {21:0.00} (인벤토리 {22}개, 어긋남 {23}/{24})",
+                "상자 = 등록부 {18:0.00} 판정 {20:0.00} 담기 {21:0.00} (인벤토리 {22}개), 대조 {19:0.00}ms 어긋남 {23}/{24}",
                 Poll.Count, Poll.AverageMs, Poll.WorstMs,
                 Inventory.AverageMs, Mixer.AverageMs, Sephirites.AverageMs, Chests.AverageMs,
                 Simulation.AverageMs, Feed.AverageMs,
                 Panel.AverageMs, Frames, Draws,
                 Catalog.Count, Catalog.TotalMs, CatalogSource.Attempts,
                 Poll.WorstPoll, Collections, WorstPollCollections,
-                ChestAlive.AverageMs, ChestFind.AverageMs, ChestFilter.AverageMs, ChestCollect.AverageMs,
+                ChestAlive.AverageMs, RegistryCheck.AverageMs, ChestFilter.AverageMs, ChestCollect.AverageMs,
                 InventoriesHeld, RegistryMismatches, RegistryChecks);
 
         public static void Write(StringBuilder text)
@@ -211,7 +211,6 @@ namespace SephPlanner.Plugin
             text.AppendLine("  " + Sephirites.Describe());
             text.AppendLine("  " + Chests.Describe());
             text.AppendLine("  " + ChestAlive.Describe());
-            text.AppendLine("  " + ChestFind.Describe());
             text.AppendLine("  " + ChestFilter.Describe());
             text.AppendLine("  " + ChestCollect.Describe());
             text.AppendLine(
@@ -219,10 +218,11 @@ namespace SephPlanner.Plugin
                     CultureInfo.InvariantCulture,
                     "      인벤토리 - 등록부 {0}개(최대 {1}), 사정거리 안 {2}개(최대 {3})",
                     InventoriesHeld, InventoriesHeldMost, InventoriesNear, InventoriesNearMost));
+            text.AppendLine("  " + RegistryCheck.Describe());
             text.AppendLine(
                 string.Format(
                     CultureInfo.InvariantCulture,
-                    "      등록부 대조 - {0}회 중 어긋남 {1}회{2}",
+                    "  등록부 대조 - {0}회 중 어긋남 {1}회{2}",
                     RegistryChecks, RegistryMismatches,
                     RegistryFirstMismatch.Length == 0 ? "" : " (" + RegistryFirstMismatch + ")"));
             text.AppendLine("  " + Simulation.Describe());
