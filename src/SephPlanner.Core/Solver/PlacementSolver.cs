@@ -302,6 +302,195 @@ namespace SephPlanner.Core.Solver
         }
 
         /// <summary>
+        /// <see cref="Polish"/>의 점유. 교환 하나가 바꾸는 칸은 둘뿐이라 해시셋 셋을 새로 채우는
+        /// 대신 격자 크기의 배열 하나를 들고 그 둘만 고친다.
+        /// </summary>
+        private sealed class PolishOccupancy : GridOccupancy
+        {
+            internal const byte Empty = 0;
+            private const byte IsItem = 1, IsCharm = 2, IsMagic = 4;
+
+            private readonly GridSpec _grid;
+            private readonly byte[] _cells;
+
+            public PolishOccupancy(GridSpec grid)
+            {
+                _grid = grid;
+                _cells = new byte[grid.Width * grid.Height];
+            }
+
+            /// <summary><see cref="OccupancyFrom"/>이 아티팩트 하나를 넣는 것과 같은 값.</summary>
+            public static byte StateOf(CharmSlot? charm) =>
+                charm is null ? Empty
+                : (byte)(IsItem | (charm.IsFiller ? 0 : IsCharm) |
+                         (!charm.IsFiller && charm.Definition.IsMagic ? IsMagic : 0));
+
+            /// <summary>석판이 차지한 칸. 아이템이되 아티팩트는 아니다.</summary>
+            public const byte Tablet = IsItem;
+
+            public void Clear() => Array.Clear(_cells, 0, _cells.Length);
+
+            public void Put(GridPos position, byte state)
+            {
+                if (Inside(position)) _cells[_grid.ToIndex(position.X, position.Y)] = state;
+            }
+
+            public byte At(GridPos position) =>
+                Inside(position) ? _cells[_grid.ToIndex(position.X, position.Y)] : Empty;
+
+            private bool Inside(GridPos position) =>
+                position.X >= 0 && position.X < _grid.Width &&
+                position.Y >= 0 && position.Y < _grid.Height;
+
+            public override bool HasItem(GridPos position) => (At(position) & IsItem) != 0;
+            public override bool HasCharm(GridPos position) => (At(position) & IsCharm) != 0;
+            public override bool HasMagicCharm(GridPos position) => (At(position) & IsMagic) != 0;
+        }
+
+        /// <summary>
+        /// 교환 하나가 실제로 바꾸는 것만 다시 보는 자리.
+        ///
+        /// <b>왜.</b> <see cref="Polish"/>는 시도마다 <see cref="OccupancyFrom"/>으로 해시셋 셋을
+        /// 새로 채우고 <see cref="TabletSimulator.Run"/>으로 격자를 통째로 다시 시뮬레이션했다.
+        /// 그런데 교환이 바꾸는 칸은 둘뿐이고 석판의 조건은 제 조건 칸의 점유만 읽으므로,
+        /// <b>조건 칸이 그 둘에 걸린 석판이 없으면 효과 행렬은 글자 그대로 같은 것이다.</b>
+        /// 실측에서 교환 하나의 2.2µs 중 점유가 0.57, 시뮬레이션이 0.12µs 였다.
+        ///
+        /// <b>호출자에게 넘기는 것은 언제나 새로 지은 것이다.</b> 받아들인 시도에서만 점유와
+        /// 행렬을 새로 짓는다 - 받아들이는 일은 드물어 비용이 없고, 넘긴 결과가 다음 시도에
+        /// 덮어써지는 별칭 사고가 구조적으로 불가능해진다.
+        /// </summary>
+        private sealed class PolishScratch
+        {
+            private readonly PlacementProblem _problem;
+            private readonly IReadOnlyList<TabletPlacement> _all;
+            private readonly List<int>?[] _watchers;
+            private readonly PolishOccupancy _occupancy;
+            private readonly SimulationResult _settled;
+            private readonly SimulationResult _trial;
+
+            private readonly bool _verify;
+
+            public PolishScratch(PlacementProblem problem, List<TabletPlacement> layout, bool verify)
+            {
+                _problem = problem;
+                _verify = verify;
+                _all = WithFixed(problem, layout);
+                _occupancy = new PolishOccupancy(problem.Grid);
+                _settled = new SimulationResult(problem.Grid, _all.Count);
+                _trial = new SimulationResult(problem.Grid, _all.Count);
+                _watchers = new List<int>?[problem.Grid.Width * problem.Grid.Height];
+
+                var cells = new List<GridPos>();
+                for (var index = 0; index < _all.Count; index++)
+                {
+                    cells.Clear();
+                    TabletSimulator.CriteriaCells(_all[index], problem.Grid, cells);
+                    foreach (var cell in cells)
+                    {
+                        if (cell.X < 0 || cell.X >= problem.Grid.Width ||
+                            cell.Y < 0 || cell.Y >= problem.Grid.Height) continue;
+                        var at = problem.Grid.ToIndex(cell.X, cell.Y);
+                        (_watchers[at] ??= new List<int>()).Add(index);
+                    }
+                }
+            }
+
+            public GridOccupancy Occupancy => _occupancy;
+
+            /// <summary>지금 배치를 그대로 옮겨 담는다. 바깥이 배치를 고친 뒤에는 이것부터 부른다.</summary>
+            public void Reset(List<TabletPlacement> layout, Dictionary<int, GridPos> positions)
+            {
+                _occupancy.Clear();
+                foreach (var placement in layout) _occupancy.Put(placement.Position, PolishOccupancy.Tablet);
+                foreach (var charm in _problem.Charms)
+                    if (positions.TryGetValue(charm.InstanceId, out var position))
+                        _occupancy.Put(position, PolishOccupancy.StateOf(charm));
+                TabletSimulator.RunInto(_all, _occupancy, _settled, _problem.FixedEffects);
+            }
+
+            /// <summary>
+            /// <see cref="Move"/>와 같은 교환을 점유에 반영하고, 그 배치의 효과 행렬을 돌려준다.
+            /// 돌려주는 것은 읽기 전용이며 다음 호출에 덮어써질 수 있다.
+            /// </summary>
+            public SimulationResult Swap(
+                GridPos from, CharmSlot? occupant, GridPos to, CharmSlot charm,
+                List<TabletPlacement> layout, Dictionary<int, GridPos> positions)
+            {
+                var leaving = PolishOccupancy.StateOf(occupant);
+                var arriving = PolishOccupancy.StateOf(charm);
+                var changed = Put(from, leaving) | Put(to, arriving);
+                if (changed) TabletSimulator.RunInto(_all, _occupancy, _trial, _problem.FixedEffects);
+
+                var used = changed ? _trial : _settled;
+                if (_verify) Verify(layout, positions, used);
+                return used;
+            }
+
+            /// <summary>
+            /// 고쳐 쓴 점유·행렬이 통째로 다시 만든 것과 같은지 본다. <see cref="SolverOptions"/>의
+            /// 테스트 전용 스위치가 켰을 때만 돈다 - 이 최적화의 위험은 느려지는 것이 아니라
+            /// 조용히 다른 답을 내는 것이라, 그 대조가 무작위 판으로 돌아가야 한다.
+            /// </summary>
+            private void Verify(
+                List<TabletPlacement> layout, Dictionary<int, GridPos> positions, SimulationResult used)
+            {
+                var full = OccupancyFrom(layout, positions, _problem);
+                var matrix = TabletSimulator.Run(_all, full, _problem.Grid, _problem.FixedEffects);
+                for (var y = 0; y < _problem.Grid.Height; y++)
+                    for (var x = 0; x < _problem.Grid.Width; x++)
+                    {
+                        var cell = new GridPos(x, y);
+                        if (_occupancy.HasItem(cell) != full.HasItem(cell) ||
+                            _occupancy.HasCharm(cell) != full.HasCharm(cell) ||
+                            _occupancy.HasMagicCharm(cell) != full.HasMagicCharm(cell))
+                            throw new InvalidOperationException($"고쳐 쓴 점유가 다시 만든 것과 다릅니다: ({x},{y})");
+                        if (used.LevelAt(cell) != matrix.LevelAt(cell) ||
+                            used.IsDisabled(cell) != matrix.IsDisabled(cell) ||
+                            used.IgnoreCriteriaAt(cell) != matrix.IgnoreCriteriaAt(cell) ||
+                            used.MultiplierAt(cell) != matrix.MultiplierAt(cell))
+                            throw new InvalidOperationException($"고쳐 쓴 효과 행렬이 다시 만든 것과 다릅니다: ({x},{y})");
+                    }
+                for (var index = 0; index < used.Applied.Length; index++)
+                    if (used.Applied[index] != matrix.Applied[index])
+                        throw new InvalidOperationException($"고쳐 쓴 석판 판정이 다시 만든 것과 다릅니다: {index}번");
+            }
+
+            /// <summary>받아들이지 않은 교환을 되돌린다. 행렬은 손대지 않는다 - 아직 정착본이다.</summary>
+            public void Undo(GridPos from, CharmSlot? occupant, GridPos to, CharmSlot charm)
+            {
+                _occupancy.Put(from, PolishOccupancy.StateOf(charm));
+                _occupancy.Put(to, PolishOccupancy.StateOf(occupant));
+            }
+
+            /// <summary>받아들인 교환을 정착시킨다.</summary>
+            public void Accept() => TabletSimulator.RunInto(_all, _occupancy, _settled, _problem.FixedEffects);
+
+            /// <summary>
+            /// 칸 하나를 고치고, 그 때문에 <b>판정이 뒤집히는 석판이 있는지</b> 답한다. 점유가
+            /// 그대로면 볼 것이 없고, 달라졌어도 그 칸을 조건으로 읽는 석판이 없으면 마찬가지다.
+            ///
+            /// <b>두 칸을 차례로 고치는 중간 상태에서 물어도 답이 맞다.</b> 첫 칸만 읽는 석판은
+            /// 둘째 칸의 값과 무관하고, 둘째 칸을 읽는 석판은 둘 다 고쳐진 뒤 다시 물어지기
+            /// 때문이다. 중간 상태 때문에 없는 뒤집힘을 봐도 손해는 다시 돌린 시뮬레이션 한 번뿐이다.
+            /// </summary>
+            private bool Put(GridPos cell, byte state)
+            {
+                if (cell.X < 0 || cell.X >= _problem.Grid.Width ||
+                    cell.Y < 0 || cell.Y >= _problem.Grid.Height) return false;
+                if (_occupancy.At(cell) == state) return false;
+                _occupancy.Put(cell, state);
+
+                var watchers = _watchers[_problem.Grid.ToIndex(cell.X, cell.Y)];
+                if (watchers is null) return false;
+                foreach (var index in watchers)
+                    if (TabletSimulator.MeetsCriteria(_all[index], _occupancy, _problem.Grid) != _settled.Applied[index])
+                        return true;
+                return false;
+            }
+        }
+
+        /// <summary>
         /// 필수 조건과 레벨별 최대 가치 순으로 탐욕 배정할 입력. 음수·비단조 표도 보존한다.
         /// </summary>
         private sealed class EstimateModel
@@ -849,7 +1038,12 @@ namespace SephPlanner.Core.Solver
             if (positions.Count == 0 || free.Count == 0) return;
 
             var byCell = CharmsByCell(problem, positions);
-            var score = ScoreOf(problem, layout, positions, occupancy, result, byCell);
+            var familiarity = Familiarity(problem, layout);
+            var score = ScoreOf(problem, layout, positions, occupancy, result, byCell, familiarity);
+
+            // 교환마다 새로 짓던 점유와 효과 행렬을 여기 한 벌만 두고 바뀐 칸만 고쳐 쓴다.
+            var scratch = new PolishScratch(problem, layout, options.VerifyIncrementalPolish);
+            scratch.Reset(layout, positions);
 
             for (var pass = 0; pass < options.PolishPasses; pass++)
             {
@@ -867,26 +1061,29 @@ namespace SephPlanner.Core.Solver
                         byCell.TryGetValue(to, out var occupant);
                         Move(positions, byCell, charm, from, occupant, to);
 
-                        var trialOccupancy = OccupancyFrom(layout, positions, problem);
-                        var trialResult = TabletSimulator.Run(WithFixed(problem, layout), trialOccupancy, problem.Grid, problem.FixedEffects);
-                        var trial = ScoreOf(problem, layout, positions, trialOccupancy, trialResult, byCell);
+                        var trialResult = scratch.Swap(from, occupant, to, charm, layout, positions);
+                        var trial = ScoreOf(problem, layout, positions, scratch.Occupancy, trialResult, byCell, familiarity);
                         if (trial.CompareTo(score) > 0)
                         {
-                            occupancy = trialOccupancy;
-                            result = trialResult;
+                            // 호출자에게 넘기는 것은 작업 공간이 아니라 새로 지은 것이다.
+                            occupancy = OccupancyFrom(layout, positions, problem);
+                            result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid, problem.FixedEffects);
+                            scratch.Accept();
                             score = trial;
                             moved = true;
                             from = to;
                             continue;
                         }
                         Move(positions, byCell, charm, to, occupant, from);
+                        scratch.Undo(from, occupant, to, charm);
                     }
                 }
                 if (PolishSupportPairs(problem, layout, free, positions, ref occupancy, ref result, options))
                 {
                     moved = true;
                     byCell = CharmsByCell(problem, positions);
-                    score = ScoreOf(problem, layout, positions, occupancy, result, byCell);
+                    score = ScoreOf(problem, layout, positions, occupancy, result, byCell, familiarity);
+                    scratch.Reset(layout, positions);
                 }
                 if (!moved) return;
             }
@@ -1007,11 +1204,16 @@ namespace SephPlanner.Core.Solver
         /// 견주기만 하면 되므로 격자와 목록까지 짓지 않는다 - 후보 배치마다 도는 자리라 그 할당이
         /// 그대로 GC 부담이 된다.
         /// </summary>
+        /// <param name="layoutFamiliarity">
+        /// <see cref="Familiarity"/>는 배치만 보므로 <see cref="Polish"/>의 교환 수만 번 동안
+        /// 같은 값이다. 미리 잰 것이 있으면 받는다.
+        /// </param>
         private static PlacementQuality ScoreOf(
             PlacementProblem problem, List<TabletPlacement> layout, Dictionary<int, GridPos> positions,
-            GridOccupancy occupancy, SimulationResult result, Dictionary<GridPos, CharmSlot>? neighbors)
+            GridOccupancy occupancy, SimulationResult result, Dictionary<GridPos, CharmSlot>? neighbors,
+            double? layoutFamiliarity = null)
         {
-            var familiarity = Familiarity(problem, layout);
+            var familiarity = layoutFamiliarity ?? Familiarity(problem, layout);
             double score = 0;
             int missing = 0, unpreserved = 0, unheld = 0, waste = 0, unsafeEmpty = 0;
             var combo = problem.PriorityCategories.Count == 0

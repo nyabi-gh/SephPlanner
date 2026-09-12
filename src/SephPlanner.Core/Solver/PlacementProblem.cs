@@ -208,6 +208,13 @@ namespace SephPlanner.Core.Solver
         public CancellationToken Cancellation { get; set; }
 
         /// <summary>
+        /// <see cref="PlacementSolver"/>의 다듬기가 교환마다 고쳐 쓰는 점유·효과 행렬을, 매번
+        /// 통째로 다시 만든 것과 대조할지. <b>테스트 전용이고 기본은 꺼져 있다.</b> 증분 경로가
+        /// 조용히 틀린 점수를 내는 것이 이 최적화의 위험이라, 그 대조를 무작위 판으로 돌린다.
+        /// </summary>
+        internal bool VerifyIncrementalPolish { get; set; }
+
+        /// <summary>
         /// 조언(후보 추천·석판 합성)이 쓰는 탐색 강도. 후보마다 한 번씩 푸는 만큼 기본보다 가볍다.
         ///
         /// <b>두 조언이 반드시 같은 값을 써야 한다.</b> 둘은 <see cref="LayoutCache"/> 하나를

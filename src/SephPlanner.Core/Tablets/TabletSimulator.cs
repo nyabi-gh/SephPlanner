@@ -138,6 +138,21 @@ namespace SephPlanner.Core.Tablets
         public static bool MeetsCriteria(TabletPlacement placement, GridOccupancy occupancy, GridSpec grid) =>
             MeetsCriteria(placement.Prepare(grid), occupancy);
 
+        /// <summary>
+        /// 이 배치의 판정이 <b>점유를 읽는</b> 칸들. <see cref="MeetsCriteria"/>가 보는 것은 이
+        /// 칸들의 점유뿐이라, 여기서 아무것도 달라지지 않으면 판정도 달라지지 않는다. 아티팩트
+        /// 둘을 맞바꾼 뒤 효과 행렬을 다시 만들어야 하는지 가리는 데 쓴다.
+        ///
+        /// <c>Placed</c>와 해석되지 않는 조건은 점유를 안 보므로 빠진다 - 앞엣것은 제 자리만
+        /// 보고 뒤엣것은 언제나 만족이다.
+        /// </summary>
+        internal static void CriteriaCells(TabletPlacement placement, GridSpec grid, List<GridPos> into)
+        {
+            foreach (var cell in placement.Prepare(grid).Criteria)
+                if (cell.Kind == TabletCriteriaKind.AnyItem || cell.Kind == TabletCriteriaKind.OnlyCharm)
+                    into.Add(cell.Position);
+        }
+
         private static bool MeetsCriteria(PreparedTablet placement, GridOccupancy occupancy)
         {
             var cells = placement.Criteria;
