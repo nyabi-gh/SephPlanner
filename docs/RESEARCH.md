@@ -446,11 +446,33 @@ ilspycmd -t GridInventory "<게임경로>/Sephiria_Data/Managed/Assembly-CSharp.
 - 아티팩트의 레벨은 곧 `levelMatrix`의 자기 칸 값이다 (`DisplayedLevel`). 기본값은 0이고
   석판 효과와 인챈트가 더해진 뒤 배수 행렬이 곱해진다.
 - 효과에 실제로 반영되는 레벨은 `min(maxLevel, 레벨)`이다. 상한을 넘겨 올리는 것은 낭비다.
+  `RefreshCharm`이 `limitedEffectEnabledLevel = Mathf.Min(maxLevel, DisplayedLevel)`을 세우고
+  `LevelToIdx`가 한 번 더 자른다. **격자에 찍히는 숫자(`DisplayedLevel`)는 안 잘리므로** 상한
+  위에서도 수는 계속 올라가는 것처럼 보인다.
 - 다음 중 하나라도 걸리면 효과가 꺼진다.
   - `disableMatrix > 0`
   - **레벨이 0 미만** (0은 살아 있다)
   - 자체 조건 불만족. 단 `ignoreCriteriaMatrix > 0`이면 조건을 건너뛴다
   - 무기 연동 아티팩트인데 해당 무기를 들고 있지 않음
+
+### 상한 위로 올려도 이웃이 대신 세어 주지는 않는다 (2026-09-12)
+
+제보로 온 질문이다 — "주변 8칸 아티팩트의 레벨당 피해를 올려 주는 것과 짝지으면, 상한 위로
+찍은 레벨도 그 증폭을 통해 값을 하지 않나?" **안 한다.** 그 아티팩트
+(`Charm_NearLevelDamage`, 조화의 수정 계열)의 `UpdateDamageBonus`가 이렇게 센다.
+
+```csharp
+int num2 = Mathf.Min(charm.DisplayedLevel, charm.maxLevel);
+num += allDamageBonusByLevel.SafeRandomAccess(CurrentLevelToIdx()) * (float)num2;
+```
+
+**이웃의 기여분이 그 이웃 자신의 상한에서 잘린다.** 그래서 상한이 14인 아티팩트를 20레벨 칸에
+두어도 증폭 쪽으로도 14까지만 세어진다. 합계에 `Mathf.FloorToInt`가 걸리는 것까지
+`PlacementSolver.NearLevelDamageWorth`가 그대로 옮겼다 - 우리가 상한 위를 낭비로 세는 것은
+막는 것이 아니라 게임이 안 주는 것을 안 준다고 세는 것이다.
+
+사용자가 "그래도 그 칸에 두고 싶다"고 할 때 쓰는 것은 값어치가 아니라 선호다 - ★ 와
+레벨 제한(`PlanPreferences.LevelCaps`)이 그 자리다.
 
 자체 조건은 `CharmActivateCriteria` 파생 10종이다. `TopInInventory`, `BottomInInventory`,
 `SideEnd`, `Inside`, `Outlined`는 위치만 보고, `BothSideCharm`, `BothSidesAreEmpty`,
