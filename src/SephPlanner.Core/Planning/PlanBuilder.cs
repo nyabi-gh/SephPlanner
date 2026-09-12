@@ -31,6 +31,20 @@ namespace SephPlanner.Core.Planning
         UnknownItems,
     }
 
+    /// <summary>
+    /// 1단계(배치)가 2단계(조언)에게 넘기는 중간물.
+    ///
+    /// 조언은 배치가 세운 <see cref="PlacementProblem"/> 을 그대로 쓴다. 그것을 다시 짓게 하면
+    /// 가방을 통째로 다시 읽어 슬롯을 만드는 일을 조언마다 되풀이하게 된다. 나머지(최선 배치·
+    /// 검증·무기·값어치)는 <see cref="Plan"/> 과 설정에 이미 있으므로 여기 담지 않는다.
+    /// </summary>
+    internal sealed class PlacementWork
+    {
+        public PlacementWork(PlacementProblem problem) => Problem = problem;
+
+        public PlacementProblem Problem { get; }
+    }
+
     /// <summary>스냅샷과 카탈로그를 합쳐 현재 배치를 채점하고 더 나은 배치를 찾는다.</summary>
     public static class PlanBuilder
     {
@@ -76,6 +90,24 @@ namespace SephPlanner.Core.Planning
             out PlanBlocker blocker, Plan? previous = null, LayoutCache? layouts = null,
             CancellationToken cancellation = default)
         {
+            layouts ??= new LayoutCache();
+            var placement = BuildPlacement(snapshot, catalog, preferences, out blocker, previous, layouts, cancellation);
+            return placement is null ? null : BuildAdvice(placement, snapshot, catalog, preferences, layouts, cancellation);
+        }
+
+        /// <summary>
+        /// 1단계. 배치와 그것을 설명하는 것까지만 만든다 - 조언 셋은 비어 있고
+        /// <see cref="Plan.AdviceStatus"/> 가 그것이 "없음" 인지 "아직" 인지를 말한다.
+        ///
+        /// <b>이것이 사용자가 기다리는 시간이다.</b> 조언은 배치보다 몇 배 비싼데 배치와 한 덩어리로
+        /// 묶여 있어서, 판이 조금만 커도 다 끝날 때까지 화면이 갱신되지 않았다. 게다가 세피라이트
+        /// 창을 여닫기만 해도 조언 쪽 지문이 바뀌어 그 덩어리가 통째로 취소됐다.
+        /// </summary>
+        public static Plan? BuildPlacement(
+            GameSnapshot snapshot, ICatalog catalog, PlanPreferences? preferences,
+            out PlanBlocker blocker, Plan? previous = null, LayoutCache? layouts = null,
+            CancellationToken cancellation = default)
+        {
             try
             {
                 return Attempt(snapshot, catalog, preferences, out blocker, previous, layouts, cancellation);
@@ -85,6 +117,79 @@ namespace SephPlanner.Core.Planning
                 blocker = PlanBlocker.None;
                 return null;
             }
+        }
+
+        /// <summary>
+        /// 2단계. 1단계가 낸 배치에 합성·후보·제거 조언을 붙인 <b>새 계획</b>을 돌려준다.
+        /// 넘긴 계획은 건드리지 않는다 - 이미 게시돼 화면이 읽고 있을 수 있다.
+        ///
+        /// 취소되면 <c>null</c> 이다. 그때 배치는 그대로 살아 있고 조언만 다시 풀면 된다.
+        /// </summary>
+        public static Plan? BuildAdvice(
+            Plan placement, GameSnapshot snapshot, ICatalog catalog, PlanPreferences? preferences,
+            LayoutCache? layouts = null, CancellationToken cancellation = default)
+        {
+            if (placement is null) throw new ArgumentNullException(nameof(placement));
+            preferences ??= PlanPreferences.None;
+
+            // 1단계가 만든 계획이 아니면 붙일 것이 없다. 실행기에 다른 조립기를 끼운 경우가 그렇다.
+            if (placement.Work is null) return placement;
+            if (!preferences.Recommendations)
+            {
+                return placement.AdviceStatus == AdviceStatus.NotRequested && placement.Offers.Count == 0 &&
+                       placement.Mixes.Count == 0 && placement.Discards.Count == 0 && placement.SkippedOffers == 0
+                    ? placement
+                    : placement.WithAdvice(
+                        new List<OfferAdvice>(), new List<MixAdvice>(), new List<DiscardAdvice>(),
+                        0, AdviceStatus.NotRequested);
+            }
+
+            try
+            {
+                return Advise(placement, snapshot, catalog, preferences, layouts, cancellation);
+            }
+            catch (OperationCanceledException)
+            {
+                return null;
+            }
+        }
+
+        private static Plan Advise(
+            Plan placement, GameSnapshot snapshot, ICatalog catalog, PlanPreferences preferences,
+            LayoutCache? layouts, CancellationToken cancellation)
+        {
+            var problem = placement.Work!.Problem;
+            var values = preferences.CharmValues;
+            layouts ??= new LayoutCache();
+            layouts.BeginPlan();
+
+            var mixes = new List<MixAdvice>();
+
+            // 합성기를 이미 썼으면 이 층에서는 더 권할 것이 없다.
+            if (snapshot.Mixer is { Used: false } mixer)
+            {
+                mixes = TabletMixAdvisor.Rank(
+                    problem, catalog, mixer.Cost, snapshot.Run?.Gold ?? int.MaxValue,
+                    layouts: layouts, cancellation: cancellation);
+            }
+
+            var candidates = Candidates(snapshot, catalog, placement.ExpectedWeaponId, out var skippedOffers);
+            var offers = OfferAdvisor.Rank(
+                problem, candidates, snapshot.Run?.Gold ?? int.MaxValue,
+                snapshot.Inventory?.ComboCounts ?? new Dictionary<string, int>(), catalog.Combo,
+                preferences.PriorityCategories, preferences.PresetCharms, values, layouts, cancellation);
+
+            // 후보마다 이미 배치를 다 풀어 두었다. 그 결과를 버리지 않고 화면이 쓸 모양으로
+            // 옮겨 두면, 증가분이라는 숫자 하나 대신 무엇이 어떻게 달라지는지 보여줄 수 있다.
+            // 기준 배치는 조언이 이미 푼 것을 그대로 받는다 - 여기서 다시 풀지 않는다.
+            if (offers.Count > 0)
+                FillPreviews(offers, problem, layouts.Baseline(problem, SolverOptions.ForAdvice(cancellation)));
+
+            var discards = placement.Verification.Passed
+                ? DiscardAdvisor.Rank(problem, placement.Best, layouts, cancellation)
+                : new List<DiscardAdvice>();
+
+            return placement.WithAdvice(offers, mixes, discards, skippedOffers, AdviceStatus.Ready);
         }
 
         private static Plan? Attempt(
@@ -224,34 +329,6 @@ namespace SephPlanner.Core.Planning
             // 조건부 배정은 수렴하지 않을 수 있으므로 현재 배치도 같은 우선순위로 비교한다.
             if (PriorityComboPlacement.Compare(best, current) < 0) best = current;
 
-            var offers = new List<OfferAdvice>();
-            var mixes = new List<MixAdvice>();
-            var skippedOffers = 0;
-            var discards = new List<DiscardAdvice>();
-            if (preferences.Recommendations)
-            {
-                // 합성기를 이미 썼으면 이 층에서는 더 권할 것이 없다.
-                if (snapshot.Mixer is { Used: false } mixer)
-                {
-                    mixes = TabletMixAdvisor.Rank(
-                        problem, catalog, mixer.Cost, snapshot.Run?.Gold ?? int.MaxValue,
-                        layouts: layouts, cancellation: cancellation);
-                }
-
-                var candidates = Candidates(snapshot, catalog, weapon, out skippedOffers);
-                offers = OfferAdvisor.Rank(
-                    problem, candidates, snapshot.Run?.Gold ?? int.MaxValue,
-                    inventory.ComboCounts, catalog.Combo, preferences.PriorityCategories,
-                    preferences.PresetCharms, values, layouts, cancellation);
-
-                // 후보마다 이미 배치를 다 풀어 두었다. 그 결과를 버리지 않고 화면이 쓸 모양으로
-                // 옮겨 두면, 증가분이라는 숫자 하나 대신 무엇이 어떻게 달라지는지 보여줄 수 있다.
-                // 기준 배치는 조언이 이미 푼 것을 그대로 받는다 - 여기서 다시 풀지 않는다.
-                if (offers.Count > 0)
-                    FillPreviews(offers, problem, layouts.Baseline(problem, SolverOptions.ForAdvice(cancellation)));
-                if (verification.Passed) discards = DiscardAdvisor.Rank(problem, best, layouts, cancellation);
-            }
-
             var moves = Moves(problem, current, best, out var manualMovesAvailable);
             var unapprovedDeactivation = !ActivationPolicy.AllowsTransition(current, best);
             var targets = Targets(problem, best);
@@ -293,10 +370,8 @@ namespace SephPlanner.Core.Planning
                 InventoryHeight = inventory.Height,
                 InventoryStorage = inventory.Storage,
                 ExpectedWeaponId = weapon,
-                Offers = offers,
-                Mixes = mixes,
-                Discards = discards,
-                SkippedOffers = skippedOffers,
+                AdviceStatus = preferences.Recommendations ? AdviceStatus.Pending : AdviceStatus.NotRequested,
+                Work = new PlacementWork(problem),
                 Names = NamesByCell(problem, best),
                 Charms = CharmsByCell(problem, best),
                 Targets = targets,

@@ -49,6 +49,10 @@ public sealed class PlanReplayTests : IDisposable
         Assert.True(first.Verification.Passed);
         Assert.NotEmpty(first.Targets);
         var secondSnapshot = RoundTrip(snapshot);
+
+        // 후보만 바꾸면 배치는 다시 풀리지 않으므로 앵커도 그대로다(그것이 2단계 게시의 요점이다).
+        // 앵커까지 보려면 가방도 함께 달라져야 한다.
+        secondSnapshot.Inventory!.Items[0].Enchant = 4;
         secondSnapshot.Offers.Add(new OfferedItem { DefinitionId = 4, Kind = "charm", Price = 2 });
         runner.Submit(secondSnapshot, preferences, "saved-catalog");
         Await(runner);
@@ -138,6 +142,9 @@ public sealed class PlanReplayTests : IDisposable
         Await(runner);
         var changed = RoundTrip(snapshot);
         changed.Run!.Gold = 0;
+
+        // 배치가 다시 풀려야 이 조립기가 불린다. 소지금과 후보는 조언 쪽 지문에만 있다.
+        changed.Inventory!.Items[0].Enchant = 4;
         changed.Offers.Add(new OfferedItem { Kind = "charm", DefinitionId = 4, Price = 1 });
         runner.Submit(changed, preferences, "saved");
         Assert.True(SpinWait.SpinUntil(() => runner.State.Error is not null, TimeSpan.FromSeconds(10)));
@@ -360,8 +367,12 @@ public sealed class PlanReplayTests : IDisposable
     private static T RoundTrip<T>(T input) =>
         System.Text.Json.JsonSerializer.Deserialize<T>(JsonConvert.SerializeObject(input))!;
 
+    /// <summary>배치와 조언 둘 다 끝날 때까지. 재현 자료는 조언까지 붙은 계획을 잡아야 한다.</summary>
     private static void Await(PlanRunner runner) =>
-        Assert.True(SpinWait.SpinUntil(() => runner.State.IsCurrent, TimeSpan.FromSeconds(10)), runner.State.Error);
+        Assert.True(
+            SpinWait.SpinUntil(
+                () => runner.State.IsCurrent && runner.State.AdviceIsCurrent, TimeSpan.FromSeconds(10)),
+            runner.State.Error ?? runner.State.AdviceError);
 
     private static (Catalog Catalog, GameSnapshot Snapshot, PlanPreferences Preferences) Inputs()
     {

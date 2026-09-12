@@ -21,8 +21,10 @@ public static class PlanReproduce
             if (replay.CoreBuild != PlanReplay.CurrentCoreBuild)
                 Console.WriteLine($"계산 코드 차이: 저장={replay.CoreBuild}, 현재={PlanReplay.CurrentCoreBuild}");
             if (allowModelChange) Remeasure(replay);
+            if (!replay.AdviceComplete)
+                Console.WriteLine("조언이 아직 붙지 않은 계획을 잡은 자료입니다. 배치만 견줍니다.");
             var plan = replay.Rebuild(allowModelChange);
-            var differences = replay.Expected!.Differences(ReplayResult.From(plan));
+            var differences = replay.Expected!.Differences(ReplayResult.From(plan), replay.AdviceComplete);
             Console.WriteLine($"점수 {plan.Current.Score:0.########} → {plan.Best.Score:0.########}");
             foreach (var difference in differences) Console.WriteLine(difference);
             Console.WriteLine(differences.Count == 0

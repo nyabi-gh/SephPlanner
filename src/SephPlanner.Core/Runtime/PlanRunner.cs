@@ -9,25 +9,71 @@ namespace SephPlanner.Core.Runtime
         GameSnapshot snapshot, ICatalog catalog, PlanPreferences preferences,
         out PlanBlocker blocker, Plan? previous, LayoutCache layouts, CancellationToken cancellation);
 
+    /// <summary>
+    /// 2단계. 게시된 배치에 조언을 붙인 <b>새 계획</b>을 낸다. 취소되면 <c>null</c> 이고 그때
+    /// 배치는 그대로 살아 있다.
+    /// </summary>
+    public delegate Plan? PlanAdviceOperation(
+        Plan placement, GameSnapshot snapshot, ICatalog catalog, PlanPreferences preferences,
+        LayoutCache layouts, CancellationToken cancellation);
+
     public sealed class PlanRunState
     {
         public Plan? Latest { get; set; }
         public string? Error { get; set; }
+
+        /// <summary>
+        /// 조언 단계에서 난 오류. 배치는 멀쩡하므로 <see cref="Error"/> 와 나눈다 - 조언 하나가
+        /// 실패했다고 자동 배치까지 막으면 고칠 수 있는 것을 못 고치게 된다.
+        /// </summary>
+        public string? AdviceError { get; set; }
         public PlanBlocker Blocker { get; set; }
         public long RequestedGeneration { get; set; }
         public long PublishedGeneration { get; set; }
         public bool IsBusy { get; set; }
         public bool HasPending { get; set; }
 
+        /// <summary>조언이 아직 도는 중이거나 다시 풀 차례를 기다리고 있다.</summary>
+        public bool AdviceBusy { get; set; }
+
+        /// <summary>게시된 계획의 조언이 지금 판의 것이다.</summary>
+        public bool AdviceIsCurrent { get; set; }
+
+        /// <summary>
+        /// <b>배치 기준이다.</b> 후보가 바뀌어 조언만 다시 푸는 동안에도 배치는 최신이다 -
+        /// 그 둘을 한 깃발로 묶어 두었더니 세피라이트 창을 여닫는 것만으로 화면이 내내
+        /// "갱신 중" 이었다.
+        /// </summary>
         public bool IsCurrent => Error is null && RequestedGeneration > 0 &&
                                  PublishedGeneration == RequestedGeneration;
     }
 
+    /// <summary>
+    /// 배치와 조언을 따로 풀어 따로 게시한다.
+    ///
+    /// <b>왜 둘인가.</b> 계획 지문에는 후보·합성기·소지금이 들어 있어서 세피라이트 보상 창을
+    /// 여닫기만 해도 지문이 바뀐다. 한 덩어리로 풀던 때는 그때마다 <b>배치까지</b> 취소하고 처음부터
+    /// 다시 풀었고, 조언이 배치보다 몇 배 비싸므로 창을 5초마다 여닫는 층에서는 어느 요청도 끝을
+    /// 보지 못했다(제보 <c>4c1efa35</c>: 게시 199 / 요청 204). 배치 지문이 그대로면 배치는 이미
+    /// 답을 알고 있으므로, 조언만 다시 푼다.
+    ///
+    /// <b>한 번에 한 작업만 돈다.</b> <see cref="LayoutCache"/> 는 스레드 안전하지 않다. 다음에
+    /// 무엇을 할지는 대기열이 아니라 세대 번호가 정하고(<see cref="StartNextLocked"/>), 배치가
+    /// 조언보다 언제나 먼저다.
+    /// </summary>
     public sealed class PlanRunner : IDisposable
     {
         private sealed class Request : IDisposable
         {
+            /// <summary>조언 단계인가. 아니면 배치 단계다.</summary>
+            public bool Advice;
+
+            /// <summary>이 단계의 요청 세대.</summary>
             public long Generation;
+
+            /// <summary>조언이 붙을 계획. 배치 단계에서는 <c>null</c> 이다.</summary>
+            public Plan? Placement;
+
             public GameSnapshot Snapshot = new GameSnapshot();
             public PlanPreferences Preferences = PlanPreferences.None;
             public string Fingerprint = "";
@@ -37,7 +83,7 @@ namespace SephPlanner.Core.Runtime
             public Plan? Previous;
 
             /// <summary>요청이 들어온 때. 여기서 게시까지가 사용자가 기다리는 시간이다.</summary>
-            public long SubmittedAt = SolveClock.Now;
+            public long RequestedAt;
 
             /// <summary>
             /// 이 요청이 낡았다고 알리는 자리. 뒤에 요청이 오면 지금 도는 풀이의 답은 어차피
@@ -55,6 +101,7 @@ namespace SephPlanner.Core.Runtime
         private readonly object _gate = new object();
         private readonly ICatalog _catalog;
         private readonly PlanBuildOperation _build;
+        private readonly PlanAdviceOperation _advise;
         private readonly TimeSpan _retryDelay;
 
         /// <summary>
@@ -67,16 +114,30 @@ namespace SephPlanner.Core.Runtime
         private string _layoutsContext = "";
 
         private Request? _running;
-        private Request? _pending;
         private Plan? _latest;
         private GameSnapshot? _replaySnapshot;
         private PlanPreferences? _replayPreferences;
         private System.Collections.Generic.List<PlanTarget>? _replayPreviousTargets;
         private string? _error;
+        private string? _adviceError;
         private PlanBlocker _blocker;
-        private long _requestedGeneration;
-        private long _publishedGeneration;
-        private string _requestedFingerprint = "";
+
+        /// <summary>마지막으로 제출된 판. 조언 단계는 배치 때의 것이 아니라 이것으로 푼다.</summary>
+        private GameSnapshot? _snapshot;
+        private PlanPreferences _preferences = PlanPreferences.None;
+        private string _catalogGeneration = "";
+        private string _contextFingerprint = "";
+        private string _placementFingerprint = "";
+        private string _fullFingerprint = "";
+
+        private long _placementGeneration;
+        private long _placementStarted;
+        private long _placementPublished;
+        private long _placementRequestedAt;
+        private long _adviceGeneration;
+        private long _adviceStarted;
+        private long _advicePublished;
+
         private DateTime _retryAfterUtc;
         private bool _disposed;
 
@@ -93,10 +154,13 @@ namespace SephPlanner.Core.Runtime
         {
         }
 
-        public PlanRunner(ICatalog catalog, PlanBuildOperation build, TimeSpan? retryDelay = null)
+        public PlanRunner(
+            ICatalog catalog, PlanBuildOperation build, TimeSpan? retryDelay = null,
+            PlanAdviceOperation? advise = null)
         {
             _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
             _build = build ?? throw new ArgumentNullException(nameof(build));
+            _advise = advise ?? Advise;
             _retryDelay = retryDelay ?? TimeSpan.FromSeconds(1);
         }
 
@@ -110,11 +174,15 @@ namespace SephPlanner.Core.Runtime
                     {
                         Latest = _latest,
                         Error = _error,
+                        AdviceError = _adviceError,
                         Blocker = _blocker,
-                        RequestedGeneration = _requestedGeneration,
-                        PublishedGeneration = _publishedGeneration,
+                        RequestedGeneration = _placementGeneration,
+                        PublishedGeneration = _placementPublished,
                         IsBusy = _running is not null,
-                        HasPending = _pending is not null,
+                        HasPending = PlacementNeededLocked() || AdviceNeededLocked(),
+                        AdviceBusy = _running is { Advice: true } || AdviceNeededLocked(),
+                        AdviceIsCurrent = _latest is not null && _adviceError is null &&
+                                          _advicePublished == _adviceGeneration,
                     };
                 }
             }
@@ -137,13 +205,19 @@ namespace SephPlanner.Core.Runtime
                         WorstPublishDelayMs = _worstPublishDelayMs,
                         WorstPublishRun = _worstPublishRun,
                         Published = _published,
-                        Backlog = _requestedGeneration - _publishedGeneration,
+                        Backlog = _placementGeneration - _placementPublished,
                         WorstBacklog = _worstBacklog,
                     };
                 }
             }
         }
 
+        /// <summary>
+        /// 지금 판을 제출한다. 돌려주는 것은 <b>배치</b> 요청 세대다.
+        ///
+        /// 배치 지문이 바뀌었으면 둘 다 새로 풀고, 전체 지문만 바뀌었으면(후보·합성기·소지금)
+        /// 조언만 다시 푼다.
+        /// </summary>
         public long Submit(
             GameSnapshot snapshot, PlanPreferences preferences, string catalogGeneration)
         {
@@ -157,51 +231,84 @@ namespace SephPlanner.Core.Runtime
             lock (_gate)
             {
                 if (_disposed) throw new ObjectDisposedException(nameof(PlanRunner));
-                var sameRequest = fingerprint == _requestedFingerprint;
-                if (sameRequest && (_running is not null || _pending is not null ||
-                                    _error is null && _publishedGeneration == _requestedGeneration))
-                    return _requestedGeneration;
-                if (sameRequest && DateTime.UtcNow < _retryAfterUtc) return _requestedGeneration;
 
-                var request = new Request
+                // 조언 단계가 쓸 판이다. 배치는 그대로인데 후보만 바뀐 경우, 조언은 배치 때의
+                // 낡은 스냅샷이 아니라 방금 들어온 것으로 풀어야 한다.
+                _snapshot = snapshot;
+                _preferences = preferences;
+                _catalogGeneration = catalogGeneration;
+                _contextFingerprint = contextFingerprint;
+
+                if (placementFingerprint != _placementFingerprint)
                 {
-                    Generation = ++_requestedGeneration,
-                    Snapshot = snapshot,
-                    Preferences = preferences,
-                    Fingerprint = fingerprint,
-                    PlacementFingerprint = placementFingerprint,
-                    PlanningContextFingerprint = contextFingerprint,
-                    CatalogGeneration = catalogGeneration,
-                    Previous = _latest,
-                };
-                _requestedFingerprint = fingerprint;
-                _error = null;
-
-                var backlog = _requestedGeneration - _publishedGeneration;
-                if (backlog > _worstBacklog) _worstBacklog = backlog;
-
-                if (_running is not null)
-                {
-                    // 돌고 있는 풀이의 답은 이제 쓰이지 않는다. 실측에서 한 번이 1초, 할당
-                    // 2GB 까지 갔으므로 그냥 끝까지 두면 그만큼을 버리는 셈이다.
-                    _running.Cancellation.Cancel();
-
-                    // 시작도 못 한 채 밀려난 요청. 여기서 정리하지 않으면 그대로 새어 나간다.
-                    _pending?.Dispose();
-                    _pending = request;
+                    _placementFingerprint = placementFingerprint;
+                    _fullFingerprint = fingerprint;
+                    NewPlacementLocked();
                 }
-                else
+                else if (fingerprint != _fullFingerprint)
                 {
-                    StartLocked(request);
+                    _fullFingerprint = fingerprint;
+                    NewAdviceLocked();
+
+                    // 배치는 그대로다. 도는 것이 조언일 때만 멈춘다.
+                    if (_running is { Advice: true }) _running.Cancellation.Cancel();
                 }
-                return request.Generation;
+                else if (_error is not null && _running is null &&
+                         !PlacementNeededLocked() && DateTime.UtcNow >= _retryAfterUtc)
+                {
+                    // 같은 판인데 앞선 계산이 실패했다. 물러섰다가 다시 해 본다.
+                    NewPlacementLocked();
+                }
+
+                StartNextLocked();
+                return _placementGeneration;
             }
         }
+
+        private void NewPlacementLocked()
+        {
+            _placementGeneration++;
+            _placementRequestedAt = SolveClock.Now;
+            _error = null;
+            NewAdviceLocked();
+
+            // 돌고 있는 풀이의 답은 이제 쓰이지 않는다. 실측에서 한 번이 1초, 할당 2GB 까지
+            // 갔으므로 그냥 끝까지 두면 그만큼을 버리는 셈이다.
+            _running?.Cancellation.Cancel();
+
+            var backlog = _placementGeneration - _placementPublished;
+            if (backlog > _worstBacklog) _worstBacklog = backlog;
+        }
+
+        private void NewAdviceLocked()
+        {
+            _adviceGeneration++;
+            _adviceError = null;
+        }
+
+        /// <summary>배치를 다시 풀어야 하는데 아직 시작하지 않았다.</summary>
+        private bool PlacementNeededLocked() =>
+            !_disposed && _snapshot is not null && _placementGeneration != _placementStarted;
+
+        /// <summary>
+        /// 지금 판의 배치가 게시돼 있는데 거기 붙은 조언이 낡았다. 낡은 배치(다시 푸는 중이거나
+        /// 앞선 계산이 실패한 경우)에는 조언을 붙이지 않는다 - 새 판의 조언을 옛 배치에 얹으면
+        /// 화면이 섞인 답을 보여 준다.
+        /// </summary>
+        private bool AdviceNeededLocked() =>
+            !_disposed && _error is null && _latest is not null &&
+            _latest.RequestGeneration == _placementGeneration &&
+            _adviceGeneration != _adviceStarted;
 
         private static Plan? Build(
             GameSnapshot snapshot, ICatalog catalog, PlanPreferences preferences,
             out PlanBlocker blocker, Plan? previous, LayoutCache layouts, CancellationToken cancellation) =>
-            PlanBuilder.Build(snapshot, catalog, preferences, out blocker, previous, layouts, cancellation);
+            PlanBuilder.BuildPlacement(snapshot, catalog, preferences, out blocker, previous, layouts, cancellation);
+
+        private static Plan? Advise(
+            Plan placement, GameSnapshot snapshot, ICatalog catalog, PlanPreferences preferences,
+            LayoutCache layouts, CancellationToken cancellation) =>
+            PlanBuilder.BuildAdvice(placement, snapshot, catalog, preferences, layouts, cancellation);
 
         public PlanReplay? CaptureReplay()
         {
@@ -216,11 +323,15 @@ namespace SephPlanner.Core.Runtime
                     CatalogVersion = PlannerData.CatalogVersion,
                     CoreBuild = PlanReplay.CurrentCoreBuild,
                     CapturedUtc = DateTime.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
-                    RequestedGeneration = _requestedGeneration,
+                    RequestedGeneration = _placementGeneration,
                     PublishedGeneration = _latest.RequestGeneration,
                     LatestError = _error ?? "",
                     CatalogGeneration = _latest.CatalogGeneration,
                     RequestFingerprint = _latest.RequestFingerprint,
+
+                    // 조언이 아직 안 붙은 계획을 잡았으면 기준 결과에서 조언을 견주지 않는다.
+                    // 재현은 언제나 조언까지 풀므로, 그대로 견주면 없는 것과 있는 것이 붙는다.
+                    AdviceComplete = _latest.AdviceStatus != AdviceStatus.Pending,
                     Snapshot = _replaySnapshot,
                     Preferences = ReplayPreferences.From(_replayPreferences),
                     Catalog = catalog.Export(),
@@ -238,16 +349,63 @@ namespace SephPlanner.Core.Runtime
                 if (_disposed) return;
                 _disposed = true;
                 _running?.Cancellation.Cancel();
-                _pending?.Dispose();
-                _pending = null;
                 _latest = null;
+                _snapshot = null;
                 _replaySnapshot = null;
                 _replayPreferences = null;
                 _replayPreviousTargets = null;
                 _layouts = new LayoutCache();
                 _layoutsContext = "";
-                _publishedGeneration = 0;
+                _placementPublished = 0;
+                _advicePublished = 0;
             }
+        }
+
+        /// <summary>
+        /// 다음에 할 일 하나를 시작한다. <b>배치가 조언보다 먼저다</b> - 배치가 낡았으면 그
+        /// 배치에 붙일 조언도 낡았다.
+        ///
+        /// 취소는 협조적이라 취소를 걸어도 그 스레드가 아직 캐시를 만지는 중일 수 있다. 그래서
+        /// 다음 작업은 여기서만 시작한다 - 부를 때 <c>_running</c> 이 비어 있다는 것이 곧 앞
+        /// 작업이 실제로 빠져나왔다는 뜻이다.
+        /// </summary>
+        private void StartNextLocked()
+        {
+            if (_running is not null) return;
+
+            if (PlacementNeededLocked())
+            {
+                _placementStarted = _placementGeneration;
+                StartLocked(new Request
+                {
+                    Generation = _placementGeneration,
+                    Snapshot = _snapshot!,
+                    Preferences = _preferences,
+                    Fingerprint = _fullFingerprint,
+                    PlacementFingerprint = _placementFingerprint,
+                    PlanningContextFingerprint = _contextFingerprint,
+                    CatalogGeneration = _catalogGeneration,
+                    Previous = _latest,
+                    RequestedAt = _placementRequestedAt,
+                });
+                return;
+            }
+
+            if (!AdviceNeededLocked()) return;
+
+            _adviceStarted = _adviceGeneration;
+            StartLocked(new Request
+            {
+                Advice = true,
+                Generation = _adviceGeneration,
+                Placement = _latest,
+                Snapshot = _snapshot!,
+                Preferences = _preferences,
+                Fingerprint = _fullFingerprint,
+                PlacementFingerprint = _placementFingerprint,
+                PlanningContextFingerprint = _contextFingerprint,
+                CatalogGeneration = _catalogGeneration,
+            });
         }
 
         private void StartLocked(Request request)
@@ -275,16 +433,25 @@ namespace SephPlanner.Core.Runtime
             var startedAt = SolveClock.Now;
             try
             {
-                plan = _build(
-                    request.Snapshot, _catalog, request.Preferences, out blocker, request.Previous,
-                    layouts, request.Cancellation.Token);
-                if (plan is not null)
+                if (request.Advice)
                 {
-                    plan.RequestGeneration = request.Generation;
-                    plan.RequestFingerprint = request.Fingerprint;
-                    plan.PlacementFingerprint = request.PlacementFingerprint;
-                    plan.PlanningContextFingerprint = request.PlanningContextFingerprint;
-                    plan.CatalogGeneration = request.CatalogGeneration;
+                    plan = _advise(
+                        request.Placement!, request.Snapshot, _catalog, request.Preferences, layouts,
+                        request.Cancellation.Token);
+                }
+                else
+                {
+                    plan = _build(
+                        request.Snapshot, _catalog, request.Preferences, out blocker, request.Previous,
+                        layouts, request.Cancellation.Token);
+                    if (plan is not null)
+                    {
+                        plan.RequestGeneration = request.Generation;
+                        plan.RequestFingerprint = request.Fingerprint;
+                        plan.PlacementFingerprint = request.PlacementFingerprint;
+                        plan.PlanningContextFingerprint = request.PlanningContextFingerprint;
+                        plan.CatalogGeneration = request.CatalogGeneration;
+                    }
                 }
             }
             catch (Exception ex)
@@ -297,56 +464,84 @@ namespace SephPlanner.Core.Runtime
 
             lock (_gate)
             {
-                // 취소된 요청의 결과는 도중에 그만둔 것이라 쓸 수 없다. 세대 검사만으로도 걸리지만,
-                // 반쪽짜리 계획을 최신이라고 게시하는 일만은 확실히 막아 둔다.
-                var usable = !request.Cancellation.IsCancellationRequested &&
-                             request.Generation == _requestedGeneration;
-                _placementStat.Add(elapsedMs, !usable);
-                if (usable && failure is null)
-                {
-                    _published++;
-                    _publishDelayMs = SolveClock.MsSince(request.SubmittedAt);
-                    if (_publishDelayMs > _worstPublishDelayMs)
-                    {
-                        _worstPublishDelayMs = _publishDelayMs;
-                        _worstPublishRun = _published;
-                    }
-                }
-
-                if (usable)
-                {
-                    _publishedGeneration = request.Generation;
-                    if (failure is null)
-                    {
-                        _latest = plan;
-                        _replaySnapshot = request.Snapshot;
-                        _replayPreferences = request.Preferences;
-                        _replayPreviousTargets = new System.Collections.Generic.List<PlanTarget>(
-                            request.Previous?.Targets ?? new System.Collections.Generic.List<PlanTarget>());
-                        _blocker = blocker;
-                        _error = null;
-                    }
-                    else
-                    {
-                        _error = failure.Message;
-                        _blocker = PlanBlocker.None;
-                        _retryAfterUtc = DateTime.UtcNow + _retryDelay;
-                    }
-                }
+                if (request.Advice) FinishAdviceLocked(request, plan, failure, elapsedMs);
+                else FinishPlacementLocked(request, plan, blocker, failure, elapsedMs);
 
                 _running = null;
-                if (_pending is not null)
-                {
-                    var next = _pending;
-                    _pending = null;
-                    next.Previous = _latest;
-                    StartLocked(next);
-                }
+                StartNextLocked();
 
                 // 다 쓴 요청이다. 자물쇠 안이라 취소를 거는 쪽과 겹치지 않고, _running 에서
                 // 이미 떼어 냈으므로 이제 아무도 닿지 못한다.
                 request.Dispose();
             }
+        }
+
+        private void FinishPlacementLocked(
+            Request request, Plan? plan, PlanBlocker blocker, Exception? failure, double elapsedMs)
+        {
+            // 취소된 요청의 결과는 도중에 그만둔 것이라 쓸 수 없다. 세대 검사만으로도 걸리지만,
+            // 반쪽짜리 계획을 최신이라고 게시하는 일만은 확실히 막아 둔다.
+            var usable = !request.Cancellation.IsCancellationRequested &&
+                         request.Generation == _placementGeneration;
+            _placementStat.Add(elapsedMs, !usable);
+            if (!usable) return;
+
+            _placementPublished = request.Generation;
+            if (failure is not null)
+            {
+                _error = failure.Message;
+                _blocker = PlanBlocker.None;
+                _retryAfterUtc = DateTime.UtcNow + _retryDelay;
+                return;
+            }
+
+            _latest = plan;
+            _replaySnapshot = request.Snapshot;
+            _replayPreferences = request.Preferences;
+            _replayPreviousTargets = new System.Collections.Generic.List<PlanTarget>(
+                request.Previous?.Targets ?? new System.Collections.Generic.List<PlanTarget>());
+            _blocker = blocker;
+            _error = null;
+
+            // 새 배치의 조언은 아직 아무것도 아니다. 0 은 어느 요청 세대와도 같지 않다.
+            _advicePublished = 0;
+
+            _published++;
+            _publishDelayMs = SolveClock.MsSince(request.RequestedAt);
+            if (_publishDelayMs > _worstPublishDelayMs)
+            {
+                _worstPublishDelayMs = _publishDelayMs;
+                _worstPublishRun = _published;
+            }
+        }
+
+        private void FinishAdviceLocked(Request request, Plan? plan, Exception? failure, double elapsedMs)
+        {
+            // 붙일 배치가 그 사이에 바뀌었으면 이 조언은 남의 판에 대한 답이다.
+            var usable = !request.Cancellation.IsCancellationRequested &&
+                         request.Generation == _adviceGeneration &&
+                         ReferenceEquals(_latest, request.Placement);
+            _adviceStat.Add(elapsedMs, !usable);
+            if (!usable) return;
+
+            if (failure is not null)
+            {
+                // 배치는 멀쩡하다. 조언 칸만 낡은 채로 두고 그 사실을 적는다.
+                _adviceError = failure.Message;
+                return;
+            }
+
+            // 취소로 돌아온 null 은 여기까지 오지 않는다(위의 usable 검사). 그래도 조립기가
+            // 아무것도 내놓지 않으면 배치를 그대로 둔다.
+            if (plan is null) return;
+
+            // 재현 자료는 조언까지 포함해 다시 풀리므로, 조언이 쓴 판이 곧 그 자료의 판이다.
+            // 후보만 바뀐 경우 그 판은 배치 때의 것이 아니라 더 뒤의 것이고, 전체 지문도 그쪽이다.
+            plan.RequestFingerprint = request.Fingerprint;
+            _replaySnapshot = request.Snapshot;
+            _replayPreferences = request.Preferences;
+            _latest = plan;
+            _advicePublished = request.Generation;
         }
     }
 }

@@ -134,8 +134,138 @@ public class PlanRunnerTests
         Assert.Equal(3, calls);
     }
 
+    /// <summary>
+    /// 추천을 껐다 켜는 것은 조언 쪽 이야기다. 가방이 그대로면 배치는 이미 답을 알고 있으므로
+    /// 다시 풀지 않고 조언만 새로 붙는다.
+    /// </summary>
     [Fact]
-    public void RecommendationChangeCreatesANewGeneration()
+    public void RecommendationChangeSolvesOnlyTheAdvice()
+    {
+        var builds = 0;
+        var advices = 0;
+        PlanBuildOperation build = (
+            GameSnapshot _, ICatalog _, PlanPreferences _,
+            out PlanBlocker blocker, Plan? _, LayoutCache _2, CancellationToken _3) =>
+        {
+            blocker = PlanBlocker.None;
+            Interlocked.Increment(ref builds);
+            return new Plan();
+        };
+        PlanAdviceOperation advise = (
+            Plan placement, GameSnapshot _, ICatalog _, PlanPreferences _,
+            LayoutCache _2, CancellationToken _3) =>
+        {
+            Interlocked.Increment(ref advices);
+            return placement;
+        };
+        var runner = new PlanRunner(EmptyCatalog, build, TimeSpan.Zero, advise);
+
+        runner.Submit(Snapshot(1), new PlanPreferences { Recommendations = true }, "catalog");
+        Assert.True(SpinWait.SpinUntil(
+            () => runner.State.IsCurrent && runner.State.AdviceIsCurrent, TimeSpan.FromSeconds(5)));
+
+        runner.Submit(Snapshot(1), new PlanPreferences { Recommendations = false }, "catalog");
+        Assert.True(SpinWait.SpinUntil(() => Volatile.Read(ref advices) == 2, TimeSpan.FromSeconds(5)));
+
+        Assert.Equal(1, Volatile.Read(ref builds));
+        Assert.Equal(1, runner.State.RequestedGeneration);
+        Assert.True(runner.State.IsCurrent);
+    }
+
+    /// <summary>
+    /// 세피라이트 보상 창은 여닫을 때마다 후보를 6개 넣었다 비운다. 그때마다 배치까지 버리던 것이
+    /// 제보 <c>4c1efa35</c> 의 "F10 을 눌렀는데 계산이 안 끝난다" 였다.
+    /// </summary>
+    [Fact]
+    public void AnOfferChangeKeepsThePlacementPublished()
+    {
+        var builds = 0;
+        var advices = 0;
+        PlanBuildOperation build = (
+            GameSnapshot _, ICatalog _, PlanPreferences _,
+            out PlanBlocker blocker, Plan? _, LayoutCache _2, CancellationToken _3) =>
+        {
+            blocker = PlanBlocker.None;
+            Interlocked.Increment(ref builds);
+            return new Plan();
+        };
+        PlanAdviceOperation advise = (
+            Plan placement, GameSnapshot _, ICatalog _, PlanPreferences _,
+            LayoutCache _2, CancellationToken _3) =>
+        {
+            Interlocked.Increment(ref advices);
+            return placement;
+        };
+        var runner = new PlanRunner(EmptyCatalog, build, TimeSpan.Zero, advise);
+
+        runner.Submit(Snapshot(1), PlanPreferences.None, "catalog");
+        Assert.True(SpinWait.SpinUntil(
+            () => runner.State.IsCurrent && runner.State.AdviceIsCurrent, TimeSpan.FromSeconds(5)));
+        var placement = runner.State.Latest;
+
+        runner.Submit(WithOffer(Snapshot(1)), PlanPreferences.None, "catalog");
+        Assert.True(SpinWait.SpinUntil(() => Volatile.Read(ref advices) == 2, TimeSpan.FromSeconds(5)));
+
+        // 배치는 그대로 게시된 채이고 세대도 그대로다. 화면에 "갱신 중" 이 붙지 않는다.
+        Assert.Equal(1, Volatile.Read(ref builds));
+        Assert.True(runner.State.IsCurrent);
+        Assert.Same(placement, runner.State.Latest);
+        Assert.Equal(1, runner.State.RequestedGeneration);
+    }
+
+    /// <summary>배치가 바뀌면 그 배치에 붙이려던 조언은 남의 판에 대한 답이 된다.</summary>
+    [Fact]
+    public void APlacementChangeDropsTheAdviceInFlight()
+    {
+        using var started = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var builds = 0;
+        var advices = 0;
+        PlanBuildOperation build = (
+            GameSnapshot _, ICatalog _, PlanPreferences _,
+            out PlanBlocker blocker, Plan? _, LayoutCache _2, CancellationToken _3) =>
+        {
+            blocker = PlanBlocker.None;
+            Interlocked.Increment(ref builds);
+            return new Plan();
+        };
+        Plan? stale = null;
+        PlanAdviceOperation advise = (
+            Plan placement, GameSnapshot _, ICatalog _, PlanPreferences _,
+            LayoutCache _2, CancellationToken cancellation) =>
+        {
+            if (Interlocked.Increment(ref advices) == 1)
+            {
+                started.Set();
+                release.Wait(TimeSpan.FromSeconds(5), CancellationToken.None);
+                Assert.True(cancellation.IsCancellationRequested, "낡아진 조언이 멈추라는 신호를 받지 못했다");
+                stale = new Plan { RequestGeneration = placement.RequestGeneration };
+                return stale;
+            }
+            return placement;
+        };
+        var runner = new PlanRunner(EmptyCatalog, build, TimeSpan.Zero, advise);
+
+        runner.Submit(Snapshot(1), PlanPreferences.None, "catalog");
+        Assert.True(started.Wait(TimeSpan.FromSeconds(5), CancellationToken.None));
+
+        runner.Submit(Snapshot(2), PlanPreferences.None, "catalog");
+        release.Set();
+
+        Assert.True(SpinWait.SpinUntil(
+            () => runner.State.IsCurrent && runner.State.AdviceIsCurrent && Volatile.Read(ref advices) == 2,
+            TimeSpan.FromSeconds(5)));
+
+        // 배치가 먼저 돌고, 옛 배치의 조언은 게시되지 않는다.
+        Assert.Equal(2, Volatile.Read(ref builds));
+        Assert.NotSame(stale, runner.State.Latest);
+        Assert.Equal(2, runner.State.RequestedGeneration);
+        Assert.Equal(2, runner.State.Latest!.RequestGeneration);
+    }
+
+    /// <summary>조언이 실패해도 배치는 살아 있다. 그것까지 잃으면 F8 이 막힌다.</summary>
+    [Fact]
+    public void AFailedAdviceLeavesThePlacementAlone()
     {
         PlanBuildOperation build = (
             GameSnapshot _, ICatalog _, PlanPreferences _,
@@ -144,15 +274,20 @@ public class PlanRunnerTests
             blocker = PlanBlocker.None;
             return new Plan();
         };
-        var runner = new PlanRunner(EmptyCatalog, build, TimeSpan.Zero);
+        PlanAdviceOperation advise = (
+            Plan _, GameSnapshot _1, ICatalog _2, PlanPreferences _3,
+            LayoutCache _4, CancellationToken _5) => throw new InvalidOperationException("조언 실패");
+        var runner = new PlanRunner(EmptyCatalog, build, TimeSpan.Zero, advise);
 
-        runner.Submit(Snapshot(1), new PlanPreferences { Recommendations = true }, "catalog");
-        Assert.True(SpinWait.SpinUntil(() => runner.State.IsCurrent, TimeSpan.FromSeconds(5)));
-        runner.Submit(Snapshot(1), new PlanPreferences { Recommendations = false }, "catalog");
-
+        runner.Submit(Snapshot(1), PlanPreferences.None, "catalog");
         Assert.True(SpinWait.SpinUntil(
-            () => runner.State.IsCurrent && runner.State.RequestedGeneration == 2,
-            TimeSpan.FromSeconds(5)));
+            () => runner.State.AdviceError is not null, TimeSpan.FromSeconds(5)));
+
+        var state = runner.State;
+        Assert.Null(state.Error);
+        Assert.True(state.IsCurrent);
+        Assert.False(state.AdviceIsCurrent);
+        Assert.NotNull(state.Latest);
     }
 
     /// <summary>
@@ -236,11 +371,20 @@ public class PlanRunnerTests
         Assert.Equal(1, stats.Placement.WorstRun);
         Assert.True(stats.WorstPublishDelayMs > 0);
         Assert.Equal(1, stats.WorstPublishRun);
-        Assert.Equal(0, stats.Advice.Count);
+
+        // 게시된 배치마다 조언이 한 번 뒤따른다.
+        Assert.True(SpinWait.SpinUntil(() => runner.Stats.Advice.Count == 1, TimeSpan.FromSeconds(5)));
     }
 
     private static GameSnapshot Snapshot(int storage) => new()
     {
         Inventory = new InventoryState { Width = 6, Height = 7, Storage = storage },
     };
+
+    /// <summary>후보만 달라진 판. 배치 지문은 그대로이고 전체 지문만 바뀐다.</summary>
+    private static GameSnapshot WithOffer(GameSnapshot snapshot)
+    {
+        snapshot.Offers.Add(new OfferedItem { Kind = "charm", DefinitionId = 4, Price = 1 });
+        return snapshot;
+    }
 }

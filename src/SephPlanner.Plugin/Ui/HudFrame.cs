@@ -32,6 +32,12 @@ namespace SephPlanner.Plugin.Ui
         /// <summary>보여주는 계획이 지금 가방보다 낡았는가. 다시 푸는 동안 직전 계획을 그대로 둔다.</summary>
         public bool Stale;
 
+        /// <summary>
+        /// 조언(합성·후보·제거)을 지금 푸는 중인가. 배치는 조언보다 먼저 게시되므로 배치가
+        /// 최신이어도 이것이 켜져 있을 수 있고, 그때 조언 칸이 빈 것은 "없다" 가 아니라 "아직" 이다.
+        /// </summary>
+        public bool AdviceBusy;
+
         /// <summary>보고 있는 후보의 <see cref="OfferAdvice.Key"/>. 빈 문자열이면 미리보기가 없다.</summary>
         public string PreviewKey = "";
 
@@ -64,6 +70,7 @@ namespace SephPlanner.Plugin.Ui
         private readonly bool _hintIsPreview;
         private readonly bool _multiplayerAutoPlace;
         private readonly bool _stale;
+        private readonly bool _adviceBusy;
 
         public HudFrameKey(HudFrame frame)
         {
@@ -90,6 +97,7 @@ namespace SephPlanner.Plugin.Ui
 
             // 계획 객체는 그대로인 채 이 표시만 켜지고 꺼진다.
             _stale = frame.Stale;
+            _adviceBusy = frame.AdviceBusy;
         }
 
         public bool Matches(in HudFrameKey other) =>
@@ -106,6 +114,7 @@ namespace SephPlanner.Plugin.Ui
             _hintIsPreview == other._hintIsPreview &&
             _multiplayerAutoPlace == other._multiplayerAutoPlace &&
             _stale == other._stale &&
+            _adviceBusy == other._adviceBusy &&
             string.Equals(_hint, other._hint, StringComparison.Ordinal) &&
             string.Equals(_reason, other._reason, StringComparison.Ordinal) &&
             string.Equals(_previewKey, other._previewKey, StringComparison.Ordinal);

@@ -9,6 +9,13 @@ namespace SephPlanner.Core.Runtime
 {
     public sealed class ReplayResult
     {
+        /// <summary>
+        /// 조언(합성·후보·제거)이 적히는 열쇠의 머리. 배치가 조언보다 먼저 게시되므로 F10 이
+        /// 조언 없는 계획을 잡을 수 있고, 그때는 이 열쇠들을 견주지 않는다
+        /// (<see cref="PlanReplay.AdviceComplete"/>).
+        /// </summary>
+        private static readonly string[] AdviceKeys = { "후보/", "합성/", "빼기/", "생략 후보" };
+
         public Dictionary<string, string> Facts { get; set; } = new Dictionary<string, string>();
         public Dictionary<string, double> Scores { get; set; } = new Dictionary<string, double>();
 
@@ -76,17 +83,22 @@ namespace SephPlanner.Core.Runtime
             return result;
         }
 
-        public List<string> Differences(ReplayResult actual)
+        /// <param name="includeAdvice">
+        /// 조언을 견줄 것인가. 조언이 아직 안 붙은 계획을 잡은 재현 자료에서는 꺼야 한다.
+        /// </param>
+        public List<string> Differences(ReplayResult actual, bool includeAdvice = true)
         {
             var differences = new List<string>();
             foreach (var key in Facts.Keys.Union(actual.Facts.Keys).OrderBy(key => key, StringComparer.Ordinal))
             {
+                if (!includeAdvice && IsAdvice(key)) continue;
                 Facts.TryGetValue(key, out var expected);
                 actual.Facts.TryGetValue(key, out var value);
                 if (expected != value) differences.Add($"{key}: 저장={expected ?? "없음"}, 재생={value ?? "없음"}");
             }
             foreach (var key in Scores.Keys.Union(actual.Scores.Keys).OrderBy(key => key, StringComparer.Ordinal))
             {
+                if (!includeAdvice && IsAdvice(key)) continue;
                 var hasExpected = Scores.TryGetValue(key, out var expected);
                 var hasActual = actual.Scores.TryGetValue(key, out var value);
                 // Mono와 .NET의 부동소수 연산 차이만 허용한다. 좌표·순위·상태에는 허용 오차가 없다.
@@ -94,6 +106,13 @@ namespace SephPlanner.Core.Runtime
                     differences.Add($"{key}: 저장={(hasExpected ? expected.ToString("R", CultureInfo.InvariantCulture) : "없음")}, 재생={(hasActual ? value.ToString("R", CultureInfo.InvariantCulture) : "없음")}");
             }
             return differences;
+        }
+
+        private static bool IsAdvice(string key)
+        {
+            foreach (var prefix in AdviceKeys)
+                if (key.StartsWith(prefix, StringComparison.Ordinal)) return true;
+            return false;
         }
 
         private static bool Finite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);

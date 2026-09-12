@@ -488,7 +488,7 @@ namespace SephPlanner.Plugin.Ui
                 _moves.End();
             }
             RenderOffers(plan, frame, previewed);
-            RenderMixes(plan, snapshot.Mixer, frame.MixerOpen);
+            RenderMixes(plan, snapshot.Mixer, frame.MixerOpen, frame.AdviceBusy);
             RenderDiscards(plan, previewed == null);
             RenderChips(snapshot, frame);
         }
@@ -770,10 +770,16 @@ namespace SephPlanner.Plugin.Ui
             }
             _offers.End();
 
-            _offerNotice.text = guessed > 0
-                ? $"순위는 참고용입니다 — 이 중 {guessed}개는 값어치를 레어도로 어림잡았습니다."
-                : "순위는 참고용입니다.";
-            Widgets.SetActive(_offerNotice, plan.Offers.Count > 0);
+            // 후보가 있는데 아직 조언이 안 붙었으면 그렇다고 말한다. 배치가 먼저 게시되므로
+            // 창을 연 직후의 빈 칸은 "볼 것이 없다" 가 아니다.
+            var pending = plan.Offers.Count == 0 && frame.AdviceBusy &&
+                          frame.Snapshot != null && frame.Snapshot.Offers.Count > 0;
+            _offerNotice.text = pending
+                ? "후보를 계산하고 있습니다."
+                : guessed > 0
+                    ? $"순위는 참고용입니다 — 이 중 {guessed}개는 값어치를 레어도로 어림잡았습니다."
+                    : "순위는 참고용입니다.";
+            Widgets.SetActive(_offerNotice, plan.Offers.Count > 0 || pending);
         }
 
         private static Color NameTone(OfferAdvice advice) =>
@@ -835,7 +841,7 @@ namespace SephPlanner.Plugin.Ui
             Widgets.SetActive(_discards.Root, visible && plan.Discards.Count > 0);
         }
 
-        private void RenderMixes(Plan plan, MixerState mixer, bool mixerOpen)
+        private void RenderMixes(Plan plan, MixerState mixer, bool mixerOpen, bool adviceBusy)
         {
             _mixes.Begin();
             for (var i = 0; i < plan.Mixes.Count && i < MixRows; i++)
@@ -850,8 +856,14 @@ namespace SephPlanner.Plugin.Ui
                 Hover(row, name, () => Explain.Join(Explain.Mix(advice)));
             }
             if (mixerOpen && plan.Mixes.Count == 0)
-                _mixes.Add("추천 조합 없음", mixer == null ? "합성기 정보를 읽는 중입니다." :
-                    mixer.Used ? "이 합성기는 이미 사용했습니다." : "현재 석판에서 추천할 수 있는 조합을 찾지 못했습니다.", NativeSkin.TextDim);
+            {
+                // 조언은 배치보다 뒤에 붙는다. 그 사이에 "없음" 이라고 하면 거짓말이 된다.
+                if (adviceBusy)
+                    _mixes.Add("계산 중", "합성 추천을 계산하고 있습니다.", NativeSkin.TextDim);
+                else
+                    _mixes.Add("추천 조합 없음", mixer == null ? "합성기 정보를 읽는 중입니다." :
+                        mixer.Used ? "이 합성기는 이미 사용했습니다." : "현재 석판에서 추천할 수 있는 조합을 찾지 못했습니다.", NativeSkin.TextDim);
+            }
             _mixes.End();
 
             // 합성 추천은 합성기 창을 열었을 때만 보인다.

@@ -64,6 +64,38 @@ public class PlanBuilderTests
         Assert.Equal(plan.Best.CellLevels, command.ExpectedCellLevels);
     }
 
+    /// <summary>
+    /// 두 단계로 나눠 푼 것이 한 번에 푼 것과 같아야 한다. 화면은 배치를 먼저 받지만 답이
+    /// 달라지면 안 된다. <b>조언을 두 번 붙여 본다</b> - 조언이 1단계가 남긴
+    /// <c>PlacementProblem</c> 을 고쳐 놓으면 두 번째가 달라진다.
+    /// </summary>
+    [Fact]
+    public void SolvingInTwoStagesGivesTheSameAnswerAsOne()
+    {
+        var snapshot = Snapshot();
+        snapshot.Offers.Add(new OfferedItem { DefinitionId = CharmEntity, Kind = "charm" });
+        snapshot.Mixer = new MixerState { Cost = 1 };
+
+        var whole = PlanBuilder.Build(snapshot, Catalog())!;
+        var placement = PlanBuilder.BuildPlacement(snapshot, Catalog(), null, out _)!;
+
+        Assert.Equal(AdviceStatus.Pending, placement.AdviceStatus);
+        Assert.Empty(placement.Offers);
+        Assert.Empty(placement.Mixes);
+
+        var first = PlanBuilder.BuildAdvice(placement, snapshot, Catalog(), null)!;
+        var second = PlanBuilder.BuildAdvice(placement, snapshot, Catalog(), null)!;
+
+        Assert.Equal(AdviceStatus.Ready, first.AdviceStatus);
+        Assert.NotEmpty(first.Offers);
+        Assert.Empty(ReplayResult.From(whole).Differences(ReplayResult.From(first)));
+        Assert.Empty(ReplayResult.From(whole).Differences(ReplayResult.From(second)));
+
+        // 넘긴 배치는 그대로 남는다. 게시된 계획을 제자리에서 고치면 화면이 반쯤 채워진 목록을 읽는다.
+        Assert.Empty(placement.Offers);
+        Assert.Equal(AdviceStatus.Pending, placement.AdviceStatus);
+    }
+
     [Fact]
     public void TurningRecommendationsOffSkipsOffersButKeepsPlacement()
     {

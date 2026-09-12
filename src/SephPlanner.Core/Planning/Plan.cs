@@ -56,6 +56,19 @@ namespace SephPlanner.Core.Planning
         }
     }
 
+    /// <summary>조언(합성·후보·제거)이 이 계획에 붙어 있는가.</summary>
+    public enum AdviceStatus
+    {
+        /// <summary>추천을 끈 세션이다. 계산하지 않는다.</summary>
+        NotRequested,
+
+        /// <summary>배치는 나왔고 조언은 뒤따라 푸는 중이다. 화면은 "계산 중" 으로 적는다.</summary>
+        Pending,
+
+        /// <summary>조언까지 이 계획의 것이다.</summary>
+        Ready,
+    }
+
     /// <summary>지금 배치와 제안, 그리고 그 차이를 설명하는 데 필요한 것들.</summary>
     public sealed class Plan
     {
@@ -99,6 +112,37 @@ namespace SephPlanner.Core.Planning
 
         /// <summary>자동 배치 명령에 실어 보낼 최종 배치. 인스턴스마다 있어야 할 자리다.</summary>
         public List<PlanTarget> Targets { get; set; } = new List<PlanTarget>();
+
+        /// <summary>
+        /// 조언 칸의 상태. 배치만 게시된 계획은 <see cref="AdviceStatus.Pending"/> 이고, 그때
+        /// <see cref="Offers"/>·<see cref="Mixes"/>·<see cref="Discards"/> 가 빈 것은 "없다" 가
+        /// 아니라 "아직" 이다. 그 둘을 가르지 않으면 화면이 거짓말을 한다.
+        /// </summary>
+        public AdviceStatus AdviceStatus { get; set; } = AdviceStatus.NotRequested;
+
+        /// <summary>
+        /// 조언 단계가 쓸 1단계의 중간물. 계획 밖으로 나가지 않고 직렬화하지도 않는다 - 재현
+        /// 자료에는 스냅샷과 설정이 있으므로 이것을 저장할 이유가 없다.
+        /// </summary>
+        internal PlacementWork? Work { get; set; }
+
+        /// <summary>
+        /// 조언만 갈아 끼운 새 계획. <b>게시된 계획을 제자리에서 고치지 않는다</b> - 화면이 매
+        /// 프레임 읽으므로 반쯤 채워진 목록을 보게 된다. 배치 쪽 값은 만들어진 뒤로 바뀌지
+        /// 않으므로 그대로 나눠 쓴다.
+        /// </summary>
+        internal Plan WithAdvice(
+            List<OfferAdvice> offers, List<MixAdvice> mixes, List<DiscardAdvice> discards,
+            int skippedOffers, AdviceStatus status)
+        {
+            var copy = (Plan)MemberwiseClone();
+            copy.Offers = offers;
+            copy.Mixes = mixes;
+            copy.Discards = discards;
+            copy.SkippedOffers = skippedOffers;
+            copy.AdviceStatus = status;
+            return copy;
+        }
 
         public long RequestGeneration { get; set; }
         public string RequestFingerprint { get; set; } = "";

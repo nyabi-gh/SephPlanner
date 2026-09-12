@@ -39,6 +39,16 @@ namespace SephPlanner.Core.Runtime
         public string LatestError { get; set; } = "";
         public string CatalogGeneration { get; set; } = "";
         public string RequestFingerprint { get; set; } = "";
+
+        /// <summary>
+        /// 잡은 계획에 조언까지 붙어 있었는가. 배치는 조언보다 먼저 게시되므로 F10 이 그 사이를
+        /// 잡을 수 있다. 재현은 언제나 조언까지 풀기 때문에, 그때의 기준 결과와 그대로 견주면
+        /// "아직 안 푼 것" 이 "다른 답" 으로 보고된다.
+        ///
+        /// 옛 자료에는 이 항목이 없어 <c>true</c> 로 읽히고, 그때는 조언이 배치와 한 번에
+        /// 계산됐으므로 그것이 사실과 같다.
+        /// </summary>
+        public bool AdviceComplete { get; set; } = true;
         public GameSnapshot? Snapshot { get; set; }
         public ReplayPreferences? Preferences { get; set; }
         public ReplayCatalog? Catalog { get; set; }
