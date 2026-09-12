@@ -151,6 +151,15 @@ namespace SephPlanner.Core.Runtime
                 if (!_port.Alive) return "인벤토리가 사라져 자동 배치 결과를 확인하지 못했습니다.";
                 foreach (var target in _command.Targets)
                 {
+                    // 번호 없는 아이템은 번호로 확인할 수 없다. 그 칸이 차 있는지만 본다 -
+                    // 애초에 못 옮기는 것이라 비었다면 우리가 아니라 게임이 치운 것이다.
+                    if (target.Immovable)
+                    {
+                        if (!_port.Occupied(target.To))
+                            return "적용 중 인벤토리가 바뀌어 목표 배치와 다릅니다. 현재 배치를 확인하세요.";
+                        continue;
+                    }
+
                     if (_port.InstanceAt(target.To) != target.InstanceId)
                         return "적용 중 인벤토리가 바뀌어 목표 배치와 다릅니다. 현재 배치를 확인하세요.";
                     if (target.IsTablet && RotationOf(target.InstanceId) != target.Rotation)
@@ -286,11 +295,19 @@ namespace SephPlanner.Core.Runtime
             var grid = new GridSpec(_command.ExpectedWidth, _command.ExpectedHeight, _command.ExpectedStorage);
             var positions = new Dictionary<int, GridPos>();
             var occupants = new Dictionary<GridPos, int>();
+
+            // 번호가 없어 옮길 수도, 맞바꿈으로 밀어낼 수도 없는 칸. 계획은 이 칸을 비워 두지만
+            // 옛 계획이나 어긋난 상태로 여기 닿을 수 있어 적용기가 한 번 더 본다.
+            var immovable = new HashSet<GridPos>();
             for (var index = 0; index < grid.Storage; index++)
             {
                 var cell = grid.ToPosition(index);
                 var instance = _port.InstanceAt(cell);
-                if (instance == 0) continue;
+                if (instance == 0)
+                {
+                    if (_port.Occupied(cell)) immovable.Add(cell);
+                    continue;
+                }
                 positions[instance] = cell;
                 occupants[cell] = instance;
             }
@@ -298,13 +315,22 @@ namespace SephPlanner.Core.Runtime
             var total = _command.Targets.Count;
             foreach (var target in _command.Targets)
             {
+                // 못 옮기는 아이템의 목표는 언제나 제자리다. 번호가 없으니 찾을 수도 없다.
+                if (target.Immovable) continue;
+
                 if (!positions.TryGetValue(target.InstanceId, out var from))
                 {
-                    outcome.Failure = "적용 도중 인벤토리가 바뀌어 자동 배치를 중단했습니다.";
+                    outcome.Failure = "계획에 있는 아이템을 가방에서 찾지 못했습니다. 자동 배치를 중단했습니다.";
                     yield break;
                 }
                 var to = target.To;
                 if (from == to) continue;
+
+                if (immovable.Contains(to))
+                {
+                    outcome.Failure = "그 칸의 아이템은 옮길 수 없어 자동 배치를 중단했습니다.";
+                    yield break;
+                }
 
                 if (!_port.Alive)
                 {

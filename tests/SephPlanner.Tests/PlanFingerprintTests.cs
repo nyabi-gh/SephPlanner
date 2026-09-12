@@ -162,6 +162,28 @@ public class PlanFingerprintTests
         Assert.NotEqual(before, PlanFingerprint.Full(snapshot, PlanPreferences.None, "catalog-1"));
     }
 
+    /// <summary>
+    /// 번호 없는 아이템 둘은 서로 다른 아이템이다. 게임 번호(0)를 그대로 쓰면 지문이 둘을 한
+    /// 몸으로 보아, 한쪽이 사라져도 계획이 낡지 않는다.
+    /// </summary>
+    [Fact]
+    public void TwoUnnumberedItemsAreToldApartByTheirCells()
+    {
+        var one = Snapshot();
+        one.Inventory!.Items.Clear();
+        one.Inventory.Items.Add(new PlacedItem { DefinitionId = 5007, InstanceId = -1, Position = new GridPos(0, 0), Immovable = true });
+        one.Inventory.Items.Add(new PlacedItem { DefinitionId = 5007, InstanceId = -3, Position = new GridPos(2, 0), Immovable = true });
+
+        var moved = Snapshot();
+        moved.Inventory!.Items.Clear();
+        moved.Inventory.Items.Add(new PlacedItem { DefinitionId = 5007, InstanceId = -1, Position = new GridPos(0, 0), Immovable = true });
+        moved.Inventory.Items.Add(new PlacedItem { DefinitionId = 5007, InstanceId = -4, Position = new GridPos(3, 0), Immovable = true });
+
+        Assert.NotEqual(
+            PlanFingerprint.Placement(one, PlanPreferences.None, "catalog"),
+            PlanFingerprint.Placement(moved, PlanPreferences.None, "catalog"));
+    }
+
     private static PlanPreferences PreferencesWithValue(int tier) => new()
     {
         CharmValues = new CharmValueBook(new CharmValueFile

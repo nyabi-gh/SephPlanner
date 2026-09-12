@@ -104,6 +104,16 @@ namespace SephPlanner.Core.Runtime
         public int Enchant { get; set; }
 
         /// <summary>
+        /// 옮길 수 없는 아이템. 게임이 인스턴스 번호를 주지 않은 것이 여기 해당한다 - 시나리오
+        /// 동행 증표(<c>Item_ScenarioCompanion_*</c>)가 그렇고, 번호가 없으니 게임에 "이것을
+        /// 저 칸으로" 라고 말할 길이 없다.
+        ///
+        /// 칸은 차지하고 석판 조건에도 아티팩트로 세므로 없는 셈 칠 수는 없다. 그래서 지금 칸에
+        /// 못 박고 나머지를 그 주위로 푼다.
+        /// </summary>
+        public bool Immovable { get; set; }
+
+        /// <summary>
         /// 성장 아티팩트가 목표까지 얼마나 왔는지. <c>null</c> 은 읽지 못했다는 뜻이며 0 과 다르다.
         ///
         /// 게임은 이 값을 서버에만 두고 소유자 화면에는 문자열로만 보낸다(<c>SetEffectHUDValue</c>).

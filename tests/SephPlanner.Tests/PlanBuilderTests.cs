@@ -51,6 +51,48 @@ public class PlanBuilderTests
         };
     }
 
+    /// <summary>
+    /// 시나리오 동행 증표는 게임이 인스턴스 번호를 주지 않아 옮길 길이 없다. 제자리에 못 박고
+    /// 나머지를 그 주위로 푼다 - 없는 셈 치면 솔버가 그 칸에 다른 것을 놓으라고 하고, 석판
+    /// 조건("그 칸에 아티팩트가 있다")도 거짓이 된다.
+    /// </summary>
+    [Fact]
+    public void AnItemThatCannotMoveKeepsItsCellAndTheRestIsPlacedAroundIt()
+    {
+        var snapshot = Snapshot();
+
+        // 석판이 레벨을 올려 주는 좋은 칸(1,0)에 못 옮기는 아이템이 앉아 있다.
+        snapshot.Inventory!.Items[0].Position = new GridPos(2, 0);
+        snapshot.Inventory.Items[0].EffectiveLevel = 0;
+        snapshot.Inventory.LevelMatrix.Clear();
+        snapshot.Inventory.Items.Add(new PlacedItem
+        {
+            DefinitionId = CharmEntity,
+            InstanceId = -8,
+            Position = new GridPos(1, 0),
+            EffectiveLevel = 2,
+            IsActive = true,
+            Immovable = true,
+        });
+        snapshot.Inventory.LevelMatrix["1,0"] = 2;
+
+        var plan = PlanBuilder.Build(snapshot, Catalog())!;
+
+        Assert.Equal(new GridPos(1, 0), plan.Best.CharmPositions[-8]);
+        Assert.DoesNotContain(plan.Moves, move => move.From == new GridPos(1, 0) || move.To == new GridPos(1, 0));
+
+        var pinned = plan.Targets.Single(target => target.InstanceId == -8);
+        Assert.Equal(pinned.From, pinned.To);
+        Assert.True(pinned.Immovable);
+
+        // 석판도 그 칸을 쓸 수 없다.
+        Assert.DoesNotContain(plan.Best.TabletPositions.Values, spot => spot.Position == new GridPos(1, 0));
+
+        // 나머지는 그대로 배치된다 - 증표 하나 때문에 계획이 통째로 막히지 않는다.
+        Assert.True(plan.Best.CharmPositions.ContainsKey(10));
+        Assert.Equal(PlanVerificationStatus.Passed, plan.Verification.Status);
+    }
+
     [Fact]
     public void TheApplyCommandCarriesTheLevelsItExpectsAfterwards()
     {

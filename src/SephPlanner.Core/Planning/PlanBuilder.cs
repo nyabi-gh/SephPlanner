@@ -293,6 +293,7 @@ namespace SephPlanner.Core.Planning
                     ObservedCategories = item.ObservedCategories,
                     Enchant = definition is null ? 0 : item.Enchant,
                     IsFiller = definition is null,
+                    Immovable = item.Immovable,
                     IsDormant = definition is not null && WeaponMatch.IsDormant(definition, weapon),
                     Weight = definition is not null &&
                              preferences.PinnedCharms.TryGetValue(item.DefinitionId, out var pin)
@@ -500,6 +501,7 @@ namespace SephPlanner.Core.Planning
                     InstanceId = charm.InstanceId,
                     From = problem.CurrentCharms[charm.InstanceId],
                     To = position,
+                    Immovable = charm.Immovable,
                 });
             }
             return targets;

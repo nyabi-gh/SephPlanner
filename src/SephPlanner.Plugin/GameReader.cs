@@ -194,7 +194,6 @@ namespace SephPlanner.Plugin
             {
                 var instance = pair.Value;
                 if (instance == null || instance.StoneTablet != null) continue;
-                if (!seenItems.Add(instance.InstanceID)) continue;
 
                 // 포션 벨트는 같은 딕셔너리를 쓰지만 격자가 아니라 y=100 줄에 산다
                 // (x 는 0..numberOfPotionStorage-1). 석판 배치와는 아무 상관이 없는 자리이므로
@@ -202,10 +201,14 @@ namespace SephPlanner.Plugin
                 // 진단이 필요할 때는 F10 덤프가 딕셔너리를 있는 그대로 보여준다.
                 if (!grid.Contains(instance.XIdx, instance.YIdx)) continue;
 
+                var identity = ItemIdentity.Of(instance.InstanceID, grid, instance.XIdx, instance.YIdx);
+                if (!seenItems.Add(identity)) continue;
+
                 state.Items.Add(new PlacedItem
                 {
                     DefinitionId = instance.EntityID,
-                    InstanceId = instance.InstanceID,
+                    InstanceId = identity,
+                    Immovable = instance.InstanceID == 0,
                     ObservedCategories = instance.Charm is Charm_WhitePaper paper
                         ? new List<string>(paper.GetItemCategory()) : null,
                     Position = new GridPos(instance.XIdx, instance.YIdx),

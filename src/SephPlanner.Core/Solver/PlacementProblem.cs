@@ -42,6 +42,13 @@ namespace SephPlanner.Core.Solver
         public bool IsFiller { get; set; }
 
         /// <summary>
+        /// 지금 칸에서 옮길 수 없다(<see cref="Runtime.PlacedItem.Immovable"/>). 배정에서 빼고
+        /// 그 칸은 석판도 다른 아티팩트도 쓰지 못한다. 점수와 석판 조건에는 평소처럼 센다 -
+        /// 빼 버리면 "그 칸에 아티팩트가 있다" 는 조건이 거짓이 되어 검증이 깨진다.
+        /// </summary>
+        public bool Immovable { get; set; }
+
+        /// <summary>
         /// 연동된 무기를 들고 있지 않아 효과가 꺼진 아티팩트. 점수에는 기여하지 않지만 이웃의
         /// 조건 판정에서는 여전히 아티팩트로 세므로 <see cref="IsFiller"/>와 다르다.
         /// </summary>

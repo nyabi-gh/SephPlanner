@@ -211,10 +211,33 @@ namespace SephPlanner.Core.Solver
             return best;
         }
 
-        private static List<GridPos> Cells(PlacementProblem problem) =>
-            Enumerable.Range(0, problem.Grid.Storage)
-                      .Select(problem.Grid.ToPosition)
-                      .ToList();
+        /// <summary>
+        /// 배치에 쓸 수 있는 칸. <b>못 옮기는 아이템이 앉은 칸은 빠진다</b> - 석판도 다른
+        /// 아티팩트도 그 칸을 쓸 수 없고, 그 아이템은 <see cref="Assign"/>이 제자리에 못 박는다.
+        /// 칸이 차 있다는 사실 자체는 점유와 시뮬레이션이 그대로 보므로 석판 조건은 영향받지 않는다.
+        /// </summary>
+        private static List<GridPos> Cells(PlacementProblem problem)
+        {
+            var cells = Enumerable.Range(0, problem.Grid.Storage)
+                                  .Select(problem.Grid.ToPosition)
+                                  .ToList();
+            if (!problem.Charms.Any(charm => charm.Immovable)) return cells;
+
+            var pinned = Pinned(problem);
+            return cells.Where(cell => !pinned.Contains(cell)).ToList();
+        }
+
+        /// <summary>못 옮기는 아이템이 앉아 있는 칸.</summary>
+        internal static HashSet<GridPos> Pinned(PlacementProblem problem)
+        {
+            var pinned = new HashSet<GridPos>();
+            foreach (var charm in problem.Charms)
+            {
+                if (!charm.Immovable) continue;
+                if (problem.CurrentCharms.TryGetValue(charm.InstanceId, out var cell)) pinned.Add(cell);
+            }
+            return pinned;
+        }
 
         /// <summary>이미 정해진 배치를 같은 기준으로 채점한다. 현재 배치와 제안을 비교할 때 쓴다.</summary>
         public static Arrangement Score(
@@ -1103,7 +1126,9 @@ namespace SephPlanner.Core.Solver
             var current = problem.CurrentCharms;
             if (problem.Charms.All(charm => current.ContainsKey(charm.InstanceId)) &&
                 current.Count == problem.Charms.Count && current.Values.Distinct().Count() == current.Count &&
-                current.Values.All(free.Contains) &&
+                // 못 옮기는 아이템의 칸은 free 에 없다. 그것 때문에 지금 배치와의 비교를 통째로
+                // 건너뛰면 "지금 자리를 지키는 쪽이 낫다" 는 답이 사라진다.
+                problem.Charms.All(charm => charm.Immovable || free.Contains(current[charm.InstanceId])) &&
                 (!forcedCharm.HasValue || current[forcedCharm.Value] == forcedCell))
             {
                 var currentOccupancy = OccupancyFrom(layout, current, problem);
@@ -1169,6 +1194,7 @@ namespace SephPlanner.Core.Solver
                 var moved = false;
                 foreach (var charm in problem.Charms)
                 {
+                    if (charm.Immovable) continue;
                     if (!positions.TryGetValue(charm.InstanceId, out var from)) continue;
 
                     foreach (var to in free)
@@ -1219,10 +1245,10 @@ namespace SephPlanner.Core.Solver
             Dictionary<int, GridPos> positions, ref GridOccupancy occupancy, ref SimulationResult result,
             SolverOptions options, int? forcedCharm = null, GridPos forcedCell = default)
         {
-            var helpers = problem.Charms.Where(charm => !charm.IsFiller && !charm.IsDormant &&
+            var helpers = problem.Charms.Where(charm => !charm.IsFiller && !charm.IsDormant && !charm.Immovable &&
                 DirectedCharmSupport.HasConnection(charm) && positions.ContainsKey(charm.InstanceId)).ToList();
             if (helpers.Count == 0) return false;
-            var targets = problem.Charms.Where(charm => !charm.IsFiller && !charm.IsDormant &&
+            var targets = problem.Charms.Where(charm => !charm.IsFiller && !charm.IsDormant && !charm.Immovable &&
                 positions.ContainsKey(charm.InstanceId)).ToList();
             if (targets.Count == 0) return false;
             var available = new HashSet<GridPos>(free);
@@ -1483,22 +1509,36 @@ namespace SephPlanner.Core.Solver
             Dictionary<GridPos, CharmSlot>? neighbors, int? forcedCharm = null, GridPos forcedCell = default)
         {
             var positions = new Dictionary<int, GridPos>();
-            if (problem.Charms.Count == 0 || free.Count == 0) return positions;
 
-            var charmsAreRows = problem.Charms.Count <= free.Count;
-            var rows = charmsAreRows ? problem.Charms.Count : free.Count;
-            var columns = charmsAreRows ? free.Count : problem.Charms.Count;
+            // 못 옮기는 아이템은 배정할 것이 없다. 지금 칸에 못 박고 나머지를 그 주위로 푼다.
+            var movable = problem.Charms;
+            if (problem.Charms.Any(charm => charm.Immovable))
+            {
+                movable = new List<CharmSlot>(problem.Charms.Count);
+                foreach (var charm in problem.Charms)
+                {
+                    if (!charm.Immovable) movable.Add(charm);
+                    else if (problem.CurrentCharms.TryGetValue(charm.InstanceId, out var pinned))
+                        positions[charm.InstanceId] = pinned;
+                }
+            }
+
+            if (movable.Count == 0 || free.Count == 0) return positions;
+
+            var charmsAreRows = movable.Count <= free.Count;
+            var rows = charmsAreRows ? movable.Count : free.Count;
+            var columns = charmsAreRows ? free.Count : movable.Count;
             var cost = new AssignmentCost[rows, columns];
             var unit = rows + 1.0;
 
-            for (var charmIndex = 0; charmIndex < problem.Charms.Count; charmIndex++)
+            for (var charmIndex = 0; charmIndex < movable.Count; charmIndex++)
             {
                 for (var cellIndex = 0; cellIndex < free.Count; cellIndex++)
                 {
                     // 헝가리안은 비용을 최소화하므로 점수를 뒤집어 넣는다. 자리를 지키는 몫은
                     // 여기서 더해야 뜻이 있다 - 채점할 때만 더하면 배정기가 이미 자리를 바꿔 놓은
                     // 뒤라, 이득이 없는데도 맞바꾸라는 제안이 나온다.
-                    var charm = problem.Charms[charmIndex];
+                    var charm = movable[charmIndex];
                     var cell = free[cellIndex];
                     var usable = CanUse(problem, charm, cell, result, occupancy, neighbors);
                     var priority = 0.0;
@@ -1525,7 +1565,7 @@ namespace SephPlanner.Core.Solver
 
                 var charmIndex = charmsAreRows ? row : assignment[row];
                 var cellIndex = charmsAreRows ? assignment[row] : row;
-                positions[problem.Charms[charmIndex].InstanceId] = free[cellIndex];
+                positions[movable[charmIndex].InstanceId] = free[cellIndex];
             }
             return positions;
         }

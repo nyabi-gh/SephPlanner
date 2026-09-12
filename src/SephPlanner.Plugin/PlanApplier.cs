@@ -182,12 +182,18 @@ namespace SephPlanner.Plugin
                 var instance = pair.Value;
                 if (instance == null) continue;
 
-                cellCounts[instance.InstanceID] =
-                    cellCounts.TryGetValue(instance.InstanceID, out var count) ? count + 1 : 1;
-                if (!grid.Contains(pair.Key.x, pair.Key.y)) continue;
+                // 번호 없는 아이템은 칸에서 만든 번호로 가리킨다(ItemIdentity). 계획도 같은
+                // 번호를 쓰므로, 여기서 0 그대로 두면 목표를 못 찾아 자동 배치가 거절된다.
+                var inGrid = grid.Contains(pair.Key.x, pair.Key.y);
+                var identity = inGrid
+                    ? ItemIdentity.Of(instance.InstanceID, grid, pair.Key.x, pair.Key.y)
+                    : instance.InstanceID;
 
-                touchesGrid.Add(instance.InstanceID);
-                positions[instance.InstanceID] = new GridPos(pair.Key.x, pair.Key.y);
+                cellCounts[identity] = cellCounts.TryGetValue(identity, out var count) ? count + 1 : 1;
+                if (!inGrid) continue;
+
+                touchesGrid.Add(identity);
+                positions[identity] = new GridPos(pair.Key.x, pair.Key.y);
             }
 
             // 여러 칸을 차지하는 아이템은 한 칸짜리 맞바꿈으로 옮기면 망가진다. 모델에 없는
@@ -258,6 +264,15 @@ namespace SephPlanner.Plugin
                         return pair.Value != null ? pair.Value.InstanceID : 0;
                 }
                 return 0;
+            }
+
+            public bool Occupied(GridPos cell)
+            {
+                foreach (var pair in _inventory.inventoryMatrix)
+                {
+                    if (pair.Key.x == cell.X && pair.Key.y == cell.Y) return pair.Value != null;
+                }
+                return false;
             }
 
             public string Swap(GridPos from, GridPos to)

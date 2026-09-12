@@ -258,6 +258,16 @@ namespace SephPlanner.Core.Solver
             foreach (var charm in problem.Charms.Where(charm => ScalesPosition.Required(problem, charm)).OrderBy(charm => charm.InstanceId))
                 builder.Append("scales:").Append(charm.InstanceId).Append(':')
                     .Append(ScalesPosition.IsLeft(problem.CurrentCharms[charm.InstanceId]) ? 'L' : 'R').Append(';');
+
+            // 못 옮기는 아이템은 그 칸을 석판에게서 빼앗는다. 열쇠에 없으면 그 아이템이 사라진
+            // 뒤에도 옛 빔을 돌려받아 못 쓰던 칸을 계속 비워 둔다.
+            foreach (var charm in problem.Charms.Where(charm => charm.Immovable).OrderBy(charm => charm.InstanceId))
+            {
+                builder.Append("pinned:").Append(charm.InstanceId).Append(':');
+                if (problem.CurrentCharms.TryGetValue(charm.InstanceId, out var at))
+                    builder.Append(at.X).Append(',').Append(at.Y);
+                builder.Append(';');
+            }
             return builder.ToString();
         }
     }

@@ -38,5 +38,11 @@ namespace SephPlanner.Core.Runtime
 
         /// <summary>석판만 의미가 있다.</summary>
         public int Rotation { get; set; }
+
+        /// <summary>
+        /// 옮길 수 없는 아이템의 자리(<see cref="PlacedItem.Immovable"/>). 목표는 언제나 제자리이고,
+        /// 적용기는 이것을 보고 번호로 찾으려 들지 않는다 - 애초에 번호가 없어서 못 옮기는 것이다.
+        /// </summary>
+        public bool Immovable { get; set; }
     }
 }

@@ -66,6 +66,11 @@ public class ApplyPlanRoutineTests
             return Cells.TryGetValue(cell, out var id) ? id : 0;
         }
 
+        /// <summary>번호 없는 아이템이 앉은 칸. <see cref="InstanceAt"/> 는 0 을 돌려준다.</summary>
+        public readonly HashSet<GridPos> Unnumbered = new();
+
+        public bool Occupied(GridPos cell) => Cells.ContainsKey(cell) || Unnumbered.Contains(cell);
+
         public string? Swap(GridPos from, GridPos to)
         {
             var index = _swaps++;
@@ -209,6 +214,48 @@ public class ApplyPlanRoutineTests
             Assert.True(frames < 100_000, "반복자가 끝나지 않는다");
         }
         return frames;
+    }
+
+    /// <summary>
+    /// 번호 없는 아이템(시나리오 동행 증표)은 제자리가 목표다. 번호로 찾으려 들면 가방에서
+    /// 못 찾아 그 자리에서 중단하고, 나머지 이동까지 막힌다 - 제보 <c>6961d1a0</c> 이 그랬다.
+    /// </summary>
+    [Fact]
+    public void AnImmovableTargetIsSkippedAndTheRestStillApplies()
+    {
+        var (inventory, clock) = Host();
+        inventory.Cells[At(0, 0)] = 10;
+        inventory.Unnumbered.Add(At(2, 1));
+
+        var routine = Routine(
+            Command(
+                new PlanTarget { InstanceId = -9, From = At(2, 1), To = At(2, 1), Immovable = true },
+                Charm(10, At(0, 0), At(1, 0))),
+            inventory, clock);
+        Drive(routine, inventory, clock);
+
+        Assert.Equal(10, inventory.InstanceAt(At(1, 0)));
+        Assert.True(routine.Settled);
+        AssertContains("자동 배치 완료", routine.Result);
+    }
+
+    /// <summary>
+    /// 번호 없는 칸은 <c>InstanceAt</c> 이 0 을 돌려주어 빈 칸처럼 보인다. 거기로 밀어 넣으면
+    /// 게임 안에서 무슨 일이 나는지 모르므로 옮기기 전에 멈춘다.
+    /// </summary>
+    [Fact]
+    public void MovingIntoAnUnnumberedCellStopsBeforeTheWrite()
+    {
+        var (inventory, clock) = Host();
+        inventory.Cells[At(0, 0)] = 10;
+        inventory.Unnumbered.Add(At(1, 0));
+
+        var routine = Routine(Command(Charm(10, At(0, 0), At(1, 0))), inventory, clock);
+        Drive(routine, inventory, clock);
+
+        Assert.Equal(0, inventory.SwapCount);
+        Assert.False(routine.Settled);
+        AssertContains("옮길 수 없어", routine.Result);
     }
 
     private static (FakeInventory Inventory, Clock Clock) Host()

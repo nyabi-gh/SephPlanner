@@ -27,6 +27,14 @@ namespace SephPlanner.Core.Runtime
         /// <summary>그 칸에 지금 있는 인스턴스. 비어 있으면 0.</summary>
         int InstanceAt(GridPos cell);
 
+        /// <summary>
+        /// 그 칸에 무엇이든 놓여 있는가. <see cref="InstanceAt"/> 만으로는 <b>빈 칸과 번호 없는
+        /// 아이템을 가를 수 없다</b> - 시나리오 동행 증표는 인스턴스 번호가 0 이라 빈 칸과 같은
+        /// 값을 돌려준다. 그 칸으로 무언가를 밀어 넣으면 게임 안에서 무슨 일이 나는지 모르므로,
+        /// 옮기기 전에 여기로 한 번 더 본다.
+        /// </summary>
+        bool Occupied(GridPos cell);
+
         /// <summary>두 칸을 맞바꾼다. 실패하면 이유, 아니면 null. 거부됐는지는 돌려주는 값으로 알 수 없다.</summary>
         string? Swap(GridPos from, GridPos destination);
 
