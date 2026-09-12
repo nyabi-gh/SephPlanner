@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
+using SephPlanner.Core.Runtime;
 
 namespace SephPlanner.Plugin
 {
@@ -156,6 +157,12 @@ namespace SephPlanner.Plugin
         /// </summary>
         public static int WorstPollCollections { get; private set; }
 
+        /// <summary>
+        /// 백그라운드 풀이의 계측을 가져오는 자리. 실행기는 카탈로그가 준비된 뒤에야 생기고 F9
+        /// 뒤에는 새로 지어지므로, 들고 있지 않고 그때그때 묻는다. 없으면 그 줄을 아예 안 적는다.
+        /// </summary>
+        public static Func<PlanRunnerStats> PlanStats;
+
         public static void CountFrame() => Frames++;
         public static void CountDraw() => Draws++;
 
@@ -198,7 +205,57 @@ namespace SephPlanner.Plugin
                 Catalog.Count, Catalog.TotalMs, CatalogSource.Attempts,
                 Poll.WorstPoll, Collections, WorstPollCollections,
                 ChestAlive.AverageMs, RegistryCheck.AverageMs, ChestFilter.AverageMs, ChestCollect.AverageMs,
-                InventoriesHeld, RegistryMismatches, RegistryChecks);
+                InventoriesHeld, RegistryMismatches, RegistryChecks) + PlanSummary();
+
+        /// <summary>
+        /// 풀이와 게시를 요약한 꼬리. 폴링 비용만으로는 "계산이 안 끝난다" 를 설명할 수 없어
+        /// 같은 줄에 붙인다. 밀린 세대가 0 이 아닌 채로 이어지면 답이 요청을 못 따라가는 것이다.
+        /// </summary>
+        private static string PlanSummary()
+        {
+            var stats = PlanStats?.Invoke();
+            if (stats == null) return "";
+
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                ", 계획 풀이 - 배치 {0}회 평균 {1:0}ms/최악 {2:0}ms(풀이 {3}) 버린 것 {4}회, " +
+                "조언 {5}회 평균 {6:0}ms, 게시 {7}회 지연 최근 {8:0}ms/최악 {9:0}ms, " +
+                "밀린 세대 {10}(최악 {11})",
+                stats.Placement.Count, stats.Placement.AverageMs, stats.Placement.WorstMs,
+                stats.Placement.WorstRun, stats.Placement.Discarded,
+                stats.Advice.Count, stats.Advice.AverageMs,
+                stats.Published, stats.PublishDelayMs, stats.WorstPublishDelayMs,
+                stats.Backlog, stats.WorstBacklog);
+        }
+
+        private static string Describe(string name, PlanSolveStat stat) =>
+            string.Format(
+                CultureInfo.InvariantCulture,
+                "{0,-28} {1,7}회  평균 {2,7:0.00}ms  최악 {3,8:0.00}ms(풀이 {4,6})  버린 것 {5}회",
+                name, stat.Count, stat.AverageMs, stat.WorstMs, stat.WorstRun, stat.Discarded);
+
+        private static void WritePlan(StringBuilder text)
+        {
+            var stats = PlanStats?.Invoke();
+            if (stats == null) return;
+
+            text.AppendLine();
+            text.AppendLine("[perf] 계획 풀이 (백그라운드 스레드)");
+            text.AppendLine("  " + Describe("배치 풀이", stats.Placement));
+            text.AppendLine("  " + Describe("조언 풀이", stats.Advice) +
+                            (stats.Advice.Count == 0 ? "  (아직 배치와 함께 푼다)" : ""));
+            text.AppendLine(
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "  게시 {0}회 - 요청에서 게시까지 최근 {1:0.0}ms, 최악 {2:0.0}ms({3}번째 게시)",
+                    stats.Published, stats.PublishDelayMs, stats.WorstPublishDelayMs,
+                    stats.WorstPublishRun));
+            text.AppendLine(
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "  밀린 세대 - 지금 {0}, 세션 최악 {1}",
+                    stats.Backlog, stats.WorstBacklog));
+        }
 
         public static void Write(StringBuilder text)
         {
@@ -240,6 +297,8 @@ namespace SephPlanner.Plugin
                     CultureInfo.InvariantCulture,
                     "  프레임 {0}회 중 화면을 다시 그린 것 {1}회 ({2:0.0}%)",
                     Frames, Draws, Frames == 0 ? 0 : 100.0 * Draws / Frames));
+
+            WritePlan(text);
         }
     }
 }

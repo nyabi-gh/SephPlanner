@@ -36,6 +36,9 @@ namespace SephPlanner.Core.Runtime
             public string CatalogGeneration = "";
             public Plan? Previous;
 
+            /// <summary>요청이 들어온 때. 여기서 게시까지가 사용자가 기다리는 시간이다.</summary>
+            public long SubmittedAt = SolveClock.Now;
+
             /// <summary>
             /// 이 요청이 낡았다고 알리는 자리. 뒤에 요청이 오면 지금 도는 풀이의 답은 어차피
             /// 버려지므로, 끝까지 돌게 두면 CPU 와 할당을 그대로 버린다.
@@ -77,6 +80,14 @@ namespace SephPlanner.Core.Runtime
         private DateTime _retryAfterUtc;
         private bool _disposed;
 
+        private readonly PlanSolveStat _placementStat = new PlanSolveStat();
+        private readonly PlanSolveStat _adviceStat = new PlanSolveStat();
+        private double _publishDelayMs;
+        private double _worstPublishDelayMs;
+        private int _worstPublishRun;
+        private int _published;
+        private long _worstBacklog;
+
         public PlanRunner(ICatalog catalog)
             : this(catalog, Build, TimeSpan.FromSeconds(1))
         {
@@ -104,6 +115,30 @@ namespace SephPlanner.Core.Runtime
                         PublishedGeneration = _publishedGeneration,
                         IsBusy = _running is not null,
                         HasPending = _pending is not null,
+                    };
+                }
+            }
+        }
+
+        /// <summary>
+        /// 지금까지의 풀이 계측. 잠금 안에서 복사해 주므로 읽는 쪽이 더 조심할 것은 없다.
+        /// </summary>
+        public PlanRunnerStats Stats
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return new PlanRunnerStats
+                    {
+                        Placement = _placementStat.Copy(),
+                        Advice = _adviceStat.Copy(),
+                        PublishDelayMs = _publishDelayMs,
+                        WorstPublishDelayMs = _worstPublishDelayMs,
+                        WorstPublishRun = _worstPublishRun,
+                        Published = _published,
+                        Backlog = _requestedGeneration - _publishedGeneration,
+                        WorstBacklog = _worstBacklog,
                     };
                 }
             }
@@ -141,6 +176,9 @@ namespace SephPlanner.Core.Runtime
                 };
                 _requestedFingerprint = fingerprint;
                 _error = null;
+
+                var backlog = _requestedGeneration - _publishedGeneration;
+                if (backlog > _worstBacklog) _worstBacklog = backlog;
 
                 if (_running is not null)
                 {
@@ -234,6 +272,7 @@ namespace SephPlanner.Core.Runtime
             Plan? plan = null;
             var blocker = PlanBlocker.None;
             Exception? failure = null;
+            var startedAt = SolveClock.Now;
             try
             {
                 plan = _build(
@@ -253,12 +292,28 @@ namespace SephPlanner.Core.Runtime
                 failure = ex;
             }
 
+            // 잠금을 기다린 시간은 풀이에 든 시간이 아니다. 자물쇠 밖에서 끊는다.
+            var elapsedMs = SolveClock.MsSince(startedAt);
+
             lock (_gate)
             {
                 // 취소된 요청의 결과는 도중에 그만둔 것이라 쓸 수 없다. 세대 검사만으로도 걸리지만,
                 // 반쪽짜리 계획을 최신이라고 게시하는 일만은 확실히 막아 둔다.
-                if (!request.Cancellation.IsCancellationRequested &&
-                    request.Generation == _requestedGeneration)
+                var usable = !request.Cancellation.IsCancellationRequested &&
+                             request.Generation == _requestedGeneration;
+                _placementStat.Add(elapsedMs, !usable);
+                if (usable && failure is null)
+                {
+                    _published++;
+                    _publishDelayMs = SolveClock.MsSince(request.SubmittedAt);
+                    if (_publishDelayMs > _worstPublishDelayMs)
+                    {
+                        _worstPublishDelayMs = _publishDelayMs;
+                        _worstPublishRun = _published;
+                    }
+                }
+
+                if (usable)
                 {
                     _publishedGeneration = request.Generation;
                     if (failure is null)

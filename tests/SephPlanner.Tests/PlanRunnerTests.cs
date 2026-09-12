@@ -192,6 +192,53 @@ public class PlanRunnerTests
         Assert.Equal(2, runner.State.RequestedGeneration);
     }
 
+    /// <summary>
+    /// 밀림은 풀이가 느려서가 아니라 요청이 답보다 자주 와서 생긴다. 그것을 인게임에서 읽으려면
+    /// 버린 풀이와 밀린 세대가 수로 남아야 한다.
+    /// </summary>
+    [Fact]
+    public void StatsCountDiscardedSolvesAndTheBacklog()
+    {
+        using var started = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var calls = 0;
+        PlanBuildOperation build = (
+            GameSnapshot _, ICatalog _, PlanPreferences _,
+            out PlanBlocker blocker, Plan? _, LayoutCache _2, CancellationToken _3) =>
+        {
+            blocker = PlanBlocker.None;
+            if (Interlocked.Increment(ref calls) == 1)
+            {
+                started.Set();
+                release.Wait(TimeSpan.FromSeconds(5), CancellationToken.None);
+            }
+            return new Plan();
+        };
+        var runner = new PlanRunner(EmptyCatalog, build, TimeSpan.Zero);
+
+        runner.Submit(Snapshot(1), PlanPreferences.None, "catalog");
+        Assert.True(started.Wait(TimeSpan.FromSeconds(5), CancellationToken.None));
+        runner.Submit(Snapshot(2), PlanPreferences.None, "catalog");
+        Assert.Equal(2, runner.Stats.Backlog);
+
+        release.Set();
+        Assert.True(SpinWait.SpinUntil(() => runner.State.IsCurrent, TimeSpan.FromSeconds(5)));
+
+        var stats = runner.Stats;
+        Assert.Equal(2, stats.Placement.Count);
+        Assert.Equal(1, stats.Placement.Discarded);
+        Assert.Equal(1, stats.Published);
+        Assert.Equal(0, stats.Backlog);
+        Assert.Equal(2, stats.WorstBacklog);
+
+        // 첫 풀이가 신호를 기다린 시간이 그대로 잡히므로 둘 다 0 보다 크다.
+        Assert.True(stats.Placement.WorstMs > 0);
+        Assert.Equal(1, stats.Placement.WorstRun);
+        Assert.True(stats.WorstPublishDelayMs > 0);
+        Assert.Equal(1, stats.WorstPublishRun);
+        Assert.Equal(0, stats.Advice.Count);
+    }
+
     private static GameSnapshot Snapshot(int storage) => new()
     {
         Inventory = new InventoryState { Width = 6, Height = 7, Storage = storage },

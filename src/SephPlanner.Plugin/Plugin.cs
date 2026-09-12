@@ -87,6 +87,10 @@ namespace SephPlanner.Plugin
                 if (!_settings.DiagnosticUploadAllowed) _diagnosticCancellation?.Cancel();
             };
             Logger.LogEvent += CaptureOwnLog;
+
+            // 실행기는 카탈로그가 준비된 뒤에 생기고 F9 뒤에는 새로 지어진다. 지금 것을 그때그때
+            // 묻게 해 두면 계측 쪽이 그 수명을 몰라도 된다.
+            FrameCost.PlanStats = () => _runner?.Stats;
             Logger.LogInfo(PluginIdentity.Describe());
         }
 
@@ -1170,6 +1174,7 @@ namespace SephPlanner.Plugin
 
         private void OnDestroy()
         {
+            FrameCost.PlanStats = null;
             _runner?.Dispose();
             _diagnosticCancellation?.Cancel();
             _diagnosticCancellation?.Dispose();
