@@ -854,7 +854,14 @@ namespace SephPlanner.Plugin.Ui
                     mixer.Used ? "이 합성기는 이미 사용했습니다." : "현재 석판에서 추천할 수 있는 조합을 찾지 못했습니다.", NativeSkin.TextDim);
             _mixes.End();
 
-            Widgets.SetActive(_mixes.Root, mixerOpen || mixer != null && !mixer.Used && plan.Mixes.Count > 0);
+            // 합성 추천은 합성기 창을 열었을 때만 보인다.
+            //
+            // 예전에는 층에 합성기가 있기만 하면 계속 띄웠다 - "합성기 앞에 서기 전에 무엇을
+            // 합칠지 정해 두는 편이 쓸모 있다" 는 생각이었다. 실제로는 <b>상점을 열어도 합성
+            // 추천이 따라 붙었다</b>. 조언 칸은 후보가 생기면 저절로 펼쳐지는데, 펼쳐진 김에
+            // 합성 줄까지 같이 보였기 때문이다. 상점에서 살 것을 고르는 중에 합성 이야기가
+            // 끼어드는 것은 도움이 아니라 잡음이라는 제보를 받고 창 기준으로 좁혔다.
+            Widgets.SetActive(_mixes.Root, mixerOpen);
         }
 
         /// <summary>
