@@ -137,4 +137,58 @@ public class NeedleConnectionTests
         Assert.Equal(solved.CharmPositions.OrderBy(pair => pair.Key),
             PlacementSolver.Solve(problem).CharmPositions.OrderBy(pair => pair.Key));
     }
+
+    /// <summary>
+    /// 침의 레어도 덤은 <b>사용자가 낮춘 대상 위에서는 그만큼 줄어든다.</b>
+    ///
+    /// 제보 <c>fee2feb9</c>: 조건을 만족하는 대상 여섯 가운데 다섯이 낮춰진 것이었는데, 덤이
+    /// 대상을 가리지 않아 침이 별 −2 짜리를 우선해서 강화했다. 값싼 것을 죽은 칸에 버려도 배수를
+    /// 다 받았기 때문이다. 여기서는 낮춘 것과 원하는 것을 나란히 두고 침이 어느 쪽을 고르는지 본다.
+    /// </summary>
+    [Fact]
+    public void TheNeedlePrefersATargetTheUserWants()
+    {
+        // 2x2. 아래 두 칸 중 하나에 침이 서고 바로 위 칸을 강화한다.
+        var problem = new PlacementProblem { Grid = new GridSpec(2, 2, 4) };
+        problem.Charms.Add(new CharmSlot
+        {
+            InstanceId = 1,
+            Weight = PlanPreferences.WeightOf(-2),
+            Definition = new CharmDefinition { EntityId = 1, IsAttackable = true, MaxLevel = 4, Rarity = Rarity.Common },
+        });
+        problem.Charms.Add(new CharmSlot
+        {
+            InstanceId = 2,
+            Weight = PlanPreferences.WeightOf(1),
+            Definition = new CharmDefinition { EntityId = 2, IsAttackable = true, MaxLevel = 4, Rarity = Rarity.Common },
+        });
+        problem.Charms.Add(new CharmSlot
+        {
+            InstanceId = 3,
+            Definition = new CharmDefinition
+            {
+                EntityId = 3,
+                MaxLevel = 4,
+                DependencyOffsetY = -1,
+                HasDependencyCondition = true,
+                DependencyMaxRarity = Rarity.Common,
+                DependencyBonusByLevel = { 10, 10, 10, 10, 10 },
+                DependencyExtraByLevel = { 25, 25, 25, 25, 25 },
+            },
+        });
+        problem.Charms.Add(new CharmSlot
+        {
+            InstanceId = 4,
+            IsFiller = true,
+            Definition = new CharmDefinition { EntityId = 4, MaxLevel = 1 },
+        });
+
+        var arrangement = PlacementSolver.Solve(problem);
+
+        // 침 바로 위에 있는 것이 원하는 쪽이어야 한다.
+        var needle = arrangement.CharmPositions[3];
+        var above = needle.Offset(0, -1);
+        Assert.Equal(above, arrangement.CharmPositions[2]);
+        Assert.NotEqual(above, arrangement.CharmPositions[1]);
+    }
 }

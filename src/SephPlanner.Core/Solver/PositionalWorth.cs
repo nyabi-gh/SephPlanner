@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Tablets;
@@ -39,6 +40,16 @@ namespace SephPlanner.Core.Solver
         ///
         /// 돌려주는 것은 배수다. 0이면 헛자리, 1이면 제 몫, 그보다 크면 레어도 조건
         /// (<c>hasDependencyCondition</c>)까지 맞아 덤이 붙은 자리다. 침이 아닌 아티팩트는 1이다.
+        ///
+        /// <b>덤은 대상이 받을 만할 때만 값이 있다.</b> 레어도 덤은 대상에게 주는 피해 보너스인데,
+        /// 예전에는 대상이 누구든 같은 배수였다 - 그래서 침이 <b>사용자가 낮춘 아티팩트를 우선해서</b>
+        /// 강화했다(제보 `fee2feb9`: 별 −2 짜리 위에 침이 붙고, 조건을 만족하는 여섯 대상 가운데
+        /// 다섯이 낮춰진 것이었다). 조건만 맞으면 값싼 것을 죽은 칸에 버려도 배수를 다 받았기
+        /// 때문이다. 이제 덤은 대상의 가중치만큼만 쳐 준다.
+        ///
+        /// <b>올린 쪽으로는 키우지 않는다</b>(<c>Math.Min</c>). 선호 대상이라고 덤을 부풀리면 침이
+        /// 그 아티팩트를 좋은 칸에서 제 위 칸으로 끌어내리게 되는데, 그것이 지금 고치는 것보다 나쁘다.
+        /// 그래서 가중치 1 이상은 전과 같은 값이고, <b>낮춘 대상에서만 덤이 줄어든다.</b>
         /// </summary>
         public static double DependencyFactor(
             CharmSlot charm, GridPos cell, int level, IReadOnlyDictionary<GridPos, CharmSlot>? neighbors)
@@ -52,11 +63,12 @@ namespace SephPlanner.Core.Solver
             if (!definition.HasDependencyCondition) return 1;
             if (target.Definition.Rarity > definition.DependencyMaxRarity) return 1;
 
+            var wanted = Math.Min(1, target.Weight);
             var baseBonus = At(definition.DependencyBonusByLevel, level);
             var extra = At(definition.DependencyExtraByLevel, level);
-            if (baseBonus <= 0) return extra > 0 ? 2 : 1;
+            if (baseBonus <= 0) return extra > 0 ? 1 + wanted : 1;
 
-            return 1 + extra / baseBonus;
+            return 1 + extra / baseBonus * wanted;
         }
 
         /// <summary>
