@@ -1,5 +1,6 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace SephPlanner.Plugin.Ui
@@ -123,7 +124,8 @@ namespace SephPlanner.Plugin.Ui
         ///
         /// <b>게임이 채팅에 쓰는 길 그대로다.</b> <c>UI_ChatInput</c>이 <c>TMP_InputField</c>를
         /// 두고 조작을 넘겨받는 순간 <c>ActivateInputField</c>를 부른다. 그 길이라 한글 IME 도
-        /// 채팅과 똑같이 동작한다 - 우리가 조합 규칙을 흉내 내지 않는다.
+        /// 채팅과 똑같이 동작한다 - 우리가 조합 규칙을 흉내 내지 않는다. 다만 확인 입력만은
+        /// 게임의 것을 쓸 수 없어 <see cref="PlannerInputField"/>로 막는다.
         ///
         /// <see cref="Clickable"/>과 같은 이유로 플레이어가 일부러 연 창에서만 쓴다. 여기서도
         /// <c>raycastTarget</c>이 켜지므로 HUD 에는 두지 않는다.
@@ -149,7 +151,7 @@ namespace SephPlanner.Plugin.Ui
             placeholder.overflowMode = TextOverflowModes.Overflow;
             Stretch(placeholder.rectTransform, 0f);
 
-            var field = rect.gameObject.AddComponent<TMP_InputField>();
+            var field = rect.gameObject.AddComponent<PlannerInputField>();
             field.textViewport = viewport;
             field.textComponent = text;
             field.placeholder = placeholder;
@@ -285,6 +287,40 @@ namespace SephPlanner.Plugin.Ui
         {
             if (component != null && component.gameObject.activeSelf != active)
                 component.gameObject.SetActive(active);
+        }
+    }
+
+    /// <summary>
+    /// <b>확인 입력을 받지 않는 글자 칸.</b> 적는 도중 스페이스를 누르면 그것이 전송으로 읽히던
+    /// 것을 여기서 끊는다.
+    ///
+    /// 게임 어셈블리로 확인한 길은 이렇다. 게임의 UI 입력은 새 입력 시스템의
+    /// <c>InputSystemUIInputModule</c>이고(<c>UIInputModule.currentModule</c>), 그 모듈은 확인
+    /// 동작이 눌린 프레임에 지금 선택된 오브젝트로 <c>submitHandler</c>를 보낸다.
+    /// <c>TMP_InputField</c>는 <c>ISubmitHandler</c>라 그것을 받아 <c>onSubmit</c>을 부르고
+    /// <c>DeactivateInputField</c>까지 한다. 확인 동작에 스페이스가 함께 걸려 있으므로 띄어쓰기
+    /// 한 번이 전송이었다.
+    ///
+    /// 모듈은 그 직전에 <c>updateSelectedHandler</c>를 보내고 칸이 키를 먹었으면 확인을 보내지
+    /// 않는데, 새 입력 시스템의 동작은 그 프레임의 IMGUI 키 사건보다 먼저 읽히므로 그 방패가
+    /// 눌린 바로 그 프레임에는 서지 않는다. 그래서 스페이스는 전송이 되면서 글자로 들어가지도
+    /// 않았다.
+    ///
+    /// <b>Enter 는 그대로 보내기다.</b> 칸이 스스로 키를 읽는 길(<c>MultiLineSubmit</c>)이
+    /// 남아 있어 거기서 <c>onSubmit</c>이 불린다. 한글 조합 중인 글자도 그 길이 마무리해 주므로,
+    /// 우리가 Enter 를 직접 읽어 보내는 것보다 안전하다.
+    ///
+    /// 칸에 커서가 없을 때의 확인은 커서를 넣는 뜻으로 남긴다 - 컨트롤러로 칸을 골라 적기
+    /// 시작하는 유일한 길이다.
+    /// </summary>
+    internal sealed class PlannerInputField : TMP_InputField
+    {
+        public override void OnSubmit(BaseEventData eventData)
+        {
+            if (!IsActive() || !IsInteractable() || isFocused) return;
+
+            ActivateInputField();
+            eventData?.Use();
         }
     }
 }
