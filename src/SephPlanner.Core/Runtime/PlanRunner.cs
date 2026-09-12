@@ -206,6 +206,22 @@ namespace SephPlanner.Core.Runtime
         }
 
         /// <summary>
+        /// 마지막으로 제출된 판의 배치 지문.
+        ///
+        /// <b>부르는 쪽이 다시 계산하지 않게 하려고 내놓는다.</b> 자동 배치는 "계산 이후 가방이
+        /// 바뀌었는가" 를 이 값으로 가르는데, 그것을 따로 계산하면 폴링마다 가방 전체를 두 번
+        /// 해싱하게 된다 - 제보 <c>6fd678ef</c> 에서 지문 계산이 폴링 시간의 46%(0.32ms 중
+        /// 0.70ms)로 가장 큰 항목이었다.
+        /// </summary>
+        public string PlacementFingerprint
+        {
+            get
+            {
+                lock (_gate) return _placementFingerprint;
+            }
+        }
+
+        /// <summary>
         /// 지금까지의 풀이 계측. 잠금 안에서 복사해 주므로 읽는 쪽이 더 조심할 것은 없다.
         /// </summary>
         public PlanRunnerStats Stats

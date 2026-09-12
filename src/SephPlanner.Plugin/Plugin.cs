@@ -628,9 +628,11 @@ namespace SephPlanner.Plugin
 
             var preferences = Preferences();
             _currentCatalogGeneration = CatalogDump.ActiveGeneration;
-            _currentPlacementFingerprint = PlanFingerprint.Placement(
-                snapshot, preferences, _currentCatalogGeneration);
             _runner.Submit(snapshot, preferences, _currentCatalogGeneration);
+
+            // 실행기가 방금 계산한 것을 받아 온다. 여기서 다시 계산하면 폴링마다 가방 전체를
+            // 두 번 해싱하는 셈이고, 그 값이 폴링 시간의 절반이었다.
+            _currentPlacementFingerprint = _runner.PlacementFingerprint;
             _panelAwaitingRefresh = false;
         }
 
@@ -1068,8 +1070,11 @@ namespace SephPlanner.Plugin
 
                 var state = _runner?.State;
                 var generation = CatalogDump.ActiveGeneration;
-                var fingerprint = PlanFingerprint.Placement(snapshot, Preferences(), generation);
-                var decision = AutoPlaceAvailability(snapshot, state, fingerprint, generation);
+
+                // 바로 위 FeedNativePanel 이 이 스냅샷을 제출했으므로 지문은 이미 손에 있다.
+                // 실행기가 없어 갱신되지 않았으면 state 도 null 이라 아래에서 거절된다.
+                var decision = AutoPlaceAvailability(
+                    snapshot, state, _currentPlacementFingerprint, generation);
                 if (!decision.Allowed)
                 {
                     Report(decision.Reason);

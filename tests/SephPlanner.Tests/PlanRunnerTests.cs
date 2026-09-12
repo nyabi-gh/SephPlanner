@@ -418,6 +418,36 @@ public class PlanRunnerTests
         Assert.Equal(new[] { false, false }, settledCalls.ToArray());
     }
 
+    /// <summary>
+    /// 실행기가 계산한 배치 지문을 그대로 내놓아야 한다. 플러그인이 자동 배치 판단에 쓰는 값이고,
+    /// 이것이 제 값이 아니면 따로 계산하는 수밖에 없다 - 그러면 폴링마다 가방을 두 번 해싱한다.
+    /// </summary>
+    [Fact]
+    public void TheRunnerHandsBackThePlacementFingerprintItComputed()
+    {
+        PlanBuildOperation build = (
+            GameSnapshot _, ICatalog _, PlanPreferences _,
+            out PlanBlocker blocker, Plan? _1, LayoutCache _2, bool settled, CancellationToken _3) =>
+        {
+            blocker = PlanBlocker.None;
+            return new Plan();
+        };
+        var runner = new PlanRunner(EmptyCatalog, build, TimeSpan.Zero);
+        Assert.Equal("", runner.PlacementFingerprint);
+
+        var first = Board(new GridPos(0, 0));
+        runner.Submit(first, PlanPreferences.None, "catalog");
+        Assert.Equal(
+            PlanFingerprint.Placement(first, PlanPreferences.None, "catalog"),
+            runner.PlacementFingerprint);
+
+        var moved = Board(new GridPos(1, 0));
+        runner.Submit(moved, PlanPreferences.None, "catalog");
+        Assert.Equal(
+            PlanFingerprint.Placement(moved, PlanPreferences.None, "catalog"),
+            runner.PlacementFingerprint);
+    }
+
     /// <summary>아티팩트 하나가 (0,0) 에서 (1,0) 으로 가는 계획을 내놓는 실행기.</summary>
     private static PlanRunner AppliedRunner(List<bool> settledCalls)
     {
