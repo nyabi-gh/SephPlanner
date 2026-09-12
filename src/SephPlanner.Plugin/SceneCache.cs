@@ -20,24 +20,38 @@ namespace SephPlanner.Plugin
     {
         private readonly float _interval;
         private readonly FindObjectsInactive _inactive;
+        private readonly FrameCost.Step _scan, _search;
 
         private T[] _found = System.Array.Empty<T>();
         private float _refreshedAt = float.NegativeInfinity;
 
         /// <param name="interval">다시 찾기까지 최소로 기다릴 시간(초).</param>
         /// <param name="inactive">비활성 오브젝트까지 찾을지. 켜면 눈에 띄게 비싸진다.</param>
-        public SceneCache(float interval, FindObjectsInactive inactive = FindObjectsInactive.Exclude)
+        /// <param name="scan">들고 있는 것이 살아 있는지 훑는 데 쓴 시간을 적을 자리(없어도 된다).</param>
+        /// <param name="search">씬 전수 탐색에 쓴 시간을 적을 자리(없어도 된다).</param>
+        public SceneCache(float interval, FindObjectsInactive inactive = FindObjectsInactive.Exclude,
+            FrameCost.Step scan = null, FrameCost.Step search = null)
         {
             _interval = interval;
             _inactive = inactive;
+            _scan = scan;
+            _search = search;
         }
+
+        /// <summary>지금 들고 있는 수. 위 훑기가 <c>O(n)</c> 이라 이 수가 곧 그 비용이다.</summary>
+        public int Count => _found.Length;
 
         public T[] Get()
         {
-            if (Time.unscaledTime - _refreshedAt < _interval && Alive()) return _found;
+            var at = FrameCost.Now;
+            var fresh = Time.unscaledTime - _refreshedAt < _interval && Alive();
+            _scan?.Add(at);
+            if (fresh) return _found;
 
+            at = FrameCost.Now;
             _refreshedAt = Time.unscaledTime;
             _found = Object.FindObjectsByType<T>(_inactive, FindObjectsSortMode.None);
+            _search?.Add(at);
             return _found;
         }
 

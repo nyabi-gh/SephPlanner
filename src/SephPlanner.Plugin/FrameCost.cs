@@ -73,6 +73,35 @@ namespace SephPlanner.Plugin
         public static readonly Step Mixer = new Step("    합성기 찾기(씬 탐색)");
         public static readonly Step Sephirites = new Step("    세피라이트 찾기(씬 탐색)");
         public static readonly Step Chests = new Step("    상자·상점 찾기(씬 탐색)");
+
+        /// <summary>
+        /// <c>상자·상점 찾기</c>를 셋으로 가른 것. 계획서 4번이 짚은 자리가 셋인데 고칠 곳이
+        /// 저마다 다르다 - 들고 있는 목록을 폴링마다 훑는 것(<see cref="ChestAlive"/>)은 캐시가
+        /// 살아 있는지 보는 값이고, 씬 전수 탐색(<see cref="ChestFind"/>)은 네 번에 한 번 도는
+        /// 것이며, 거리·보임 판정(<see cref="ChestFilter"/>)은 인벤토리마다 계층을 걷는 것이다.
+        /// 어느 쪽인지 모르고 고치면 또 짐작이 되므로 먼저 가른다.
+        /// </summary>
+        public static readonly Step ChestAlive = new Step("      들고 있는 것 훑기");
+        public static readonly Step ChestFind = new Step("      씬 전수 탐색");
+        public static readonly Step ChestFilter = new Step("      거리·보임 판정");
+        public static readonly Step ChestCollect = new Step("      내용 담기");
+
+        /// <summary>
+        /// 마지막 폴링에서 들고 있던 인벤토리 수와, 세션 최대. 위의 훑기가 <c>O(n)</c> 이라
+        /// 시간만으로는 "무엇이 많아서" 인지 알 수 없다. 기계와 무관한 수라 전후 비교에도 쓴다.
+        /// </summary>
+        public static int InventoriesHeld { get; private set; }
+        public static int InventoriesHeldMost { get; private set; }
+        public static int InventoriesNear { get; private set; }
+        public static int InventoriesNearMost { get; private set; }
+
+        public static void CountInventories(int held, int near)
+        {
+            InventoriesHeld = held;
+            InventoriesNear = near;
+            if (held > InventoriesHeldMost) InventoriesHeldMost = held;
+            if (near > InventoriesNearMost) InventoriesNearMost = near;
+        }
         public static readonly Step Simulation = new Step("  시뮬레이터 대조");
         public static readonly Step Feed = new Step("  지문 계산과 제출");
         public static readonly Step Panel = new Step("화면 갱신(매 프레임)");
@@ -143,13 +172,16 @@ namespace SephPlanner.Plugin
                 "대조 {7:0.00} 지문 {8:0.00}), " +
                 "화면 평균 {9:0.000}ms, 프레임 {10}회 중 다시 그린 것 {11}회, " +
                 "카탈로그 짓기 {12}회 합계 {13:0.0}ms (시도 {14}회), " +
-                "0세대 수집 {16}회(최악 폴링 안에서 {17}회)",
+                "0세대 수집 {16}회(최악 폴링 안에서 {17}회), " +
+                "상자 = 훑기 {18:0.00} 탐색 {19:0.00} 판정 {20:0.00} 담기 {21:0.00} (인벤토리 {22}개)",
                 Poll.Count, Poll.AverageMs, Poll.WorstMs,
                 Inventory.AverageMs, Mixer.AverageMs, Sephirites.AverageMs, Chests.AverageMs,
                 Simulation.AverageMs, Feed.AverageMs,
                 Panel.AverageMs, Frames, Draws,
                 Catalog.Count, Catalog.TotalMs, CatalogSource.Attempts,
-                Poll.WorstPoll, Collections, WorstPollCollections);
+                Poll.WorstPoll, Collections, WorstPollCollections,
+                ChestAlive.AverageMs, ChestFind.AverageMs, ChestFilter.AverageMs, ChestCollect.AverageMs,
+                InventoriesHeld);
 
         public static void Write(StringBuilder text)
         {
@@ -161,6 +193,15 @@ namespace SephPlanner.Plugin
             text.AppendLine("  " + Mixer.Describe());
             text.AppendLine("  " + Sephirites.Describe());
             text.AppendLine("  " + Chests.Describe());
+            text.AppendLine("  " + ChestAlive.Describe());
+            text.AppendLine("  " + ChestFind.Describe());
+            text.AppendLine("  " + ChestFilter.Describe());
+            text.AppendLine("  " + ChestCollect.Describe());
+            text.AppendLine(
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "      인벤토리 - 들고 있는 것 {0}개(최대 {1}), 사정거리 안 {2}개(최대 {3})",
+                    InventoriesHeld, InventoriesHeldMost, InventoriesNear, InventoriesNearMost));
             text.AppendLine("  " + Simulation.Describe());
             text.AppendLine("  " + Feed.Describe());
             text.AppendLine("  " + Panel.Describe());

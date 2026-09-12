@@ -23,7 +23,8 @@ namespace SephPlanner.Plugin
         /// 떨어진 꾸러미뿐이고 그것도 이 간격만큼이다.
         /// </summary>
         private static readonly SceneCache<GridInventory> Inventories =
-            new SceneCache<GridInventory>(1f);
+            new SceneCache<GridInventory>(1f, FindObjectsInactive.Exclude,
+                FrameCost.ChestAlive, FrameCost.ChestFind);
 
         /// <summary>
         /// 세피라이트는 <b>보상 창이 열려 있을 때만</b> 찾는다. 후보가 될 수 있는 것은 그 창이
@@ -46,9 +47,12 @@ namespace SephPlanner.Plugin
             FrameCost.Sephirites.Add(step);
 
             step = FrameCost.Now;
+            var found = Inventories.Get();
+
+            var filtering = FrameCost.Now;
             var shown = ShownInventory();
             var nearby = new List<GridInventory>();
-            foreach (var inventory in Inventories.Get())
+            foreach (var inventory in found)
             {
                 if (inventory == null || inventory == playerInventory) continue;
                 if (inventory.UnitAvatar is PlayerAvatar) continue;
@@ -61,7 +65,13 @@ namespace SephPlanner.Plugin
             // FindObjectsByType 의 순서는 비보장이다. 순서만 흔들려도 스냅샷이 "변경"으로 보여
             // 재계산이 돌고 후보 순번이 바뀐다.
             nearby.Sort((a, b) => a.netId.CompareTo(b.netId));
+            FrameCost.ChestFilter.Add(filtering);
+
+            var collecting = FrameCost.Now;
             foreach (var inventory in nearby) Collect(snapshot.Offers, inventory, player);
+            FrameCost.ChestCollect.Add(collecting);
+
+            FrameCost.CountInventories(Inventories.Count, nearby.Count);
             FrameCost.Chests.Add(step);
         }
 
