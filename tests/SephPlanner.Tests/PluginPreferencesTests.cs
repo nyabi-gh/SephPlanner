@@ -26,6 +26,25 @@ public sealed class PluginPreferencesTests : IDisposable
         Assert.False(Load().IsDeactivationAllowed(9));
     }
     [Fact]
+    public void ASupportTargetSurvivesAReloadAndClearsWithTheBuild()
+    {
+        var prefs = Load();
+        Assert.False(prefs.IsSupportTarget(3002));
+        prefs.ToggleSupportTarget(3002);
+
+        var restored = Load();
+        Assert.True(restored.IsSupportTarget(3002));
+        Assert.Contains(3002, restored.ToPreferences(false).SupportTargets);
+
+        restored.ToggleSupportTarget(3002);
+        Assert.False(Load().IsSupportTarget(3002));
+
+        restored.ToggleSupportTarget(3002);
+        restored.ResetBuild();
+        Assert.Empty(Load().ToPreferences(false).SupportTargets);
+    }
+
+    [Fact]
     public void NewerSettingsSurviveEditingAndResetWithoutAffectingLegacyPlanning()
     {
         Directory.CreateDirectory(_directory);

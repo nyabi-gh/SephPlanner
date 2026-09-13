@@ -205,7 +205,7 @@ namespace SephPlanner.Core.Solver
         /// <b>채점 강도는 여기 없다.</b> <c>SearchBeam</c> 이 <c>SolverOptions</c> 에서 읽는 것은
         /// <c>BeamWidth</c>·<c>ExactCandidates</c>·<c>ParentQuota</c> 뿐이고, 다듬기 횟수나 수렴
         /// 반복, 탐색 예산은 <c>Evaluate</c> 쪽에서만 쓰인다. 우선 카테고리도 마찬가지로
-        /// <c>PriorityComboPlacement</c> 가 채점할 때만 본다. 그것들을 빔 열쇠에 두면 강도만 다른
+        /// <c>PriorityPlacement</c> 가 채점할 때만 본다. 그것들을 빔 열쇠에 두면 강도만 다른
         /// 조언들이 같은 빔을 두 번 찾는다 - <see cref="DiscardAdvisor"/> 가 <c>ForAdvice</c> 의
         /// 예산 둘을 덮어쓰기 때문에 실제로 그랬다.
         /// </summary>

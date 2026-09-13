@@ -74,7 +74,7 @@ namespace SephPlanner.Core.Solver
                 if (layouts.Count == 0) break;
                 remaining -= layouts.Count;
                 var improved = EvaluateLayouts(problem, layouts, options);
-                if (PriorityComboPlacement.Compare(improved, best) <= 0) break;
+                if (PriorityPlacement.Compare(improved, best) <= 0) break;
                 best = improved;
             }
             return best;
@@ -164,7 +164,7 @@ namespace SephPlanner.Core.Solver
 
                 var arrangement = Evaluate(problem, cells, layout, options);
                 evaluated.Add((layout, arrangement));
-                if (best != null && PriorityComboPlacement.Compare(arrangement, best) <= 0) continue;
+                if (best != null && PriorityPlacement.Compare(arrangement, best) <= 0) continue;
 
                 best = arrangement;
                 bestLayout = layout;
@@ -177,10 +177,10 @@ namespace SephPlanner.Core.Solver
             {
                 options.Cancellation.ThrowIfCancellationRequested();
                 var polished = Evaluate(problem, cells, bestLayout, options, polish: true);
-                if (PriorityComboPlacement.Compare(polished, best) > 0) best = polished;
+                if (PriorityPlacement.Compare(polished, best) > 0) best = polished;
             }
             best = ImproveEmptySides(problem, cells, evaluated, best, options);
-            return PriorityComboPlacement.Improve(problem, best, options);
+            return PriorityPlacement.Improve(problem, best, options);
         }
 
         private static Arrangement ImproveEmptySides(
@@ -204,7 +204,7 @@ namespace SephPlanner.Core.Solver
                         options.Cancellation.ThrowIfCancellationRequested();
                         var trial = Evaluate(problem, cells, candidate.Layout, options,
                             reservedEmpty: empty, forcedCharm: charm.InstanceId, forcedCell: cell);
-                        if (PriorityComboPlacement.Compare(trial, best) > 0) best = trial;
+                        if (PriorityPlacement.Compare(trial, best) > 0) best = trial;
                     }
                 }
             }
@@ -1045,7 +1045,7 @@ namespace SephPlanner.Core.Solver
                     var value = active ? model.ValueByRank[rank][Math.Min(level, model.LevelCap)] : 0;
                     var quality = new PlacementQuality((model.Required[rank] && !active ? 1 : 0) +
                         (ScalesPosition.Accepts(problem, charm, cell) ? 0 : 1),
-                        model.Preserved[rank] && !active ? 1 : 0, held ? 0 : 1, 0, 0, value,
+                        model.Preserved[rank] && !active ? 1 : 0, held ? 0 : 1, 0, 0, 0, value,
                         entry.Unsafe ? -1 : 0, charm.IsFiller || charm.IsDormant ? 0 : Math.Max(0, level - charm.WorthLevelCap),
                         (index == current ? 1 : 0) + (index == planned ? PlanBonus : 0), problem.Scale.ScoreStep);
                     if (best.HasValue)
@@ -1075,7 +1075,7 @@ namespace SephPlanner.Core.Solver
             for (var index = 0; index < cells.Count; index++)
                 if (!used[index] && groups[model.GroupByCell[index]].Unsafe) unsafeEmpty++;
             return new PlacementQuality(
-                missing, unpreserved, unheld, 0, 0, total, unsafeEmpty, waste, familiarity, problem.Scale.ScoreStep);
+                missing, unpreserved, unheld, 0, 0, 0, total, unsafeEmpty, waste, familiarity, problem.Scale.ScoreStep);
         }
 
         private static Arrangement Evaluate(
@@ -1095,7 +1095,7 @@ namespace SephPlanner.Core.Solver
             var bestOccupancy = occupancy;
             var bestResult = result;
             var bestScore = new PlacementQuality(int.MaxValue, int.MaxValue, int.MaxValue,
-                0, 0, double.NegativeInfinity, int.MaxValue, int.MaxValue, 0, problem.Scale.ScoreStep);
+                0, 0, 0, double.NegativeInfinity, int.MaxValue, int.MaxValue, 0, problem.Scale.ScoreStep);
 
             for (var iteration = 0; iteration < options.FixpointIterations; iteration++)
             {
@@ -1366,7 +1366,8 @@ namespace SephPlanner.Core.Solver
         {
             var familiarity = layoutFamiliarity ?? Familiarity(problem, layout);
             double score = 0;
-            int missing = 0, unpreserved = 0, unheld = 0, waste = 0, unsafeEmpty = 0;
+            int missing = 0, unpreserved = 0, unheld = 0, waste = 0, unsafeEmpty = 0, supportMatches = 0;
+            var designated = problem.DesignatedTargets.Count > 0;
             var combo = problem.PriorityCategories.Count == 0
                 ? null
                 : new Arrangement { ScoreStep = problem.Scale.ScoreStep };
@@ -1393,15 +1394,19 @@ namespace SephPlanner.Core.Solver
                     combo.CharmPositions[charm.InstanceId] = position;
                     if (part.Inactive) combo.InactiveCharms.Add(charm.InstanceId);
                 }
+                if (designated && !part.Inactive && DirectedCharmSupport.HasConnection(charm) &&
+                    DirectedCharmSupport.ConnectedTarget(charm, positions[charm.InstanceId], result, problem.Grid,
+                        occupancy, neighbors, out var linked) && linked.IsSupportTarget) supportMatches++;
             }
             for (var index = 0; index < problem.Grid.Storage; index++)
             {
                 var cell = problem.Grid.ToPosition(index);
                 if (!occupancy.HasItem(cell) && Unsafe(cell, result)) unsafeEmpty++;
             }
-            if (combo is not null && neighbors is not null) PriorityComboPlacement.Describe(problem, combo, neighbors);
+            if (combo is not null && neighbors is not null) PriorityPlacement.Describe(problem, combo, neighbors);
             return new PlacementQuality(missing, unpreserved, unheld, combo?.PriorityComboMatches ?? 0,
-                combo?.PriorityComboProgress ?? 0, score, unsafeEmpty, waste, familiarity, problem.Scale.ScoreStep);
+                combo?.PriorityComboProgress ?? 0, supportMatches, score, unsafeEmpty, waste, familiarity,
+                problem.Scale.ScoreStep);
         }
 
         /// <summary>
@@ -1875,16 +1880,26 @@ namespace SephPlanner.Core.Solver
                     if (ScalesPosition.Required(problem, charm)) arrangement.WrongSideCharms.Add(charm.InstanceId);
                 }
                 var inactive = arrangement.InactiveCharms.Contains(charm.InstanceId);
-                var unlinked = !inactive && DirectedCharmSupport.HasConnection(charm) &&
-                    !DirectedCharmSupport.IsConnected(charm, positions[charm.InstanceId], result, problem.Grid,
-                        occupancy, neighbors);
+                var unlinked = false;
+                if (!inactive && DirectedCharmSupport.HasConnection(charm))
+                {
+                    var connected = DirectedCharmSupport.ConnectedTarget(charm, positions[charm.InstanceId], result,
+                        problem.Grid, occupancy, neighbors, out var linked);
+                    unlinked = !connected;
+                    if (problem.DesignatedTargets.Count > 0)
+                    {
+                        if (connected && linked.IsSupportTarget) arrangement.SupportTargetMatches++;
+                        else if (DirectedCharmSupport.WantsDesignatedTarget(problem, charm))
+                            arrangement.UnmatchedSupportCharms.Add(charm.InstanceId);
+                    }
+                }
                 if (unlinked) arrangement.UnlinkedCharms.Add(charm.InstanceId);
                 if (charm.Retained && (inactive || unlinked)) arrangement.UnretainedCharms.Add(charm.InstanceId);
                 if (Preserve(charm) && (inactive || unlinked)) arrangement.UnpreservedCharms.Add(charm.InstanceId);
                 if (!charm.Retained && problem.ProtectedActive.Contains(charm.InstanceId) && (inactive || unlinked))
                     arrangement.UnapprovedDeactivations.Add(charm.InstanceId);
             }
-            PriorityComboPlacement.Describe(problem, arrangement, neighbors);
+            PriorityPlacement.Describe(problem, arrangement, neighbors);
             var quality = ScoreOf(problem, layout, positions, occupancy, result, neighbors);
             arrangement.UnsafeEmptyCells = quality.UnsafeEmpty;
             arrangement.WastedLevels = quality.Waste;

@@ -356,7 +356,7 @@ namespace SephPlanner.Core.Solver
                     : outcome.Solved.TabletPositions.ContainsKey(candidateId);
                 if (!placed || outcome.Solved.UnretainedCharms.Count > 0 ||
                     !ActivationPolicy.AllowsTransition(baseline, outcome.Solved)) continue;
-                if (best is null || PriorityComboPlacement.Compare(outcome.Solved, best.Solved) > 0) best = outcome;
+                if (best is null || PriorityPlacement.Compare(outcome.Solved, best.Solved) > 0) best = outcome;
             }
             if (best is null) return null;
 

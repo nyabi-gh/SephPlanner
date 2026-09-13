@@ -5,6 +5,7 @@ using System.Text;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
+using SephPlanner.Core.Solver;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -88,7 +89,8 @@ namespace SephPlanner.Plugin.Ui
             Widgets.Column(list, S(0.15f));
             for (var i = 0; i < RowsPerPage; i++)
                 _rows.Add(new Row(
-                    list, Skin, Base, entry => Toggle(entry, 1), ToggleHold, ToggleRetain, ToggleDeactivation, StepCap));
+                    list, Skin, Base, entry => Toggle(entry, 1), ToggleHold, ToggleRetain, ToggleDeactivation,
+                    ToggleSupportTarget, StepCap));
 
             BuildPager(content);
         }
@@ -307,6 +309,14 @@ namespace SephPlanner.Plugin.Ui
             Refresh();
         }
 
+        private void ToggleSupportTarget(Entry entry)
+        {
+            if (entry == null || entry.EntityId == 0) return;
+
+            _prefs.ToggleSupportTarget(entry.EntityId);
+            Refresh();
+        }
+
         private void ToggleHold(Entry entry)
         {
             if (entry == null || entry.EntityId == 0) return;
@@ -409,7 +419,7 @@ namespace SephPlanner.Plugin.Ui
                 note.Append(Marks(level)).Append(' ')
                     .Append(PlanPreferences.WeightOf(level).ToString("0.##")).Append("배 → ");
             }
-            return note.Append("해제로 강화 칸을 양보합니다. 기본은 활성 보존이며, 끄기 허용을 켠 아이템만 점수 이득을 위해 끕니다. 사용 유지는 끄기 허용보다 우선하고 지원 연결·빼기·교체도 보호합니다. 고정은 배치 조건을 무시하는 칸을 요구합니다. 레벨 제한은 그 레벨까지만 값으로 쳐서 남는 레벨을 다른 아티팩트에 돌립니다(우클릭으로 되돌림).").ToString();
+            return note.Append("해제로 강화 칸을 양보합니다. 기본은 활성 보존이며, 끄기 허용을 켠 아이템만 점수 이득을 위해 끕니다. 사용 유지는 끄기 허용보다 우선하고 지원 연결·빼기·교체도 보호합니다. 고정은 배치 조건을 무시하는 칸을 요구합니다. 레벨 제한은 그 레벨까지만 값으로 쳐서 남는 레벨을 다른 아티팩트에 돌립니다(우클릭으로 되돌림). 강화 대상은 북향의 침과 빛나는 모래시계가 그 아티팩트를 강화하게 합니다(점수보다 우선하며, 닿을 수 없으면 그 지정만 무시하고 알립니다).").ToString();
         }
 
         /// <summary>단계를 기호로. 양수는 ★, 음수는 양보 표시를 단계 수만큼.</summary>
@@ -452,6 +462,7 @@ namespace SephPlanner.Plugin.Ui
             var plan = _context.Plan;
             var found = new Dictionary<int, Entry>();
             var order = new List<int>();
+            var canSupport = SupportTargetCandidates();
 
             if (plan != null)
             {
@@ -481,6 +492,8 @@ namespace SephPlanner.Plugin.Ui
                         Retained = _prefs.IsRetained(entityId),
                         AllowDeactivation = _prefs.IsDeactivationAllowed(entityId),
                         LevelCap = _prefs.LevelCap(entityId),
+                        SupportTarget = _prefs.IsSupportTarget(entityId),
+                        CanSupport = canSupport.Contains(entityId),
                     };
                     found[entityId] = entry;
                     order.Add(entityId);
@@ -491,8 +504,8 @@ namespace SephPlanner.Plugin.Ui
             // 가져온 빌드의 아티팩트도 같이 보인다 - 무엇을 아직 못 모았는지가 곧 살 목록이다.
             var favorites = new HashSet<int>(_prefs.Preset()?.FavoriteCharms ?? new List<int>());
             var listed = _prefs.PinnedLevels.Keys.Concat(_prefs.HeldCharms).Concat(_prefs.RetainedCharms)
-                .Concat(_prefs.DeactivationAllowed).Concat(_prefs.LevelCaps.Keys).Concat(favorites)
-                .Distinct().ToList();
+                .Concat(_prefs.DeactivationAllowed).Concat(_prefs.LevelCaps.Keys).Concat(_prefs.SupportTargets)
+                .Concat(favorites).Distinct().ToList();
             foreach (var entityId in listed)
             {
                 if (found.ContainsKey(entityId)) continue;
@@ -511,6 +524,7 @@ namespace SephPlanner.Plugin.Ui
                     Retained = _prefs.IsRetained(entityId),
                     AllowDeactivation = _prefs.IsDeactivationAllowed(entityId),
                     LevelCap = _prefs.LevelCap(entityId),
+                    SupportTarget = _prefs.IsSupportTarget(entityId),
                 };
                 order.Add(entityId);
             }
@@ -534,6 +548,37 @@ namespace SephPlanner.Plugin.Ui
                 }
                 _entries.Add(entry);
             }
+        }
+
+        /// <summary>
+        /// 침·모래시계가 강화할 수 있는 아티팩트. 가방에 그런 아티팩트가 없으면 비어 있고, 그러면
+        /// 줄에 단추도 걸리지 않는다 - 고를 것이 없는 지정을 띄워 두면 이름 자리만 좁아진다.
+        /// </summary>
+        private HashSet<int> SupportTargetCandidates()
+        {
+            var candidates = new HashSet<int>();
+            var items = _context.Snapshot?.Inventory?.Items;
+            if (items == null) return candidates;
+
+            var needle = false;
+            var magicHelper = false;
+            foreach (var item in items)
+            {
+                var definition = _context.Catalog?.Charm(item.DefinitionId);
+                if (definition == null) continue;
+                if (PositionalWorth.IsNeedle(definition)) needle = true;
+                if (definition.MagicSupport != null) magicHelper = true;
+            }
+            if (!needle && !magicHelper) return candidates;
+
+            foreach (var item in items)
+            {
+                var definition = _context.Catalog?.Charm(item.DefinitionId);
+                if (definition == null) continue;
+                if (needle && (item.IsAttackable ?? definition.IsAttackable) || magicHelper && definition.IsMagic)
+                    candidates.Add(item.DefinitionId);
+            }
+            return candidates;
         }
 
         /// <summary>
@@ -592,6 +637,12 @@ namespace SephPlanner.Plugin.Ui
 
             /// <summary>제한 해제 칸에 고정돼 있는가. 아티팩트 줄에만 뜻이 있다.</summary>
             public bool Held;
+
+            /// <summary>침·모래시계가 강화할 대상으로 지정됐는가.</summary>
+            public bool SupportTarget;
+
+            /// <summary>이 가방에서 침·모래시계의 대상이 될 수 있는가. 아니면 단추를 걸지 않는다.</summary>
+            public bool CanSupport;
             public int LevelCap;
             public bool Retained;
             public bool AllowDeactivation;
@@ -604,6 +655,7 @@ namespace SephPlanner.Plugin.Ui
             private readonly TextMeshProUGUI _detail;
             private readonly TextMeshProUGUI _hold;
             private readonly TextMeshProUGUI _cap;
+            private readonly TextMeshProUGUI _support;
             private readonly TextMeshProUGUI _retain;
             private readonly TextMeshProUGUI _deactivation;
             private readonly Image _background;
@@ -611,7 +663,7 @@ namespace SephPlanner.Plugin.Ui
 
             public Row(
                 RectTransform parent, NativeSkin skin, float b, Action<Entry> onClick, Action<Entry> onHold,
-                Action<Entry> onRetain, Action<Entry> onDeactivation, Action<Entry, int> onCap)
+                Action<Entry> onRetain, Action<Entry> onDeactivation, Action<Entry> onSupport, Action<Entry, int> onCap)
             {
                 _background = Widgets.ClickableRow(
                     "Entry", parent, NativeSkin.SlotFill, () => onClick(_entry));
@@ -635,6 +687,11 @@ namespace SephPlanner.Plugin.Ui
                 _deactivation = Widgets.Clickable("Deactivation", rect, skin, b * 0.8f, NativeSkin.TextDim, () => onDeactivation(_entry));
                 _deactivation.text = "끄기 허용";
                 Widgets.Fixed(_deactivation.rectTransform, b * 1.5f, b * 4.2f);
+                // 침·모래시계가 있는 가방에서, 그 대상이 될 수 있는 줄에만 걸린다. 없는 줄에 늘
+                // 띄우면 이름 자리를 그만큼 잡아먹는다.
+                _support = Widgets.Clickable("Support", rect, skin, b * 0.8f, NativeSkin.TextDim, () => onSupport(_entry));
+                _support.text = "강화 대상";
+                Widgets.Fixed(_support.rectTransform, b * 1.5f, b * 4.2f);
                 _cap = Widgets.Clickable("Cap", rect, skin, b * 0.8f, NativeSkin.TextDim, () => onCap(_entry, 1));
                 Widgets.Fixed(_cap.rectTransform, b * 1.5f, b * 4.2f);
                 _hold = Widgets.Clickable("Hold", rect, skin, b * 0.8f, NativeSkin.TextDim, () => onHold(_entry));
@@ -659,6 +716,8 @@ namespace SephPlanner.Plugin.Ui
                 Widgets.SetActive(_retain, entry.EntityId != 0);
                 _deactivation.color = entry.AllowDeactivation ? NativeSkin.Mint : NativeSkin.TextDim;
                 Widgets.SetActive(_deactivation, entry.EntityId != 0);
+                _support.color = entry.SupportTarget ? NativeSkin.Mint : NativeSkin.TextDim;
+                Widgets.SetActive(_support, entry.EntityId != 0 && (entry.CanSupport || entry.SupportTarget));
                 _cap.text = entry.LevelCap > 0 ? "레벨 " + entry.LevelCap : "레벨 제한";
                 _cap.color = entry.LevelCap > 0 ? NativeSkin.Mint : NativeSkin.TextDim;
                 Widgets.SetActive(_cap, entry.EntityId != 0);

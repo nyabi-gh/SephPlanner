@@ -77,7 +77,7 @@ namespace SephPlanner.Core.Solver
                 var solved = PlacementSolver.EvaluateLayouts(trial, yardstick, options);
                 cancellation.ThrowIfCancellationRequested();
                 if (!ActivationPolicy.AllowsTransition(baseline, solved) || solved.UnretainedCharms.Count > 0 || solved.UnplacedTablets > 0 || solved.CharmPositions.Count != trial.Charms.Count ||
-                    solved.Score <= baseline.Score + 0.001 || PriorityComboPlacement.Compare(solved, baseline) <= 0)
+                    solved.Score <= baseline.Score + 0.001 || PriorityPlacement.Compare(solved, baseline) <= 0)
                     continue;
 
                 var finalCounts = Counts(trial, solved.CharmPositions);

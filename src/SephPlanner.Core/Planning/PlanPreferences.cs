@@ -82,6 +82,22 @@ namespace SephPlanner.Core.Planning
         /// </summary>
         public Dictionary<int, int> LevelCaps { get; set; } = new Dictionary<int, int>();
 
+        /// <summary>
+        /// 침·모래시계가 강화할 대상으로 삼을 아티팩트(엔티티 번호).
+        ///
+        /// <b>왜 필요한가.</b> 게임은 자리만 보고 대상을 정하므로 여기 물어볼 것이 없다는 것이
+        /// 원래 판단이었고(docs/RESEARCH.md), 그 전제는 "우리 점수가 대상들을 갈라낼 수 있다"였다.
+        /// 갈라내지 못하는 자리가 둘 있다 - 마법서 26종은 값어치가 전부 레어도 어림값이라 같은
+        /// 레어도끼리 완전 동률이고, 침이 주는 것은 대상의 피해량이라 우리 모델 밖이다. ★ 는
+        /// 누가 좋은 칸을 갖느냐라서 이 말을 대신할 수 없다(<see cref="PinnedCharms"/>가 침의
+        /// 대상 선택을 일부러 키우지 않는다).
+        ///
+        /// <b>점수 배수가 아니라 배치 우선순위다.</b> 지정한 대상에 닿는 배치를 먼저 고르고,
+        /// 그 때문에 일반 점수가 낮아질 수 있다. 닿을 수 없으면 계획을 포기하지 않고 그 지정만
+        /// 무시하며 <see cref="Arrangement.UnmatchedSupportCharms"/>로 알린다.
+        /// </summary>
+        public HashSet<int> SupportTargets { get; set; } = new HashSet<int>();
+
         /// <summary>소유한 해당 종류의 아티팩트 전부를 활성 상태로 유지한다.</summary>
         public HashSet<int> RetainedCharms { get; set; } = new HashSet<int>();
         public HashSet<int> DeactivationAllowed { get; set; } = new HashSet<int>();

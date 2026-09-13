@@ -178,6 +178,8 @@ namespace SephPlanner.Core.Runtime
                 Add(builder, "levelCap", cap.Key);
                 Add(builder, "levelCapLevel", cap.Value);
             }
+            foreach (var target in preferences.SupportTargets.OrderBy(value => value))
+                Add(builder, "supportTarget", target);
             foreach (var retained in preferences.RetainedCharms.OrderBy(value => value))
                 Add(builder, "retained", retained);
             foreach (var allowed in preferences.DeactivationAllowed.OrderBy(value => value))

@@ -46,6 +46,12 @@ namespace SephPlanner.Plugin
 
         /// <summary>제한 해제 칸 고정. 엔티티 번호 목록이다(<see cref="PlanPreferences.HeldCharms"/>).</summary>
         public List<int> HeldCharms { get; set; } = new List<int>();
+
+        /// <summary>
+        /// 침·모래시계가 강화할 대상으로 지정한 아티팩트
+        /// (<see cref="PlanPreferences.SupportTargets"/>).
+        /// </summary>
+        public List<int> SupportTargets { get; set; } = new List<int>();
         public List<int> RetainedCharms { get; set; } = new List<int>();
         public List<int> DeactivationAllowed { get; set; } = new List<int>();
 
@@ -109,6 +115,16 @@ namespace SephPlanner.Plugin
             if (entityId == 0) return;
 
             if (!HeldCharms.Remove(entityId)) HeldCharms.Add(entityId);
+            Changed();
+        }
+
+        public bool IsSupportTarget(int entityId) => entityId != 0 && SupportTargets.Contains(entityId);
+
+        public void ToggleSupportTarget(int entityId)
+        {
+            if (entityId == 0) return;
+
+            if (!SupportTargets.Remove(entityId)) SupportTargets.Add(entityId);
             Changed();
         }
 
@@ -213,6 +229,7 @@ namespace SephPlanner.Plugin
             PinnedCharms.Clear();
             LevelCaps.Clear();
             HeldCharms.Clear();
+            SupportTargets.Clear();
             RetainedCharms.Clear();
             DeactivationAllowed.Clear();
             Changed();
@@ -244,6 +261,7 @@ namespace SephPlanner.Plugin
             PinnedCharms = new Dictionary<int, int>(PinnedLevels),
             LevelCaps = new Dictionary<int, int>(LevelCaps),
             HeldCharms = new HashSet<int>(HeldCharms),
+            SupportTargets = new HashSet<int>(SupportTargets),
             RetainedCharms = new HashSet<int>(RetainedCharms),
             DeactivationAllowed = new HashSet<int>(DeactivationAllowed),
             CharmValues = CharmValueSource.Book,
@@ -296,6 +314,7 @@ namespace SephPlanner.Plugin
                         loaded.PinnedLevels = loaded.PinnedLevels ?? new Dictionary<int, int>();
                         loaded.LevelCaps = loaded.LevelCaps ?? new Dictionary<int, int>();
                         loaded.HeldCharms = loaded.HeldCharms ?? new List<int>();
+                        loaded.SupportTargets = loaded.SupportTargets ?? new List<int>();
                         loaded.RetainedCharms = loaded.RetainedCharms ?? new List<int>();
                         loaded.DeactivationAllowed = loaded.DeactivationAllowed ?? new List<int>();
                         loaded.MigrateLegacyPins();

@@ -302,6 +302,7 @@ namespace SephPlanner.Core.Planning
                         ? PlanPreferences.WeightOf(pin)
                         : 1,
                     Held = definition is not null && preferences.HeldCharms.Contains(item.DefinitionId),
+                    IsSupportTarget = definition is not null && preferences.SupportTargets.Contains(item.DefinitionId),
                     Retained = definition is not null && preferences.RetainedCharms.Contains(item.DefinitionId),
                     AllowDeactivation = definition is not null && preferences.DeactivationAllowed.Contains(item.DefinitionId),
                 };
@@ -344,7 +345,7 @@ namespace SephPlanner.Core.Planning
                 : PlacementSolver.Solve(problem, new SolverOptions { Cancellation = cancellation }, layouts);
 
             // 조건부 배정은 수렴하지 않을 수 있으므로 현재 배치도 같은 우선순위로 비교한다.
-            if (PriorityComboPlacement.Compare(best, current) < 0) best = current;
+            if (PriorityPlacement.Compare(best, current) < 0) best = current;
 
             var moves = Moves(problem, current, best, out var manualMovesAvailable);
             var unapprovedDeactivation = !ActivationPolicy.AllowsTransition(current, best);
@@ -423,9 +424,11 @@ namespace SephPlanner.Core.Planning
             var warnings = new List<string>();
             foreach (var charm in problem.Charms)
             {
-                if (!best.UnmatchedComboCharms.Contains(charm.InstanceId)) continue;
                 var name = Naming.Of(charm.Definition.Names, charm.Definition.Id, "아티팩트");
-                warnings.Add(name + ": " + PriorityComboPlacement.FailureReason(problem, charm));
+                if (best.UnmatchedComboCharms.Contains(charm.InstanceId))
+                    warnings.Add(name + ": " + PriorityPlacement.FailureReason(problem, charm));
+                if (best.UnmatchedSupportCharms.Contains(charm.InstanceId))
+                    warnings.Add(name + ": " + PriorityPlacement.SupportFailureReason(problem, charm));
             }
             return warnings;
         }

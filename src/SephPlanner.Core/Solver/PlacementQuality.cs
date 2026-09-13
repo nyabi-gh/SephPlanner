@@ -4,12 +4,12 @@ namespace SephPlanner.Core.Solver
 {
     internal readonly struct PlacementQuality : IComparable<PlacementQuality>
     {
-        internal readonly int RetentionFailures, ActivationFailures, HoldFailures, ComboMatches, UnsafeEmpty, Waste;
+        internal readonly int RetentionFailures, ActivationFailures, HoldFailures, ComboMatches, SupportMatches, UnsafeEmpty, Waste;
         internal readonly double ComboProgress, Value, Familiarity;
 
         internal PlacementQuality(int retentionFailures, int activationFailures, int holdFailures,
-            int comboMatches, double comboProgress, double value, int unsafeEmpty, int waste, double familiarity,
-            double scoreStep)
+            int comboMatches, double comboProgress, int supportMatches, double value, int unsafeEmpty, int waste,
+            double familiarity, double scoreStep)
         {
             // 눈금은 견줄 때가 아니라 만들 때 씌운다 - 견주는 쪽은 CompareTo 라 눈금을 받을 자리가 없다.
             value = scoreStep > 0 ? Math.Floor(value / scoreStep) * scoreStep : value;
@@ -18,6 +18,7 @@ namespace SephPlanner.Core.Solver
             HoldFailures = holdFailures;
             ComboMatches = comboMatches;
             ComboProgress = comboProgress;
+            SupportMatches = supportMatches;
             Value = value;
             UnsafeEmpty = unsafeEmpty;
             Waste = waste;
@@ -26,7 +27,7 @@ namespace SephPlanner.Core.Solver
 
         internal static PlacementQuality From(Arrangement value) => new PlacementQuality(
             value.UnretainedCharms.Count + value.UnapprovedDeactivations.Count + value.WrongSideCharms.Count, value.UnpreservedCharms.Count, value.UnheldCharms.Count,
-            value.PriorityComboMatches, value.PriorityComboProgress, value.Score,
+            value.PriorityComboMatches, value.PriorityComboProgress, value.SupportTargetMatches, value.Score,
             value.UnsafeEmptyCells, value.WastedLevels, value.Preference, value.ScoreStep);
 
         /// <summary>
@@ -49,6 +50,8 @@ namespace SephPlanner.Core.Solver
             order = ComboMatches.CompareTo(other.ComboMatches);
             if (order != 0) return order;
             order = Compare(ComboProgress, other.ComboProgress);
+            if (order != 0) return order;
+            order = SupportMatches.CompareTo(other.SupportMatches);
             if (order != 0) return order;
             order = other.ActivationFailures.CompareTo(ActivationFailures);
             if (order != 0) return order;

@@ -12,7 +12,7 @@ public class ScoreResolutionTests
     private const double Step = 0.05;
 
     private static PlacementQuality Quality(double value, int unsafeEmpty = 0, double familiarity = 0) =>
-        new PlacementQuality(0, 0, 0, 0, 0, value, unsafeEmpty, 0, familiarity, Step);
+        new PlacementQuality(0, 0, 0, 0, 0, 0, value, unsafeEmpty, 0, familiarity, Step);
 
     /// <summary>
     /// 눈금보다 작은 점수 차이는 감점 빈칸 정리를 이기지 못한다. 이 자리가 원래 문제였다 -

@@ -111,6 +111,9 @@ namespace SephPlanner.Core.Runtime
 
         /// <summary>없던 시절의 자료에는 이 항목이 없다. 그때는 제한을 건 것이 없다는 뜻이다.</summary>
         public Dictionary<int, int>? LevelCaps { get; set; }
+
+        /// <summary>같은 이유로 없을 수 있다. 없으면 지정한 강화 대상이 없다는 뜻이다.</summary>
+        public HashSet<int>? SupportTargets { get; set; }
         public HashSet<int>? PresetCharms { get; set; }
         public CharmValueFile? CharmValues { get; set; }
         public bool? Recommendations { get; set; }
@@ -123,6 +126,7 @@ namespace SephPlanner.Core.Runtime
             RetainedCharms = new HashSet<int>(preferences.RetainedCharms),
             DeactivationAllowed = new HashSet<int>(preferences.DeactivationAllowed),
             LevelCaps = new Dictionary<int, int>(preferences.LevelCaps),
+            SupportTargets = new HashSet<int>(preferences.SupportTargets),
             PresetCharms = new HashSet<int>(preferences.PresetCharms),
             CharmValues = preferences.CharmValues.Export(),
             Recommendations = preferences.Recommendations,
@@ -143,6 +147,9 @@ namespace SephPlanner.Core.Runtime
                 LevelCaps = LevelCaps is null
                     ? new Dictionary<int, int>()
                     : new Dictionary<int, int>(LevelCaps),
+                SupportTargets = SupportTargets is null
+                    ? new HashSet<int>()
+                    : new HashSet<int>(SupportTargets),
                 PresetCharms = new HashSet<int>(PresetCharms),
                 CharmValues = new CharmValueBook(CharmValues),
                 Recommendations = Recommendations.Value,

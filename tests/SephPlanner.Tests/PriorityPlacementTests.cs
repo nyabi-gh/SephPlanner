@@ -6,7 +6,7 @@ using SephPlanner.Core.Tablets;
 
 namespace SephPlanner.Tests;
 
-public class PriorityComboPlacementTests
+public class PriorityPlacementTests
 {
     [Theory]
     [InlineData(1289)]
@@ -274,7 +274,7 @@ public class PriorityComboPlacementTests
         problem.Charms[2].Definition.Categories.Clear();
         var result = PlacementSolver.Solve(problem);
         Assert.Equal(new[] { 1 }, result.UnmatchedComboCharms);
-        Assert.Contains("양옆 아티팩트 둘", PriorityComboPlacement.FailureReason(problem, problem.Charms[0]));
+        Assert.Contains("양옆 아티팩트 둘", PriorityPlacement.FailureReason(problem, problem.Charms[0]));
     }
 
     [Fact]
@@ -285,7 +285,7 @@ public class PriorityComboPlacementTests
         problem.PriorityCategories.Add("GLACIER");
         var result = PlacementSolver.Solve(problem);
         Assert.Equal(new[] { 1 }, result.UnmatchedComboCharms);
-        Assert.Contains("행이 아직 열리지", PriorityComboPlacement.FailureReason(problem, problem.Charms[0]));
+        Assert.Contains("행이 아직 열리지", PriorityPlacement.FailureReason(problem, problem.Charms[0]));
     }
 
     [Fact]

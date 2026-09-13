@@ -200,7 +200,7 @@ namespace SephPlanner.Core.Solver
             return new[] { LineCategory(charm.Definition, cell) };
         }
 
-        internal static bool IsNeedle(CharmDefinition definition) =>
+        public static bool IsNeedle(CharmDefinition definition) =>
             definition.DependencyBonusByLevel.Count > 0;
 
         /// <summary>

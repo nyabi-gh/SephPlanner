@@ -6,8 +6,14 @@ using SephPlanner.Core.Tablets;
 
 namespace SephPlanner.Core.Solver
 {
-    /// <summary>F2 지정은 점수 배수가 아니라 배치 선택의 우선순위다. 표시 점수에는 섞지 않는다.</summary>
-    public static class PriorityComboPlacement
+    /// <summary>
+    /// F2 지정은 점수 배수가 아니라 배치 선택의 우선순위다. 표시 점수에는 섞지 않는다.
+    ///
+    /// 둘을 다룬다 - 지정 콤보(열쇠·종이·침처럼 자리가 카테고리를 정하는 것)와 지정한 강화
+    /// 대상(침·모래시계가 누구를 강화할지)이다. 한 패스로 도는 것은 둘이 같은 아티팩트에 함께
+    /// 걸릴 수 있어서다 - 침은 양쪽 모두의 대상이라, 따로 돌면 두 패스가 서로의 답을 되돌린다.
+    /// </summary>
+    public static class PriorityPlacement
     {
         private const int Passes = 3;
 
@@ -46,6 +52,15 @@ namespace SephPlanner.Core.Solver
             return "자리·활성 조건·고정을 만족하는 지정 콤보 배치를 찾지 못했습니다.";
         }
 
+        internal static string SupportFailureReason(PlacementProblem problem, CharmSlot charm)
+        {
+            var (dx, dy) = DirectedCharmSupport.Offset(charm);
+            var cells = Enumerable.Range(0, problem.Grid.Storage).Select(problem.Grid.ToPosition);
+            return cells.Any(cell => problem.Grid.Contains(cell.Offset(dx, dy)))
+                ? "지정한 강화 대상에 닿는 배치를 찾지 못했습니다."
+                : "강화 방향에 대상을 놓을 칸이 없습니다.";
+        }
+
         public static int Compare(Arrangement left, Arrangement right)
             => PlacementQuality.From(left).CompareTo(PlacementQuality.From(right));
 
@@ -80,9 +95,12 @@ namespace SephPlanner.Core.Solver
         internal static Arrangement Improve(PlacementProblem problem, Arrangement best, SolverOptions options)
         {
             var cancellation = options.Cancellation;
-            if (problem.PriorityCategories.Count == 0) return best;
+            var designated = problem.DesignatedTargets.Count > 0;
+            if (problem.PriorityCategories.Count == 0 && !designated) return best;
             cancellation.ThrowIfCancellationRequested();
-            var flexible = problem.Charms.Where(charm => !charm.IsFiller && Applies(charm.Definition))
+            var flexible = problem.Charms.Where(charm => !charm.IsFiller &&
+                    (problem.PriorityCategories.Count > 0 && Applies(charm.Definition) ||
+                     designated && DirectedCharmSupport.WantsDesignatedTarget(problem, charm)))
                 .OrderBy(charm => charm.InstanceId).ToList();
             if (flexible.Count == 0 || best.UnplacedTablets > 0 || best.CharmPositions.Count != problem.Charms.Count)
                 return best;
@@ -115,7 +133,8 @@ namespace SephPlanner.Core.Solver
                 foreach (var charm in flexible)
                 {
                     if (problem.PriorityCategories.Count == 1 &&
-                        !best.UnmatchedComboCharms.Contains(charm.InstanceId)) continue;
+                        !best.UnmatchedComboCharms.Contains(charm.InstanceId) &&
+                        !best.UnmatchedSupportCharms.Contains(charm.InstanceId)) continue;
                     var seed = best;
                     var trials = 0;
                     foreach (var targets in Targets(problem, seed, charm, cells))
@@ -175,8 +194,22 @@ namespace SephPlanner.Core.Solver
                 foreach (var target in problem.Charms.OrderBy(other => seed.CharmPositions[other.InstanceId] == targetCell ? 0 : 1))
                 {
                     if (!DirectedCharmSupport.Accepts(charm, target) ||
+                        !target.IsSupportTarget &&
                         !PositionalWorth.CategoriesOf(target, targetCell, neighbors).Any(problem.PriorityCategories.Contains)) continue;
                     yield return new[] { (charm.InstanceId, cell), (target.InstanceId, targetCell) };
+                }
+                yield break;
+            }
+
+            // 모래시계·별조각은 카테고리를 물려받지 않으므로 지정한 대상일 때만 옮겨 볼 것이 있다.
+            if (charm.Definition.MagicSupport is { } support)
+            {
+                var magicCell = cell.Offset(support.OffsetX, support.OffsetY);
+                if (magicCell == cell || !problem.Grid.Contains(magicCell)) yield break;
+                foreach (var target in problem.Charms.OrderBy(other => seed.CharmPositions[other.InstanceId] == magicCell ? 0 : 1))
+                {
+                    if (!target.IsSupportTarget || !DirectedCharmSupport.Accepts(charm, target)) continue;
+                    yield return new[] { (charm.InstanceId, cell), (target.InstanceId, magicCell) };
                 }
                 yield break;
             }

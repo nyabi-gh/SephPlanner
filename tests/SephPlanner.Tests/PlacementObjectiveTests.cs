@@ -150,9 +150,9 @@ public class PlacementObjectiveTests
                         if (a == b || a == c || b == c) continue;
                         var scored = PlacementSolver.Score(p, [], new Dictionary<int, GridPos>
                         { [1] = new(a, 0), [2] = new(b, 0), [3] = new(c, 0) });
-                        if (optimum is null || PriorityComboPlacement.Compare(scored, optimum) > 0) optimum = scored;
+                        if (optimum is null || PriorityPlacement.Compare(scored, optimum) > 0) optimum = scored;
                     }
-            Assert.Equal(0, PriorityComboPlacement.Compare(PlacementSolver.Solve(p), optimum!));
+            Assert.Equal(0, PriorityPlacement.Compare(PlacementSolver.Solve(p), optimum!));
         }
     }
 
@@ -171,10 +171,10 @@ public class PlacementObjectiveTests
                         positions[1] = p.Grid.ToPosition(first);
                         positions[2] = p.Grid.ToPosition(second);
                         var scored = PlacementSolver.Score(p, new[] { p.Tablets[0].At(p.Grid.ToPosition(tablet), rotation) }, positions);
-                        if (optimum is null || PriorityComboPlacement.Compare(scored, optimum) > 0) optimum = scored;
+                        if (optimum is null || PriorityPlacement.Compare(scored, optimum) > 0) optimum = scored;
                     }
         var solved = PlacementSolver.Solve(p);
-        Assert.Equal(0, PriorityComboPlacement.Compare(solved, optimum!));
+        Assert.Equal(0, PriorityPlacement.Compare(solved, optimum!));
     }
 
     [Fact]

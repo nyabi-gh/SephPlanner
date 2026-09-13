@@ -24,14 +24,32 @@ namespace SephPlanner.Core.Solver
 
         internal static bool IsConnected(
             CharmSlot helper, GridPos cell, SimulationResult result, GridSpec grid, GridOccupancy occupancy,
-            IReadOnlyDictionary<GridPos, CharmSlot>? neighbors)
+            IReadOnlyDictionary<GridPos, CharmSlot>? neighbors) =>
+            ConnectedTarget(helper, cell, result, grid, occupancy, neighbors, out _);
+
+        /// <summary>이 자리에서 실제로 강화하게 되는 아티팩트. 연결이 없으면 거짓이다.</summary>
+        internal static bool ConnectedTarget(
+            CharmSlot helper, GridPos cell, SimulationResult result, GridSpec grid, GridOccupancy occupancy,
+            IReadOnlyDictionary<GridPos, CharmSlot>? neighbors, out CharmSlot target)
         {
             if (!PositionalWorth.IsNeedle(helper.Definition))
-                return TryTarget(helper, cell, result, grid, occupancy, neighbors, out _, out _);
+                return TryTarget(helper, cell, result, grid, occupancy, neighbors, out target, out _);
+
+            target = helper;
             // 게임의 피해 보너스 탐색은 중간 침의 활성 여부로 사슬을 끊지 않는다.
             return neighbors is not null &&
-                   PositionalWorth.DependencyTarget(helper, cell, neighbors, out var target, out var targetCell) &&
+                   PositionalWorth.DependencyTarget(helper, cell, neighbors, out target, out var targetCell) &&
                    PlacementSolver.Reason(target, targetCell, result, grid, occupancy) == CharmInactiveReason.None;
+        }
+
+        /// <summary>이 침·모래시계가 지정된 대상 가운데 하나라도 강화할 수 있는가.</summary>
+        internal static bool WantsDesignatedTarget(PlacementProblem problem, CharmSlot helper)
+        {
+            foreach (var target in problem.DesignatedTargets)
+            {
+                if (Accepts(helper, target)) return true;
+            }
+            return false;
         }
 
         internal static bool IsTarget(CharmSlot target) =>

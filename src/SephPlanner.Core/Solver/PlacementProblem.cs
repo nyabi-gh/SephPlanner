@@ -72,6 +72,12 @@ namespace SephPlanner.Core.Solver
         /// 없으면 무시된다.
         /// </summary>
         public bool Held { get; set; }
+
+        /// <summary>
+        /// 침·모래시계가 이 아티팩트를 강화하도록 지정했다
+        /// (<see cref="Planning.PlanPreferences.SupportTargets"/>).
+        /// </summary>
+        public bool IsSupportTarget { get; set; }
         public bool Retained { get; set; }
         public bool AllowDeactivation { get; set; }
 
@@ -149,6 +155,15 @@ namespace SephPlanner.Core.Solver
         /// 처음 읽을 때 짓는다. 개수나 지금 자리를 바꾼 뒤에는 null 로 되돌려야 다시 짓는다.
         /// </summary>
         public Dictionary<string, int>? BaseComboCounts { get; set; }
+
+        private List<CharmSlot>? _designatedTargets;
+
+        /// <summary>
+        /// 사용자가 강화 대상으로 지정한 아티팩트. 비어 있는 것이 보통이라, 지정이 없으면 관련
+        /// 계산이 통째로 빠지도록 여기서 한 번만 모은다.
+        /// </summary>
+        internal List<CharmSlot> DesignatedTargets =>
+            _designatedTargets ??= Charms.FindAll(charm => charm.IsSupportTarget && !charm.IsFiller);
 
         private double? _needleTargetWorth;
 
@@ -280,6 +295,14 @@ namespace SephPlanner.Core.Solver
         public int PriorityComboMatches { get; set; }
         public double PriorityComboProgress { get; set; }
         public List<int> UnmatchedComboCharms { get; } = new List<int>();
+
+        /// <summary>지정한 강화 대상에 닿은 침·모래시계의 수. 많을수록 앞선다.</summary>
+        public int SupportTargetMatches { get; set; }
+
+        /// <summary>
+        /// 지정한 대상을 강화할 수 있었는데 닿지 못한 침·모래시계. 계획은 그대로 쓰고 화면이 알린다.
+        /// </summary>
+        public List<int> UnmatchedSupportCharms { get; } = new List<int>();
 
         public List<TabletPlacement> Tablets { get; } = new List<TabletPlacement>();
 
