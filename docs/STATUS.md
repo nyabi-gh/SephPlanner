@@ -139,7 +139,7 @@ DataTool·Plugin Release 빌드까지 통과한다. 실패·건너뛴 테스트�
 [강화 대상 지정](notes/SUPPORT-TARGET-REPORT-2026-09-13.md), [가치 평가 점검](notes/VALUE-AUDIT-2026-09-06.md).
 검토 보고서: [0.2.6 회귀 검토](notes/REVIEW-0.2.6.md), [2026-09-05 전체 검토](notes/REVIEW-2026-09-05.md).
 전체 검토는 그 시점의 기록이며 항목별 처리 상태를 담지 않는다. 무엇이 닫혔는지는
-[백로그](ROADMAP.md)의 "2026-09-05 2차 개선"과 [변경 기록](../CHANGELOG.md)에 나뉘어 있다.
+[백로그](ROADMAP.md)의 "2026-09-05 2차 개선"과 [변경 기록](CHANGELOG.md)에 나뉘어 있다.
 
 ## 게임 1.0.31 대조
 

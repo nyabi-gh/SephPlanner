@@ -126,7 +126,7 @@ SephPlanner를 업데이트한다면
   문제가 다시 나면 그것은 게임 쪽 문제이므로 TEAM HORAY에 제보해 주세요. 지우면 사라지는
   문제는 이 도구 탓이니 개발사가 아니라 아래 주소에 알려 주세요. 개발사가 모드 문제와
   게임 문제를 가려낼 수 있도록 부탁한 내용입니다.
-- 제보와 새 버전: https://github.com/nyabi-gh/SephPlanner-Release
+- 제보와 새 버전: https://github.com/nyabi-gh/SephPlanner
   (Issues 탭에 올려 주세요. GitHub 계정이 없으면 이 파일을 받은 글에 댓글로 남겨도 됩니다.)
 
 

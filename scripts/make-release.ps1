@@ -53,7 +53,7 @@ $pluginSource = Get-Content (Join-Path $root "src/SephPlanner.Plugin/Plugin.cs")
 if ($pluginSource -notmatch [regex]::Escape("[BepInPlugin(PluginGuid, ""SephPlanner"", ""$version"")]")) {
     throw "[BepInPlugin] 의 버전이 $version 이 아닙니다. Plugin.cs 를 맞추세요."
 }
-$changelog = Get-Content (Join-Path $root "CHANGELOG.md")
+$changelog = Get-Content (Join-Path $root "docs/CHANGELOG.md")
 if ($changelog -notcontains "## $version") {
     throw "CHANGELOG.md 에 '## $version' 절이 없습니다."
 }
@@ -164,7 +164,7 @@ try {
 
     Write-Host "완성: $zip"
     Write-Host "릴리스 본문: $notesPath"
-    Write-Host "  gh release create v$version `"$zip`" -R nyabi-gh/SephPlanner-Release --notes-file `"$notesPath`""
+    Write-Host "  gh release create v$version `"$zip`" -R nyabi-gh/SephPlanner --notes-file `"$notesPath`""
 }
 finally {
     if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
