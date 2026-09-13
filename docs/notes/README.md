@@ -25,6 +25,7 @@
 
 - [F2 콤보·친타마니](FEEDBACK-2026-09-06.md)
 - [북향의 침·합작 추천](NORTH-NEEDLE-MIXER-REPORTS-2026-09-10.md)
+- [강화 대상 지정](SUPPORT-TARGET-REPORT-2026-09-13.md) — 침의 레어도 덤 편향과 마법서 값어치의 공백
 
 ## 측정
 
