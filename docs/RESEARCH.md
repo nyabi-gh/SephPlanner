@@ -949,6 +949,18 @@ dotnet run --project src/SephPlanner.DataTool -- --values
   상인의 `CurrentSelling` 인벤토리에 있고 세상에 진열되는 것이 아니라 창 안에서만 그려진다
   (`Safe.Trade` → `UI_ShopPanel.Open(..., NetworkconnectedMerchant.CurrentSelling, ...)`).
   가까이 가기만 해도 재고가 떴다는 제보로 드러났고, 열기 전 상자와 같은 문제다.
+- **상점의 사파이어 보충 칸은 인벤토리가 아니다**(2026-09-13). 재고와 나란히 그려지지만 다른
+  자리에 있다 — `UI_ShopPanel.DoReplenishment`가 사파이어
+  (`PlayerLocalDataStorage.GetSapphire`·`sapphireUseInRun`, 런 안의 소지금이 아니라 계정 쪽
+  저장소)를 받고 상인의 `UnitAI_NewBasic.replenishments`에 `{ entityID, purchased }`를 채운 뒤
+  자기 아이콘 구역에 그린다. **`CurrentSelling`은 건드리지 않는다** — IL 에 그 인벤토리를 만지는
+  호출이 없다. 값은 `replenishmentTryCount`의 거듭제곱이라 누를수록 오른다.
+  그래서 `GridInventory`만 훑던 동안에는 보충한 물건이 통째로 후보에서 빠졌다.
+  창의 `ShopCharacter`는 아바타라 보충 목록으로 바로 이어지지 않으므로, 창이 보여 주는
+  `Shop` 인벤토리와 `CurrentSelling`이 같은 상인을 등록부에서 찾아 잇는다.
+  물건 값은 상점 재고와 같다 — 게임의 `UnitAvatar.BuyReplenishmentFromShop`도 같은
+  `ItemDatabase.GetItemBuyPrice`를 협상 스탯과 함께 부르고, 산 것은 상점을 거치지 않고 곧바로
+  플레이어 인벤토리로 들어간다. **사파이어는 칸을 굴리는 값이지 물건 값이 아니다.**
 - **금고와 시체**(상인이 죽은 뒤의 `Safe`)는 `UI_InventoryViewer`가 지금 보여주는 것일 때만.
   이 창은 무엇을 띄웠는지가 전부 비공개라 `Inventory` 속성을 리플렉션으로 읽는다. 읽지 못하면
   "보이지 않는 것"으로 물러선다 — 덜 보여주는 쪽이 원칙에 맞다.

@@ -61,6 +61,7 @@ namespace SephPlanner.Plugin
 
             var collecting = FrameCost.Now;
             foreach (var inventory in nearby) Collect(snapshot.Offers, inventory, player);
+            CollectReplenishment(snapshot.Offers, player);
             FrameCost.ChestCollect.Add(collecting);
 
             FrameCost.CountInventories(found.Count, nearby.Count);
@@ -73,6 +74,25 @@ namespace SephPlanner.Plugin
         /// </summary>
         public static bool IsShown(GridInventory inventory) =>
             inventory != null && IsVisible(inventory, ShownInventory());
+
+        /// <summary>
+        /// 상점 창이 지금 보여 주는 재고를 파는 상인. 없으면 <c>null</c>. 보충 목록은 상인 쪽에
+        /// 있는데 창의 <c>ShopCharacter</c>는 아바타라, 파는 인벤토리로 이어 주는 것이 확실하다.
+        /// </summary>
+        internal static UnitAI_NewBasic ShownMerchant()
+        {
+            var ui = UIManager.Instance;
+            if (ui == null) return null;
+
+            var shop = ui.GetElement<UI_ShopPanel>();
+            if (shop == null || !shop.IsOpened || shop.Shop == null) return null;
+
+            foreach (var candidate in NetworkRegistry.All<UnitAI_NewBasic>())
+            {
+                if (candidate != null && candidate.CurrentSelling == shop.Shop) return candidate;
+            }
+            return null;
+        }
 
         /// <summary>보상 창이 지금 보여 주는 세피라이트. 없으면 <c>null</c>.</summary>
         public static Sephirite ShownSephirite()
@@ -196,6 +216,41 @@ namespace SephPlanner.Plugin
             }
 
             LastSephiriteReport = report.ToString();
+        }
+
+        /// <summary>
+        /// 상점의 사파이어 보충 칸. 게임은 여기 나온 물건을 상점 재고(<c>CurrentSelling</c>)에 넣지
+        /// 않고 상인의 <c>replenishments</c> 목록에 담아 창의 별도 구역에 그린다
+        /// (<c>UI_ShopPanel.DoReplenishment</c>). 그래서 <see cref="GridInventory"/>만 훑으면 보충한
+        /// 것이 통째로 빠진다 - 사파이어를 써서 굴려 놓고도 화면이 조용한 이유였다.
+        ///
+        /// 값은 상점 물건과 같은 골드 계산이다. 게임의 <c>UnitAvatar.BuyReplenishmentFromShop</c>도
+        /// 같은 <c>GetItemBuyPrice</c>를 협상 스탯과 함께 부른다 - 사파이어는 이 칸을 굴리는 값이지
+        /// 물건 값이 아니다.
+        ///
+        /// 창이 열려 있을 때만 읽는 것은 상점 재고와 같은 이유다. 보충 칸도 창 안에서만 그려진다.
+        /// </summary>
+        private static void CollectReplenishment(List<OfferedItem> offers, PlayerAvatar buyer)
+        {
+            var merchant = ShownMerchant();
+            if (merchant == null || merchant.replenishments == null) return;
+
+            foreach (var item in merchant.replenishments)
+            {
+                // 이미 산 것은 자리만 남는다. 목록에서 사라지지 않으므로 여기서 걸러야 한다.
+                if (item == null || item.purchased) continue;
+
+                var entity = ItemDatabase.FindItemById(item.entityID);
+                if (entity == null) continue;
+
+                offers.Add(new OfferedItem
+                {
+                    DefinitionId = item.entityID,
+                    Kind = KindOf(entity.type),
+                    Price = PriceOf(entity, merchant.Avatar, buyer),
+                    SlotIndex = offers.Count,
+                });
+            }
         }
 
         private static void Collect(List<OfferedItem> offers, GridInventory inventory, PlayerAvatar buyer)

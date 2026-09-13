@@ -67,6 +67,19 @@ namespace SephPlanner.Plugin
                     text.AppendLine($"      reward entity={reward.entityID} instance={reward.instanceID}");
             }
 
+            // 상점의 사파이어 보충 칸. 창이 열려 있을 때만 적는다 - 인벤토리와 같은 규칙이다.
+            var merchant = OfferReader.ShownMerchant();
+            if (merchant != null && merchant.replenishments != null)
+            {
+                text.AppendLine(
+                    $"  Replenishment count={merchant.replenishments.Count} tries={merchant.replenishmentTryCount}");
+                foreach (var item in merchant.replenishments)
+                {
+                    if (item != null)
+                        text.AppendLine($"      entity={item.entityID} purchased={item.purchased}");
+                }
+            }
+
             foreach (var inventory in Object.FindObjectsByType<GridInventory>(FindObjectsSortMode.None))
             {
                 if (inventory == null || inventory == own) continue;
