@@ -4,7 +4,8 @@ public sealed class DiagnosticServerOptions
 {
     public string StorageDirectory { get; set; } = "/data/reports";
     public string AdminTokenFile { get; set; } = "/run/secrets/diagnostics_admin_token";
-    public string[] TrustedProxies { get; set; } = ["10.77.0.1"];
+    // 비워 두면 Validate 가 막는다. 전달 헤더를 신뢰할 프록시는 배포가 지정하며 저장소에 적지 않는다.
+    public string[] TrustedProxies { get; set; } = [];
     // 초기 운영 추정값이다. 실제 수집량과 저장 공간에 맞춰 환경 변수로 조정한다.
     public long MaximumStorageBytes { get; set; } = 512L * 1024 * 1024;
     public int MaximumReports { get; set; } = 1000;
