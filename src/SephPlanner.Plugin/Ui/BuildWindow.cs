@@ -419,7 +419,7 @@ namespace SephPlanner.Plugin.Ui
                 note.Append(Marks(level)).Append(' ')
                     .Append(PlanPreferences.WeightOf(level).ToString("0.##")).Append("배 → ");
             }
-            return note.Append("해제로 강화 칸을 양보합니다. 기본은 활성 보존이며, 끄기 허용을 켠 아이템만 점수 이득을 위해 끕니다. 사용 유지는 끄기 허용보다 우선하고 지원 연결·빼기·교체도 보호합니다. 고정은 배치 조건을 무시하는 칸을 요구합니다. 레벨 제한은 그 레벨까지만 값으로 쳐서 남는 레벨을 다른 아티팩트에 돌립니다(우클릭으로 되돌림). 강화 대상은 북향의 침과 빛나는 모래시계가 그 아티팩트를 강화하게 합니다(점수보다 우선하며, 닿을 수 없으면 그 지정만 무시하고 알립니다).").ToString();
+            return note.Append("해제로 강화 칸을 양보합니다. 기본은 활성 보존이며, 끄기 허용을 켠 아이템만 점수 이득을 위해 끕니다. 사용 유지는 끄기 허용보다 우선하고 지원 연결·빼기·교체도 보호합니다. 고정은 배치 조건을 무시하는 칸을 요구합니다. 레벨 제한은 그 레벨까지만 값으로 쳐서 남는 레벨을 다른 아티팩트에 돌립니다(우클릭으로 되돌림). 대상은 북향의 침과 빛나는 모래시계가 그 아티팩트를 강화하게 합니다(점수보다 우선하며, 닿을 수 없으면 그 지정만 무시하고 알립니다).").ToString();
         }
 
         /// <summary>단계를 기호로. 양수는 ★, 음수는 양보 표시를 단계 수만큼.</summary>
@@ -687,11 +687,11 @@ namespace SephPlanner.Plugin.Ui
                 _deactivation = Widgets.Clickable("Deactivation", rect, skin, b * 0.8f, NativeSkin.TextDim, () => onDeactivation(_entry));
                 _deactivation.text = "끄기 허용";
                 Widgets.Fixed(_deactivation.rectTransform, b * 1.5f, b * 4.2f);
-                // 침·모래시계가 있는 가방에서, 그 대상이 될 수 있는 줄에만 걸린다. 없는 줄에 늘
-                // 띄우면 이름 자리를 그만큼 잡아먹는다.
+                // 침·모래시계가 있는 가방에서, 그 대상이 될 수 있는 줄에만 걸린다. 이름 자리는
+                // 남는 폭이라, 단추가 하나 늘 때마다 이름이 그만큼 잘린다. 같은 이유로 이름도 짧다.
                 _support = Widgets.Clickable("Support", rect, skin, b * 0.8f, NativeSkin.TextDim, () => onSupport(_entry));
-                _support.text = "강화 대상";
-                Widgets.Fixed(_support.rectTransform, b * 1.5f, b * 4.2f);
+                _support.text = "대상";
+                Widgets.Fixed(_support.rectTransform, b * 1.5f, b * 2.2f);
                 _cap = Widgets.Clickable("Cap", rect, skin, b * 0.8f, NativeSkin.TextDim, () => onCap(_entry, 1));
                 Widgets.Fixed(_cap.rectTransform, b * 1.5f, b * 4.2f);
                 _hold = Widgets.Clickable("Hold", rect, skin, b * 0.8f, NativeSkin.TextDim, () => onHold(_entry));
