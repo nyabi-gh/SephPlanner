@@ -38,8 +38,8 @@ namespace SephPlanner.Core.Solver
         /// 북향의 침이 제 값을 하는가. 게임 <c>Charm_UpCharmDamage.OnRequestCharmDamageBonus</c>가
         /// 대상을 못 찾으면 0을 돌려주므로, 대상 없는 침은 자리만 차지하고 아무 일도 하지 않는다.
         ///
-        /// 돌려주는 것은 배수다. 0이면 헛자리, 1이면 제 몫, 그보다 크면 레어도 조건
-        /// (<c>hasDependencyCondition</c>)까지 맞아 덤이 붙은 자리다. 침이 아닌 아티팩트는 1이다.
+        /// 돌려주는 것은 배수다. 0이면 헛자리이고, 그보다 크면 강화할 대상을 찾은 자리다. 침이
+        /// 아닌 아티팩트는 1이다.
         ///
         /// <b>덤은 대상이 받을 만할 때만 값이 있다.</b> 레어도 덤은 대상에게 주는 피해 보너스인데,
         /// 예전에는 대상이 누구든 같은 배수였다 - 그래서 침이 <b>사용자가 낮춘 아티팩트를 우선해서</b>
@@ -50,25 +50,47 @@ namespace SephPlanner.Core.Solver
         /// <b>올린 쪽으로는 키우지 않는다</b>(<c>Math.Min</c>). 선호 대상이라고 덤을 부풀리면 침이
         /// 그 아티팩트를 좋은 칸에서 제 위 칸으로 끌어내리게 되는데, 그것이 지금 고치는 것보다 나쁘다.
         /// 그래서 가중치 1 이상은 전과 같은 값이고, <b>낮춘 대상에서만 덤이 줄어든다.</b>
+        ///
+        /// <b>그리고 대상이 실제로 얼마나 센지를 곱한다</b>(<see cref="TargetShare"/>). 침이 주는
+        /// 것은 <b>대상의 피해에 대한 백분율</b>인데 예전에는 백분율만 세고 그 백분율이 걸리는
+        /// 대상을 보지 않았다. 실제 카탈로그에서 덤은 기본의 2.5배(6~10% 에 15~25%)이고 조건은
+        /// 레어도 언커먼 이하라, 공격 가능한 아티팩트 72종 중 41종이 해당한다 - 그래서 침이 주력
+        /// 대신 흔한 아티팩트를 3.5배로 선호했다. 대상 값어치의 몫을 곱하면 "약한 것의 35%" 와
+        /// "센 것의 10%" 를 같은 자로 견주게 된다. 대상이 하나뿐이면 몫이 1이라 전과 같은 값이다.
         /// </summary>
         public static double DependencyFactor(
-            CharmSlot charm, GridPos cell, int level, IReadOnlyDictionary<GridPos, CharmSlot>? neighbors)
+            PlacementProblem problem, CharmSlot charm, GridPos cell, int level,
+            IReadOnlyDictionary<GridPos, CharmSlot>? neighbors)
         {
             if (!IsNeedle(charm.Definition)) return 1;
             if (neighbors is null) return 1;
 
             if (!DependencyTarget(charm, cell, neighbors, out var target, out _)) return 0;
 
+            var share = TargetShare(problem, target);
             var definition = charm.Definition;
-            if (!definition.HasDependencyCondition) return 1;
-            if (target.Definition.Rarity > definition.DependencyMaxRarity) return 1;
+            if (!definition.HasDependencyCondition) return share;
+            if (target.Definition.Rarity > definition.DependencyMaxRarity) return share;
 
             var wanted = Math.Min(1, target.Weight);
             var baseBonus = At(definition.DependencyBonusByLevel, level);
             var extra = At(definition.DependencyExtraByLevel, level);
-            if (baseBonus <= 0) return extra > 0 ? 1 + wanted : 1;
+            if (baseBonus <= 0) return (extra > 0 ? 1 + wanted : 1) * share;
 
-            return 1 + extra / baseBonus * wanted;
+            return (1 + extra / baseBonus * wanted) * share;
+        }
+
+        /// <summary>
+        /// 이 대상이 판에서 가장 값진 대상의 몇 몫인가. 자리에 따라 흔들리지 않도록 둘 다 상한
+        /// 레벨로 잰다 - 대상이 옮겨 다닐 때마다 침의 값어치가 따라 흔들리면 배치가 폴링마다
+        /// 달라진다. 잰 것은 값어치이지 피해량이 아니므로 어림이다.
+        /// </summary>
+        private static double TargetShare(PlacementProblem problem, CharmSlot target)
+        {
+            var best = problem.NeedleTargetWorth;
+            if (best <= 0) return 1;
+
+            return Math.Min(1, Math.Max(0, target.Worth.At(target.Definition.MaxLevel)) / best);
         }
 
         /// <summary>

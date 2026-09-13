@@ -97,7 +97,8 @@ public class ComboCountingTests
         var inherited = new List<string>();
         ComboCounting.PositionalCategories(needle, new GridPos(0, 1), neighbors, inherited);
         Assert.Equal(connected ? 1 : 0, inherited.Count);
-        Assert.Equal(connected ? 1 : 0, PositionalWorth.DependencyFactor(needle, new GridPos(0, 1), 0, neighbors));
+        Assert.Equal(connected ? 1 : 0, PositionalWorth.DependencyFactor(
+            new PlacementProblem { Charms = { needle, target } }, needle, new GridPos(0, 1), 0, neighbors));
     }
 
     [Theory]

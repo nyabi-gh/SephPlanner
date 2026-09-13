@@ -150,6 +150,33 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         public Dictionary<string, int>? BaseComboCounts { get; set; }
 
+        private double? _needleTargetWorth;
+
+        /// <summary>
+        /// 침이 고를 수 있는 대상 가운데 가장 값진 것(상한 레벨 기준). 침의 값어치를 대상의 세기에
+        /// 비례시키는 자다 - <see cref="PositionalWorth.DependencyFactor"/>. 배정 비용 행렬의
+        /// 최내곽에서 읽으므로 한 번만 센다. 판은 풀기 전에 다 채워지고, 후보·제거 갈래는
+        /// <see cref="OfferAdvisor.Clone"/>이 새 판을 만들므로 여기서 다시 세어진다.
+        /// </summary>
+        internal double NeedleTargetWorth
+        {
+            get
+            {
+                if (_needleTargetWorth is { } cached) return cached;
+
+                var best = 0.0;
+                foreach (var charm in Charms)
+                {
+                    if (charm.IsFiller || charm.IsDormant) continue;
+                    if (!(charm.IsAttackable ?? charm.Definition.IsAttackable)) continue;
+
+                    best = Math.Max(best, charm.Worth.At(charm.Definition.MaxLevel));
+                }
+                _needleTargetWorth = best;
+                return best;
+            }
+        }
+
         /// <summary>
         /// 지금 놓여 있는 자리. 같은 조건과 효과·빈칸 품질에서는 이동을 줄인다.
         /// </summary>

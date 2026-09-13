@@ -1593,7 +1593,7 @@ namespace SephPlanner.Core.Solver
 
             // 북향의 침은 강화할 대상이 있어야 제 몫을 한다. 대상 없이 선 침은 값어치가 0 이라,
             // 이것이 없으면 솔버가 침을 아무 데나 세우고도 최적이라고 한다.
-            var factor = PositionalWorth.DependencyFactor(charm, cell, effective, neighbors);
+            var factor = PositionalWorth.DependencyFactor(problem, charm, cell, effective, neighbors);
             if (PositionalWorth.IsNeedle(charm.Definition) && neighbors is not null &&
                 !DirectedCharmSupport.IsConnected(charm, cell, result, problem.Grid, occupancy, neighbors)) factor = 0;
             // DisableEffect는 침의 보너스 요청을 끄지 않고 limitedEffectEnabledLevel만 0으로 만든다.

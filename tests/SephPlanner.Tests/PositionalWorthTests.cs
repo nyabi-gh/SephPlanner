@@ -201,4 +201,76 @@ public class PositionalWorthTests
         // lineCategory[y % 3] 이 GLACIER 가 되는 줄은 y = 1 이다.
         Assert.Equal(new GridPos(0, 1), PlacementSolver.Solve(problem).CharmPositions[1]);
     }
+
+    /// <summary>
+    /// 실제 카탈로그의 북향(1289·1290). 덤은 기본의 2.5배이고 조건은 레어도 언커먼 이하다.
+    /// </summary>
+    private static CharmDefinition ConditionalNeedle() => new()
+    {
+        MaxLevel = 2,
+        Rarity = Rarity.Rare,
+        Behavior = "Charm_UpCharmDamage",
+        DependencyOffsetY = -1,
+        DependencyBonusByLevel = { 6, 8, 10 },
+        DependencyExtraByLevel = { 15, 20, 25 },
+        HasDependencyCondition = true,
+        DependencyMaxRarity = Rarity.Uncommon,
+    };
+
+    private static CharmSlot Target(int id, Rarity rarity, double worth) => new()
+    {
+        InstanceId = id,
+        Definition = new CharmDefinition { MaxLevel = 2, IsAttackable = true, Rarity = rarity },
+        Worth = new CharmWorth { Base = worth, PerLevel = worth },
+    };
+
+    /// <summary>
+    /// 침이 주는 것은 대상의 피해에 대한 백분율이므로, 값싼 대상의 35%가 주력의 10%를 이기려면
+    /// 그 대상이 그만큼 세야 한다. 레어도 덤만 세던 때는 값싼 쪽이 무조건 이겼다(3.5배).
+    /// </summary>
+    [Fact]
+    public void ANeedleWeighsTheRarityBonusAgainstHowStrongTheTargetIs()
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(2, 2, 4) };
+        problem.Charms.Add(new CharmSlot { InstanceId = 1, Definition = ConditionalNeedle() });
+        problem.Charms.Add(Target(2, Rarity.Common, 1));
+        problem.Charms.Add(Target(3, Rarity.Rare, 10));
+
+        var arrangement = PlacementSolver.Solve(problem);
+        var above = arrangement.CharmPositions[1].Offset(0, -1);
+
+        Assert.Equal(above, arrangement.CharmPositions[3]);
+    }
+
+    /// <summary>
+    /// 세기가 같으면 게임의 레어도 덤이 그대로 이긴다 - 이쪽은 우리 선호가 아니라 게임 규칙이다.
+    /// </summary>
+    [Fact]
+    public void BetweenEquallyStrongTargetsTheRarityBonusStillDecides()
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(2, 2, 4) };
+        problem.Charms.Add(new CharmSlot { InstanceId = 1, Definition = ConditionalNeedle() });
+        problem.Charms.Add(Target(2, Rarity.Common, 5));
+        problem.Charms.Add(Target(3, Rarity.Rare, 5));
+
+        var arrangement = PlacementSolver.Solve(problem);
+        var above = arrangement.CharmPositions[1].Offset(0, -1);
+
+        Assert.Equal(above, arrangement.CharmPositions[2]);
+    }
+
+    /// <summary>고를 대상이 하나뿐이면 몫이 1이라 값어치가 전과 같다.</summary>
+    [Fact]
+    public void OneTargetKeepsTheFullRarityBonus()
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(1, 2, 2) };
+        problem.Charms.Add(new CharmSlot { InstanceId = 1, Definition = ConditionalNeedle() });
+        problem.Charms.Add(Target(2, Rarity.Common, 1));
+
+        var arrangement = PlacementSolver.Solve(problem);
+
+        Assert.Equal(
+            problem.Charms[1].Worth.At(0) + problem.Charms[0].Worth.At(0) * 3.5,
+            arrangement.Score, 8);
+    }
 }
