@@ -12,7 +12,8 @@
 
 ## 범위와 근거
 
-- [전체 대응 목록](EFFECT-AUDIT-INVENTORY-2026-09-09.md): 저장 카탈로그의 아티팩트 299종,
+- 전체 대응 목록(아티팩트 299종 전수 대조표)은 2026-09-13 에 지웠다 - 그 뒤 311종이 되어
+  숫자가 전부 어긋났기 때문이다. 아래 스크립트로 언제든 다시 뽑는다. 저장 카탈로그의 아티팩트 299종,
   동작 클래스 136종, 석판 68종, 콤보 20종을 점검 당시 어셈블리와 전수 대조했다.
 - `Assembly-CSharp.dll` 전체를 `ilspycmd`로 디컴파일하고, 배치·카테고리·연결·능력치 전환
   경로와 활성 조건 10종을 상세 대조했다. 클래스 목록에는 상속 관계와 직접 호출 흔적도 남겼다.
@@ -287,7 +288,7 @@ F10에 기본 합·증폭·최종 능력치, 게임과 같은 정렬의 카테�
 
 ```powershell
 ilspycmd 'D:/SteamLibrary/steamapps/common/Sephiria/Sephiria_Data/Managed/Assembly-CSharp.dll' -o artifacts/effect-audit/decompiled
-python scripts/audit-effects.py --catalog "$env:LOCALAPPDATA/SephPlanner/catalog-generations/20260907T103854027-38738e3fc000497faf30efd6eaadbf25" --decompiled artifacts/effect-audit/decompiled/Assembly-CSharp.decompiled.cs --assembly 'D:/SteamLibrary/steamapps/common/Sephiria/Sephiria_Data/Managed/Assembly-CSharp.dll' --output docs/EFFECT-AUDIT-INVENTORY-2026-09-09.md
+python scripts/audit-effects.py --catalog "$env:LOCALAPPDATA/SephPlanner/catalog-generations/20260907T103854027-38738e3fc000497faf30efd6eaadbf25" --decompiled artifacts/effect-audit/decompiled/Assembly-CSharp.decompiled.cs --assembly 'D:/SteamLibrary/steamapps/common/Sephiria/Sephiria_Data/Managed/Assembly-CSharp.dll' --output docs/notes/EFFECT-AUDIT-INVENTORY.md
 ```
 
 게임 갱신 후에는 새로 수집한 카탈로그로 경로를 바꾸고 판정 문서도 다시 검토한다. 자동 목록은

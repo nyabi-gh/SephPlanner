@@ -93,7 +93,7 @@ dotnet run --project src/SephPlanner.DataTool -- --measure
 ```
 
 아티팩트 하나하나의 값어치가 어디까지 측정됐는지 보고, 아직 레어도 어림값에 기대고 있는 것들을
-손으로 채울 초안으로 뽑는다. 채우는 법은 [data/values/README.md](data/values/README.md) 참고.
+손으로 채울 초안으로 뽑는다. 채우는 법은 [data/values/README.md](../data/values/README.md) 참고.
 
 **레벨이 올라도 값어치가 내려가는 아티팩트도 함께 적는다.** 그런 구간이 있으면 낮은 레벨 칸이
 정답이 되어 "왜 이걸 낮은 자리에 두느냐"는 제보가 온다. 원인이 된 능력치와 그 수치 변화까지
@@ -128,10 +128,10 @@ zip은 이 저장소의 Releases 에 올린다. 변경 기록은 CHANGELOG.md �
 옮겨 적지 않는다. 두 벌이 되면 한쪽만 고친 채 나가기 때문이다. 커뮤니티 글에는 Releases 링크를
 걸고 zip을 직접 첨부하지 않는다 - 첨부하면 옛 버전이 돌아다닌다.
 
-**저장소 둘을 합치는 중이다(2026-09-13 기준 아직 안 끝났다).** 소스는 비공개 `SephPlanner`에,
-배포는 공개 `SephPlanner-Release`에 있었다. 누적 다운로드가 릴리스 자산에 붙어 있어 옮길 수 없으므로
-**소스를 릴리스 저장소로 옮기고 이름을 `SephPlanner`로 바꾼다.** 이 문서와 README 의 저장소 서술은
-합친 뒤를 전제로 쓰여 있다. 남은 절차는 [현재 상태](STATUS.md)의 "저장소 공개와 합치기"에 있다.
+**소스와 배포본이 한 저장소에 있다**(`nyabi-gh/SephPlanner`, 공개). 2026-09-13 에 합쳤고 옛
+소스 저장소는 `SephPlanner-archive` 로 이름을 바꿔 잠갔다. 경위와, 그때 일부러 남긴 것들은
+[현재 상태](STATUS.md)의 "저장소 공개와 합치기" 에 있다 - **옛 태그가 로컬과 원격에서 갈라져
+있으므로 `git fetch --tags` 의 clobber 경고는 정상이고 `--force` 로 맞추지 않는다.**
 
 **태그를 먼저 달고 zip을 만든다.** manifest에 적히는 커밋이 곧 태그가 가리켜야 할 커밋이라,
 나중에 달면 zip을 만든 커밋과 태그가 갈라져 어느 소스에서 나온 zip인지 되짚을 수 없다.
@@ -204,15 +204,16 @@ CHANGELOG의 해당 절도 함께 확인한다.
 ## 문서
 
 - [STATUS.md](STATUS.md) — 현재 구현·추정·실기 미검증 범위와 다음 작업. 설계·감사·제보 문서는 여기서 잇는다
-- [BASELINE.md](BASELINE.md) — 0.3.3이 왜 0.2.8 기준인지, 0.3.x에서 무엇을 골라 이식하고 무엇을 버렸는지
 - [REPRODUCTION.md](REPRODUCTION.md) — F10 계획 재현 자료와 진단 도구 사용법
 - [DIAGNOSTIC-UPLOAD.md](DIAGNOSTIC-UPLOAD.md) — F10 비공개 진단 전송과 서버 배포 인계
 
 - [INSTALL.txt](INSTALL.txt) — 사용자용 설치 안내. 메모장에서 그대로 읽히도록 마크다운 없이 평문으로 쓰고, 배포 zip에 `설치안내.txt`로 들어간다
 - [RESEARCH.md](RESEARCH.md) — 게임 내부 구조 조사 결과
 - [LEGAL.md](LEGAL.md) — 약관·저작권 검토와 그에 따른 설계 제약
-- [ROADMAP.md](ROADMAP.md) — 백로그, 측정 기준선, 고치지 않기로 한 것. 날짜가 붙은 확인·릴리스 표는 0.2.x 시절의 과거 기록이므로 지금 할 일은 STATUS를 본다
+- [ROADMAP.md](ROADMAP.md) — 백로그, 측정 기준선, 고치지 않기로 한 것
+- [PERFORMANCE.md](PERFORMANCE.md) — 성능과 응답성. 지금 값, 남은 일감, 지켜야 할 규약
 - [CHANGELOG.md](CHANGELOG.md) — 버전별 사용자 영향 변경 사항
 - [PLACEMENT-OBJECTIVE.md](PLACEMENT-OBJECTIVE.md) — 배치 평가 순서, 활성 보호, 선호도 가중치, 사용 유지
+- [HANDOVER.md](HANDOVER.md) — 직전 세션이 남긴 길잡이. 세션마다 덮어쓰며, STATUS 와 어긋나면 STATUS 가 정본이다
 - [notes/](notes) — 지난 검토·감사·제보 분석과 측정 기록. 그때의 사실이며 현재 상태가 아니다
 - [LICENSE](../LICENSE) — MIT. 우리가 비영리인 것은 운영 방침이지 라이선스 조건이 아니다
