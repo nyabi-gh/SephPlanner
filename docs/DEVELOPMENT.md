@@ -133,6 +133,12 @@ zip은 이 저장소의 Releases 에 올린다. 변경 기록은 CHANGELOG.md �
 [현재 상태](STATUS.md)의 "저장소 공개와 합치기" 에 있다 - **옛 태그가 로컬과 원격에서 갈라져
 있으므로 `git fetch --tags` 의 clobber 경고는 정상이고 `--force` 로 맞추지 않는다.**
 
+**zip 의 이름과 `manifest.json` 은 게임 안 업데이트가 읽는다.** 플러그인은 `releases/latest` 가
+가리키는 태그 `v{버전}` 에서 `SephPlanner-v{버전}.zip` 을 받고, 안의 `manifest.json` 으로 버전과
+DLL 둘의 SHA-256 을 대조한다(`UpdateClient`·`UpdatePackage`). 자산 이름·zip 안 경로·manifest
+의 `version`/`files` 모양을 바꾸면 이미 깔린 판의 업데이트가 끊긴다. 시험 버전은 `Pre-release`
+로 올려야 안정판 사용자에게 안내되지 않는다.
+
 **태그를 먼저 달고 zip을 만든다.** manifest에 적히는 커밋이 곧 태그가 가리켜야 할 커밋이라,
 나중에 달면 zip을 만든 커밋과 태그가 갈라져 어느 소스에서 나온 zip인지 되짚을 수 없다.
 `make-release.ps1`이 HEAD에 `v{버전}` 태그가 없으면 멈추고, `[BepInPlugin]`의 버전과

@@ -73,6 +73,7 @@ namespace SephPlanner.Plugin
         public ConfigEntry<bool> MultiplayerAutoPlace { get; }
         public ConfigEntry<string> DiagnosticConsent { get; }
         public ConfigEntry<bool> DiagnosticChoiceMade { get; }
+        public ConfigEntry<bool> UpdateCheck { get; }
         private readonly Action _reviewDiagnostics;
 
         public bool DiagnosticUploadAllowed => DiagnosticConsent.Value ==
@@ -124,6 +125,10 @@ namespace SephPlanner.Plugin
                 "F10 진단을 비공개 서버로 전송하는 데 동의한 대상과 항목 버전. F3에서 변경합니다.");
             DiagnosticChoiceMade = config.Bind("Diagnostics", "UploadChoiceMade", false,
                 "F10 진단 전송 여부를 사용자가 선택했는지 기록합니다.");
+            // 진단 전송과 달리 동의 창이 없다. GitHub 에 가는 것은 "최신 판이 무엇이냐" 는 물음
+            // 하나뿐이고 받는 것은 창에서 따로 묻는다. 끄는 자리는 F3 에 있다.
+            UpdateCheck = config.Bind("Updates", "CheckOnStart", true,
+                "게임을 켤 때 GitHub Releases 에서 새 안정판이 있는지 확인합니다. 있으면 창으로 물어본 뒤에만 받습니다.");
 
             PollInterval = config.Bind(
                 "General", "PollIntervalSeconds", 0.25f, Ranged(
@@ -293,6 +298,7 @@ namespace SephPlanner.Plugin
                     Read = () => DiagnosticUploadAllowed ? 1 : 0,
                     Write = i => { if (i == 0) SetDiagnosticConsent(false); else _reviewDiagnostics(); },
                 },
+                Switch("시작할 때 업데이트 확인", UpdateCheck),
                 Steps("갱신 주기", PollInterval, PollSteps,
                     new[] { "0.15초", "0.25초", "0.5초", "1초" }),
                 Key("접기/펼치기", ExpandKey),

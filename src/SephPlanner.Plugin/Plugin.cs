@@ -49,6 +49,17 @@ namespace SephPlanner.Plugin
         private readonly DiagnosticUploadThrottle _diagnosticThrottle = new DiagnosticUploadThrottle(DiagnosticUploadThrottle.DefaultInterval);
         private string _diagnosticNotice;
         private float _diagnosticNoticeUntil;
+        private UpdateClient _updateClient;
+        private UpdateWindow _updateWindow;
+        private CancellationTokenSource _updateCancellation;
+        private Task<Version> _updateCheck;
+        private Task<string> _updateInstall;
+        private Version _updateAvailable;
+
+        /// <summary>화면에 띄워야 하는데 아직 못 띄운 단계. 창을 만들 수 있을 때까지 폴링마다 다시 시도한다.</summary>
+        private UpdateWindow.Stage? _updatePrompt;
+        private float _updatePromptRetryAt;
+        private bool _updatedOnThisStart;
         private string _lastPanelOrigin;
         private string _lastPanelBlocker;
         private readonly Dictionary<string, string> _lastErrors = new Dictionary<string, string>();
@@ -92,6 +103,11 @@ namespace SephPlanner.Plugin
             // 묻게 해 두면 계측 쪽이 그 수명을 몰라도 된다.
             FrameCost.PlanStats = () => _runner?.Stats;
             Logger.LogInfo(PluginIdentity.Describe());
+
+            _updateWindow = new UpdateWindow(StartUpdateInstall, () => Logger.LogInfo("업데이트를 미뤘습니다. 다음 실행 때 다시 묻습니다."));
+            _updateClient = new UpdateClient();
+            Guarded(FinishPreviousUpdate, "업데이트 정리");
+            if (_settings.UpdateCheck.Value) StartUpdateCheck();
         }
 
         private void Update()
@@ -106,6 +122,7 @@ namespace SephPlanner.Plugin
             // Player.log 에만 쌓고 우리 로그는 조용하므로, 여기서 잡아 같은 것 한 번씩 남긴다.
             Guarded(HandleInput, "입력 처리");
             Guarded(CheckDiagnosticUpload, "진단 전송 상태");
+            Guarded(CheckUpdateProgress, "업데이트 진행");
 
             var panelStarted = FrameCost.Now;
             Guarded(UpdateNativePanel, "화면 갱신");
@@ -198,7 +215,7 @@ namespace SephPlanner.Plugin
 
                 // 커서를 읽기만 한다. 그려 둔 사각형과 겹치는지 우리가 세므로 raycastTarget 을
                 // 켤 필요가 없고, HUD 가 게임 입력을 가져가지 않는다는 보장이 그대로 남는다.
-                _hud.UpdateHover(Cursor(), !_hidden && !_moving && !_window.IsOpen && !_build.IsOpen && !_diagnosticWindow.IsOpen && !_noteWindow.IsOpen);
+                _hud.UpdateHover(Cursor(), !_hidden && !_moving && !AnyWindowOpen());
             }
 
             // 리소스는 부팅 직후 준비되므로 첫 프레임에 확인한다.
@@ -532,6 +549,117 @@ namespace SephPlanner.Plugin
             Report(message, AutoPlaceNoticeSeconds);
         }
 
+        private bool AnyWindowOpen() =>
+            _window.IsOpen || _build.IsOpen || _diagnosticWindow.IsOpen || _noteWindow.IsOpen || _updateWindow.IsOpen;
+
+        private static Version CurrentVersion() => typeof(SephPlannerPlugin).Assembly.GetName().Version;
+
+        /// <summary>
+        /// 지금 로드된 DLL 둘의 자리. 업데이트는 이 파일들을 바꾸는 것이지 <c>plugins</c> 폴더에
+        /// 새로 놓는 것이 아니다 - 하위 폴더에 설치한 사람도 같은 자리를 받는다.
+        /// </summary>
+        private static Dictionary<string, string> UpdateTargets() => new Dictionary<string, string>
+        {
+            [UpdatePackage.PluginFile] = typeof(SephPlannerPlugin).Assembly.Location,
+            [UpdatePackage.CoreFile] = typeof(UpdateClient).Assembly.Location,
+        };
+
+        /// <summary>지난 실행이 밀어 둔 옛 DLL 을 지운다. 있었다면 이번이 새 버전의 첫 실행이다.</summary>
+        private void FinishPreviousUpdate()
+        {
+            if (!UpdateInstaller.CleanRetired(UpdateTargets().Values)) return;
+            _updatedOnThisStart = true;
+            Logger.LogInfo("업데이트가 적용됐습니다. 이전 버전의 DLL 을 지웠습니다.");
+        }
+
+        private void StartUpdateCheck()
+        {
+            _updateCancellation = new CancellationTokenSource();
+            _updateCancellation.CancelAfter(TimeSpan.FromSeconds(30));
+            var cancellation = _updateCancellation.Token;
+            var current = CurrentVersion();
+            _updateCheck = Task.Run(() => _updateClient.CheckAsync(current, cancellation));
+        }
+
+        private void StartUpdateInstall(Version version)
+        {
+            if (_updateInstall != null) return;
+            _updateWindow.Show(UpdateWindow.Stage.Working, version, CurrentVersion());
+            _updateCancellation = new CancellationTokenSource();
+            _updateCancellation.CancelAfter(TimeSpan.FromMinutes(5));
+            var cancellation = _updateCancellation.Token;
+            var targets = UpdateTargets();
+            Logger.LogInfo("업데이트 " + UpdateClient.Format(version) + " 을 받습니다.");
+            _updateInstall = Task.Run(async () =>
+            {
+                try
+                {
+                    var zip = await _updateClient.DownloadAsync(version, cancellation).ConfigureAwait(false);
+                    cancellation.ThrowIfCancellationRequested();
+                    UpdateInstaller.Install(UpdatePackage.Extract(zip, version), targets);
+                    return null;
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning("업데이트 실패: " + ex);
+                    return ex is OperationCanceledException ? "시간이 너무 오래 걸려 그만두었습니다." : ex.Message;
+                }
+            });
+        }
+
+        /// <summary>
+        /// 확인과 설치의 결과를 메인 스레드에서 걷는다. 창은 게임의 HUD 캔버스가 서야 만들 수
+        /// 있고 다른 창 위에 겹쳐 띄우지 않으므로, 띄울 것이 있으면 될 때까지 폴링마다 되짚는다.
+        /// </summary>
+        private void CheckUpdateProgress()
+        {
+            if (_updateCheck != null && _updateCheck.IsCompleted)
+            {
+                var completed = _updateCheck;
+                _updateCheck = null;
+                DisposeUpdateCancellation();
+                try
+                {
+                    _updateAvailable = completed.GetAwaiter().GetResult();
+                    if (_updateAvailable != null)
+                    {
+                        Logger.LogInfo("새 버전 " + UpdateClient.Format(_updateAvailable) + " 이 있습니다.");
+                        _updatePrompt = UpdateWindow.Stage.Offer;
+                    }
+                    else Logger.LogInfo("최신 안정판입니다.");
+                }
+                catch (Exception ex)
+                {
+                    // 확인은 조용히 실패한다. 오프라인이거나 GitHub 가 잠깐 안 되는 것을 게임 화면에서 알릴 이유가 없다.
+                    Logger.LogWarning("업데이트 확인 실패: " + ex.Message);
+                }
+            }
+
+            if (_updateInstall != null && _updateInstall.IsCompleted)
+            {
+                var completed = _updateInstall;
+                _updateInstall = null;
+                DisposeUpdateCancellation();
+                var error = completed.GetAwaiter().GetResult();
+                if (error == null) Logger.LogInfo("업데이트 " + UpdateClient.Format(_updateAvailable) + " 을 설치했습니다. 다음 실행부터 적용됩니다.");
+                _updateWindow.Show(error == null ? UpdateWindow.Stage.Done : UpdateWindow.Stage.Failed, _updateAvailable, CurrentVersion(), error ?? "");
+                _updatePrompt = _updateWindow.IsOpen ? null : _updateWindow.Current;
+            }
+
+            if (!_updatePrompt.HasValue || AnyWindowOpen() || Time.unscaledTime < _updatePromptRetryAt) return;
+            _updatePromptRetryAt = Time.unscaledTime + 1f;
+            if (_updatePrompt == UpdateWindow.Stage.Offer)
+                _updateWindow.Show(UpdateWindow.Stage.Offer, _updateAvailable, CurrentVersion());
+            _updateWindow.Toggle("");
+            if (_updateWindow.Blocker.Length == 0) _updatePrompt = null;
+        }
+
+        private void DisposeUpdateCancellation()
+        {
+            _updateCancellation?.Dispose();
+            _updateCancellation = null;
+        }
+
         private void PollGameState()
         {
             var started = FrameCost.BeginPoll();
@@ -700,6 +828,13 @@ namespace SephPlanner.Plugin
                 // 접힌 화면은 안내 줄을 물고 있지 않다. 처음 뜰 때 잠깐 보여 주지 않으면
                 // 무엇을 눌러야 하는지 알 길이 없다.
                 Report(Guide());
+
+                // 화면이 처음 서는 순간에 알린다. Awake 에서 걸어 두면 게임이 뜨는 사이에 시효가 지난다.
+                if (_updatedOnThisStart)
+                {
+                    _updatedOnThisStart = false;
+                    ReportDiagnostic("SephPlanner " + UpdateClient.Format(CurrentVersion()) + " 으로 업데이트됐습니다.");
+                }
                 if (_hud.Origin != _lastPanelOrigin)
                 {
                     _lastPanelOrigin = _hud.Origin;
@@ -1202,6 +1337,9 @@ namespace SephPlanner.Plugin
             _diagnosticCancellation?.Cancel();
             _diagnosticCancellation?.Dispose();
             _diagnosticClient?.Dispose();
+            _updateCancellation?.Cancel();
+            _updateCancellation?.Dispose();
+            _updateClient?.Dispose();
             Logger.LogEvent -= CaptureOwnLog;
             if (_moving && _settings != null && _hud.IsAlive)
             {
@@ -1213,6 +1351,7 @@ namespace SephPlanner.Plugin
             _build.Destroy();
             _diagnosticWindow.Destroy();
             _noteWindow.Destroy();
+            _updateWindow?.Destroy();
             GrowthProgressWatch.Clear();
         }
     }
