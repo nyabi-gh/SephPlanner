@@ -156,7 +156,7 @@ BepInEx 를 잘못 받는 것이었다. 라이선스를 하나씩 확인했다.
 | 창구 | 주소 | 비고 |
 |---|---|---|
 | 공식 디스코드 | `discord.gg/g7AaeBuyMV` | 스팀 상점 페이지에 걸린 공식 링크. 개발자가 상주한다 |
-| 이메일 | `team.horay.game@gmail.com` | `teamhoray.com/privacy-policy`의 개인정보 보호책임자(문지환) 연락처. 공개된 유일한 이메일이다 |
+| 이메일 | `team.horay.game@gmail.com` | `teamhoray.com/privacy-policy`의 개인정보 보호책임자 연락처. 공개된 유일한 이메일이다 |
 | X / Bluesky | `@TeamHoray` / `@teamhoray.bsky.social` | DM. 위 둘이 막혔을 때 |
 
 `teamhoray.com/mod-api`는 기술 문서일 뿐 문의 창구도 모드 정책도 담고 있지 않으며, "출시 전

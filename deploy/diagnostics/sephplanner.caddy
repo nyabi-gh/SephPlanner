@@ -1,8 +1,0 @@
-sephplanner.nyabi.me {
-    request_body {
-        max_size 8MiB
-    }
-    reverse_proxy 10.77.0.2:8081 {
-        header_up X-Real-IP {remote_host}
-    }
-}

@@ -2,8 +2,7 @@ bin/
 obj/
 artifacts/
 /reports/
-deploy/diagnostics/secrets/
-deploy/diagnostics/publish/
+deploy/
 *.user
 .vs/
 data/generated/
