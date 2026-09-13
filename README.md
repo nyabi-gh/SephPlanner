@@ -4,7 +4,7 @@
 상황에서 어떤 아티팩트를 고르는 게 좋은지 알려준다. **게임 안에 직접 그린다** — 게임을 켜면
 플러그인이 저절로 올라오고, 따로 실행할 것이 없다.
 
-TEAM HORAY와 무관한 팬 제작 도구이며, 비영리로 배포한다.
+TEAM HORAY와 무관한 팬 제작 도구이며, 비영리로 배포한다. 소스는 MIT 라이선스다.
 
 ## 추천과 아이템 배치
 
@@ -165,7 +165,7 @@ CHANGELOG의 해당 절도 함께 확인한다.
 - [CHANGELOG.md](CHANGELOG.md) — 버전별 사용자 영향 변경 사항
 - [docs/PLACEMENT-OBJECTIVE.md](docs/PLACEMENT-OBJECTIVE.md) — 배치 평가 순서, 활성 보호, 선호도 가중치, 사용 유지
 - [docs/notes/](docs/notes) — 지난 검토·감사·제보 분석과 측정 기록. 그때의 사실이며 현재 상태가 아니다
-- [LICENSE](LICENSE) — 배포 조건. 독점 라이선스이고 소스는 공개하지 않는다
+- [LICENSE](LICENSE) — MIT. 우리가 비영리인 것은 운영 방침이지 라이선스 조건이 아니다
 
 ## 인게임 화면
 
