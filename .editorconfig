@@ -5,6 +5,9 @@ indent_style = space
 indent_size = 4
 insert_final_newline = true
 trim_trailing_whitespace = true
+# .gitattributes 가 eol=lf 라 저장소에는 LF 로 들어간다. 이것을 적어 두지 않으면 dotnet format 이
+# 자기가 고쳐 쓰는 줄에만 윈도우 기본 줄바꿈(CRLF)을 넣어, 로컬은 초록인데 CI 는 빨간 상태가 된다.
+end_of_line = lf
 
 [*.cs]
 dotnet_sort_system_directives_first = true
