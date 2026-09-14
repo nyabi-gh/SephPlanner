@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using SephPlanner.Core.Model;
+using SephPlanner.Core.Planning;
 using SephPlanner.Core.Tablets;
 
 namespace SephPlanner.Core.Solver
@@ -23,6 +24,14 @@ namespace SephPlanner.Core.Solver
         internal static string FailureReason(PlacementProblem problem, CharmSlot charm)
         {
             var cells = Enumerable.Range(0, problem.Grid.Storage).Select(problem.Grid.ToPosition).ToList();
+
+            // 강화 대상 지정이 콤보 우선보다 앞서므로, 침이 지정을 따르느라 콤보를 못 보인 것이
+            // 가장 흔한 이유다. "자리를 못 찾았다" 로 뭉뚱그리면 사용자가 없는 자리를 찾으러 간다.
+            if (problem.DesignatedTargets.Count > 0 && DirectedCharmSupport.HasConnection(charm) &&
+                DirectedCharmSupport.WantsDesignatedTarget(problem, charm))
+                return "지정한 강화 대상을 따르느라 이 콤보를 보이지 못했습니다. "
+                       + "콤보 쪽이 먼저라면 F2에서 이 아티팩트의 강화 대상 지정을 푸세요.";
+
             if (charm.Definition.LineCategories.Count > 0)
             {
                 if (!charm.Definition.LineCategories.Any(problem.PriorityCategories.Contains))
@@ -56,9 +65,45 @@ namespace SephPlanner.Core.Solver
         {
             var (dx, dy) = DirectedCharmSupport.Offset(charm);
             var cells = Enumerable.Range(0, problem.Grid.Storage).Select(problem.Grid.ToPosition);
-            return cells.Any(cell => problem.Grid.Contains(cell.Offset(dx, dy)))
-                ? "지정한 강화 대상에 닿는 배치를 찾지 못했습니다."
-                : "강화 방향에 대상을 놓을 칸이 없습니다.";
+            if (!cells.Any(cell => problem.Grid.Contains(cell.Offset(dx, dy))))
+                return "강화 방향에 대상을 놓을 칸이 없습니다.";
+
+            // 지정한 대상이 지금 꺼져 있으면 옮겨 봐야 연결이 서지 않는다. 자리 이야기를 하면
+            // 사용자가 칸을 옮겨 보며 시간을 버린다.
+            var blocked = problem.DesignatedTargets
+                .Where(target => DirectedCharmSupport.Accepts(charm, target) && target.IsDormant)
+                .Select(target => Naming.Of(target.Definition.Names, target.Definition.Id, "아티팩트"))
+                .ToList();
+            if (blocked.Count > 0)
+                return $"지정한 대상({string.Join(", ", blocked)})이 꺼져 있어 연결이 서지 않습니다.";
+
+            return "지정한 강화 대상에 닿는 배치를 찾지 못했습니다. 다른 지정과 부딪히거나 "
+                   + "대상이 그 자리에서 조건을 만족하지 못하는 경우입니다.";
+        }
+
+        /// <summary>
+        /// 가방 안의 어느 침·모래시계도 강화할 수 없는 지정. 예전에는 아무 말 없이 무시됐다 -
+        /// F2 목록은 가방에 없는 아티팩트의 지정도 들고 있으므로, 다른 판에서 걸어 둔 지정이
+        /// 이번 판에서 죽은 채로 남아 있어도 화면에 아무 자취가 없었다(2026-09-14 제보 점검).
+        /// </summary>
+        internal static List<string> UnusableDesignations(PlacementProblem problem)
+        {
+            var warnings = new List<string>();
+            if (problem.DesignatedTargets.Count == 0) return warnings;
+
+            var helpers = problem.Charms.FindAll(
+                charm => !charm.IsFiller && DirectedCharmSupport.HasConnection(charm));
+            if (helpers.Count == 0) return warnings;
+
+            foreach (var target in problem.DesignatedTargets)
+            {
+                if (helpers.Exists(helper => DirectedCharmSupport.Accepts(helper, target))) continue;
+
+                warnings.Add(Naming.Of(target.Definition.Names, target.Definition.Id, "아티팩트") + ": " +
+                    "강화 대상으로 지정돼 있지만 가방의 침·모래시계가 강화할 수 있는 종류가 아닙니다. " +
+                    "침은 공격 가능한 아티팩트만, 모래시계는 마법만 강화합니다.");
+            }
+            return warnings;
         }
 
         public static int Compare(Arrangement left, Arrangement right)

@@ -47,11 +47,17 @@ namespace SephPlanner.Core.Solver
             if (order != 0) return order;
             order = other.HoldFailures.CompareTo(HoldFailures);
             if (order != 0) return order;
+            // 강화 대상 지정이 콤보 우선보다 앞선다. 둘은 침 하나를 두고 부딪힌다 - 침은 대상의
+            // 카테고리를 물려받으므로(게임 SearchCategory) "밀고 있는 카테고리를 보이는 대상"과
+            // "지정한 대상"이 다르면 한쪽만 고를 수 있다. 이름을 콕 집은 지정이 카테고리 선호보다
+            // 구체적이고, 콤보의 값어치는 점수에 이미 들어 있어 완전히 사라지지도 않는다.
+            // 뒤집혀 있던 동안 침은 0레벨짜리 마법서를 강화하고 "지정한 대상에 닿는 배치를 찾지
+            // 못했다"고 말했다(2026-09-14 제보).
+            order = SupportMatches.CompareTo(other.SupportMatches);
+            if (order != 0) return order;
             order = ComboMatches.CompareTo(other.ComboMatches);
             if (order != 0) return order;
             order = Compare(ComboProgress, other.ComboProgress);
-            if (order != 0) return order;
-            order = SupportMatches.CompareTo(other.SupportMatches);
             if (order != 0) return order;
             order = other.ActivationFailures.CompareTo(ActivationFailures);
             if (order != 0) return order;

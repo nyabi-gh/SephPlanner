@@ -108,6 +108,68 @@ public class SupportTargetTests
         Assert.Equal(1, solved.SupportTargetMatches);
     }
 
+    /// <summary>
+    /// <b>강화 대상 지정은 F2 콤보 우선보다 앞선다.</b>
+    ///
+    /// 둘은 침 하나를 두고 부딪힌다 - 침은 대상의 카테고리를 물려받으므로(게임 <c>SearchCategory</c>)
+    /// "밀고 있는 카테고리를 가진 대상" 과 "지정한 대상" 이 다르면 한쪽만 고를 수 있다. 콤보가
+    /// 앞서던 동안 침은 밀고 있는 카테고리를 가진 흔한 대상으로 갔고, 화면에는 "지정한 강화
+    /// 대상에 닿는 배치를 찾지 못했습니다" 가 떴다 - 닿는 배치는 있었는데도 그랬다(2026-09-14 제보).
+    /// </summary>
+    [Fact]
+    public void ADesignatedTargetOutranksThePriorityCombo()
+    {
+        static PlacementProblem Board()
+        {
+            var board = Needles();
+            board.Combos = _ => new ComboDefinition { Id = "SPARK", Thresholds = { 2 } };
+            board.PriorityCategories.Add("SPARK");
+
+            // 흔한 쪽이 밀고 있는 카테고리를 가졌다. 침은 대상의 카테고리를 물려받으므로
+            // 그쪽을 가리켜야 콤보가 한 걸음 나아간다.
+            board.Charms[1].Definition.Categories.Add("SPARK");
+            return board;
+        }
+
+        var plain = PlacementSolver.Solve(Board());
+        Assert.Equal(plain.CharmPositions[1].Offset(0, -1), plain.CharmPositions[2]);
+
+        var problem = Board();
+        problem.Charms[2].IsSupportTarget = true;
+        var solved = PlacementSolver.Solve(problem);
+
+        Assert.Equal(solved.CharmPositions[1].Offset(0, -1), solved.CharmPositions[3]);
+        Assert.Equal(1, solved.SupportTargetMatches);
+
+        // 콤보를 못 보인 이유를 자리 탓으로 돌리지 않는다. 사용자가 풀 수 있는 말이어야 한다.
+        Assert.Contains(1, solved.UnmatchedComboCharms);
+        Assert.Contains("강화 대상을 따르느라", PriorityPlacement.FailureReason(problem, problem.Charms[0]));
+    }
+
+    /// <summary>
+    /// 가방의 어느 침·모래시계도 강화할 수 없는 지정은 조용히 무시되지 않는다. F2 목록은 가방에
+    /// 없는 아티팩트의 지정도 들고 있어, 다른 판에서 걸어 둔 것이 죽은 채 남기 쉽다.
+    /// </summary>
+    [Fact]
+    public void ADesignationNoHelperCanUseIsCalledOut()
+    {
+        static PlacementProblem Board(int designated)
+        {
+            var board = Needles();
+            board.Charms.Add(Magic(4, 10));
+            board.Charms.Single(charm => charm.InstanceId == designated).IsSupportTarget = true;
+            return board;
+        }
+
+        // 침밖에 없는 가방에서 마법을 지정했다. 침은 공격 가능한 것만 강화한다.
+        Assert.Contains(
+            "강화할 수 있는 종류가 아닙니다",
+            Assert.Single(PriorityPlacement.UnusableDesignations(Board(4))));
+
+        // 침이 받아들일 수 있는 지정에는 아무 말도 하지 않는다.
+        Assert.Empty(PriorityPlacement.UnusableDesignations(Board(3)));
+    }
+
     /// <summary>지정이 없으면 이 기능이 없던 때와 같은 배치와 점수여야 한다.</summary>
     [Fact]
     public void NoDesignationChangesNothing()

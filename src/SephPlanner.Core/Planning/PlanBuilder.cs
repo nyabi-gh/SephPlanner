@@ -435,6 +435,7 @@ namespace SephPlanner.Core.Planning
                 if (best.UnmatchedSupportCharms.Contains(charm.InstanceId))
                     warnings.Add(name + ": " + PriorityPlacement.SupportFailureReason(problem, charm));
             }
+            warnings.AddRange(PriorityPlacement.UnusableDesignations(problem));
             return warnings;
         }
 
