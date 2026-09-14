@@ -172,6 +172,27 @@ namespace SephPlanner.Core.Planning
             _ => "",
         };
 
+        /// <summary>
+        /// 다음 칸이 열렸을 때의 증가분이 지금 값과 눈에 띄게 다른가. 한 자리까지 적는 화면에서
+        /// 같은 숫자가 두 번 나오면 잡음이므로, 그만큼 벌어졌을 때만 말한다.
+        /// </summary>
+        private const double SoonVisible = 0.05;
+
+        public static bool HasSoon(double gain, double? soon) =>
+            soon.HasValue && Math.Abs(soon.Value - gain) >= SoonVisible;
+
+        /// <summary>줄 오른쪽에 붙는 짧은 표. 감쌀지 말지는 부르는 쪽이 정한다.</summary>
+        public static string SoonTag(double gain, double? soon) =>
+            HasSoon(gain, soon) ? $"다음 칸 {soon!.Value:+0.#;-0.#;0}" : "";
+
+        /// <summary>쪽지에 들어가는 한 줄. 왜 순위가 지금 증가분과 어긋나 보이는지를 답한다.</summary>
+        public static string SoonLine(double gain, double? soon) =>
+            HasSoon(gain, soon)
+                ? $"가방이 한 칸 더 열리면 {soon!.Value:+0.#;-0.#;0} 입니다. 한 번 하면 되돌릴 수 없는 "
+                  + "선택이라 순위는 이 값으로 세웁니다. 칸은 번호 순서로 열리므로 다음 칸이 어디인지는 "
+                  + "정해져 있습니다. 배치와 점수는 지금 열린 칸으로만 계산합니다."
+                : "";
+
         /// <summary>지금 집을 수 있는 후보 하나. 왜 그 자리에 있는지를 순위 대신 설명한다.</summary>
         public static List<string> Offer(OfferAdvice advice, int gold, CharmValueBook? values)
         {
@@ -205,6 +226,9 @@ namespace SephPlanner.Core.Planning
             if (effect.IgnoreCriteriaCells > 0)
                 lines.Add($"{effect.IgnoreCriteriaCells}칸은 배치 조건을 무시합니다.");
 
+            var soon = SoonLine(advice.Gain, advice.SoonGain);
+            if (soon.Length > 0) lines.Add(soon);
+
             return lines;
         }
 
@@ -227,6 +251,9 @@ namespace SephPlanner.Core.Planning
             if (reach.Length > 0) lines.Add($"결과가 미치는 범위: {reach}");
 
             if (!advice.Affordable) lines.Add("소지금이 모자랍니다.");
+
+            var soon = SoonLine(advice.Gain, advice.SoonGain);
+            if (soon.Length > 0) lines.Add(soon);
 
             return lines;
         }

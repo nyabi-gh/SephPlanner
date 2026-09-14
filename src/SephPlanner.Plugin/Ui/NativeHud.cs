@@ -817,6 +817,11 @@ namespace SephPlanner.Plugin.Ui
                     advice.Affordable ? NativeSkin.TextDim : NativeSkin.Bad)).Append("  ");
             }
 
+            // 순위는 다음 칸이 열린 판의 값으로 세우므로, 그것이 지금 값과 다르면 적어 준다.
+            // 적지 않으면 증가분이 낮은 것이 위에 있는 이유가 화면에서 사라진다.
+            var soonTag = Explain.SoonTag(advice.Gain, advice.SoonGain);
+            if (soonTag.Length > 0) parts.Append(Tint(soonTag, NativeSkin.Mint)).Append("  ");
+
             var gain = advice.Gain;
             var text = gain > 0.001 ? $"+{gain:0.#}" : gain < -0.001 ? $"{gain:0.#}" : "0";
             parts.Append(Tint(
@@ -834,6 +839,10 @@ namespace SephPlanner.Plugin.Ui
                     $"현재 위치: {advice.Position.X + 1}열 {advice.Position.Y + 1}행\n" +
                     "이 항목 하나를 가방에서 빼고 다시 배치했을 때의 추정 이득입니다. F8은 아이템을 제거하지 않습니다.\n" +
                     "콤보 단계가 유지되는 후보만 표시합니다. 실제 전투 효과와 다를 수 있습니다." +
+                    (advice.SoonGain.HasValue
+                        ? $"\n가방이 한 칸 더 열려도 여전히 이득입니다({advice.SoonGain.Value:+0.#;-0.#;0}). "
+                          + "그렇지 않은 것은 목록에서 뺐습니다."
+                        : "") +
                     (advice.ReducesComboCount ? "\n콤보 개수는 줄어 다음 단계가 멀어질 수 있습니다." : "") +
                     (advice.Activated.Count > 0 ? "\n켜지는 아티팩트: " + string.Join(", ", advice.Activated) : ""));
             }
@@ -848,9 +857,12 @@ namespace SephPlanner.Plugin.Ui
             {
                 var advice = plan.Mixes[i];
                 var name = advice.NameA + " + " + advice.NameB;
+                var soonTag = Explain.SoonTag(advice.Gain, advice.SoonGain);
                 var row = _mixes.Add(
                     name,
-                    RotationTag(advice) + Tint($"{advice.Gain:+0.#;-0.#;0}",
+                    RotationTag(advice) +
+                    (soonTag.Length > 0 ? Tint(soonTag, NativeSkin.Mint) + "  " : "") +
+                    Tint($"{advice.Gain:+0.#;-0.#;0}",
                         advice.Gain > 0.001 ? NativeSkin.Good : NativeSkin.TextDim),
                     advice.Affordable ? NativeSkin.Text : NativeSkin.TextDim);
                 Hover(row, name, () => Explain.Join(Explain.Mix(advice)));

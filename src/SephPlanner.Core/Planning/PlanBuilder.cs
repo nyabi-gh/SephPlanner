@@ -170,6 +170,10 @@ namespace SephPlanner.Core.Planning
             layouts ??= new LayoutCache();
             layouts.BeginPlan();
 
+            // 되돌릴 수 없는 선택 셋이 나눠 쓰는 "다음 칸이 열린 판". 하나만 두어야 늘어난 판의
+            // 빔과 기준 배치도 한 번만 풀린다.
+            var lookahead = new Lookahead(problem);
+
             var mixes = new List<MixAdvice>();
 
             // 합성기를 이미 썼으면 이 층에서는 더 권할 것이 없고, 멀리 있으면 아직 권할 때가
@@ -178,14 +182,15 @@ namespace SephPlanner.Core.Planning
             {
                 mixes = TabletMixAdvisor.Rank(
                     problem, catalog, mixer.Cost, snapshot.Run?.Gold ?? int.MaxValue,
-                    layouts: layouts, cancellation: cancellation);
+                    layouts: layouts, lookahead: lookahead, cancellation: cancellation);
             }
 
             var candidates = Candidates(snapshot, catalog, placement.ExpectedWeaponId, out var skippedOffers);
             var offers = OfferAdvisor.Rank(
                 problem, candidates, snapshot.Run?.Gold ?? int.MaxValue,
                 snapshot.Inventory?.ComboCounts ?? new Dictionary<string, int>(), catalog.Combo,
-                preferences.PriorityCategories, preferences.PresetCharms, values, layouts, cancellation);
+                preferences.PriorityCategories, preferences.PresetCharms, values, layouts, lookahead,
+                cancellation);
 
             // 후보마다 이미 배치를 다 풀어 두었다. 그 결과를 버리지 않고 화면이 쓸 모양으로
             // 옮겨 두면, 증가분이라는 숫자 하나 대신 무엇이 어떻게 달라지는지 보여줄 수 있다.
@@ -194,7 +199,7 @@ namespace SephPlanner.Core.Planning
                 FillPreviews(offers, problem, layouts.Baseline(problem, SolverOptions.ForAdvice(cancellation)));
 
             var discards = placement.Verification.Passed
-                ? DiscardAdvisor.Rank(problem, placement.Best, layouts, cancellation)
+                ? DiscardAdvisor.Rank(problem, placement.Best, layouts, lookahead, cancellation)
                 : new List<DiscardAdvice>();
 
             return placement.WithAdvice(offers, mixes, discards, skippedOffers, AdviceStatus.Ready);

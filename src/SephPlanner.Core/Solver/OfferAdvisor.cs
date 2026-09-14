@@ -27,6 +27,19 @@ namespace SephPlanner.Core.Solver
         public OfferCandidate Candidate { get; set; } = new OfferCandidate();
         public double Gain { get; set; }
 
+        /// <summary>
+        /// 다음 칸이 열렸다고 쳤을 때의 증가분. 줄은 이 값으로 세운다 - 후보를 집는 것은 되돌릴
+        /// 수 없고, 아래·오른쪽으로 뻗는 석판은 잠긴 칸 몫이 버려져 지금 가방에서만 값이 낮기
+        /// 때문이다(<see cref="Lookahead"/>).
+        ///
+        /// 앞을 보지 못했으면 <c>null</c> 이다 - 가방이 다 열렸거나, 늘어난 판에서 이 후보를
+        /// 받아들일 배치를 찾지 못한 경우다. 그때는 <see cref="Gain"/>이 그대로 줄 세우기의 값이다.
+        /// </summary>
+        public double? SoonGain { get; set; }
+
+        /// <summary>줄 세우기에 실제로 쓰이는 증가분.</summary>
+        public double RankedGain => SoonGain ?? Gain;
+
         /// <summary>지금 소지금으로 살 수 있는지. 그냥 집으면 되는 것은 항상 참이다.</summary>
         public bool Affordable { get; set; }
 
@@ -122,6 +135,12 @@ namespace SephPlanner.Core.Solver
             public CharmSlot? DisplacedCharm;
 
             /// <summary>
+            /// 이긴 갈래를 채점한 배치 후보들. 앞보기가 이것을 그대로 넘겨 받는다 - 칸은 늘기만
+            /// 하므로 여기 담긴 자리는 늘어난 판에서도 전부 유효하고, 탐색을 한 번 더 돌리지 않는다.
+            /// </summary>
+            public IReadOnlyList<List<TabletPlacement>>? Layouts;
+
+            /// <summary>
             /// 이 갈래가 빼낸 석판이 원래 목록에서 몇 번째였는지. 석판을 그대로 둔 갈래는 -1 이다.
             /// 석판을 하나 뺀 갈래의 배치는 그대로 둔 갈래의 배치에서 그 자리만 빼면 나오므로,
             /// 이 번호가 있으면 탐색을 다시 돌리지 않아도 된다.
@@ -144,6 +163,7 @@ namespace SephPlanner.Core.Solver
             IReadOnlyCollection<int>? presetCharms = null,
             CharmValueBook? values = null,
             LayoutCache? layouts = null,
+            Lookahead? lookahead = null,
             CancellationToken cancellation = default)
         {
             // 볼 것이 없으면 기준 점수조차 풀 이유가 없다. 상자도 상점도 열지 않은 평상시가
@@ -178,6 +198,10 @@ namespace SephPlanner.Core.Solver
                 if (outcome is not null)
                 {
                     entry.Gain = outcome.Solved.Score - baseScore;
+
+                    // 밀어낸 것은 늘어난 판에서도 밀어낸 채로 둔다. 집는 것도 버리는 것도 지금
+                    // 하는 일이고, 칸이 하나 열린다고 버린 것이 돌아오지는 않는다.
+                    entry.SoonGain = lookahead?.GainOf(outcome.Trial, layouts, faster, outcome.Layouts);
                     entry.Effect = EffectOf(candidate, outcome.Trial, outcome.Solved, candidateId);
                     entry.Displacement = outcome.Displacement;
                     entry.Displaced = outcome.Displacement?.Name ?? "";
@@ -192,14 +216,15 @@ namespace SephPlanner.Core.Solver
 
             // 살 수 없는 것은 아무리 좋아도 지금 고를 수 없다. 지우지는 않고 아래로 내린다.
             // 그다음은 가져온 빌드가 지목한 아티팩트다 - 빌드의 축이라 점수와 상관없이 먼저 권한다.
-            // 콤보 가치는 배치 점수에 안 잡히므로 여기서 더해 줄을 세운다. 증가분까지 같으면
+            // 콤보 가치는 배치 점수에 안 잡히므로 여기서 더해 줄을 세운다. 증가분은 다음 칸이
+            // 열린 판에서 잰 것을 쓴다 - 이 선택은 되돌릴 수 없고 가방은 줄지 않는다. 증가분까지 같으면
             // 여력이 큰 쪽을 위로 올린다. 아티팩트가 적을 때는 여러 석판이 똑같이 최대치를
             // 뽑아내 증가분만으로는 우열이 드러나지 않는다. 그래도 같으면 정의 번호로 가른다 -
             // 입력 순서는 게임의 오브젝트 열거 순서라 폴링마다 흔들릴 수 있다.
             return advice.OrderByDescending(entry => entry.Available)
                          .ThenByDescending(entry => entry.Affordable)
                          .ThenByDescending(entry => entry.MatchesPreset)
-                         .ThenByDescending(entry => entry.Gain + entry.ComboBonus)
+                         .ThenByDescending(entry => entry.RankedGain + entry.ComboBonus)
                          .ThenByDescending(entry => entry.Effect.Reach)
                          .ThenBy(entry => entry.Candidate.DefinitionId)
                          .ToList();
@@ -362,8 +387,8 @@ namespace SephPlanner.Core.Solver
 
             // 이긴 갈래만 배치 후보 전부로 다시 푼다. 화면에 나가는 증가분은 기준 점수와 같은
             // 잣대에서 나와야 하고, 미리보기도 이 결과를 그대로 쓴다.
-            best.Solved = PlacementSolver.EvaluateLayouts(
-                best.Trial, layouts.Of(best.Trial, faster), faster);
+            best.Layouts = layouts.Of(best.Trial, faster);
+            best.Solved = PlacementSolver.EvaluateLayouts(best.Trial, best.Layouts, faster);
             return best.Solved.UnretainedCharms.Count == 0 && ActivationPolicy.AllowsTransition(baseline, best.Solved) ? best : null;
         }
 
@@ -488,6 +513,11 @@ namespace SephPlanner.Core.Solver
             var clone = new PlacementProblem
             {
                 Grid = problem.Grid,
+
+                // 눈금을 빠뜨리면 갈래만 기본값으로 채점되어, 기준과 후보가 서로 다른 자로
+                // 재어진다. 카탈로그가 스스로 잰 눈금은 기본값과 다르다(제보들에서 콤보
+                // 2.1768 대 2.59, 비교 눈금 0.0319 대 0.05).
+                Scale = problem.Scale,
                 Charms = new List<CharmSlot>(problem.Charms),
                 Tablets = new List<TabletSlot>(problem.Tablets),
                 FixedTablets = problem.FixedTablets,

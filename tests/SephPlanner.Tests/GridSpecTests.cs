@@ -41,6 +41,43 @@ public class GridSpecTests
         Assert.False(TwoRowsOpen.Contains(new GridPos(0, -1)));
     }
 
+    /// <summary>
+    /// 다음에 열릴 칸은 인덱스 순서라 확정적이다. 한 칸씩 여는 것은 게임 코드에서 읽은 사실이고
+    /// (<c>LevelController.LevelUpOnServer</c>의 <c>AddStorage(1)</c>), 몇 번 열릴지는 사실이
+    /// 아니므로 세지 않는다.
+    /// </summary>
+    [Fact]
+    public void GrowingOpensTheNextCellInIndexOrder()
+    {
+        var grown = TwoRowsOpen.Grown(GridSpec.OpeningStep);
+
+        Assert.Equal(13, grown.Storage);
+        Assert.True(grown.Contains(0, 2));
+        Assert.False(grown.Contains(1, 2));
+
+        // 지금 판은 그대로다. 늘어난 판은 새 값이고, 배치와 점수는 여전히 지금 판으로 푼다.
+        Assert.Equal(12, TwoRowsOpen.Storage);
+        Assert.False(TwoRowsOpen.Contains(0, 2));
+    }
+
+    [Fact]
+    public void GrowingAddsARowWhenTheOpenAreaSpillsOver()
+    {
+        var grown = new GridSpec(6, 2, 12).Grown(1);
+
+        Assert.Equal(3, grown.Height);
+    }
+
+    /// <summary>다 열린 가방은 자기 자신을 돌려준다. 부르는 쪽은 그것으로 앞볼 것이 없음을 안다.</summary>
+    [Fact]
+    public void AFullyOpenGridCannotGrow()
+    {
+        var full = GridSpec.WithStorage(GridSpec.DefaultWidth * GridSpec.DefaultHeight);
+
+        Assert.Equal(full.Storage, full.Grown(1).Storage);
+        Assert.Equal(full.Storage, full.Grown(99).Storage);
+    }
+
     [Fact]
     public void AFullyOpenGridContainsEveryCell()
     {

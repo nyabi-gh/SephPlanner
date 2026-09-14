@@ -52,6 +52,7 @@ namespace SephPlanner.Core.Runtime
                 result.Fact(key + "/우선", offer.MatchesPriority);
                 result.Scores[key + "/이득"] = offer.Gain;
                 result.Scores[key + "/콤보"] = offer.ComboBonus;
+                Soon(result, key, offer.Gain, offer.SoonGain);
                 if (offer.Preview is null) continue;
                 result.Scores[key + "/미리보기"] = offer.Preview.Score;
                 foreach (var cell in offer.Preview.Names)
@@ -67,6 +68,7 @@ namespace SephPlanner.Core.Runtime
                 result.Fact(key + "/구매", mix.Affordable);
                 result.Fact(key + "/질의", mix.Query);
                 result.Scores[key] = mix.Gain;
+                Soon(result, key, mix.Gain, mix.SoonGain);
             }
             for (var i = 0; i < plan.Discards.Count; i++)
             {
@@ -74,6 +76,7 @@ namespace SephPlanner.Core.Runtime
                 var key = "빼기/" + i;
                 result.Fact(key, discard.InstanceId);
                 result.Scores[key] = discard.Gain;
+                Soon(result, key, discard.Gain, discard.SoonGain);
             }
             result.Fact("경고/콤보", string.Join("\n", plan.ComboPlacementWarnings));
             result.Fact("경고/유지", string.Join("\n", plan.RetentionWarnings));
@@ -113,6 +116,15 @@ namespace SephPlanner.Core.Runtime
             foreach (var prefix in AdviceKeys)
                 if (key.StartsWith(prefix, StringComparison.Ordinal)) return true;
             return false;
+        }
+
+        /// <summary>
+        /// 앞보기 증가분. <b>지금 값과 다를 때만</b> 적는다 - 무조건 적으면 이 항목이 없던 시절의
+        /// 재현 자료가 전부 "없음 대 값" 으로 어긋난다(PERFORMANCE.md 의 "지켜야 할 규약").
+        /// </summary>
+        private static void Soon(ReplayResult result, string key, double gain, double? soon)
+        {
+            if (soon.HasValue && Math.Abs(soon.Value - gain) > 1e-9) result.Scores[key + "/다음 칸"] = soon.Value;
         }
 
         private static bool Finite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);

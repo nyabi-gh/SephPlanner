@@ -21,6 +21,16 @@ namespace SephPlanner.Core.Solver
         /// <summary>합성했을 때의 점수 증가분. 재료 둘이 사라지고 결과 하나가 생기는 것까지 반영된다.</summary>
         public double Gain { get; set; }
 
+        /// <summary>
+        /// 다음 칸이 열렸다고 쳤을 때의 증가분. 합성은 재료가 사라지므로 되돌릴 수 없고, 합쳐진
+        /// 질의가 잠긴 칸으로 나가면 지금 증가분에 잡히지 않는다(<see cref="Lookahead"/>).
+        /// 앞을 보지 못했으면 <c>null</c> 이다.
+        /// </summary>
+        public double? SoonGain { get; set; }
+
+        /// <summary>줄 세우기에 실제로 쓰이는 증가분.</summary>
+        public double RankedGain => SoonGain ?? Gain;
+
         public bool Affordable { get; set; }
 
         /// <summary>결과 석판이 실제로 미치는 범위. 증가분이 비슷할 때 무엇이 다른지 드러낸다.</summary>
@@ -58,10 +68,17 @@ namespace SephPlanner.Core.Solver
         ///
         /// 실측 비교(석판 6, 42칸): 상위 3개는 쌍마다 제대로 푼 결과와 완전히 같았고, 넷째
         /// 자리에서 +2.70 인 쌍이 +0.65 인 쌍에 밀렸다. 대신 4.3초/6.1GB 가 0.54초/0.79GB 가 됐다.
+        ///
+        /// <b>앞을 볼 수 있으면 짐작도 늘어난 판에서 한다</b>(<see cref="Lookahead"/>). 합성은
+        /// 되돌릴 수 없으므로 줄 세우기의 자는 늘어난 판이 맞고, 그쪽에서만 재면 비용은 지금과
+        /// 같다. 그래서 <b>지금 가방에서만 좋은 쌍</b>이 상위 몇에서 밀릴 수 있다 - 짐작이 원래
+        /// 지고 있던 손실과 같은 종류이고, 화면에 나가는 두 숫자는 <c>Confirm</c>이 두 판 모두에서
+        /// 제대로 낸다.
         /// </summary>
         public static List<MixAdvice> Rank(
             PlacementProblem problem, ICatalog catalog, int cost, int gold, int limit = 5,
-            LayoutCache? layouts = null, CancellationToken cancellation = default)
+            LayoutCache? layouts = null, Lookahead? lookahead = null,
+            CancellationToken cancellation = default)
         {
             var materials = Materials(problem);
             if (materials.Count < 2) return new List<MixAdvice>();
@@ -69,7 +86,6 @@ namespace SephPlanner.Core.Solver
             layouts ??= new LayoutCache();
             var faster = SolverOptions.ForAdvice(cancellation);
             var baseArrangement = layouts.Baseline(problem, faster);
-            var baseScore = baseArrangement.Score;
 
             // 짐작의 바탕. 석판이 다 놓이지 못한 배치는 자리와 석판의 짝이 어긋나므로 쓰지 않고,
             // 그때는 쌍마다 제대로 푼다(그런 판은 석판이 칸보다 많은 극단이라 쌍도 몇 개 안 된다).
@@ -87,9 +103,9 @@ namespace SephPlanner.Core.Solver
                 for (var j = i + 1; j < materials.Count; j++)
                 {
                     var best = Best(
-                        problem, materials[i], materials[j], mixedDefinition, baseScore,
+                        problem, materials[i], materials[j], mixedDefinition,
                         layouts, baseLayout, problem.Tablets.IndexOf(materials[i].Slot),
-                        problem.Tablets.IndexOf(materials[j].Slot), faster);
+                        problem.Tablets.IndexOf(materials[j].Slot), faster, lookahead);
                     if (best is not null) advice.Add(best);
                 }
             }
@@ -98,17 +114,17 @@ namespace SephPlanner.Core.Solver
 
             // 증가분이 같은 쌍이 여럿일 때 인스턴스 번호로 갈라야 제안이 흔들리지 않는다.
             var shown = advice
-                .OrderByDescending(entry => entry.Gain)
+                .OrderByDescending(entry => entry.RankedGain)
                 .ThenBy(entry => entry.InstanceA)
                 .ThenBy(entry => entry.InstanceB)
                 .Take(limit)
                 .ToList();
 
-            shown.RemoveAll(entry => !Confirm(entry, baseArrangement, layouts, faster));
+            shown.RemoveAll(entry => !Confirm(entry, baseArrangement, layouts, faster, lookahead));
 
             // 다시 푼 값으로 순서가 뒤집힐 수 있다. 보여주는 것은 다시 푼 값이므로 줄도 그것으로 세운다.
             return shown
-                .OrderByDescending(entry => entry.Gain)
+                .OrderByDescending(entry => entry.RankedGain)
                 .ThenBy(entry => entry.InstanceA)
                 .ThenBy(entry => entry.InstanceB)
                 .ToList();
@@ -122,14 +138,17 @@ namespace SephPlanner.Core.Solver
         /// 오는데, 어느 쪽이든 결과 질의가 같으므로 따라 해도 같은 석판이 나온다.
         /// </summary>
         private static bool Confirm(
-            MixAdvice advice, Arrangement baseline, LayoutCache layouts, SolverOptions faster)
+            MixAdvice advice, Arrangement baseline, LayoutCache layouts, SolverOptions faster,
+            Lookahead? lookahead)
         {
             var trial = advice.Trial;
             if (trial is null) return false;
 
-            var solved = PlacementSolver.EvaluateLayouts(trial, layouts.Of(trial, faster), faster);
+            var candidates = layouts.Of(trial, faster);
+            var solved = PlacementSolver.EvaluateLayouts(trial, candidates, faster);
             if (solved.UnretainedCharms.Count > 0 || !ActivationPolicy.AllowsTransition(baseline, solved)) return false;
             advice.Gain = solved.Score - baseline.Score;
+            advice.SoonGain = lookahead?.GainOf(trial, layouts, faster, candidates);
             advice.Effect = EffectOf(trial, solved);
             return true;
         }
@@ -140,12 +159,12 @@ namespace SephPlanner.Core.Solver
             (MixMaterial Material, TabletSlot Slot) a,
             (MixMaterial Material, TabletSlot Slot) b,
             TabletDefinition mixedDefinition,
-            double baseScore,
             LayoutCache layouts,
             IReadOnlyList<TabletPlacement>? baseLayout,
             int indexA,
             int indexB,
-            SolverOptions faster)
+            SolverOptions faster,
+            Lookahead? lookahead)
         {
             MixAdvice? best = null;
 
@@ -167,12 +186,31 @@ namespace SephPlanner.Core.Solver
                     };
                     trial.Tablets.Add(mixedSlot);
 
-                    var guesses = Guesses(baseLayout, indexA, indexB, mixedSlot);
-                    var solved = PlacementSolver.EvaluateLayouts(
-                        trial, guesses ?? layouts.Of(trial, faster), faster);
-                    if (solved.UnretainedCharms.Count > 0 ||
-                        !ActivationPolicy.AllowsTransition(layouts.Baseline(problem, faster), solved)) continue;
-                    var gain = solved.Score - baseScore;
+                    var guesses = Guesses(baseLayout, indexA, indexB, mixedSlot) ?? layouts.Of(trial, faster);
+
+                    // 앞을 볼 수 있으면 짐작을 <b>늘어난 판에서만</b> 한다. 두 판을 다 재면 값은
+                    // 더 나오지만 실측에서 합성 추천이 두 배가 됐다 - 짐작 단계가 이 조언 비용의
+                    // 대부분이기 때문이다(docs/PERFORMANCE.md 의 "한 칸 앞보기가 더한 값").
+                    // 여기서 재는 것은 어느 쌍을 다시 풀지 고르는 값뿐이고, 화면에 나가는 두
+                    // 숫자는 Confirm 이 두 판 모두에서 제대로 낸다.
+                    Arrangement against;
+                    Arrangement solved;
+                    if (lookahead is { Available: true })
+                    {
+                        against = lookahead.Baseline(layouts, faster)!;
+                        var ahead = lookahead.Solve(trial, layouts, faster, guesses);
+                        if (ahead is null) continue;
+                        solved = ahead;
+                    }
+                    else
+                    {
+                        against = layouts.Baseline(problem, faster);
+                        solved = PlacementSolver.EvaluateLayouts(trial, guesses, faster);
+                        if (solved.UnretainedCharms.Count > 0 ||
+                            !ActivationPolicy.AllowsTransition(against, solved)) continue;
+                    }
+
+                    var gain = solved.Score - against.Score;
                     if (best is not null && gain <= best.Gain) continue;
 
                     best = new MixAdvice
@@ -191,6 +229,7 @@ namespace SephPlanner.Core.Solver
                     };
                 }
             }
+
             return best;
         }
 

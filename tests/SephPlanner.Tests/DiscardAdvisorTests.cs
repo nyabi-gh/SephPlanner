@@ -106,6 +106,7 @@ public class DiscardAdvisorTests
         var snapshot = new SephPlanner.Core.Runtime.GameSnapshot { Inventory = inventory };
         var catalog = new Catalog(problem.Tablets.Select(t => t.Definition), problem.Charms.Select(c => c.Definition));
         var plan = PlanBuilder.Build(snapshot, catalog, new PlanPreferences { Recommendations = false })!;
+        Assert.Equal(AdviceStatus.NotRequested, plan.AdviceStatus);
         Assert.Empty(plan.Discards);
         Assert.Equal(4, plan.CreateApplyCommand().Targets.Count);
         var preferences = new PlanPreferences
@@ -116,7 +117,12 @@ public class DiscardAdvisorTests
             }),
         };
         plan = PlanBuilder.Build(snapshot, catalog, preferences)!;
-        Assert.NotEmpty(plan.Discards);
+
+        // 조언이 실제로 돈 것은 상태로 확인한다. 목록 자체는 비어 있는 것이 맞다 - 이 판에서
+        // 석판 빼기는 가방이 빠듯해서만 이득이라, 계획이 보는 "칸 하나 더 열린 판"에서는
+        // 자물쇠가 석판을 버리지 않고도 켜진다(LookaheadTests).
+        Assert.Equal(AdviceStatus.Ready, plan.AdviceStatus);
+        Assert.Empty(plan.Discards);
         Assert.Equal(4, plan.CreateApplyCommand().Targets.Count);
         Assert.Contains(plan.CreateApplyCommand().Targets, t => t.InstanceId == 4);
         inventory.LevelMatrix["0,0"] = 9;

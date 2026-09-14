@@ -212,6 +212,43 @@ public class SolverCostTests
     }
 
     /// <summary>
+    /// 앞보기의 값은 <b>탐색 한 번</b>이다. 조언마다, 후보마다가 아니다.
+    ///
+    /// 늘어난 판의 빔을 한 번 찾고 나면, 갈래마다는 지금 판에서 이미 찾아 둔 배치 후보를 그대로
+    /// 늘어난 판에서 채점하기만 한다(<see cref="Lookahead"/>). 여기가 조언마다 하나씩 늘기
+    /// 시작하면 그때가 회귀다 - 그 모양으로 만들어 재 봤을 때 합성 추천이 두 배가 됐다.
+    /// </summary>
+    [Fact]
+    public void LookingAheadCostsOneMoreLayoutSearch()
+    {
+        void Compare(string what, Func<PlacementProblem, LayoutCache, Lookahead?, object> run)
+        {
+            var problem = FullBag(charmCount: 20);
+            var without = new LayoutCache();
+            run(problem, without, null);
+
+            var with = new LayoutCache();
+            problem = FullBag(charmCount: 20);
+            run(problem, with, new Lookahead(problem));
+
+            Assert.True(
+                without.Searches + 1 == with.Searches,
+                $"{what}: 앞보기 없이 {without.Searches}번, 앞보기로 {with.Searches}번 탐색했다.");
+        }
+
+        Compare("후보", (problem, cache, lookahead) =>
+            OfferAdvisor.Rank(
+                problem, Candidates(charms: 4, tablets: 4), int.MaxValue, layouts: cache, lookahead: lookahead));
+
+        Compare("합성", (problem, cache, lookahead) =>
+            TabletMixAdvisor.Rank(problem, MixCatalog(), cost: 0, gold: 1000, layouts: cache, lookahead: lookahead));
+
+        Compare("빼기", (problem, cache, lookahead) =>
+            DiscardAdvisor.Rank(
+                problem, PlacementSolver.Solve(problem, SolverOptions.ForAdvice(default)), cache, lookahead));
+    }
+
+    /// <summary>
     /// 열쇠를 나눠도 <b>잣대는 강도마다 따로</b>여야 한다. 빔은 나눠 쓰되 채점 결과는 아니라는
     /// 것이 2번에서 세운 선이고, 그 선이 이 둘 사이를 지난다.
     /// </summary>
