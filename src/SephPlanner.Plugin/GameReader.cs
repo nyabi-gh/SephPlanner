@@ -43,7 +43,8 @@ namespace SephPlanner.Plugin
             {
                 step = FrameCost.Now;
                 snapshot.Mixer = ReadMixer(avatar.transform.position, offerRadius * MixerReach);
-                snapshot.EnchantChance = ReadEnchantChance();
+                snapshot.EnchantChance = ReadEnchantChance(
+                    avatar.transform.position, offerRadius * MixerReach);
                 FrameCost.Mixer.Add(step);
 
                 OfferReader.Fill(snapshot, avatar, offerRadius);
@@ -159,8 +160,10 @@ namespace SephPlanner.Plugin
         /// <summary>
         /// 지금 인챈트를 걸 수 있는 기회. 제단도 없고 창도 닫혀 있으면 <c>null</c> 이다.
         ///
-        /// 합성기와 같은 이유로 거리를 보지 않는다 - 미니맵에 뜨는 고정물이라 이 층에 있다는
-        /// 사실 자체가 이미 보이는 정보다.
+        /// 합성기와 같이 <b>거리를 함께 싣는다.</b> 미니맵에 뜨는 고정물이라 이 층에 있다는 사실
+        /// 자체는 숨은 정보가 아니지만, 인챈트 조언은 공짜가 아니라서(아티팩트 35개 가방에서 377ms)
+        /// 층에 제단이 있기만 하면 계속 돌게 두면 안 된다. 걸어가는 동안 준비될 만큼 넉넉한
+        /// 거리에서만 돈다 - 합성기와 같은 반경이다.
         ///
         /// 게임은 사람마다 따로 세고(<c>remainingByGuid</c>), 클라이언트는 접속할 때 한 번 물어
         /// 받아 둔다. <b>답이 오기 전에는 -1 이다</b> - 그대로 0 으로 옮기면 아직 쓰지도 않은
@@ -168,22 +171,29 @@ namespace SephPlanner.Plugin
         ///
         /// 층에 제단이 여럿이면 더한다. 제단마다 내 몫이 따로 있어 실제로 그만큼 걸 수 있다.
         /// </summary>
-        private static EnchantChanceState ReadEnchantChance()
+        private static EnchantChanceState ReadEnchantChance(Vector3 origin, float reach)
         {
             var found = false;
             var uses = 0;
+            var near = false;
             foreach (var altar in NetworkRegistry.All<AltarOfEnchant>())
             {
                 if (altar == null) continue;
                 found = true;
 
                 var local = AltarRemaining != null && AltarRemaining.GetValue(altar) is int value ? value : -1;
-                uses += local < 0 ? Math.Max(0, altar.localUseCount) : local;
+                var remaining = local < 0 ? Math.Max(0, altar.localUseCount) : local;
+                uses += remaining;
+
+                // 아직 쓸 수 있는 제단만 거리를 따진다. 다 쓴 제단 앞에 서 있다고 계산할 일은 없다.
+                if (remaining > 0 && Vector3.Distance(origin, altar.transform.position) <= reach) near = true;
             }
 
             // 물약은 제단 없이도 창을 연다. 층에 제단이 없어도 창이 열려 있으면 기회가 있는 것이다.
             var open = IsEnchantOpen();
-            return found || open ? new EnchantChanceState { AltarUses = uses, Open = open } : null;
+            return found || open
+                ? new EnchantChanceState { AltarUses = uses, Open = open, Near = near }
+                : null;
         }
 
         /// <summary>

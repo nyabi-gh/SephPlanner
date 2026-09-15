@@ -42,6 +42,10 @@ namespace SephPlanner.Core.Runtime
             {
                 Add(builder, "enchantUses", enchant.AltarUses);
                 Add(builder, "enchantOpen", enchant.Open);
+
+                // 가까워지면 조언이 새로 도므로 지문이 그 순간을 잡아야 한다. 재지 않은 자료에서는
+                // 이 줄 자체가 없어야 그때의 지문과 같다 - `mixerNear` 와 같다.
+                if (enchant.Near is bool altarNear) Add(builder, "enchantNear", altarNear);
             }
 
             foreach (var category in preferences.PriorityCategories.OrderBy(value => value, StringComparer.Ordinal))

@@ -177,7 +177,18 @@ public class PlanFingerprintTests
         Assert.NotEqual(fresh, spent);
 
         snapshot.EnchantChance = new EnchantChanceState { AltarUses = 0, Open = true };
-        Assert.NotEqual(spent, PlanFingerprint.Full(snapshot, PlanPreferences.None, "catalog-1"));
+        var opened = PlanFingerprint.Full(snapshot, PlanPreferences.None, "catalog-1");
+        Assert.NotEqual(spent, opened);
+
+        // 가까워지는 순간도 잡아야 한다. 그때 조언이 새로 돌기 때문이다.
+        snapshot.EnchantChance = new EnchantChanceState { AltarUses = 1, Near = false };
+        var far = PlanFingerprint.Full(snapshot, PlanPreferences.None, "catalog-1");
+        snapshot.EnchantChance = new EnchantChanceState { AltarUses = 1, Near = true };
+        Assert.NotEqual(far, PlanFingerprint.Full(snapshot, PlanPreferences.None, "catalog-1"));
+
+        // 거리를 재지 않은 자료는 그 줄 자체가 없어야 한다.
+        snapshot.EnchantChance = new EnchantChanceState { AltarUses = 1, Near = null };
+        Assert.NotEqual(far, PlanFingerprint.Full(snapshot, PlanPreferences.None, "catalog-1"));
     }
 
     /// <summary>

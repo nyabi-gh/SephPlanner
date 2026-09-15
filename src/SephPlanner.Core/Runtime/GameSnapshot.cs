@@ -31,7 +31,7 @@ namespace SephPlanner.Core.Runtime
         /// 지금 인챈트를 걸 수 있는 기회. 없으면 null 이다.
         ///
         /// 제단과 인챈트 물약이 <b>같은 창</b>을 연다(<c>EInventoryMode.Enchant</c>). 제단은 층에
-        /// 놓인 고정물이라 걸어가기 전에 미리 재어 둘 수 있고, 물약은 언제든 마실 수 있어 창이
+        /// 놓인 고정물이라 걸어가는 동안 미리 재어 둘 수 있고, 물약은 언제든 마실 수 있어 창이
         /// 열린 것 자체가 신호다. 그래서 둘을 한 자리에 담는다.
         /// </summary>
         public EnchantChanceState? EnchantChance { get; set; }
@@ -56,10 +56,21 @@ namespace SephPlanner.Core.Runtime
         public bool Open { get; set; }
 
         /// <summary>
-        /// 지금 조언을 만들 이유가 있는가. 제단 몫이 남았으면 걸어가는 동안 미리 재어 두고,
-        /// 남지 않았어도 창이 열렸으면 - 물약이다 - 그때 잰다.
+        /// 플레이어가 제단 가까이에 있는지. 합성기의 같은 이름과 같은 자리이고 이유도 같다 -
+        /// <b>인챈트 조언은 공짜가 아니다.</b> 아티팩트 35개짜리 가방에서 재어 보니 377ms 로,
+        /// 하나 빼기(272ms)보다 비싸고 합성(838ms)보다 싸다. 층에 제단이 있기만 하면 계속 돌면
+        /// 합성기가 <c>Near</c> 를 갖기 전에 겪은 일을 그대로 되풀이한다.
+        ///
+        /// <c>null</c> 은 재지 않았다는 뜻이며 그때는 거리를 따지지 않는다 - 이 값이 없던 시절의
+        /// 재현 자료가 그렇다.
         /// </summary>
-        public bool Available => AltarUses > 0 || Open;
+        public bool? Near { get; set; }
+
+        /// <summary>
+        /// 지금 조언을 만들 이유가 있는가. 제단 몫이 남았고 걸어갈 만큼 가까우면 미리 재어 두고,
+        /// 제단이 없거나 멀어도 창이 열렸으면 - 물약이 그렇다 - 그때 잰다.
+        /// </summary>
+        public bool Available => (AltarUses > 0 && Near != false) || Open;
     }
 
     /// <summary>석판 합성기의 상태. 한 사람이 층마다 한 번만 쓸 수 있다.</summary>

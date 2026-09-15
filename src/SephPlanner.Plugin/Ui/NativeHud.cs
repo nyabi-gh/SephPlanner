@@ -884,6 +884,7 @@ namespace SephPlanner.Plugin.Ui
                     _enchants.Add("계산 중", "인챈트 추천을 계산하고 있습니다.", NativeSkin.TextDim);
                 else
                     _enchants.Add("추천 대상 없음", chance == null ? "제단 정보를 읽는 중입니다." :
+                        !chance.Available ? "제단에서 떨어져 있어 아직 계산하지 않았습니다. 가까이 가면 계산합니다." :
                         "인챈트로 값이 오르는 아티팩트를 찾지 못했습니다. 인챈트가 이미 상한에 "
                         + "닿았거나, 올려도 효과에 반영되지 않는 자리입니다.", NativeSkin.TextDim);
             }

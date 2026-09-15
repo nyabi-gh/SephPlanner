@@ -203,9 +203,10 @@ namespace SephPlanner.Core.Planning
                 ? DiscardAdvisor.Rank(problem, placement.Best, layouts, lookahead, cancellation)
                 : new List<DiscardAdvice>();
 
-            // 제단 몫을 다 썼고 창도 안 열렸으면 이 층에서는 더 권할 것이 없다. 합성기와 달리
-            // 거리는 보지 않는다 - 계산이 조언 넷 중 제일 싸고, 무엇에 걸지는 걸어가기 전에 정해
-            // 두는 편이 쓸모 있다. 화면에 내보내는 것은 그 창이 열렸을 때뿐이다.
+            // 제단 몫을 다 썼거나 아직 멀면 권할 때가 아니다. 창이 열렸으면 - 물약이 그렇다 -
+            // 거리와 무관하게 잰다. 거리를 보는 이유는 합성기와 같다: 이 조언은 공짜가 아니라
+            // (아티팩트 35개 가방에서 377ms) 층에 제단이 있기만 하면 계속 돌게 두면 안 된다.
+            // 화면에 내보내는 것은 그 창이 열렸을 때뿐이다.
             var enchants = snapshot.EnchantChance is { Available: true } && placement.Verification.Passed
                 ? EnchantAdvisor.Rank(problem, placement.Best, layouts, lookahead, cancellation)
                 : new List<EnchantAdvice>();

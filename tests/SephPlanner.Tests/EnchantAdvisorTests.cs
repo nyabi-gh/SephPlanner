@@ -159,15 +159,18 @@ public class EnchantAdvisorTests
     }
 
     /// <summary>
-    /// 제단 몫이 없고 창도 안 열렸으면 계획이 인챈트 조언을 만들지 않는다. <b>물약은 제단 없이도
-    /// 창을 열므로</b> 마지막 줄이 그 길이다 - 이것이 없으면 물약을 마신 사람은 빈 화면을 본다.
+    /// 언제 조언을 만드는가. 제단 몫이 남았고 가까워야 하며, 멀거나 제단이 없어도 창이 열렸으면
+    /// 만든다 - <b>물약은 제단 없이도 창을 열기 때문</b>이고, 이것이 없으면 물약을 마신 사람은
+    /// 빈 화면을 본다. 거리를 보는 이유는 합성기와 같다: 이 조언은 공짜가 아니다.
     /// </summary>
     [Theory]
-    [InlineData(null, false, false)]
-    [InlineData(0, false, false)]
-    [InlineData(1, false, true)]
-    [InlineData(0, true, true)]
-    public void TheAltarOrAnOpenWindowGatesTheAdvice(int? remaining, bool open, bool advised)
+    [InlineData(null, false, null, false)]   // 제단도 창도 없다
+    [InlineData(0, false, true, false)]      // 앞에 서 있지만 다 썼다
+    [InlineData(1, false, false, false)]     // 몫은 남았지만 아직 멀다
+    [InlineData(1, false, true, true)]       // 몫이 남았고 가깝다
+    [InlineData(1, false, null, true)]       // 거리를 재지 않은 옛 자료는 전처럼 돈다
+    [InlineData(0, true, false, true)]       // 물약 - 제단 몫도 없고 멀어도 창이 열렸다
+    public void TheAltarOrAnOpenWindowGatesTheAdvice(int? remaining, bool open, bool? near, bool advised)
     {
         var inventory = new InventoryState { Width = 1, Height = 1, Storage = 1 };
         inventory.Items.Add(new PlacedItem { DefinitionId = 1, InstanceId = 1, Position = new GridPos(0, 0), IsActive = true });
@@ -175,7 +178,7 @@ public class EnchantAdvisorTests
         {
             Inventory = inventory,
             EnchantChance = remaining is null ? null
-                : new EnchantChanceState { AltarUses = remaining.Value, Open = open },
+                : new EnchantChanceState { AltarUses = remaining.Value, Open = open, Near = near },
         };
         var catalog = new Catalog(
             Array.Empty<TabletDefinition>(),
@@ -197,7 +200,7 @@ public class EnchantAdvisorTests
         var snapshot = new GameSnapshot
         {
             Inventory = inventory,
-            EnchantChance = new EnchantChanceState { AltarUses = 1 },
+            EnchantChance = new EnchantChanceState { AltarUses = 1, Near = true },
         };
         var catalog = new Catalog(
             Array.Empty<TabletDefinition>(),
