@@ -26,6 +26,40 @@ namespace SephPlanner.Core.Runtime
         /// 쓸모 있기 때문이다. 상자 속 내용물과 달리 숨은 정보가 아니다.
         /// </summary>
         public MixerState? Mixer { get; set; }
+
+        /// <summary>
+        /// 지금 인챈트를 걸 수 있는 기회. 없으면 null 이다.
+        ///
+        /// 제단과 인챈트 물약이 <b>같은 창</b>을 연다(<c>EInventoryMode.Enchant</c>). 제단은 층에
+        /// 놓인 고정물이라 걸어가기 전에 미리 재어 둘 수 있고, 물약은 언제든 마실 수 있어 창이
+        /// 열린 것 자체가 신호다. 그래서 둘을 한 자리에 담는다.
+        /// </summary>
+        public EnchantChanceState? EnchantChance { get; set; }
+    }
+
+    /// <summary>인챈트를 걸 기회. 게임이 사람마다 따로 세므로 남은 횟수도 내 몫이다.</summary>
+    public sealed class EnchantChanceState
+    {
+        /// <summary>
+        /// 이 층의 제단에서 내가 더 쓸 수 있는 횟수(<c>AltarOfEnchant.localRemaining</c>의 합).
+        ///
+        /// 게임은 접속할 때 서버에 한 번 묻고 답이 올 때까지 -1 을 들고 있다. 그 -1 을 0 으로
+        /// 적으면 아직 못 쓴 제단이 다 쓴 것으로 보이므로, 읽는 쪽이 프리팹의 <c>localUseCount</c>
+        /// 로 메운다.
+        /// </summary>
+        public int AltarUses { get; set; }
+
+        /// <summary>
+        /// 아티팩트 선택 창이 지금 열려 있는지. <b>인챈트 물약은 제단 없이도 이 창을 연다</b> -
+        /// 이것이 없으면 물약을 마신 사람은 빈 화면을 본다.
+        /// </summary>
+        public bool Open { get; set; }
+
+        /// <summary>
+        /// 지금 조언을 만들 이유가 있는가. 제단 몫이 남았으면 걸어가는 동안 미리 재어 두고,
+        /// 남지 않았어도 창이 열렸으면 - 물약이다 - 그때 잰다.
+        /// </summary>
+        public bool Available => AltarUses > 0 || Open;
     }
 
     /// <summary>석판 합성기의 상태. 한 사람이 층마다 한 번만 쓸 수 있다.</summary>

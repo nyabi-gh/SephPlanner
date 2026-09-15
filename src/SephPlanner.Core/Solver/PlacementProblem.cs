@@ -88,6 +88,33 @@ namespace SephPlanner.Core.Solver
         /// 문자열로 풀지 않고 한 번만 해석해 둔다. Definition 은 생성 직후 바뀌지 않는다.
         /// </summary>
         public CharmCriteriaKind Criteria => _criteria ??= CharmCriteria.FromTypeName(Definition.CriteriaType);
+
+        /// <summary>
+        /// 인챈트만 다른 사본. <see cref="OfferAdvisor.Clone"/>은 목록만 얕게 복사하므로 슬롯을
+        /// 제자리에서 고치면 <b>기준 배치까지 함께 바뀐다</b> - 버리기 조언이 목록에서 빼기만
+        /// 하는 것과 달리 인챈트 조언은 슬롯의 내용을 바꾸므로 여기가 필요하다.
+        ///
+        /// <see cref="Worth"/>는 정의에서 나오고 인챈트와 무관하다. 물려주지 않으면 사본마다
+        /// 값어치 해석이 한 번씩 더 돈다 - 배정 비용 행렬의 최내곽에서 쓰이는 값이다.
+        /// </summary>
+        internal CharmSlot WithEnchant(int enchant) => new CharmSlot
+        {
+            ObservedCategories = ObservedCategories,
+            IsAttackable = IsAttackable,
+            Definition = Definition,
+            InstanceId = InstanceId,
+            Enchant = enchant,
+            Weight = Weight,
+            Worth = Worth,
+            IsFiller = IsFiller,
+            LevelCap = LevelCap,
+            Immovable = Immovable,
+            IsDormant = IsDormant,
+            Held = Held,
+            IsSupportTarget = IsSupportTarget,
+            Retained = Retained,
+            AllowDeactivation = AllowDeactivation,
+        };
     }
 
     public sealed class TabletSlot

@@ -94,6 +94,12 @@ namespace SephPlanner.Core.Planning
         public List<MixAdvice> Mixes { get; set; } = new List<MixAdvice>();
 
         /// <summary>
+        /// 인챈트 제단에서 어디에 걸면 좋은지. 이 층에 제단이 있고 내가 쓸 횟수가 남았을 때만
+        /// 채워진다.
+        /// </summary>
+        public List<EnchantAdvice> Enchants { get; set; } = new List<EnchantAdvice>();
+
+        /// <summary>
         /// 후보가 너무 많아 평가하지 못하고 넘어간 수. 조용히 빠뜨리면 화면에 없는 선택지를
         /// 없는 셈 치게 된다.
         /// </summary>
@@ -115,8 +121,8 @@ namespace SephPlanner.Core.Planning
 
         /// <summary>
         /// 조언 칸의 상태. 배치만 게시된 계획은 <see cref="AdviceStatus.Pending"/> 이고, 그때
-        /// <see cref="Offers"/>·<see cref="Mixes"/>·<see cref="Discards"/> 가 빈 것은 "없다" 가
-        /// 아니라 "아직" 이다. 그 둘을 가르지 않으면 화면이 거짓말을 한다.
+        /// <see cref="Offers"/>·<see cref="Mixes"/>·<see cref="Discards"/>·<see cref="Enchants"/> 가
+        /// 빈 것은 "없다" 가 아니라 "아직" 이다. 그 둘을 가르지 않으면 화면이 거짓말을 한다.
         /// </summary>
         public AdviceStatus AdviceStatus { get; set; } = AdviceStatus.NotRequested;
 
@@ -133,12 +139,13 @@ namespace SephPlanner.Core.Planning
         /// </summary>
         internal Plan WithAdvice(
             List<OfferAdvice> offers, List<MixAdvice> mixes, List<DiscardAdvice> discards,
-            int skippedOffers, AdviceStatus status)
+            List<EnchantAdvice> enchants, int skippedOffers, AdviceStatus status)
         {
             var copy = (Plan)MemberwiseClone();
             copy.Offers = offers;
             copy.Mixes = mixes;
             copy.Discards = discards;
+            copy.Enchants = enchants;
             copy.SkippedOffers = skippedOffers;
             copy.AdviceStatus = status;
             return copy;

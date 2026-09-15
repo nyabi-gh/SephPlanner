@@ -19,6 +19,9 @@ namespace SephPlanner.Plugin.Ui
         public CharmValueBook Values = CharmValueBook.Empty;
         public bool Expanded;
         public bool MixerOpen;
+
+        /// <summary>제단·인챈트 물약이 연 아티팩트 선택 창이 떠 있는가. 인챈트 조언은 이때만 보인다.</summary>
+        public bool EnchantOpen;
         public bool Recommendations = true;
         public bool MultiplayerAutoPlace;
         public bool QueryVerified;
@@ -65,6 +68,7 @@ namespace SephPlanner.Plugin.Ui
         private readonly int _prefs;
         private readonly bool _expanded;
         private readonly bool _mixerOpen;
+        private readonly bool _enchantOpen;
         private readonly bool _recommendations;
         private readonly bool _queryVerified;
         private readonly bool _hintIsPreview;
@@ -88,6 +92,7 @@ namespace SephPlanner.Plugin.Ui
             _prefs = frame.Prefs != null ? frame.Prefs.Revision : -1;
             _expanded = frame.Expanded;
             _mixerOpen = frame.MixerOpen;
+            _enchantOpen = frame.EnchantOpen;
             _recommendations = frame.Recommendations;
             _queryVerified = frame.QueryVerified;
             _hintIsPreview = frame.HintIsPreview;
@@ -109,6 +114,7 @@ namespace SephPlanner.Plugin.Ui
             _prefs == other._prefs &&
             _expanded == other._expanded &&
             _mixerOpen == other._mixerOpen &&
+            _enchantOpen == other._enchantOpen &&
             _recommendations == other._recommendations &&
             _queryVerified == other._queryVerified &&
             _hintIsPreview == other._hintIsPreview &&

@@ -232,6 +232,30 @@ namespace SephPlanner.Core.Planning
             return lines;
         }
 
+        /// <summary>
+        /// 제단에서 어느 아티팩트에 걸지. 순위에 안 드러나는 것 - 상한까지 얼마가 남았는지와,
+        /// 이 인챈트로 무엇이 되살아나는지 - 를 말한다.
+        /// </summary>
+        public static List<string> Enchant(EnchantAdvice advice)
+        {
+            var lines = new List<string>
+            {
+                $"인챈트 {advice.Enchant - 1} → {advice.Enchant} (상한 {advice.MaxEnchant}). "
+                + "인챈트는 아이템을 따라다니므로 자리를 옮겨도 남습니다.",
+            };
+
+            if (advice.Enchant >= advice.MaxEnchant)
+                lines.Add("이 아티팩트가 받을 수 있는 마지막 인챈트입니다.");
+
+            if (advice.Activated.Count > 0)
+                lines.Add("이 인챈트로 효과가 되살아납니다: " + string.Join(", ", advice.Activated));
+
+            var soon = SoonLine(advice.Gain, advice.SoonGain);
+            if (soon.Length > 0) lines.Add(soon);
+
+            return lines;
+        }
+
         public static List<string> Mix(MixAdvice advice)
         {
             var lines = new List<string>

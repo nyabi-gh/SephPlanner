@@ -43,6 +43,40 @@ public sealed class HudFrameTests
         Assert.True(closed.Matches(new HudFrameKey(frame)));
     }
 
+    /// <summary>
+    /// 인챈트 조언은 제단이 연 창이 떠 있을 때만 보인다. 그 상태가 열쇠에 없으면 창을 열어도
+    /// 화면이 그대로여서 조언이 나타나지 않는다 - 합성기 창과 같은 자리다.
+    /// </summary>
+    [Fact]
+    public void OpeningAndClosingTheEnchantWindowRedrawsEvenThoughThePlanIsTheSame()
+    {
+        var frame = new HudFrame
+        {
+            Snapshot = new(),
+            Plan = new Plan(),
+            Catalog = new Catalog([], []),
+            Prefs = new(),
+            Values = CharmValueBook.Empty,
+            Expanded = true,
+            RuntimeVerification = PlanVerificationStatus.Passed,
+            RuntimeVerificationReason = "",
+            Hint = "",
+            PreviewKey = "",
+            EnchantOpen = false,
+        };
+
+        var closed = new HudFrameKey(frame);
+        frame.EnchantOpen = true;
+        var opened = new HudFrameKey(frame);
+
+        Assert.False(closed.Matches(opened));
+        Assert.True(opened.Matches(new HudFrameKey(frame)));
+
+        frame.EnchantOpen = false;
+        Assert.False(opened.Matches(new HudFrameKey(frame)));
+        Assert.True(closed.Matches(new HudFrameKey(frame)));
+    }
+
     /// <summary>계획 객체가 그대로여도 낡음 표시가 바뀌면 다시 그려야 한다.</summary>
     [Fact]
     public void GoingStaleAndBackRedrawsEvenThoughThePlanIsTheSame()

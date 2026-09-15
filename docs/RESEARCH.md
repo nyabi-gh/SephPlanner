@@ -504,6 +504,48 @@ num += allDamageBonusByLevel.SafeRandomAccess(CurrentLevelToIdx()) * (float)num2
 값이 있다. 예전에는 게임이 보고한 레벨에서 석판 몫을 빼서 역산했는데, 4단계의 배수가 걸린 칸에서는
 나눗셈이 떨어지지 않아 근사값이 됐다.
 
+### 인챈트를 거는 자리 (2026-09-15)
+
+인챈트를 **올리는** 길은 셋이고 전부 `DungeonManager.EnchantOnServer(instanceID)` 하나로 모인다.
+그 함수는 `globalItemStatTable`의 `"{instanceID}/Enchant"`를 1 올릴 뿐이라 상한도 조건도 없다.
+거는 쪽에 규칙이 있다.
+
+- **인챈트 제단**(`AltarOfEnchant`). 층에 놓인 고정물이고 `AltarOfEnchant_Spawner`가 프리팹별
+  `spawnChance`로 하나를 고른다. 미니맵에 뜬다(`minimapElementName`). 상호작용하면
+  `UI_CharacterStatusPanel`을 `EInventoryMode.Enchant`로 열고 자기를 `EnchantBinding`에 건다.
+  **사람마다 따로 센다** - 서버가 `remainingByGuid`로 플레이어 GUID별 잔여 횟수를 들고 있고
+  초기값은 프리팹의 `localUseCount`(필드 기본값 1)다. 클라이언트는 `OnStartClient`에서 한 번
+  물어보며(`CmdQueryRemaining` → `TargetSetRemaining`) **답이 오기 전 `localRemaining`은 -1**이다.
+  가방에 아티팩트가 하나도 없으면 창을 열지 않는다.
+- **인챈트 물약**(`PotionEffect_Enchant`). 같은 창을 열고 `EnchantPotionEntityID`를 건다.
+  제단이 없어도 열리며, 전투 중에는 거절한다. 마시는 것으로 소모되지 않고
+  (`DecreaseItemOnDrink => false`) 실제로 하나를 골랐을 때 줄어든다.
+- **유니크 페어**(`GridInventory.uniquePairCount > 0`). 이미 가진 아티팩트와 같은 것을 집으면
+  새 아이템이 들어오는 대신 **가진 쪽의 인챈트가 `(들어오는 것의 인챈트 + 1)`만큼** 오른다
+  (`AddItemAtPosition`). 이 수치를 올려 주는 것은 `StatusInstance_UniquePair`다.
+
+**고르는 쪽의 제한은 인챈트 수치 자체에 걸린다.** `UI_CharacterStatusPanel`이 아티팩트를 받을 때
+보는 것은 둘이다.
+
+```csharp
+if (icon.Item.Charm.maxLevel > 0)
+    if (!int.TryParse(GetGlobalItemStatValue(icon.Item.InstanceID, "Enchant"), out var result)
+        || icon.Item.Charm.maxLevel > result)
+```
+
+즉 `maxLevel == 0`이면 아예 못 걸고, 걸 수 있는 것은 `인챈트 < maxLevel`인 동안뿐이다.
+**석판이 준 레벨과는 무관하다** - 20레벨 칸에 앉아 있어도 인챈트가 0이면 받고, 0레벨 칸에
+있어도 인챈트가 상한이면 거절한다. 거절할 때는 각각 `cantEnchantLevelZeroString`,
+`cantEnchantLevelMaxString`을 띄운다.
+
+**그래서 어디에 걸지는 눈으로 세기 어렵다.** 효과에 반영되는 레벨은 `min(maxLevel, 표시 레벨)`
+이므로 이미 상한 위에 앉은 아티팩트는 인챈트를 걸어도 값이 0 이고, 반대로 인챈트는 위 4단계의
+배수보다 **먼저** 더해지므로 배수 칸에서는 +1 이 레벨 +배수가 된다. 답은 대개 "상한 아래에
+있으면서 배수 칸에 앉은 것"이다. `EnchantAdvisor`(Core)가 이것을 잰다.
+
+내리는 길도 있다. `DisenchantOnServer`는 0 미만으로 내려가지 않으며, 유니크 페어로 올려 둔 몫을
+되돌릴 때만 불린다(`uniquePairArtifactConvertDataServerside`).
+
 ### 각인
 
 `GridInventory.engravings`(`SyncList<StoneTablet>`)는 **격자 위 고정된 자리에서 석판과 똑같이

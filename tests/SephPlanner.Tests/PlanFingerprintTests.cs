@@ -163,6 +163,44 @@ public class PlanFingerprintTests
     }
 
     /// <summary>
+    /// 제단 몫이 줄거나 창이 열리면 인챈트 조언이 생기고 사라지므로 지문이 그 순간을 잡아야 한다.
+    /// </summary>
+    [Fact]
+    public void TheEnchantAltarAndItsWindowInvalidateTheFullPlan()
+    {
+        var snapshot = Snapshot();
+        snapshot.EnchantChance = new EnchantChanceState { AltarUses = 1 };
+        var fresh = PlanFingerprint.Full(snapshot, PlanPreferences.None, "catalog-1");
+
+        snapshot.EnchantChance = new EnchantChanceState { AltarUses = 0 };
+        var spent = PlanFingerprint.Full(snapshot, PlanPreferences.None, "catalog-1");
+        Assert.NotEqual(fresh, spent);
+
+        snapshot.EnchantChance = new EnchantChanceState { AltarUses = 0, Open = true };
+        Assert.NotEqual(spent, PlanFingerprint.Full(snapshot, PlanPreferences.None, "catalog-1"));
+    }
+
+    /// <summary>
+    /// 제단을 <b>읽지 않은</b> 스냅샷은 제단 줄을 아예 갖지 않는다. 그래서 다 쓴 제단(0회)과도
+    /// 지문이 다르다.
+    ///
+    /// <b>이 조건부가 규약이다.</b> 지문에 항목을 무조건 더하면 그 줄을 모르는 옛 `.replay` 가
+    /// 통째로 "입력 지문 불일치"로 거부된다 - 실제로 그렇게 넣었다가 `reports/` 열둘 중 열이
+    /// 재생조차 못 했다(2026-09-15). 합성기의 `mixerNear` 가 조건부인 이유도 같다. 진짜 감시자는
+    /// `reports/` 재현이므로, 지문을 건드렸으면 `--reproduce` 를 변경 전후로 돌려 견준다.
+    /// </summary>
+    [Fact]
+    public void AnUnreadAltarIsNotTheSameAsASpentOne()
+    {
+        var snapshot = Snapshot();
+        var unread = PlanFingerprint.Full(snapshot, PlanPreferences.None, "catalog-1");
+
+        snapshot.EnchantChance = new EnchantChanceState { AltarUses = 0, Open = false };
+
+        Assert.NotEqual(unread, PlanFingerprint.Full(snapshot, PlanPreferences.None, "catalog-1"));
+    }
+
+    /// <summary>
     /// 번호 없는 아이템 둘은 서로 다른 아이템이다. 게임 번호(0)를 그대로 쓰면 지문이 둘을 한
     /// 몸으로 보아, 한쪽이 사라져도 계획이 낡지 않는다.
     /// </summary>

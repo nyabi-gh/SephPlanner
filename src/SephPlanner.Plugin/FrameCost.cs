@@ -71,7 +71,7 @@ namespace SephPlanner.Plugin
         public static readonly Step Poll = new Step("폴링 전체");
         public static readonly Step Read = new Step("  게임 상태 읽기");
         public static readonly Step Inventory = new Step("    가방 읽기");
-        public static readonly Step Mixer = new Step("    합성기 찾기(씬 탐색)");
+        public static readonly Step Mixer = new Step("    합성기·제단 찾기(씬 탐색)");
         public static readonly Step Sephirites = new Step("    세피라이트 찾기(씬 탐색)");
         public static readonly Step Chests = new Step("    상자·상점 찾기(씬 탐색)");
 
@@ -173,7 +173,7 @@ namespace SephPlanner.Plugin
             string.Format(
                 CultureInfo.InvariantCulture,
                 "메인 스레드 부담 - 폴링 {0}회 평균 {1:0.00}ms/최악 {2:0.00}ms(폴링 {15}) " +
-                "(가방 {3:0.00} 합성기 {4:0.00} 세피라이트 {5:0.00} 상자 {6:0.00} " +
+                "(가방 {3:0.00} 합성기·제단 {4:0.00} 세피라이트 {5:0.00} 상자 {6:0.00} " +
                 "시뮬 {7:0.00} 지문 {8:0.00}), " +
                 "화면 평균 {9:0.000}ms, 프레임 {10}회 중 다시 그린 것 {11}회, " +
                 "카탈로그 짓기 {12}회 합계 {13:0.0}ms (시도 {14}회), " +

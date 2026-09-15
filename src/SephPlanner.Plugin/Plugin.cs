@@ -892,12 +892,13 @@ namespace SephPlanner.Plugin
             var adviceBusy = state.AdviceBusy || plan.AdviceStatus == AdviceStatus.Pending;
 
             var mixerOpen = _settings.Recommendations.Value && GameReader.IsMixerOpen();
-            AutoExpand(plan, mixerOpen, adviceBusy);
+            var enchantOpen = _settings.Recommendations.Value && GameReader.IsEnchantOpen();
+            AutoExpand(plan, mixerOpen, enchantOpen, adviceBusy);
 
             var preview = PreviewName(plan);
             try
             {
-                Render(plan, preview, state, mixerOpen, stale, adviceBusy);
+                Render(plan, preview, state, mixerOpen, enchantOpen, stale, adviceBusy);
             }
             catch (Exception ex)
             {
@@ -913,7 +914,8 @@ namespace SephPlanner.Plugin
         }
 
         private void Render(
-            Plan plan, string preview, PlanRunState state, bool mixerOpen, bool stale, bool adviceBusy)
+            Plan plan, string preview, PlanRunState state, bool mixerOpen, bool enchantOpen,
+            bool stale, bool adviceBusy)
         {
             _hud.Render(new HudFrame
             {
@@ -924,6 +926,7 @@ namespace SephPlanner.Plugin
                 Values = CharmValueSource.Book,
                 Expanded = _expanded,
                 MixerOpen = mixerOpen,
+                EnchantOpen = enchantOpen,
                 Recommendations = _settings.Recommendations.Value,
                 MultiplayerAutoPlace = _settings.MultiplayerAutoPlace.Value,
                 QueryVerified = CatalogDump.QueryVerificationPassed(),
@@ -1064,10 +1067,10 @@ namespace SephPlanner.Plugin
         /// 게시되므로 창을 연 직후에는 조언이 비어 있는데, 그때 접혀 있으면 계산 중이라는 말도
         /// 함께 숨는다.
         /// </summary>
-        private void AutoExpand(Plan plan, bool mixerOpen, bool adviceBusy)
+        private void AutoExpand(Plan plan, bool mixerOpen, bool enchantOpen, bool adviceBusy)
         {
             var coming = adviceBusy && _lastSnapshot != null && _lastSnapshot.Offers.Count > 0;
-            var expanded = _adviceExpansion.Update(plan.Offers.Count > 0 || coming, mixerOpen);
+            var expanded = _adviceExpansion.Update(plan.Offers.Count > 0 || coming, mixerOpen, enchantOpen);
             if (expanded.HasValue) _expanded = expanded.Value;
         }
 

@@ -34,6 +34,16 @@ namespace SephPlanner.Core.Runtime
             Add(builder, "mixerUsed", snapshot.Mixer?.Used ?? false);
             Add(builder, "mixerAffordable", (snapshot.Mixer?.Cost ?? 0) <= gold);
 
+            // 제단 몫이 줄거나 창이 열리고 닫히면 인챈트 조언이 생기고 사라진다. 합성기의
+            // "가까이 있는가"와 같은 자리이고, 조건부인 이유도 같다 - 제단을 읽지 않던 옛
+            // 재현 자료에서는 이 줄 자체가 없어야 그때의 지문과 같다. 무조건 더했더니
+            // `reports/` 열둘 중 열이 "지문이 다르다"로 재생 자체를 거부했다.
+            if (snapshot.EnchantChance is { } enchant)
+            {
+                Add(builder, "enchantUses", enchant.AltarUses);
+                Add(builder, "enchantOpen", enchant.Open);
+            }
+
             foreach (var category in preferences.PriorityCategories.OrderBy(value => value, StringComparer.Ordinal))
                 Add(builder, "priority", category);
             foreach (var charm in preferences.PresetCharms.OrderBy(value => value))

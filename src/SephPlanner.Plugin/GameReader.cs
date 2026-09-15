@@ -43,6 +43,7 @@ namespace SephPlanner.Plugin
             {
                 step = FrameCost.Now;
                 snapshot.Mixer = ReadMixer(avatar.transform.position, offerRadius * MixerReach);
+                snapshot.EnchantChance = ReadEnchantChance();
                 FrameCost.Mixer.Add(step);
 
                 OfferReader.Fill(snapshot, avatar, offerRadius);
@@ -131,6 +132,58 @@ namespace SephPlanner.Plugin
         {
             var panel = UIManager.Instance != null ? UIManager.Instance.GetElement<UI_TabletMixPanel>() : null;
             return panel != null && panel.IsOpened;
+        }
+
+        /// <summary>
+        /// 제단이나 인챈트 물약이 연 아티팩트 선택 창이 지금 떠 있는가. 인챈트 조언은 이때만
+        /// 화면에 나간다 - 합성 추천이 상점을 열어도 같이 보이던 것과 같은 실수를 피한다
+        /// (<c>NativeHud.RenderMixes</c> 의 주석).
+        ///
+        /// 가방 창과 같은 <c>UI_CharacterStatusPanel</c> 이고 모드로만 갈린다. 창이 닫힐 때
+        /// 게임이 스스로 <c>None</c> 으로 되돌리므로 모드만 봐도 된다.
+        /// </summary>
+        internal static bool IsEnchantOpen()
+        {
+            var panel = UIManager.Instance != null
+                ? UIManager.Instance.GetElement<UI_CharacterStatusPanel>()
+                : null;
+            return panel != null && panel.IsOpened &&
+                   panel.InventoryMode == UI_CharacterStatusPanel.EInventoryMode.Enchant;
+        }
+
+        private static readonly System.Reflection.FieldInfo AltarRemaining =
+            typeof(AltarOfEnchant).GetField(
+                "localRemaining",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        /// <summary>
+        /// 지금 인챈트를 걸 수 있는 기회. 제단도 없고 창도 닫혀 있으면 <c>null</c> 이다.
+        ///
+        /// 합성기와 같은 이유로 거리를 보지 않는다 - 미니맵에 뜨는 고정물이라 이 층에 있다는
+        /// 사실 자체가 이미 보이는 정보다.
+        ///
+        /// 게임은 사람마다 따로 세고(<c>remainingByGuid</c>), 클라이언트는 접속할 때 한 번 물어
+        /// 받아 둔다. <b>답이 오기 전에는 -1 이다</b> - 그대로 0 으로 옮기면 아직 쓰지도 않은
+        /// 제단이 다 쓴 것으로 보이므로, 그때는 프리팹이 정한 <c>localUseCount</c> 로 메운다.
+        ///
+        /// 층에 제단이 여럿이면 더한다. 제단마다 내 몫이 따로 있어 실제로 그만큼 걸 수 있다.
+        /// </summary>
+        private static EnchantChanceState ReadEnchantChance()
+        {
+            var found = false;
+            var uses = 0;
+            foreach (var altar in NetworkRegistry.All<AltarOfEnchant>())
+            {
+                if (altar == null) continue;
+                found = true;
+
+                var local = AltarRemaining != null && AltarRemaining.GetValue(altar) is int value ? value : -1;
+                uses += local < 0 ? Math.Max(0, altar.localUseCount) : local;
+            }
+
+            // 물약은 제단 없이도 창을 연다. 층에 제단이 없어도 창이 열려 있으면 기회가 있는 것이다.
+            var open = IsEnchantOpen();
+            return found || open ? new EnchantChanceState { AltarUses = uses, Open = open } : null;
         }
 
         /// <summary>

@@ -144,11 +144,12 @@ namespace SephPlanner.Core.Planning
             if (!preferences.Recommendations)
             {
                 return placement.AdviceStatus == AdviceStatus.NotRequested && placement.Offers.Count == 0 &&
-                       placement.Mixes.Count == 0 && placement.Discards.Count == 0 && placement.SkippedOffers == 0
+                       placement.Mixes.Count == 0 && placement.Discards.Count == 0 &&
+                       placement.Enchants.Count == 0 && placement.SkippedOffers == 0
                     ? placement
                     : placement.WithAdvice(
                         new List<OfferAdvice>(), new List<MixAdvice>(), new List<DiscardAdvice>(),
-                        0, AdviceStatus.NotRequested);
+                        new List<EnchantAdvice>(), 0, AdviceStatus.NotRequested);
             }
 
             try
@@ -202,7 +203,14 @@ namespace SephPlanner.Core.Planning
                 ? DiscardAdvisor.Rank(problem, placement.Best, layouts, lookahead, cancellation)
                 : new List<DiscardAdvice>();
 
-            return placement.WithAdvice(offers, mixes, discards, skippedOffers, AdviceStatus.Ready);
+            // 제단 몫을 다 썼고 창도 안 열렸으면 이 층에서는 더 권할 것이 없다. 합성기와 달리
+            // 거리는 보지 않는다 - 계산이 조언 넷 중 제일 싸고, 무엇에 걸지는 걸어가기 전에 정해
+            // 두는 편이 쓸모 있다. 화면에 내보내는 것은 그 창이 열렸을 때뿐이다.
+            var enchants = snapshot.EnchantChance is { Available: true } && placement.Verification.Passed
+                ? EnchantAdvisor.Rank(problem, placement.Best, layouts, lookahead, cancellation)
+                : new List<EnchantAdvice>();
+
+            return placement.WithAdvice(offers, mixes, discards, enchants, skippedOffers, AdviceStatus.Ready);
         }
 
         private static Plan? Attempt(

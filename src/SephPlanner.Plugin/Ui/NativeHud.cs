@@ -45,6 +45,7 @@ namespace SephPlanner.Plugin.Ui
         /// 후보로 넘어가면 무엇을 보고 있는지 알 수 없다.</summary>
         public const int OfferRows = 6;
         private const int MixRows = 3;
+        private const int EnchantRows = 3;
 
         /// <summary>
         /// 커서가 올라오면 설명할 것 하나. 그리는 자리마다 여기에 등록한다.
@@ -95,6 +96,7 @@ namespace SephPlanner.Plugin.Ui
         private Section _moves;
         private Section _offers;
         private Section _mixes;
+        private Section _enchants;
         private Section _discards;
         private TextMeshProUGUI _offerNotice;
         private TextMeshProUGUI _chips;
@@ -218,6 +220,7 @@ namespace SephPlanner.Plugin.Ui
             _moves = new Section(_detail, _skin, _base, "옮길 것", NativeSkin.TextDim, MoveRows, detail);
             BuildOffers(_detail, detail);
             _mixes = new Section(_detail, _skin, _base, "석판 합성기", NativeSkin.Mint, MixRows, detail);
+            _enchants = new Section(_detail, _skin, _base, "인챈트", NativeSkin.Mint, EnchantRows, detail);
             _discards = new Section(_detail, _skin, _base, "하나 빼기 검토 · 자동 제거 안 함", NativeSkin.Mint, 3, detail);
             _chips = Widgets.Paragraph("Chips", _detail, _skin, S(0.8f), NativeSkin.TextDim);
             _chips.richText = true;
@@ -489,6 +492,7 @@ namespace SephPlanner.Plugin.Ui
             }
             RenderOffers(plan, frame, previewed);
             RenderMixes(plan, snapshot.Mixer, frame.MixerOpen, frame.AdviceBusy);
+            RenderEnchants(plan, snapshot.EnchantChance, frame.EnchantOpen, frame.AdviceBusy);
             RenderDiscards(plan, previewed == null);
             RenderChips(snapshot, frame);
         }
@@ -848,6 +852,44 @@ namespace SephPlanner.Plugin.Ui
             }
             _discards.End();
             Widgets.SetActive(_discards.Root, visible && plan.Discards.Count > 0);
+        }
+
+        /// <summary>
+        /// 어느 아티팩트에 인챈트를 걸지. 제단과 인챈트 물약이 여는 창이 떠 있을 때만 보인다 -
+        /// 합성 추천이 상점을 열어도 따라 붙던 것과 같은 실수를 반복하지 않는다.
+        /// </summary>
+        private void RenderEnchants(
+            Plan plan, EnchantChanceState chance, bool enchantOpen, bool adviceBusy)
+        {
+            _enchants.Begin();
+            for (var i = 0; i < plan.Enchants.Count && i < EnchantRows; i++)
+            {
+                var advice = plan.Enchants[i];
+                var soonTag = Explain.SoonTag(advice.Gain, advice.SoonGain);
+                var row = _enchants.Add(
+                    advice.Name,
+                    Tint($"{advice.Enchant}/{advice.MaxEnchant}", NativeSkin.TextDim) + "  " +
+                    (soonTag.Length > 0 ? Tint(soonTag, NativeSkin.Mint) + "  " : "") +
+                    Tint($"{advice.Gain:+0.#;-0.#;0}",
+                        advice.Gain > 0.001 ? NativeSkin.Good : NativeSkin.TextDim),
+                    NativeSkin.Text);
+                Hover(row, advice.Name,
+                    () => $"현재 위치: {advice.Position.X + 1}열 {advice.Position.Y + 1}행\n"
+                          + Explain.Join(Explain.Enchant(advice)));
+            }
+            if (enchantOpen && plan.Enchants.Count == 0)
+            {
+                // 조언은 배치보다 뒤에 붙는다. 그 사이에 "없음" 이라고 하면 거짓말이 된다.
+                if (adviceBusy)
+                    _enchants.Add("계산 중", "인챈트 추천을 계산하고 있습니다.", NativeSkin.TextDim);
+                else
+                    _enchants.Add("추천 대상 없음", chance == null ? "제단 정보를 읽는 중입니다." :
+                        "인챈트로 값이 오르는 아티팩트를 찾지 못했습니다. 인챈트가 이미 상한에 "
+                        + "닿았거나, 올려도 효과에 반영되지 않는 자리입니다.", NativeSkin.TextDim);
+            }
+            _enchants.End();
+
+            Widgets.SetActive(_enchants.Root, enchantOpen);
         }
 
         private void RenderMixes(Plan plan, MixerState mixer, bool mixerOpen, bool adviceBusy)
