@@ -164,7 +164,7 @@ try {
 
     Write-Host "완성: $zip"
     Write-Host "릴리스 본문: $notesPath"
-    Write-Host "  gh release create v$version `"$zip`" -R nyabi-gh/SephPlanner --notes-file `"$notesPath`""
+    Write-Host "  gh release create v$version `"$zip`" -R nyabi-gh/SephPlanner --title `"SephPlanner $version`" --notes-file `"$notesPath`""
 }
 finally {
     if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
