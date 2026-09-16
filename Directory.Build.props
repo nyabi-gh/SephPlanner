@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup>
     <!-- 배포 버전. 릴리스 zip 이름과 어셈블리 버전이 여기서 나온다. -->
-    <Version>0.4.4</Version>
+    <Version>0.4.5</Version>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>

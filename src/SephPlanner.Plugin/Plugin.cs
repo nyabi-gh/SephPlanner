@@ -18,7 +18,7 @@ namespace SephPlanner.Plugin
     /// 세피리아 상태를 읽어 게임 HUD에 배치와 추천을 표시하고, 싱글플레이에서는 제안된 배치를
     /// 게임 자체의 이동 경로로 적용한다. 멀티 세션에서는 읽기만 한다.
     /// </summary>
-    [BepInPlugin(PluginGuid, "SephPlanner", "0.4.4")]
+    [BepInPlugin(PluginGuid, "SephPlanner", "0.4.5")]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001", Justification = "Unity의 OnDestroy에서 계산 작업을 정리합니다.")]
     public sealed class SephPlannerPlugin : BaseUnityPlugin
     {
@@ -1112,10 +1112,10 @@ namespace SephPlanner.Plugin
         private List<ActionRow> WindowActions() => new List<ActionRow>
         {
             new ActionRow { Label = "자동 배치", Run = AutoPlace },
-            new ActionRow { Label = "후보 미리보기", Run = CyclePreview },
-            new ActionRow { Label = "접기 / 펼치기", Run = ToggleExpand },
-            new ActionRow { Label = "숨기기 / 다시 보기", Run = ToggleHidden },
-            new ActionRow { Label = "빌드 창", Run = () => ToggleWindow(_build, _settings.BuildKey, "빌드 창") },
+            new ActionRow { Label = "다음 후보 미리보기", Run = CyclePreview },
+            new ActionRow { Label = "추천 화면 접기 / 펼치기", Run = ToggleExpand },
+            new ActionRow { Label = "플래너 화면 숨기기 / 보이기", Run = ToggleHidden },
+            new ActionRow { Label = "빌드 설정 창 열기", Run = () => ToggleWindow(_build, _settings.BuildKey, "빌드 창") },
         };
 
         private void ToggleExpand()

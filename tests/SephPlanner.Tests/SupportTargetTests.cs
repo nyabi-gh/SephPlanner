@@ -143,7 +143,9 @@ public class SupportTargetTests
 
         // 콤보를 못 보인 이유를 자리 탓으로 돌리지 않는다. 사용자가 풀 수 있는 말이어야 한다.
         Assert.Contains(1, solved.UnmatchedComboCharms);
-        Assert.Contains("강화 대상을 따르느라", PriorityPlacement.FailureReason(problem, problem.Charms[0]));
+        var reason = PriorityPlacement.FailureReason(problem, problem.Charms[0]);
+        Assert.Contains("‘침·모래시계·별조각 우선’으로 지정한 아이템을 강화하느라", reason);
+        Assert.Contains("강화받는 아이템의 ‘침·모래시계·별조각 우선’을 끄세요", reason);
     }
 
     /// <summary>
@@ -163,7 +165,7 @@ public class SupportTargetTests
 
         // 침밖에 없는 가방에서 마법을 지정했다. 침은 공격 가능한 것만 강화한다.
         Assert.Contains(
-            "강화할 수 있는 종류가 아닙니다",
+            "지원 아이템이 연결할 수 없는 종류입니다",
             Assert.Single(PriorityPlacement.UnusableDesignations(Board(4))));
 
         // 침이 받아들일 수 있는 지정에는 아무 말도 하지 않는다.

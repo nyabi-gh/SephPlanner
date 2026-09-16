@@ -106,7 +106,8 @@ public class AutoPlacePolicyTests
         var decision = AutoPlacePolicy.Evaluate(context);
 
         Assert.False(decision.Allowed);
-        Assert.Contains("질의 검증", decision.Reason);
+        Assert.Contains("석판 효과 계산을 검증하지 못해", decision.Reason);
+        Assert.Contains("아이템 데이터 다시 읽기", decision.Reason);
     }
 
     [Fact]

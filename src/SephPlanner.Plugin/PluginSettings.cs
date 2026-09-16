@@ -281,10 +281,10 @@ namespace SephPlanner.Plugin
         {
             return _rows ??= new List<OptionRow>
             {
-                Switch("인게임 화면", Panel),
+                Switch("플래너 화면 표시", Panel),
                 new OptionRow
                 {
-                    Label = "모서리",
+                    Label = "화면 기준 위치",
                     Choices = new[] { "왼쪽 위", "오른쪽 위", "왼쪽 아래", "오른쪽 아래" },
                     Read = () => (int)Corner.Value,
                     Write = i => ChangeCorner((PanelCorner)i),
@@ -293,31 +293,31 @@ namespace SephPlanner.Plugin
                 Steps("폭", Width, WidthSteps,
                     new[] { "아주 좁게", "좁게", "보통", "넓게", "아주 넓게" }),
                 Steps("불투명도", Opacity, OpacitySteps, new[] { "55%", "70%", "85%", "100%" }),
-                Switch("후보 추천", Recommendations),
-                Steps("추천 범위", OfferRadius, RadiusSteps,
+                Switch("획득·합성·인챈트·제거 추천", Recommendations),
+                Steps("주변 아이템 탐색 범위", OfferRadius, RadiusSteps,
                     new[] { "좁게", "보통", "넓게", "아주 넓게" }),
                 Switch("멀티 자동 배치(실험)", MultiplayerAutoPlace),
                 new OptionRow
                 {
-                    Label = "F10 진단 전송",
+                    Label = "진단 서버 전송",
                     Choices = new[] { "꺼짐", "켜짐" },
                     Read = () => DiagnosticUploadAllowed ? 1 : 0,
                     Write = i => { if (i == 0) SetDiagnosticConsent(false); else _reviewDiagnostics(); },
                 },
                 Switch("시작할 때 업데이트 확인", UpdateCheck),
-                Steps("갱신 주기", PollInterval, PollSteps,
+                Steps("가방 확인 간격", PollInterval, PollSteps,
                     new[] { "0.15초", "0.25초", "0.5초", "1초" }),
                 Switch("패드 View 버튼으로 창 열기", PadWindow),
-                Key("접기/펼치기", ExpandKey),
+                Key("추천 화면 접기/펼치기", ExpandKey),
                 Key("자동 배치", AutoPlaceKey),
                 Key("후보 미리보기", PreviewKey),
-                Key("빌드 창", BuildKey),
+                Key("빌드 설정 창", BuildKey),
                 Key("불투명도 바꾸기", OpacityKey),
-                Key("이동 모드", MoveKey),
-                Key("숨기기", HideKey),
-                Key("이 창 열기", SettingsKey),
-                Key("데이터 다시 만들기", DumpKey),
-                Key("진단 덤프", InventoryDumpKey),
+                Key("플래너 화면 이동", MoveKey),
+                Key("화면 숨기기/보이기", HideKey),
+                Key("설정 창", SettingsKey),
+                Key("아이템 데이터 다시 읽기", DumpKey),
+                Key("문제 진단 저장·전송", InventoryDumpKey),
             };
         }
 
@@ -348,7 +348,7 @@ namespace SephPlanner.Plugin
         private static OptionRow Switch(string label, ConfigEntry<bool> entry) => new OptionRow
         {
             Label = label,
-            Choices = new[] { "끄기", "켜기" },
+            Choices = new[] { "꺼짐", "켜짐" },
             Read = () => entry.Value ? 1 : 0,
             Write = i => entry.Value = i == 1,
         };

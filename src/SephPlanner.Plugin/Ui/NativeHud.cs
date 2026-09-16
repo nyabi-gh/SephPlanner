@@ -81,7 +81,9 @@ namespace SephPlanner.Plugin.Ui
         private LayoutElement _hintSize;
         private LayoutElement _chipSize;
         private TextMeshProUGUI _score;
+        private LayoutElement _scoreSize;
         private TextMeshProUGUI _gain;
+        private LayoutElement _gainSize;
         private TextMeshProUGUI _notice;
         private LayoutElement _noticeSize;
         private TextMeshProUGUI _nextMove;
@@ -296,15 +298,10 @@ namespace SephPlanner.Plugin.Ui
 
         private void BuildHeader(RectTransform parent)
         {
-            var row = Widgets.Rect("Header", parent);
-            Widgets.Row(row, S(0.5f));
-            Widgets.Fixed(row, S(1.5f));
-
-            _score = Widgets.Label("Score", row, _skin, S(1.2f), NativeSkin.TextBright);
-            Widgets.Fixed(_score.rectTransform, S(1.5f)).flexibleWidth = 1;
-
-            _gain = Widgets.Label("Gain", row, _skin, S(0.9f), NativeSkin.Good, TextAlignmentOptions.MidlineRight);
-            Widgets.Fixed(_gain.rectTransform, S(1.5f), S(4f));
+            _score = Widgets.Paragraph("Score", parent, _skin, S(1f), NativeSkin.TextBright);
+            _scoreSize = Widgets.Fixed(_score.rectTransform, S(1.5f));
+            _gain = Widgets.Paragraph("Gain", parent, _skin, S(0.85f), NativeSkin.Good);
+            _gainSize = Widgets.Fixed(_gain.rectTransform, S(1.2f));
 
             // 안내 줄은 접혔다 펴지며 길이가 크게 달라진다. 한 줄로 잘라 내면 뒤쪽 단축키가
             // 통째로 사라져, 누를 것이 없는 화면에서 조작을 알 길이 없어진다.
@@ -428,8 +425,10 @@ namespace SephPlanner.Plugin.Ui
             var score = previewed?.Preview.Score ?? plan.Best.Score;
             var gain = score - plan.Current.Score;
             _score.text = previewed != null
-                ? $"미리보기 {plan.Current.Score:0.#} / {score:0.#}"
-                : $"{plan.Current.Score:0.#} / {score:0.#}";
+                ? $"점수: 현재 {plan.Current.Score:0.#} → 획득 후 {score:0.#}"
+                : $"점수: 현재 {plan.Current.Score:0.#} → 제안 {score:0.#}";
+            Hover(_score.rectTransform, "배치 평가 점수", () =>
+                "게임 효과를 환산한 추정 점수이며 실제 피해량이 아닙니다. 사용 유지·침·모래시계·별조각 우선·콤보 지정 등은 점수보다 먼저 적용됩니다.");
             _gain.text = gain > 0.001 ? $"+{gain:0.#}" : gain < -0.001 ? $"{gain:0.#}" :
                 previewed == null && plan.HasPlacementChanges ? "배치 정리" : "변경 없음";
             _gain.color = gain > 0.001 ? NativeSkin.Good : gain < -0.001 ? NativeSkin.Bad : NativeSkin.TextDim;
@@ -455,12 +454,21 @@ namespace SephPlanner.Plugin.Ui
             }
 
             if (previewed == null && plan.HasPlacementChanges &&
+                plan.Best.SupportTargetMatches > plan.Current.SupportTargetMatches)
+            {
+                _gain.text = $"침·모래시계·별조각 우선 ({gain:+0.#;-0.#;0})";
+                _gain.color = NativeSkin.Mint;
+            }
+
+            if (previewed == null && plan.HasPlacementChanges &&
                 plan.Best.UnretainedCharms.Count < plan.Current.UnretainedCharms.Count)
             {
                 _gain.text = $"사용 유지 우선 ({gain:+0.#;-0.#;0})";
                 _gain.color = NativeSkin.Mint;
             }
 
+            Widgets.FitHeight(_score, _scoreSize, inner);
+            Widgets.FitHeight(_gain, _gainSize, inner);
             var warning = Warning(
                 snapshot, plan, frame.MultiplayerAutoPlace, frame.QueryVerified,
                 frame.RuntimeVerification, frame.RuntimeVerificationReason, frame.Stale);
@@ -571,7 +579,7 @@ namespace SephPlanner.Plugin.Ui
                 warnings.Add("갱신 중 - 가방이 바뀌어 다시 계산하고 있습니다. 아래는 직전 계획입니다.");
 
             if (!queryVerified)
-                warnings.Add("석판 질의 검증이 끝나지 않았거나 실패해 자동 배치를 껐습니다. F9로 다시 만드세요.");
+                warnings.Add("석판 효과 계산을 검증하지 못해 자동 배치를 사용할 수 없습니다. ‘아이템 데이터 다시 읽기’(기본 F9)를 실행하세요.");
 
             if (plan.Best.UnplacedTablets > 0)
                 warnings.Add($"석판 {plan.Best.UnplacedTablets}개는 놓을 자리가 없어 계산에서 빠졌습니다.");
@@ -591,7 +599,7 @@ namespace SephPlanner.Plugin.Ui
                 warnings.Add($"선택지가 많아 {plan.SkippedOffers}개는 평가하지 못했습니다.");
 
             if (plan.Best.UnheldCharms.Count > 0)
-                warnings.Add($"배치 조건을 무시하는 칸이 모자라 고정 {plan.Best.UnheldCharms.Count}개를 지키지 못했습니다.");
+                warnings.Add($"배치 조건을 무시하는 칸이 모자라 ‘조건 무시 칸’ 지정 {plan.Best.UnheldCharms.Count}개를 지키지 못했습니다.");
 
             warnings.AddRange(plan.ComboPlacementWarnings);
             warnings.AddRange(plan.RetentionWarnings);
@@ -689,12 +697,12 @@ namespace SephPlanner.Plugin.Ui
                 // 첫 줄은 쪽지의 제목으로 올라간다.
                 lines.RemoveAt(0);
                 if (definition?.HasNoActivationEffect == true)
-                    lines.Add("자체 활성 효과가 없어 감점 칸을 활용할 수 있습니다. 사용 유지·고정과 주변 효과는 계속 고려합니다.");
+                    lines.Add("자체 활성 효과가 없어 감점 칸을 활용할 수 있습니다. 사용 유지·조건 무시 칸 지정과 주변 효과는 계속 고려합니다.");
                 if (pinned > 0)
                 {
                     lines.Add(
-                        $"강화 우선 {new string('★', pinned)} - 이득을 " +
-                        $"{PlanPreferences.WeightOf(pinned):0.##}배로 칩니다. 패널티는 그대로 반영합니다." +
+                        $"강화칸 우선 {new string('★', pinned)} - 배치 평가에서 이득을 " +
+                        $"{PlanPreferences.WeightOf(pinned):0.##}배로 칩니다. 게임 효과의 배수가 아니며 패널티는 그대로 반영합니다." +
                         (reason == CharmInactiveReason.Weapon
                             ? " 지금은 꺼져 있어 점수에는 들어가지 않지만, 자리는 이 지정대로 잡습니다."
                             : ""));
@@ -702,13 +710,19 @@ namespace SephPlanner.Plugin.Ui
                 else if (pinned < 0)
                 {
                     lines.Add(
-                        $"양보 {string.Concat(System.Linq.Enumerable.Repeat(_skin.YieldMark, -pinned))} - 이득을 " +
-                        $"{PlanPreferences.WeightOf(pinned):0.##}배로 칩니다. 패널티는 그대로 반영합니다.");
+                        $"강화칸 양보 {string.Concat(System.Linq.Enumerable.Repeat(_skin.YieldMark, -pinned))} - 배치 평가에서 이득을 " +
+                        $"{PlanPreferences.WeightOf(pinned):0.##}배로 칩니다. 패널티는 그대로 반영합니다. 효과를 끄거나 침 연결을 금지하지는 않습니다.");
                 }
                 if (frame.Prefs != null && frame.Prefs.IsRetained(charmId))
-                    lines.Add("사용 유지: 활성 상태와 모래시계의 마법 연결을 우선하며 빼기·교체 추천에서 보호합니다.");
+                    lines.Add("사용 유지: 활성 상태와 지원 연결을 지키고 빼기·교체 추천에서 보호합니다.");
                 if (frame.Prefs != null && frame.Prefs.IsHeld(charmId))
-                    lines.Add("고정 - 배치 조건을 무시하는 칸에만 앉힙니다.");
+                    lines.Add("조건 무시 칸: 배치 조건을 무시하는 칸을 우선합니다. 좌표나 회전을 고정하지는 않습니다.");
+                if (frame.Prefs != null && frame.Prefs.IsSupportTarget(charmId))
+                    lines.Add("침·모래시계·별조각 우선: 이 아이템을 우선 강화합니다. 콤보 지정과 강화칸 우선·양보보다 먼저 적용됩니다.");
+                if (frame.Prefs != null && frame.Prefs.IsDeactivationAllowed(charmId))
+                    lines.Add("끄기 허용: 배치 이득이 있으면 효과를 꺼도 됩니다. 항상 끄지는 않으며 사용 유지가 함께 켜져 있으면 효과를 유지합니다.");
+                if (frame.Prefs != null && frame.Prefs.LevelCap(charmId) > 0)
+                    lines.Add($"목표 레벨: {frame.Prefs.LevelCap(charmId)}레벨까지만 이득으로 평가합니다. 실제 배치 레벨은 더 높을 수 있습니다.");
                 return Explain.Join(lines);
             });
         }
@@ -799,7 +813,7 @@ namespace SephPlanner.Plugin.Ui
         {
             var parts = new StringBuilder();
 
-            if (!advice.Available) return Tint("선택 불가", NativeSkin.Bad);
+            if (!advice.Available) return Tint("배치 미확보", NativeSkin.Bad);
 
             if (advice.MatchesPreset) parts.Append(Tint("빌드", NativeSkin.Mint)).Append("  ");
 
@@ -942,7 +956,7 @@ namespace SephPlanner.Plugin.Ui
         {
             if (advice.RotationA == 0 && advice.RotationB == 0) return "";
 
-            return Tint($"회전 {advice.RotationA}/{advice.RotationB}", NativeSkin.Amber) + "  ";
+            return Tint($"회전 {advice.RotationA * 90}°/{advice.RotationB * 90}°", NativeSkin.Amber) + "  ";
         }
 
         /// <summary>
@@ -1163,7 +1177,7 @@ namespace SephPlanner.Plugin.Ui
                 SetIcon(icon);
                 _name.text = icon == null ? name : "";
                 _name.color = NativeSkin.TabletText;
-                _level.text = "회전 " + rotation;
+                _level.text = rotation * 90 + "°";
                 _level.color = NativeSkin.TabletText;
             }
 

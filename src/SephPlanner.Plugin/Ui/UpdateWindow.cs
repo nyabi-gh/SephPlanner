@@ -85,8 +85,8 @@ namespace SephPlanner.Plugin.Ui
             {
                 case Stage.Offer:
                     _body.text = "새 버전 " + latest + " 이 있습니다. 지금 버전은 " + UpdateClient.Format(_current) + " 입니다.\n\n" +
-                        "업데이트를 누르면 GitHub Releases 에서 받아 BepInEx/plugins 의 SephPlanner DLL 두 개를 바꿉니다. " +
-                        "BepInEx 와 설정, 빌드 지정은 그대로 둡니다.\n\n" +
+                        "업데이트를 누르면 SephPlanner 배포 페이지에서 새 버전을 받아 설치합니다. " +
+                        "저장한 설정과 빌드 지정은 유지됩니다.\n\n" +
                         "새 버전은 게임을 다시 시작한 뒤부터 적용됩니다. 무엇이 바뀌었는지는 " +
                         "github.com/nyabi-gh/SephPlanner/releases 에 있습니다.";
                     SetHint("ESC: 나중에");

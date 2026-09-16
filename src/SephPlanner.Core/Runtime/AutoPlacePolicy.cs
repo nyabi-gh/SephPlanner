@@ -66,7 +66,7 @@ namespace SephPlanner.Core.Runtime
                 return AutoPlaceDecision.Deny("최신 요청과 계획의 generation이 달라 자동 배치를 잠갔습니다.");
             if (!context.CatalogVerified || plan.CatalogGeneration != context.CatalogGeneration)
                 return AutoPlaceDecision.Deny(
-                    "석판 질의 검증이 끝나지 않아 자동 배치를 사용할 수 없습니다. F9로 데이터를 다시 만드세요.");
+                    "석판 효과 계산을 검증하지 못해 자동 배치를 사용할 수 없습니다. ‘아이템 데이터 다시 읽기’(기본 F9)를 실행하세요.");
             if (!plan.Verification.Passed) return AutoPlaceDecision.Deny(plan.Verification.Reason);
             if (context.RuntimeVerification != PlanVerificationStatus.Passed)
             {

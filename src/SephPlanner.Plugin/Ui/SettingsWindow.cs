@@ -97,9 +97,9 @@ namespace SephPlanner.Plugin.Ui
             _controls = controls.gameObject.AddComponent<CanvasGroup>();
             var tabs = Widgets.Rect("Tabs", controls);
             Widgets.Row(tabs, S(1f));
-            _tabFocus = Button(tabs, "표시 설정", 8f, () => Show(Tab.Display)).gameObject;
+            _tabFocus = Button(tabs, "일반 설정", 8f, () => Show(Tab.Display)).gameObject;
             Button(tabs, "단축키", 8f, () => Show(Tab.Keys));
-            Button(tabs, "동작", 8f, () => Show(Tab.Actions));
+            Button(tabs, "바로 실행", 8f, () => Show(Tab.Actions));
 
             var general = Widgets.Rect("General", controls);
             Widgets.Column(general, S(0.25f));
@@ -278,9 +278,10 @@ namespace SephPlanner.Plugin.Ui
 
         private string Note()
         {
-            if (_tab == Tab.Display) return "단축키는 위의 단축키 탭에서 변경할 수 있습니다.";
+            if (_tab == Tab.Display) return "화살표로 설정을 바꿉니다. 표시된 값은 현재 상태입니다. 추천을 꺼도 배치 계산과 빌드 지정은 유지됩니다.\n"
+                + "단축키는 ‘단축키’ 탭에서 바꾸고, ‘바로 실행’ 탭에서는 버튼으로 실행합니다.";
             if (_tab == Tab.Actions)
-                return "누르면 이 창을 닫고 실행합니다. 패드는 지도가 닫혀 있고 가방·상자 창이 떠 있는 동안 " +
+                return "버튼을 누르면 이 창을 닫고 해당 기능을 한 번 실행합니다. 패드는 지도가 닫혀 있고 가방·상자·상점 창이 떠 있는 동안 " +
                        "View(뒤로) 버튼으로 이 창을 엽니다. 단축키 지정은 키보드만 받습니다.";
             if (_capture.Capturing)
                 return "누른 키를 먼저 놓고 원하는 키를 누르세요. Ctrl·Alt·Shift 조합 가능(좌우 구분). ESC는 취소입니다.";

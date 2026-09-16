@@ -29,8 +29,8 @@ namespace SephPlanner.Core.Solver
             // 가장 흔한 이유다. "자리를 못 찾았다" 로 뭉뚱그리면 사용자가 없는 자리를 찾으러 간다.
             if (problem.DesignatedTargets.Count > 0 && DirectedCharmSupport.HasConnection(charm) &&
                 DirectedCharmSupport.WantsDesignatedTarget(problem, charm))
-                return "지정한 강화 대상을 따르느라 이 콤보를 보이지 못했습니다. "
-                       + "콤보 쪽이 먼저라면 F2에서 이 아티팩트의 강화 대상 지정을 푸세요.";
+                return "‘침·모래시계·별조각 우선’으로 지정한 아이템을 강화하느라 이 콤보를 복사하지 못했습니다. "
+                       + "콤보를 우선하려면 빌드 창(기본 F2)에서 강화받는 아이템의 ‘침·모래시계·별조각 우선’을 끄세요.";
 
             if (charm.Definition.LineCategories.Count > 0)
             {
@@ -58,7 +58,7 @@ namespace SephPlanner.Core.Solver
                         other != charm && !other.IsFiller && PositionalWorth.CategoriesOf(other, cell).Contains(category)) >= 2)))
                     return "지정 콤보를 공유하는 양옆 아티팩트 둘을 찾지 못했습니다.";
             }
-            return "자리·활성 조건·고정을 만족하는 지정 콤보 배치를 찾지 못했습니다.";
+            return "자리·활성 조건·‘조건 무시 칸’ 지정을 만족하는 콤보 배치를 찾지 못했습니다.";
         }
 
         internal static string SupportFailureReason(PlacementProblem problem, CharmSlot charm)
@@ -75,9 +75,9 @@ namespace SephPlanner.Core.Solver
                 .Select(target => Naming.Of(target.Definition.Names, target.Definition.Id, "아티팩트"))
                 .ToList();
             if (blocked.Count > 0)
-                return $"지정한 대상({string.Join(", ", blocked)})이 꺼져 있어 연결이 서지 않습니다.";
+                return $"‘침·모래시계·별조각 우선’으로 지정한 아이템({string.Join(", ", blocked)})이 꺼져 있어 강화할 수 없습니다.";
 
-            return "지정한 강화 대상에 닿는 배치를 찾지 못했습니다. 다른 지정과 부딪히거나 "
+            return "‘침·모래시계·별조각 우선’으로 지정한 아이템에 닿는 배치를 찾지 못했습니다. 다른 지정과 부딪히거나 "
                    + "대상이 그 자리에서 조건을 만족하지 못하는 경우입니다.";
         }
 
@@ -100,8 +100,8 @@ namespace SephPlanner.Core.Solver
                 if (helpers.Exists(helper => DirectedCharmSupport.Accepts(helper, target))) continue;
 
                 warnings.Add(Naming.Of(target.Definition.Names, target.Definition.Id, "아티팩트") + ": " +
-                    "강화 대상으로 지정돼 있지만 가방의 침·모래시계가 강화할 수 있는 종류가 아닙니다. " +
-                    "침은 공격 가능한 아티팩트만, 모래시계는 마법만 강화합니다.");
+                    "‘침·모래시계·별조각 우선’이 켜져 있지만 가방의 지원 아이템이 연결할 수 없는 종류입니다. " +
+                    "침은 공격 가능한 아티팩트만, 모래시계와 별조각은 마법만 지원합니다.");
             }
             return warnings;
         }

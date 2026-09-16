@@ -33,7 +33,7 @@ namespace SephPlanner.Plugin.Ui
             _cancel = cancel;
         }
 
-        protected override string Title => "F10 진단 메모";
+        protected override string Title => "문제 진단 메모";
         protected override float WidthRatio => 34f;
         protected override GameObject DefaultFocus => _input == null ? null : _input.gameObject;
 
@@ -70,7 +70,7 @@ namespace SephPlanner.Plugin.Ui
             send.text = "보내기 (Enter)";
             Widgets.Fixed(send.rectTransform, S(1.8f), S(13f));
             var cancel = Widgets.Clickable("Cancel", row, Skin, S(0.85f), NativeSkin.Text, Cancel);
-            cancel.text = "취소 (ESC)";
+            cancel.text = "전송 안 함 (ESC)";
             Widgets.Fixed(cancel.rectTransform, S(1.8f), S(13f));
 
             UpdateCount();

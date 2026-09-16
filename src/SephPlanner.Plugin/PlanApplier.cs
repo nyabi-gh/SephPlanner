@@ -126,7 +126,7 @@ namespace SephPlanner.Plugin
             try
             {
                 if (!CatalogDump.QueryVerificationPassed())
-                    return Denied("석판 질의 검증이 완료되지 않았거나 실패해 자동 배치를 실행하지 않습니다. F9로 데이터를 다시 만드세요.");
+                    return Denied("석판 효과 계산을 검증하지 못해 자동 배치를 실행하지 않습니다. ‘아이템 데이터 다시 읽기’(기본 F9)를 실행하세요.");
                 if (command.ExpectedCatalogGeneration.Length == 0 ||
                     command.ExpectedCatalogGeneration != CatalogDump.ActiveGeneration)
                     return Denied("계획을 만든 카탈로그가 더 이상 최신이 아니어서 자동 배치를 실행하지 않습니다.");
