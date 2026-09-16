@@ -1,6 +1,6 @@
 namespace SephPlanner.Plugin
 {
-    /// <summary>패드의 View 버튼를 눌렀을 때 창에 할 일.</summary>
+    /// <summary>패드의 View 버튼을 눌렀을 때 창에 할 일.</summary>
     internal enum PadWindowAction
     {
         None,
@@ -12,13 +12,13 @@ namespace SephPlanner.Plugin
     /// <summary>
     /// 패드로 창을 여닫을 때인지 가린다.
     ///
-    /// <b>게임은 패드 버튼를 하나도 남기지 않고 쓴다</b>(docs/RESEARCH.md 의 "패드 단축키").
-    /// 키보드의 F 키 같은 빈자리가 없어서, 아무 버튼나 잡으면 누를 때마다 게임 동작이 함께
+    /// <b>게임은 패드 버튼을 하나도 남기지 않고 쓴다</b>(docs/RESEARCH.md 의 "패드 단축키").
+    /// 키보드의 F 키 같은 빈자리가 없어서, 아무 버튼이나 잡으면 누를 때마다 게임 동작이 함께
     /// 난다 - 우리는 입력을 가져가지 않으므로 막을 길이 없다.
     ///
     /// 빈틈이 하나 있다. 지도를 여는 View(<c>select</c>)는 <c>HandleOnOpenMapPanel</c>이
     /// <b>컨트롤 스택이 비었을 때만</b> 지도를 열고 UI 액션 맵에는 아예 없다. 즉 게임 창이
-    /// 떠 있는 동안 이 버튼는 게임에서 아무 일도 하지 않는다. 그 조건을 그대로 우리 조건으로
+    /// 떠 있는 동안 이 버튼은 게임에서 아무 일도 하지 않는다. 그 조건을 그대로 우리 조건으로
     /// 삼으면 한 누름에 둘이 함께 나지 않는다.
     /// </summary>
     internal static class PadShortcut
@@ -29,7 +29,7 @@ namespace SephPlanner.Plugin
         {
             if (!enabled || !pressed) return PadWindowAction.None;
             // 우리 창이 떠 있으면 그것을 닫는 뜻이다. 패드에는 ESC 자리가 start 하나뿐이라
-            // 연 버튼로 닫히지 않으면 닫는 길을 따로 외워야 한다.
+            // 연 버튼으로 닫히지 않으면 닫는 길을 따로 외워야 한다.
             if (settingsOpen) return PadWindowAction.CloseSettings;
             if (buildOpen) return PadWindowAction.CloseBuild;
 

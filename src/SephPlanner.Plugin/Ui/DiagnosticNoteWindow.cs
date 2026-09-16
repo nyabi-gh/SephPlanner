@@ -154,7 +154,7 @@ namespace SephPlanner.Plugin.Ui
         }
 
         /// <summary>
-        /// 우리 버튼가 아닌 이유로 닫혔으면(게임이 위에 다른 창을 올리는 등) 취소로 본다.
+        /// 우리 버튼이 아닌 이유로 닫혔으면(게임이 위에 다른 창을 올리는 등) 취소로 본다.
         /// 붙잡고 있던 진단을 여기서 매듭지어야 설명 파일 없이 남지 않는다.
         /// </summary>
         protected override void Closed()

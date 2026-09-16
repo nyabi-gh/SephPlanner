@@ -269,7 +269,7 @@ namespace SephPlanner.Plugin.Ui
             if (_controls != null) _controls.interactable = !_capture.BlocksShortcuts;
             if (_cancel != null) _cancel.transform.parent.gameObject.SetActive(_capture.Capturing);
             if (_note == null) return;
-            // 패드에는 ESC 가 없다. 게임이 그 자리로 쓰는 것은 start 이고, 연 버튼로도 닫힌다.
+            // 패드에는 ESC 가 없다. 게임이 그 자리로 쓰는 것은 start 이고, 연 버튼으로도 닫힌다.
             SetHint(PadInput.InUse()
                 ? "View 또는 start 로 닫기"
                 : "ESC로 닫기 · 키 지정 중에는 ESC로 취소");
@@ -282,7 +282,7 @@ namespace SephPlanner.Plugin.Ui
             if (_tab == Tab.Display) return "단축키는 위의 단축키 탭에서 변경할 수 있습니다.";
             if (_tab == Tab.Actions)
                 return "누르면 이 창을 닫고 실행합니다. 패드는 게임 창이 떠 있는 동안 " +
-                       "View(뒤로) 버튼로 이 창을 엽니다. 단축키 지정은 키보드만 받습니다.";
+                       "View(뒤로) 버튼으로 이 창을 엽니다. 단축키 지정은 키보드만 받습니다.";
             if (_capture.Capturing)
                 return "누른 키를 먼저 놓고 원하는 키를 누르세요. Ctrl·Alt·Shift 조합 가능(좌우 구분). ESC는 취소입니다.";
             return (_result.Length > 0 ? _result + "\n" : "") +

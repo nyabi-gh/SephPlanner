@@ -7,7 +7,7 @@ namespace SephPlanner.Plugin
     ///
     /// <b>구식 <c>Input</c> 의 조이스틱 KeyCode 로는 읽지 않는다.</b> BepInEx 단축키가 타는
     /// <c>UnityInput</c> 은 구식과 새 입력 시스템 두 구현 중 하나로 잡히는데, 새 쪽에는 조이스틱
-    /// 버튼가 아예 없고 구식 쪽도 버튼 번호가 기기마다 다르다. 게임이 새 InputSystem 을 쓰므로
+    /// 버튼이 아예 없고 구식 쪽도 버튼 번호가 기기마다 다르다. 게임이 새 InputSystem 을 쓰므로
     /// 마우스와 같은 길로 읽는다(<c>SephPlannerPlugin.Cursor</c>).
     /// </summary>
     internal static class PadInput
@@ -15,7 +15,7 @@ namespace SephPlanner.Plugin
         /// <summary><c>PlayerInputController.GamepadScheme</c> 과 같은 값.</summary>
         private const string GamepadScheme = "Gamepad";
 
-        /// <summary>View(뒤로·공유) 버튼가 이번 프레임에 눌렸는가.</summary>
+        /// <summary>View(뒤로·공유) 버튼이 이번 프레임에 눌렸는가.</summary>
         public static bool OpenPressed()
         {
             var pad = Gamepad.current;

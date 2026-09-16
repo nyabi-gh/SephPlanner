@@ -641,7 +641,7 @@ namespace SephPlanner.Plugin.Ui
             /// <summary>침·모래시계가 강화할 대상으로 지정됐는가.</summary>
             public bool SupportTarget;
 
-            /// <summary>이 가방에서 침·모래시계의 대상이 될 수 있는가. 아니면 버튼를 걸지 않는다.</summary>
+            /// <summary>이 가방에서 침·모래시계의 대상이 될 수 있는가. 아니면 버튼을 걸지 않는다.</summary>
             public bool CanSupport;
             public int LevelCap;
             public bool Retained;
@@ -688,7 +688,7 @@ namespace SephPlanner.Plugin.Ui
                 _deactivation.text = "끄기 허용";
                 Widgets.Fixed(_deactivation.rectTransform, b * 1.5f, b * 4.2f);
                 // 침·모래시계가 있는 가방에서, 그 대상이 될 수 있는 줄에만 걸린다. 이름 자리는
-                // 남는 폭이라, 버튼가 하나 늘 때마다 이름이 그만큼 잘린다. 같은 이유로 이름도 짧다.
+                // 남는 폭이라, 버튼이 하나 늘 때마다 이름이 그만큼 잘린다. 같은 이유로 이름도 짧다.
                 _support = Widgets.Clickable("Support", rect, skin, b * 0.8f, NativeSkin.TextDim, () => onSupport(_entry));
                 _support.text = "대상";
                 Widgets.Fixed(_support.rectTransform, b * 1.5f, b * 2.2f);

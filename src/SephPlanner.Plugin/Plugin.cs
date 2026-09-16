@@ -1206,7 +1206,7 @@ namespace SephPlanner.Plugin
             // 하나만 적는다 - 그 창 안에 나머지가 전부 있다.
             if (pad)
             {
-                _guide = "가방·상자 창을 열고 View(뒤로) 버튼로 SephPlanner 창";
+                _guide = "가방·상자 창을 열고 View(뒤로) 버튼으로 SephPlanner 창";
                 return _guide;
             }
 
@@ -1355,7 +1355,7 @@ namespace SephPlanner.Plugin
             return mouse != null ? mouse.position.ReadValue() : (Vector2)Input.mousePosition;
         }
 
-        /// <summary>오른쪽 버튼가 이 프레임에 눌렸는가. 커서와 같은 길로 읽는다.</summary>
+        /// <summary>오른쪽 버튼이 이 프레임에 눌렸는가. 커서와 같은 길로 읽는다.</summary>
         private static bool RightClicked()
         {
             var mouse = UnityEngine.InputSystem.Mouse.current;
