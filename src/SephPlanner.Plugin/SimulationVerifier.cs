@@ -45,7 +45,8 @@ namespace SephPlanner.Plugin
             for (var i = 0; i < tablets.Count; i++)
             {
                 if (result.Applied[i] != tablets[i].IsApplied)
-                    return $"석판 {tablets[i].entityID} 적용 여부 {result.Applied[i]} != {tablets[i].IsApplied}";
+                    return Collapsed(inv, grid, tablets, result) ??
+                           $"석판 {tablets[i].entityID} 적용 여부 {result.Applied[i]} != {tablets[i].IsApplied}";
 
                 if (!result.Applied[i]) continue;
 
@@ -54,6 +55,35 @@ namespace SephPlanner.Plugin
             }
 
             return CompareMatrices(inv, grid, result);
+        }
+
+        /// <summary>
+        /// 게임이 계산해 둔 효과가 통째로 비었는가. 게임은 맞바꿈·회전 끝에 레벨 행렬을 다시
+        /// 만드는데, 그것이 도중에 예외로 멈추면 석판이 전부 비적용이 되고 칸 레벨이 0 으로 남는다
+        /// (제보 5915982c, 2026-09-15). 그때 첫 번째 차이만 적으면 화면에는
+        /// "석판 2053 적용 여부 True != False" 만 떠서 무슨 일이 난 것인지 읽을 수 없다.
+        ///
+        /// 어긋남을 찾았을 때만 부른다 - 칸마다 레벨 행렬을 훑는다.
+        /// </summary>
+        private static string Collapsed(
+            GridInventory inv, GridSpec grid, List<StoneTablet> tablets, SimulationResult result)
+        {
+            var applied = 0;
+            for (var i = 0; i < tablets.Count; i++)
+            {
+                if (tablets[i].IsApplied) return null;
+                if (result.Applied[i]) applied++;
+            }
+            if (applied == 0) return null;
+
+            for (var index = 0; index < grid.Storage; index++)
+            {
+                var position = grid.ToPosition(index);
+                if (LookupLevel(inv, (sbyte)position.X, (sbyte)position.Y) != 0) return null;
+            }
+
+            return $"게임이 계산한 가방 효과가 비어 있습니다 - 석판 {tablets.Count}개가 전부 비적용이고 " +
+                   "칸 레벨도 전부 0 입니다. 동기화 중이면 곧 사라지고, 계속 남으면 방을 나갔다 들어오세요.";
         }
 
         private static void AddTablet(

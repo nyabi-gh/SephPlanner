@@ -489,6 +489,67 @@ public class ApplyPlanRoutineTests
         AssertContains("원래 배치로 되돌렸습니다.", routine.Result);
     }
 
+    /// <summary>
+    /// 게임은 맞바꿈 끝에 레벨 행렬을 다시 만든다. 그것이 예외로 멈추면 있던 레벨이 전부 0 으로
+    /// 남고, 그 상태에서는 수동 드래그도 같은 경로를 타므로 "손으로 정리하라"가 사람을 헛되이
+    /// 붙잡는다. 제보 5915982c 에서 맞바꿈과 되돌리기가 같은 예외로 끝난 자리다.
+    /// </summary>
+    [Fact]
+    public void ACollapsedLevelMatrixTellsThePlayerToReloadInsteadOfTidyingUp()
+    {
+        var (inventory, clock) = Host();
+        inventory.Cells[At(0, 0)] = 10;
+        inventory.Cells[At(1, 0)] = 11;
+        inventory.Levels[At(0, 0)] = 2;
+        inventory.FailingSwaps.Add(1);
+        inventory.FailingSwaps.Add(2);
+        inventory.BeforeSwap = index => { if (index == 1) inventory.Levels.Clear(); };
+
+        var routine = Routine(Command(Charm(10, At(0, 0), At(2, 0)), Charm(11, At(1, 0), At(3, 0))), inventory, clock);
+        Drive(routine, inventory, clock);
+
+        AssertContains("되돌리기도 실패해", routine.Result);
+        AssertContains("칸 레벨이 전부 0", routine.Result);
+        Assert.DoesNotContain("손으로 정리한 뒤", routine.Result);
+    }
+
+    [Fact]
+    public void LevelsThatSurviveAFailedSwapStillAskForATidyUp()
+    {
+        var (inventory, clock) = Host();
+        inventory.Cells[At(0, 0)] = 10;
+        inventory.Cells[At(1, 0)] = 11;
+        inventory.Levels[At(0, 0)] = 2;
+        inventory.FailingSwaps.Add(1);
+        inventory.FailingSwaps.Add(2);
+
+        var routine = Routine(Command(Charm(10, At(0, 0), At(2, 0)), Charm(11, At(1, 0), At(3, 0))), inventory, clock);
+        Drive(routine, inventory, clock);
+
+        AssertContains("되돌리기도 실패해", routine.Result);
+        AssertContains("손으로 정리한 뒤", routine.Result);
+        Assert.DoesNotContain("칸 레벨이 전부 0", routine.Result);
+    }
+
+    /// <summary>자리는 돌아왔어도 효과가 죽어 있으면 "되돌렸다" 만으로는 사실이 아니다.</summary>
+    [Fact]
+    public void ARollbackThatRestoredThePositionsStillReportsDeadEffects()
+    {
+        var (inventory, clock) = Host();
+        inventory.Cells[At(0, 0)] = 10;
+        inventory.Cells[At(1, 0)] = 11;
+        inventory.Levels[At(0, 0)] = 2;
+        inventory.FailingSwaps.Add(1);
+        inventory.BeforeSwap = index => { if (index == 1) inventory.Levels.Clear(); };
+
+        var routine = Routine(Command(Charm(10, At(0, 0), At(2, 0)), Charm(11, At(1, 0), At(3, 0))), inventory, clock);
+        Drive(routine, inventory, clock);
+
+        Assert.Equal(10, inventory.Cells[At(0, 0)]);
+        AssertContains("원래 배치로 되돌렸습니다.", routine.Result);
+        AssertContains("칸 레벨이 전부 0", routine.Result);
+    }
+
     [Fact]
     public void AReadFailureAfterSendingDoesNotGuessWhetherTheWriteLanded()
     {

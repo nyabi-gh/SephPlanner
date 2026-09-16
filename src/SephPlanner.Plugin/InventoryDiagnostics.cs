@@ -106,69 +106,102 @@ namespace SephPlanner.Plugin
         public static string Write(GridInventory inv, PlayerAvatar player, float offerRadius, string directory = null)
         {
             var text = new StringBuilder();
-            text.AppendLine(PluginIdentity.Describe());
-            text.AppendLine();
-            text.AppendLine($"Width={inv.Width} Height={inv.Height} Storage={inv.CurrentInventoryStorage} " +
-                            $"SubBag={inv.numberOfSubBagStorage} Potion={inv.numberOfPotionStorage}");
-
-            text.AppendLine();
-            text.AppendLine("[inventoryMatrix]");
-            foreach (var pair in inv.inventoryMatrix)
+            Section(text, "머리", () =>
             {
-                var instance = pair.Value;
-                if (instance == null)
+                text.AppendLine(PluginIdentity.Describe());
+                text.AppendLine();
+                text.AppendLine($"Width={inv.Width} Height={inv.Height} Storage={inv.CurrentInventoryStorage} " +
+                                $"SubBag={inv.numberOfSubBagStorage} Potion={inv.numberOfPotionStorage}");
+            });
+
+            Section(text, "inventoryMatrix", () =>
+            {
+                text.AppendLine();
+                text.AppendLine("[inventoryMatrix]");
+                foreach (var pair in inv.inventoryMatrix)
                 {
-                    text.AppendLine($"  ({pair.Key.x},{pair.Key.y}) <null>");
-                    continue;
+                    var instance = pair.Value;
+                    if (instance == null)
+                    {
+                        text.AppendLine($"  ({pair.Key.x},{pair.Key.y}) <null>");
+                        continue;
+                    }
+
+                    var entity = instance.Entity;
+                    text.AppendLine(
+                        $"  ({pair.Key.x},{pair.Key.y}) idx=({instance.XIdx},{instance.YIdx}) " +
+                        $"entity={instance.EntityID} instance={instance.InstanceID} qty={instance.Quantity} " +
+                        $"type={(entity == null ? "?" : entity.type.ToString())} " +
+                        $"active={(entity == null ? "?" : entity.activeType.ToString())} " +
+                        $"key={(entity?.aName == null ? "?" : entity.aName.key)} " +
+                        $"charm={(instance.Charm != null)} tablet={(instance.StoneTablet != null)}");
                 }
+            });
 
-                var entity = instance.Entity;
-                text.AppendLine(
-                    $"  ({pair.Key.x},{pair.Key.y}) idx=({instance.XIdx},{instance.YIdx}) " +
-                    $"entity={instance.EntityID} instance={instance.InstanceID} qty={instance.Quantity} " +
-                    $"type={(entity == null ? "?" : entity.type.ToString())} " +
-                    $"active={(entity == null ? "?" : entity.activeType.ToString())} " +
-                    $"key={(entity?.aName == null ? "?" : entity.aName.key)} " +
-                    $"charm={(instance.Charm != null)} tablet={(instance.StoneTablet != null)}");
-            }
-
-            text.AppendLine();
-            text.AppendLine("[stoneTablets]");
-            foreach (var pair in inv.stoneTablets)
+            Section(text, "stoneTablets", () =>
             {
-                var tablet = pair.Value;
-                if (tablet == null) continue;
-                text.AppendLine(
-                    $"  ({pair.Key.x},{pair.Key.y}) entity={tablet.entityID} instance={tablet.instanceID} " +
-                    $"rot={tablet.rotation} applied={tablet.IsApplied} custom={tablet.isCustomTablet}");
-            }
+                text.AppendLine();
+                text.AppendLine("[stoneTablets]");
+                foreach (var pair in inv.stoneTablets)
+                {
+                    var tablet = pair.Value;
+                    if (tablet == null) continue;
+                    text.AppendLine(
+                        $"  ({pair.Key.x},{pair.Key.y}) entity={tablet.entityID} instance={tablet.instanceID} " +
+                        $"rot={tablet.rotation} applied={tablet.IsApplied} custom={tablet.isCustomTablet}");
+                }
+            });
 
-            text.AppendLine();
-            text.AppendLine("[engravings]");
-            foreach (var engraving in inv.engravings)
+            Section(text, "engravings", () =>
             {
-                if (engraving == null) continue;
-                text.AppendLine(
-                    $"  ({engraving.xIdx},{engraving.yIdx}) entity={engraving.entityID} " +
-                    $"instance={engraving.instanceID} rot={engraving.rotation} " +
-                    $"applied={engraving.IsApplied} custom={engraving.isCustomTablet}");
-            }
+                text.AppendLine();
+                text.AppendLine("[engravings]");
+                foreach (var engraving in inv.engravings)
+                {
+                    if (engraving == null) continue;
+                    text.AppendLine(
+                        $"  ({engraving.xIdx},{engraving.yIdx}) entity={engraving.entityID} " +
+                        $"instance={engraving.instanceID} rot={engraving.rotation} " +
+                        $"applied={engraving.IsApplied} custom={engraving.isCustomTablet}");
+                }
+            });
 
-            text.AppendLine();
-            text.AppendLine("[levelMatrix]");
-            foreach (var pair in inv.levelMatrix)
-                text.AppendLine($"  ({pair.Key.x},{pair.Key.y}) = {pair.Value}");
+            Section(text, "levelMatrix", () =>
+            {
+                text.AppendLine();
+                text.AppendLine("[levelMatrix]");
+                foreach (var pair in inv.levelMatrix)
+                    text.AppendLine($"  ({pair.Key.x},{pair.Key.y}) = {pair.Value}");
+            });
 
-            WriteOffers(text, inv, player, offerRadius);
-            EffectStateDiagnostics.Append(text, inv, player);
-            UiDiagnostics.Write(text);
-            FrameCost.Write(text);
+            Section(text, "offers", () => WriteOffers(text, inv, player, offerRadius));
+            Section(text, "효과 상호작용 검증", () => EffectStateDiagnostics.Append(text, inv, player));
+            Section(text, "화면", () => UiDiagnostics.Write(text));
+            Section(text, "perf", () => FrameCost.Write(text));
 
             directory ??= PlannerData.DataDirectory;
             Directory.CreateDirectory(directory);
             var path = Path.Combine(directory, FileName);
             File.WriteAllText(path, text.ToString());
             return path;
+        }
+
+        /// <summary>
+        /// 한 구역이 터져도 파일은 남긴다. 이 덤프는 무너진 상태를 적으러 오는 것이라, 그때 터지는
+        /// 구역 하나에 나머지까지 잃으면 정작 필요할 때 자료가 없다 - 제보 5915982c 에서 Item 이
+        /// 끊긴 아티팩트 하나에 걸려 세 번 다 저장되지 않았다. 터진 구역은 그 사실을 파일에 적는다.
+        /// </summary>
+        private static void Section(StringBuilder text, string name, System.Action write)
+        {
+            try
+            {
+                write();
+            }
+            catch (System.Exception ex)
+            {
+                text.AppendLine();
+                text.AppendLine($"[{name} 실패] {ex}");
+            }
         }
     }
 }

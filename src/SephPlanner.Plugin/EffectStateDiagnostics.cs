@@ -23,7 +23,26 @@ namespace SephPlanner.Plugin
                 증폭 = avatar.GetCustomStatAmp(id),
                 최종값 = avatar.GetCustomStatUnsafe(id),
             }), Formatting.Indented));
-            var ordered = inventory.charms.Values.ToList();
+            // 이 덤프는 무너진 상태를 적으러 오는 것이라 부서진 항목에서 터지면 안 된다. Item 이
+            // 끊긴 아티팩트 하나에 걸려 제보 5915982c 의 덤프가 세 번 다 저장되지 않았고, 무엇이
+            // 끊겼는지도 그래서 알 수 없었다. 게임의 레벨 재계산이 멈춘 자리도 같은 항목으로 보인다.
+            var ordered = new List<Charm_Basic>();
+            var severed = new List<string>();
+            foreach (var pair in inventory.charms)
+            {
+                var charm = pair.Value;
+                if (charm == null || charm.Item == null)
+                {
+                    severed.Add($"({pair.Key.x},{pair.Key.y}) " + (charm == null
+                        ? "<null>"
+                        : $"{charm.GetType().Name} idx=({charm.xIdx},{charm.yIdx}) Item=<null>"));
+                    continue;
+                }
+                ordered.Add(charm);
+            }
+            text.AppendLine($"[끊긴 charms 항목] {severed.Count}개");
+            foreach (var line in severed)
+                text.AppendLine("  " + line);
             text.AppendLine("[정렬 전 아티팩트 열거 순서]");
             text.AppendLine(JsonConvert.SerializeObject(ordered.Select(charm => charm.Item.InstanceID)));
             ordered.Sort((left, right) => left.Order.CompareTo(right.Order));
@@ -71,7 +90,7 @@ namespace SephPlanner.Plugin
             text.AppendLine(JsonConvert.SerializeObject(conversions, Formatting.Indented));
         }
 
-        private static object TimerState(global::Timer timer) => new
+        private static object TimerState(global::Timer timer) => timer == null ? null : new
         {
             경과 = timer.GetTimer(),
             주기 = timer.time,
