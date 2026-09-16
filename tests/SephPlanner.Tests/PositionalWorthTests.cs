@@ -114,6 +114,21 @@ public class PositionalWorthTests
         Assert.Equal(Worth.ComboThreshold, with.Score - without.Score, 3);
     }
 
+    private static CharmDefinition TelescopeDef() => new()
+    {
+        MaxLevel = 5,
+        Behavior = "Charm_PlanetModule",
+        NeighborEnhanceCategory = "PLANET",
+    };
+
+    /// <summary>게임이 거대화하는 행성 - <c>PLANET</c> 카테고리이면서 소환 타입이다.</summary>
+    private static CharmDefinition PlanetDef() => new()
+    {
+        MaxLevel = 5,
+        Behavior = "Charm_SummonGreenBat",
+        Categories = { "PLANET" },
+    };
+
     /// <summary>
     /// 거대한 망원경(<c>Charm_PlanetModule</c>)은 이웃 여덟 칸의 행성을 강화한다. 1x3 격자에서
     /// 가운데 서면 둘을, 끝에 서면 하나만 감싼다.
@@ -122,23 +137,42 @@ public class PositionalWorthTests
     public void ATelescopeSitsWhereItTouchesTheMostPlanets()
     {
         var problem = new PlacementProblem { Grid = new GridSpec(3, 1, 3) };
-        problem.Charms.Add(new CharmSlot
-        {
-            InstanceId = 1,
-            Definition = new CharmDefinition { MaxLevel = 5, NeighborEnhanceCategory = "PLANET" },
-        });
-        problem.Charms.Add(new CharmSlot
-        {
-            InstanceId = 2,
-            Definition = new CharmDefinition { MaxLevel = 5, Categories = { "PLANET" } },
-        });
-        problem.Charms.Add(new CharmSlot
-        {
-            InstanceId = 3,
-            Definition = new CharmDefinition { MaxLevel = 5, Categories = { "PLANET" } },
-        });
+        problem.Charms.Add(new CharmSlot { InstanceId = 1, Definition = TelescopeDef() });
+        problem.Charms.Add(new CharmSlot { InstanceId = 2, Definition = PlanetDef() });
+        problem.Charms.Add(new CharmSlot { InstanceId = 3, Definition = PlanetDef() });
 
         Assert.Equal(new GridPos(1, 0), PlacementSolver.Solve(problem).CharmPositions[1]);
+    }
+
+    /// <summary>
+    /// 게임 <c>SearchPlanet</c>은 <c>PLANET</c> 카테고리에 더해 그 칸의 Charm 이
+    /// <c>Charm_SummonGreenBat</c> 일 것을 요구한다. 카탈로그의 <c>PLANET</c> 열하나 가운데 넷 -
+    /// 망원경 자신, 혜성, 악보 '은하', 붉은행성 관찰일지 - 이 그 타입이 아니므로, 카테고리만 보면
+    /// 망원경이 거대화하지도 못할 것을 감싸고 앉는다. 두 칸짜리 격자라 이웃은 하나뿐이고,
+    /// 그 하나가 진짜 행성일 때만 점수가 오른다.
+    /// </summary>
+    [Fact]
+    public void ATelescopeOnlyCountsPlanetsTheGameCanEnlarge()
+    {
+        static double Score(CharmDefinition neighbour)
+        {
+            var problem = new PlacementProblem { Grid = new GridSpec(2, 1, 2) };
+            problem.Charms.Add(new CharmSlot { InstanceId = 1, Definition = TelescopeDef() });
+            problem.Charms.Add(new CharmSlot { InstanceId = 2, Definition = neighbour });
+            return PlacementSolver.Solve(problem).Score;
+        }
+
+        var planet = PlanetDef();
+        var lookalike = new CharmDefinition
+        {
+            MaxLevel = 5,
+            Behavior = "Charm_FlamePlanet",
+            Categories = { "PLANET" },
+        };
+
+        var step = PositionalWorth.EnhanceStep * new CharmSlot { Definition = planet }.Worth.LevelStep;
+        Assert.True(step > 0);
+        Assert.Equal(step, Score(planet) - Score(lookalike), 6);
     }
 
     /// <summary>

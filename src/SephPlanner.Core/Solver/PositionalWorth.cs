@@ -139,8 +139,25 @@ namespace SephPlanner.Core.Solver
         }
 
         /// <summary>
+        /// 이웃 강화가 실제로 걸리는 charm 타입. 지금은 거대 망원경 하나뿐이라
+        /// <see cref="CharmDefinition.NeighborEnhanceCategory"/> 와 짝을 이룬다 - 카탈로그도 그
+        /// 카테고리를 <c>Charm_PlanetModule</c> 에만 채운다(<c>ItemCatalog</c>).
+        /// </summary>
+        private const string EnhanceableBehavior = "Charm_SummonGreenBat";
+
+        /// <summary>
         /// 거대한 망원경(<c>Charm_PlanetModule</c>)처럼 이웃 여덟 칸의 같은 카테고리 아티팩트를
         /// 강화하는 것. 자기 레벨은 보지 않고 몇을 감쌌는지만 본다 - 게임도 그렇다.
+        ///
+        /// <b>카테고리만으로는 대상이 되지 않는다.</b> 게임의 <c>SearchPlanet</c> 은 그 칸의
+        /// <c>Entity.categories</c> 에 <c>PLANET</c> 이 있고 <b>그 칸의 Charm 이
+        /// <c>Charm_SummonGreenBat</c> 일 때만</b> <c>SetEnhancement</c> 를 부른다(1.0.33 디컴파일).
+        /// 카탈로그의 <c>PLANET</c> 열하나 가운데 넷 - 거대 망원경 자신, 혜성, 악보 '은하',
+        /// 붉은행성 관찰일지 - 이 그 타입이 아니다. 카테고리만 보면 망원경이 거대화하지도 못할 것
+        /// 옆에 앉아 진짜 행성이 설 자리를 가져간다.
+        ///
+        /// 카테고리는 <b>정의의 것</b>을 본다. 게임도 <c>Entity.categories</c> 를 읽으므로 하얀
+        /// 종이가 물려받은 카테고리는 여기 섞이지 않는다.
         /// </summary>
         public static double NeighborEnhanceWorth(
             CharmSlot charm, GridPos cell, IReadOnlyDictionary<GridPos, CharmSlot>? neighbors)
@@ -153,6 +170,7 @@ namespace SephPlanner.Core.Solver
             {
                 if (!neighbors.TryGetValue(cell.Offset(dx, dy), out var neighbor)) continue;
                 if (neighbor == charm || neighbor.IsFiller || neighbor.IsDormant) continue;
+                if (neighbor.Definition.Behavior != EnhanceableBehavior) continue;
                 if (!neighbor.Definition.Categories.Contains(category)) continue;
 
                 worth += EnhanceStep * neighbor.Worth.LevelStep;

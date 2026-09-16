@@ -674,7 +674,7 @@ fixedMultiplyLevel)를 들고 있고, 배수는 석판과 같은 `multiplyLevelM
   | 아티팩트 | 게임 클래스 | 게임이 보는 것 |
   |---|---|---|
   | 북향의 금빛/파란 침 | `Charm_UpCharmDamage` | `(x+xOffset, y+yOffset)` 칸 하나. 기본은 바로 위 |
-  | 거대한 망원경 | `Charm_PlanetModule` | 이웃 여덟 칸의 `PLANET` 카테고리 아티팩트 |
+  | 거대한 망원경 | `Charm_PlanetModule` | 이웃 여덟 칸에서 `Entity.categories` 에 `PLANET` 이 있고 **Charm 이 `Charm_SummonGreenBat`** 인 것 |
   | 헌신의 휘장 | `Charm_CompanionChaos` | 같은 행 전체(`0..Width-1`)의 `ICompanionCharm` |
   | 캘세더니 열쇠 | `Charm_3Elemental_ByRow` | 자기 행 하나. `lineCategory[YIdx % 개수]` |
 
@@ -710,6 +710,20 @@ fixedMultiplyLevel)를 들고 있고, 배수는 석판과 같은 `multiplyLevelM
   낫다)만 확실하므로 `PositionalWorth.EnhanceStep`을 **그 아티팩트의 레벨 한 칸**으로 두었다 -
   콤보 한 단계(2.59)의 절반 남짓이라 잰 값을 뒤집지 못하는 크기다. `ComboProgress`와 같은 성격의
   값이며, 재고 나면 그 상수 하나만 고치면 된다.
+
+  **망원경은 대상 판정이 카테고리 하나가 아니다(2026-09-16).** `SearchPlanet` 은 이웃 칸의
+  `Entity.categories` 에 `PLANET` 이 있는지 본 뒤 **그 칸의 `Charm` 이 `Charm_SummonGreenBat`
+  인지 한 번 더 본다.** 둘 다 맞아야 `SetEnhancement(true)` 가 걸린다. 카탈로그의 `PLANET`
+  열하나 가운데 넷 - 거대 망원경 자신, 혜성, 악보 '은하', 붉은행성 관찰일지 - 이 그 타입이 아니라
+  거대화 대상이 아니다. 우리는 카테고리만 보고 있었다(제보 2026-09-16, `PositionalWorth`).
+
+  **크기도 문구로는 셀 수 있다(2026-09-16).** 능력치 표에는 없지만 효과 문구에 수치가 있다 -
+  거대화는 `피해량 50% 증가` 이고, 소환 행성 일곱의 피해량 범위도 문구에 있다(푸른 10→30,
+  잿빛 15→40, 노란 20→60, 붉은 26→60, 하늘색 30→60, 하얀 30→72, 암흑 50→90). 레벨 한 칸이
+  올리는 피해로 나누면 거대화 한 번이 **레벨 0 에서 1.25~2.5칸, 상한 레벨에서 3.75~6칸**이다.
+  지금의 `EnhanceStep` = 1 은 그보다 낮다. 다만 우리 모델에서 행성의 값어치는 능력치가 없어
+  레어도 어림값이라, 이 비율을 그대로 옮기는 것은 "피해 비율 = 값어치 비율" 이라는 가정을 하나
+  더 얹는 일이다. 휘장의 혼돈 모드에는 여전히 수치가 없으므로 상수를 올린다면 둘을 갈라야 한다.
 
   이 넷을 넣으면서 **배정 뒤에 다듬는 단계**(`PlacementSolver.Polish`)가 필요해졌다. 헝가리안의
   비용이 직전 반복의 이웃을 보고 매겨지는 근사라, 두 아티팩트가 동시에 움직여야 좋아지는 수
