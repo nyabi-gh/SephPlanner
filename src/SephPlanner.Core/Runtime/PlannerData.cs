@@ -54,8 +54,10 @@ namespace SephPlanner.Core.Runtime
         /// v15: 능력치별 원본·환산 근거와 마법 치명타 적용 여부를 담는다.
         /// v22: 능력치 표 없이 아티팩트 코드가 올려 주는 능력치를 함께 담는다. 없으면 그쪽
         ///      아티팩트들이 레어도 어림값으로만 평가된다.
+        /// v23: 소환 행성의 레벨별 피해량을 담는다. 거대 망원경의 거대화 크기를 이 표의 비율로
+        ///      재며, 없으면 예전처럼 레벨 한 칸이라는 어림값으로 물러선다.
         /// </summary>
-        public const int CatalogVersion = 22;
+        public const int CatalogVersion = 23;
 
         /// <summary>플러그인이 생성하고 진단 도구가 읽는 데이터 위치.</summary>
         public static string DataDirectory =>

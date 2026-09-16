@@ -248,6 +248,17 @@ public sealed class PlanReplayTests : IDisposable
     }
 
     [Fact]
+    public void CatalogVersion22StillReplaysAfterThePlanetDamageTableWasAdded()
+    {
+        // 소환 행성의 피해량 표를 더하기만 한 변경이다. 빠진 것은 수집하지 않은 것으로 읽혀
+        // 거대화 크기가 예전 어림값으로 물러서므로, 그때 모은 자료의 결과가 그대로 나온다.
+        var replay = RoundTrip(Capture());
+        replay.CatalogVersion = 22;
+        var plan = replay.Rebuild(true);
+        Assert.Empty(replay.Expected!.Differences(ReplayResult.From(plan)));
+    }
+
+    [Fact]
     public void DifferentModelRequiresExplicitComparisonAndStillChecksResults()
     {
         var capture = Capture();

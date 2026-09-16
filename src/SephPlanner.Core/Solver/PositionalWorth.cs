@@ -26,11 +26,14 @@ namespace SephPlanner.Core.Solver
         /// <summary>
         /// 강화 한 번을 그 아티팩트의 레벨 한 칸으로 친다.
         ///
-        /// <b>잰 값이 아니다.</b> 거대한 망원경의 행성 강화도 헌신의 휘장의 혼돈 모드도 게임에서
-        /// 능력치 수치가 아니라 소환물의 동작을 바꾸는 것이라, 정적 데이터로는 크기가 안 나온다.
-        /// 방향(모아 두는 쪽이 낫다)만은 확실하므로 크기는 가장 보수적인 어림으로 두었다 -
-        /// 레벨 한 칸이면 콤보 한 단계(<see cref="Worth.ComboThreshold"/> = 3.4)의 1/3 남짓이라,
-        /// 실제로 잰 값을 뒤집지 못한다. 재고 나면 여기만 고치면 된다.
+        /// <b>잰 값이 아니다.</b> 헌신의 휘장의 혼돈 모드(<c>SetChaoticMode</c>)는 능력치 수치가
+        /// 아니라 소환물의 동작을 바꾸는 것이라 정적 데이터로 크기가 안 나온다. 방향(모아 두는
+        /// 쪽이 낫다)만은 확실하므로 크기는 가장 보수적인 어림으로 두었다 - 레벨 한 칸이면 콤보
+        /// 한 단계(<see cref="Worth.ComboThreshold"/> = 3.4)의 1/3 남짓이라, 실제로 잰 값을
+        /// 뒤집지 못한다.
+        ///
+        /// <b>망원경 쪽은 이제 잰다</b>(<see cref="EnlargeSteps"/>). 이 값은 휘장의 것이고,
+        /// 행성의 피해량 표가 없는 옛 카탈로그에서 물러설 자리로도 쓴다.
         /// </summary>
         public const double EnhanceStep = 1.0;
 
@@ -173,9 +176,34 @@ namespace SephPlanner.Core.Solver
                 if (neighbor.Definition.Behavior != EnhanceableBehavior) continue;
                 if (!neighbor.Definition.Categories.Contains(category)) continue;
 
-                worth += EnhanceStep * neighbor.Worth.LevelStep;
+                worth += EnlargeSteps(neighbor) * neighbor.Worth.LevelStep;
             }
             return worth;
+        }
+
+        /// <summary>
+        /// 거대화 한 번이 그 행성의 <b>레벨 몇 칸</b>인가. 게임은 <c>GreenBat</c> 이 쏘는 순간
+        /// <c>num += num * 0.5f</c> 로 그때의 피해량에 곱으로 걸므로, 레벨별 피해량 표
+        /// (<c>damageByLevel</c>)와 견주면 크기가 나온다. 북향의 침이 두 표의 비율만 쓰는 것과
+        /// 같은 자리라 피해량을 값어치 단위로 옮길 필요가 없다.
+        ///
+        /// <b>레벨 0 으로 잰다.</b> 곱이라서 실제로는 레벨이 오를수록 커지지만(푸른 행성 1.25칸 →
+        /// 상한 3.75칸), 이웃의 지금 레벨을 보면 배치가 바뀔 때마다 망원경의 값어치가 따라 흔들린다 -
+        /// 침의 <see cref="TargetShare"/> 가 자리에 흔들리지 않으려고 상한 레벨로 재는 것과 같은
+        /// 이유다. 둘 중 아래로 잡는 쪽을 골랐으므로 이 값은 언제나 실제보다 작거나 같다.
+        ///
+        /// 표가 없으면 - 소환 행성이 아니거나 카탈로그 22 이하로 모은 자료 - <see cref="EnhanceStep"/>
+        /// 으로 물러선다. 1.25 는 일곱 행성 가운데 가장 작은 값이라 그 물러섬도 위로 넘지 않는다.
+        /// </summary>
+        private static double EnlargeSteps(CharmSlot planet)
+        {
+            var damage = planet.Definition.SummonDamageByLevel;
+            if (damage.Count < 2 || damage[0] <= 0) return EnhanceStep;
+
+            var step = (damage[damage.Count - 1] - damage[0]) / (double)(damage.Count - 1);
+            if (step <= 0) return EnhanceStep;
+
+            return 0.5 * damage[0] / step;
         }
 
         /// <summary>

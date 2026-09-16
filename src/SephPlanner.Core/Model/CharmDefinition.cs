@@ -94,6 +94,13 @@ namespace SephPlanner.Core.Model
         public string NeighborEnhanceCategory { get; set; } = "";
 
         /// <summary>
+        /// 소환 행성이 레벨마다 쏘는 피해량(게임 <c>Charm_SummonGreenBat.damageByLevel</c>).
+        /// 거대 망원경의 거대화가 그 행성의 <b>레벨 몇 칸짜리인지를 이 표의 비율로</b> 잰다 -
+        /// 피해량을 값어치로 옮기지는 않는다. 소환 행성이 아니면 비어 있다.
+        /// </summary>
+        public List<int> SummonDamageByLevel { get; set; } = new List<int>();
+
+        /// <summary>
         /// 놓인 행에 따라 갈아입는 카테고리. 게임 <c>Charm_3Elemental_ByRow.lineCategory</c>
         /// (캘세더니 열쇠)이고 <c>행 % 개수</c>로 고른다. 그래서 이 아티팩트는 어느 줄에 서느냐로
         /// 어떤 콤보를 미느냐가 갈린다. 다른 아티팩트에서는 비어 있다.

@@ -136,6 +136,7 @@ namespace SephPlanner.Plugin
                     GrowthRewardEntityId = charm is Charm_GrowthStatusInstance reward && reward.reward != null
                         ? reward.reward.id : 0,
                     NeighborEnhanceCategory = NeighborEnhanceCategory(charm),
+                    SummonDamageByLevel = SummonDamageByLevel(charm),
                     LineCategories = LineCategories(charm),
                     Categories = entity.categories ?? new List<string>(),
                     Names = DisplayName(entity),
@@ -320,6 +321,16 @@ namespace SephPlanner.Plugin
         /// </summary>
         private static string NeighborEnhanceCategory(Charm_Basic charm) =>
             charm is Charm_PlanetModule ? "PLANET" : "";
+
+        /// <summary>
+        /// 소환 행성의 레벨별 피해량. 거대 망원경의 거대화는 <c>GreenBat</c> 이 쏘는 순간
+        /// <c>num += num * 0.5f</c> 로 걸리므로, 크기를 알려면 이 표가 있어야 한다.
+        /// 공개 필드라 그대로 읽는다.
+        /// </summary>
+        private static List<int> SummonDamageByLevel(Charm_Basic charm) =>
+            charm is Charm_SummonGreenBat planet && planet.damageByLevel != null
+                ? new List<int>(planet.damageByLevel)
+                : new List<int>();
 
         /// <summary>
         /// 놓인 행이 정하는 카테고리(<c>Charm_3Elemental_ByRow.lineCategory</c>). 캘세더니 열쇠가

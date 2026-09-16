@@ -151,16 +151,19 @@ public class PositionalWorthTests
     /// 망원경이 거대화하지도 못할 것을 감싸고 앉는다. 두 칸짜리 격자라 이웃은 하나뿐이고,
     /// 그 하나가 진짜 행성일 때만 점수가 오른다.
     /// </summary>
+    /// <summary>두 칸짜리 격자에 망원경과 이웃 하나. 차이는 거대화 몫뿐이다.</summary>
+    private static double ScoreBesideTelescope(CharmDefinition neighbour)
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(2, 1, 2) };
+        problem.Charms.Add(new CharmSlot { InstanceId = 1, Definition = TelescopeDef() });
+        problem.Charms.Add(new CharmSlot { InstanceId = 2, Definition = neighbour });
+        return PlacementSolver.Solve(problem).Score;
+    }
+
     [Fact]
     public void ATelescopeOnlyCountsPlanetsTheGameCanEnlarge()
     {
-        static double Score(CharmDefinition neighbour)
-        {
-            var problem = new PlacementProblem { Grid = new GridSpec(2, 1, 2) };
-            problem.Charms.Add(new CharmSlot { InstanceId = 1, Definition = TelescopeDef() });
-            problem.Charms.Add(new CharmSlot { InstanceId = 2, Definition = neighbour });
-            return PlacementSolver.Solve(problem).Score;
-        }
+        static double Score(CharmDefinition neighbour) => ScoreBesideTelescope(neighbour);
 
         var planet = PlanetDef();
         var lookalike = new CharmDefinition
@@ -173,6 +176,27 @@ public class PositionalWorthTests
         var step = PositionalWorth.EnhanceStep * new CharmSlot { Definition = planet }.Worth.LevelStep;
         Assert.True(step > 0);
         Assert.Equal(step, Score(planet) - Score(lookalike), 6);
+    }
+
+    /// <summary>
+    /// 거대화는 <c>GreenBat</c>이 쏘는 순간 <c>num += num * 0.5f</c>로 그때의 피해량에 곱으로
+    /// 걸린다. 그래서 크기는 레벨별 피해량 표와 견주어 <b>그 행성의 레벨 몇 칸</b>으로 나온다 -
+    /// 푸른 행성(10→30, 5레벨)은 레벨 한 칸이 4이고 거대화가 5라 1.25칸이다. 표가 없는 카탈로그
+    /// 22 이하의 자료에서는 예전 어림값(레벨 한 칸)으로 물러선다.
+    /// </summary>
+    [Fact]
+    public void TheEnlargementIsMeasuredFromThePlanetsDamageTable()
+    {
+        var bystander = new CharmDefinition { MaxLevel = 5, Behavior = "Charm_SummonGreenBat" };
+        var guessed = PlanetDef();
+        var measured = PlanetDef();
+        measured.SummonDamageByLevel = new List<int> { 10, 14, 18, 22, 26, 30 };
+
+        var levelStep = new CharmSlot { Definition = measured }.Worth.LevelStep;
+        var baseline = ScoreBesideTelescope(bystander);
+
+        Assert.Equal(PositionalWorth.EnhanceStep * levelStep, ScoreBesideTelescope(guessed) - baseline, 6);
+        Assert.Equal(1.25 * levelStep, ScoreBesideTelescope(measured) - baseline, 6);
     }
 
     /// <summary>
