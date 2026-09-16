@@ -10,6 +10,7 @@ using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
 using SephPlanner.Plugin.Ui;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace SephPlanner.Plugin
 {
@@ -34,6 +35,7 @@ namespace SephPlanner.Plugin
         private int _verifiedTablets;
 
         private readonly NativeHud _hud = new NativeHud();
+        private readonly PadInput _pad = new PadInput();
         private SettingsWindow _window;
         private BuildWindow _build;
         private PluginPreferences _prefs;
@@ -109,6 +111,16 @@ namespace SephPlanner.Plugin
             Guarded(FinishPreviousUpdate, "업데이트 정리");
             if (_settings.UpdateCheck.Value) StartUpdateCheck();
         }
+
+        private void OnEnable() => InputSystem.onBeforeUpdate += CapturePadContext;
+
+        private void OnDisable()
+        {
+            InputSystem.onBeforeUpdate -= CapturePadContext;
+            _pad.Clear();
+        }
+
+        private void CapturePadContext() => Guarded(_pad.Capture, "패드 입력 준비");
 
         private void Update()
         {
@@ -1067,7 +1079,7 @@ namespace SephPlanner.Plugin
         }
 
         private static string CloseHint(ConfigEntry<KeyboardShortcut> key) =>
-            PadInput.InUse() ? "View 또는 start 로 닫기" : Describe(key) + " 또는 ESC 로 닫기";
+            PadInput.InUse() ? "B(취소)로 닫기" : Describe(key) + " 또는 ESC 로 닫기";
 
         /// <summary>
         /// 패드로 창을 여닫는다. 어느 버튼이고 왜 그 버튼 하나뿐인지는 <see cref="PadShortcut"/>에
@@ -1079,8 +1091,8 @@ namespace SephPlanner.Plugin
         /// </summary>
         private void HandlePadInput()
         {
-            var action = PadShortcut.Decide(
-                _settings.PadWindow.Value, PadInput.OpenPressed(), PadInput.GameUiOpen(),
+            var action = _pad.Decide(
+                _settings.PadWindow.Value,
                 _window.IsOpen, _build.IsOpen, AnsweringWindowOpen());
 
             if (action == PadWindowAction.Open)

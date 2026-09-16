@@ -181,13 +181,10 @@ namespace SephPlanner.Plugin
                 "동작한다. 동기화가 검증되지 않았고 개발사도 잠가 두는 편이 안전하다고 했으므로, " +
                 "같이 하는 사람의 동의를 얻고 켠다.");
 
-            // 패드에는 게임이 안 쓰는 버튼이 하나도 없다. 유일한 빈틈이 게임 창이 떠 있는
-            // 동안의 View 인데, 그 자리에서만 듣게 하면 게임 동작과 겹치지 않는다
-            // (docs/RESEARCH.md 의 "패드 단축키", <see cref="PadShortcut"/>).
             PadWindow = config.Bind(
                 "NativePanel", "PadOpensWindow", true,
                 "게임패드의 View(뒤로) 버튼으로 SephPlanner 창을 엽니다. 가방·상자 같은 게임 창이 " +
-                "떠 있는 동안에만 듣습니다 - 그때는 이 버튼이 게임에서 아무 일도 하지 않습니다.");
+                "떠 있고 지도가 닫혀 있는 동안에만 듣습니다.");
 
             // 게임이 쓰지 않는 키로 고른다. 게임은 수정키를 보지 않으므로 Ctrl+Alt 를 붙여도
             // 글자 키는 게임 조작을 함께 발동시킨다(docs/RESEARCH.md 의 "게임 단축키").

@@ -154,10 +154,10 @@ namespace SephPlanner.Core.Runtime
 
             var drift = TargetDrift();
 
-            // 레벨이 통째로 사라진 것을 LevelDrift 로 말하면 "계산에 없는 효과가 걸려 있다" 가
-            // 되는데, 그것은 사실과 반대다 - 걸린 것이 없어진 쪽이다.
-            var collapsed = Collapsed();
-            var levels = drift is null && collapsed is null ? LevelDrift() : "";
+            var levels = drift is null ? LevelDrift() : "";
+            // 예상도 전부 0이면 정상 배치다. 예상과 다른 소실만 별도 복구 안내를 붙인다.
+            var collapsed = drift is null && levels.Length == 0 ? null : Collapsed();
+            if (collapsed != null) levels = "";
             Settled = drift is null && collapsed is null && levels.Length == 0 && !RequiresResync;
             Result = Join(
                 drift ?? $"자동 배치 완료 - 이동 {moves.Count}건, 회전 {rotations.Count}건" + levels, collapsed);

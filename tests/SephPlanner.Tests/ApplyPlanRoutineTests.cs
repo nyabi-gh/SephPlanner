@@ -1,6 +1,7 @@
 using System.Collections;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Runtime;
+using SephPlanner.Core.Tablets;
 
 namespace SephPlanner.Tests;
 
@@ -487,6 +488,48 @@ public class ApplyPlanRoutineTests
         Assert.Equal(11, inventory.Cells[At(1, 0)]);
         AssertContains("이동 중 오류(권한 없음)", routine.Result);
         AssertContains("원래 배치로 되돌렸습니다.", routine.Result);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(2)]
+    public void AnExpectedZeroLevelLayoutSettlesAfterMoving(int levelBefore)
+    {
+        var (inventory, clock) = Host();
+        inventory.Cells[At(0, 0)] = 10;
+        inventory.Levels[At(1, 0)] = levelBefore;
+        inventory.BeforeSwap = _ => inventory.Levels.Clear();
+        var command = Command(Charm(10, At(0, 0), At(2, 0)));
+        var grid = new GridSpec(Width, Height, Storage);
+        for (var index = 0; index < grid.Storage; index++)
+            command.ExpectedCellLevels[grid.ToPosition(index)] = 0;
+
+        var routine = Routine(command, inventory, clock);
+        Drive(routine, inventory, clock);
+
+        Assert.True(routine.Settled);
+        Assert.Equal(10, inventory.Cells[At(2, 0)]);
+        Assert.Equal("자동 배치 완료 - 이동 1건, 회전 0건", routine.Result);
+        Assert.False(routine.RequiresResync);
+    }
+
+    [Fact]
+    public void UnexpectedZeroLevelsStillReportCollapseAfterMoving()
+    {
+        var (inventory, clock) = Host();
+        inventory.Cells[At(0, 0)] = 10;
+        inventory.Levels[At(1, 0)] = 2;
+        inventory.BeforeSwap = _ => inventory.Levels.Clear();
+        var command = Command(Charm(10, At(0, 0), At(2, 0)));
+        command.ExpectedCellLevels[At(1, 0)] = 2;
+
+        var routine = Routine(command, inventory, clock);
+        Drive(routine, inventory, clock);
+
+        Assert.False(routine.Settled);
+        Assert.Equal(10, inventory.Cells[At(2, 0)]);
+        AssertContains("칸 레벨이 전부 0", routine.Result);
+        Assert.DoesNotContain("계산에 없는 효과", routine.Result);
     }
 
     /// <summary>

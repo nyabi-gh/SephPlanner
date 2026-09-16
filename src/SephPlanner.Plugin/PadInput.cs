@@ -1,4 +1,5 @@
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.LowLevel;
 
 namespace SephPlanner.Plugin
 {
@@ -10,16 +11,29 @@ namespace SephPlanner.Plugin
     /// 버튼이 아예 없고 구식 쪽도 버튼 번호가 기기마다 다르다. 게임이 새 InputSystem 을 쓰므로
     /// 마우스와 같은 길로 읽는다(<c>SephPlannerPlugin.Cursor</c>).
     /// </summary>
-    internal static class PadInput
+    internal sealed class PadInput
     {
         /// <summary><c>PlayerInputController.GamepadScheme</c> 과 같은 값.</summary>
         private const string GamepadScheme = "Gamepad";
 
-        /// <summary>View(뒤로·공유) 버튼이 이번 프레임에 눌렸는가.</summary>
-        public static bool OpenPressed()
+        private readonly PadShortcut _shortcut = new PadShortcut();
+
+        public void Capture()
+        {
+            var updateType = InputState.currentUpdateType;
+            if (updateType != InputUpdateType.Dynamic && updateType != InputUpdateType.Fixed &&
+                updateType != InputUpdateType.Manual) return;
+            _shortcut.Capture(InputState.updateCount, GameWindow(), MapOpen());
+        }
+
+        public void Clear() => _shortcut.Clear();
+
+        public PadWindowAction Decide(bool enabled, bool settingsOpen, bool buildOpen, bool otherWindowOpen)
         {
             var pad = Gamepad.current;
-            return pad != null && pad.selectButton.wasPressedThisFrame;
+            return _shortcut.Decide(
+                InputState.updateCount, enabled, pad != null && pad.selectButton.wasPressedThisFrame,
+                GameWindow(), MapOpen(), settingsOpen, buildOpen, otherWindowOpen);
         }
 
         /// <summary>
@@ -39,11 +53,13 @@ namespace SephPlanner.Plugin
             return input != null && input.currentControlScheme == GamepadScheme;
         }
 
-        /// <summary>
-        /// 게임 창이 떠 있는가. 게임이 캐릭터 조작을 막는 조건과 같은 것을 본다
-        /// (<c>UIManager.CurrentControlStack == null</c>).
-        /// </summary>
-        public static bool GameUiOpen() =>
-            UIManager.Instance != null && UIManager.Instance.CurrentControlStack != null;
+        private static object GameWindow() =>
+            UIManager.Instance != null ? UIManager.Instance.CurrentControlStack : null;
+
+        private static bool MapOpen()
+        {
+            var map = UIManager.Instance != null ? UIManager.Instance.GetElement<UI_MapPanel>() : null;
+            return map != null && map.IsOpened;
+        }
     }
 }

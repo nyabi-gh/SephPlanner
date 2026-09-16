@@ -1459,11 +1459,18 @@ F9 덤프, F10 인벤토리 덤프). 단축키를 새로 정할 일이 생기면
 **F 키에 해당하는 빈자리가 없다.** 우리는 입력을 가져가지 않으므로(HUD 무입력 보장) 어느 버튼을
 잡아도 누를 때마다 게임 동작이 함께 난다. 조합키도 소용이 없다 - 키보드에서와 같은 이유다.
 
-**빈틈은 하나다.** `select`(View/뒤로)는 UI 액션 맵에 아예 없고, Player 맵의 지도 열기는
-`HandleOnOpenMapPanel` 이 **`UIManager.CurrentControlStack == null` 일 때만** 연다. 즉 가방·상자·
-우리 창처럼 컨트롤 스택에 무엇이 올라가 있는 동안 이 버튼은 게임에서 아무 일도 하지 않는다.
-그 조건을 그대로 우리 조건으로 삼았다(`PadShortcut`). L3·R3 도 UI 맵에는 없지만 능력치 창은
-`ControlCombine` 갈래가 있어 다른 창 위에서도 열리므로 안전하지 않다.
+**View는 지도 상태와 입력 순서까지 봐야 한다.** `select`(View/뒤로)는 UI 액션 맵에 없고,
+`HandleOnOpenMapPanel` 은 **`UIManager.CurrentControlStack == null` 일 때만** 지도를 연다.
+그러나 이미 열린 지도는 다른 창 아래에 있어도 View로 닫는다. 입력 콜백에서 지도가 열린 뒤
+플러그인의 `Update`가 실행되므로, 그때 스택이 있는지만 보면 같은 누름에 두 창이 열린다.
+
+`PadInput`은 입력 처리 전의 스택과 지도 상태를 `InputSystem.onBeforeUpdate`에서 읽는다.
+`PadShortcut`은 같은 입력 갱신에서 같은 스택이 유지되고, 전후 모두 지도가 닫혀 있을 때만
+여닫는다. 한 누름은 한 번만 처리하며, 입력 갱신 번호를 늘리지 않는 `BeforeRender`에서는
+기록을 덮어쓰지 않는다. 설치된 Input System 1.20.0의 디컴파일과
+[onBeforeUpdate 문서](https://docs.unity3d.com/Packages/com.unity.inputsystem@1.20/api/UnityEngine.InputSystem.InputSystem.html#UnityEngine_InputSystem_InputSystem_onBeforeUpdate),
+[InputState 문서](https://docs.unity3d.com/Packages/com.unity.inputsystem@1.20/api/UnityEngine.InputSystem.LowLevel.InputState.html)를 대조했다.
+L3·R3도 UI 맵에는 없지만 능력치 창은 `ControlCombine` 갈래가 있어 다른 창 위에서도 열린다.
 
 **읽는 길은 마우스와 같다** - `UnityEngine.InputSystem.Gamepad.current`. 구식 `Input` 의 조이스틱
 KeyCode 는 쓰지 않는다. BepInEx 의 `UnityInput` 은 구식과 새 입력 시스템 두 구현 중 하나로 잡히는데
@@ -1474,7 +1481,10 @@ KeyCode 는 쓰지 않는다. BepInEx 의 `UnityInput` 은 구식과 새 입력 
 `ControllerManager.Instance.GetController("DualShock")` 처럼 게임이 들고 있는 아이콘 셋을 쓴다.
 
 **창 안은 이미 컨트롤러로 된다.** 우리 창이 컨트롤 스택에 올라가고(`PlannerPanel`) 버튼이 전부
-`Selectable` 이라, 스틱으로 옮기고 A 로 누르는 것이 게임의 다른 창과 똑같다. `defaultSelectable`
+`Selectable` 이라, 스틱으로 옮기고 A 로 누르는 것이 게임의 다른 창과 똑같다. 닫기는 B(취소)다.
+UI의 `Cancel`은 `*/{Cancel}`에 묶이고, `GamepadState`의 `buttonEast`가 그 용도다.
+`UIInputModule.Update`는 이 액션으로 `CloseFromEsc`를 호출한다. start는 `CloseControl`이라
+스택이 없을 때 일시정지 창을 여는 입력이며, 떠 있는 창을 닫는 입력이 아니다. `defaultSelectable`
 에 초점을 줄 곳을 넣어 두는 것까지 이미 있었다. 그래서 패드 지원에서 실제로 없던 것은 **여는
 길** 하나였다. 아직 마우스가 있어야 하는 자리는 셋이다 - 이동 모드(커서 따라가기), 빌드 창의
 우클릭(★·레벨 제한 내리기), HUD 툴팁 호버.
