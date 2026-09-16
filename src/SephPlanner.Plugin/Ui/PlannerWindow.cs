@@ -63,8 +63,8 @@ namespace SephPlanner.Plugin.Ui
         }
 
         /// <summary>
-        /// 오른쪽 단추가 눌렸다. 마우스는 게임의 EventSystem 을 거치지 않고 직접 읽어 넘어온다 -
-        /// 게임의 UI 입력 모듈이 오른쪽 단추를 넘겨주는지 확인할 길이 없고, 커서 좌표는 F6 이동
+        /// 오른쪽 버튼가 눌렸다. 마우스는 게임의 EventSystem 을 거치지 않고 직접 읽어 넘어온다 -
+        /// 게임의 UI 입력 모듈이 오른쪽 버튼를 넘겨주는지 확인할 길이 없고, 커서 좌표는 F6 이동
         /// 모드가 이미 같은 길로 읽고 있어 확실하다. 무엇이 눌렸는지는 <see cref="Under"/>로 센다.
         /// </summary>
         public virtual void RightClick(Vector2 cursor)

@@ -251,7 +251,7 @@ namespace SephPlanner.Plugin.Ui
             {
                 if (row.Entry == null || !Under(row.Rect, cursor)) continue;
 
-                // 제한 단추 위에서는 그 제한을 내린다. 줄 전체의 우클릭은 지금처럼 ★ 를 내린다.
+                // 제한 버튼 위에서는 그 제한을 내린다. 줄 전체의 우클릭은 지금처럼 ★ 를 내린다.
                 if (Under(row.CapRect, cursor)) StepCap(row.Entry, -1);
                 else Toggle(row.Entry, -1);
                 return;
@@ -552,7 +552,7 @@ namespace SephPlanner.Plugin.Ui
 
         /// <summary>
         /// 침·모래시계가 강화할 수 있는 아티팩트. 가방에 그런 아티팩트가 없으면 비어 있고, 그러면
-        /// 줄에 단추도 걸리지 않는다 - 고를 것이 없는 지정을 띄워 두면 이름 자리만 좁아진다.
+        /// 줄에 버튼도 걸리지 않는다 - 고를 것이 없는 지정을 띄워 두면 이름 자리만 좁아진다.
         /// </summary>
         private HashSet<int> SupportTargetCandidates()
         {
@@ -641,7 +641,7 @@ namespace SephPlanner.Plugin.Ui
             /// <summary>침·모래시계가 강화할 대상으로 지정됐는가.</summary>
             public bool SupportTarget;
 
-            /// <summary>이 가방에서 침·모래시계의 대상이 될 수 있는가. 아니면 단추를 걸지 않는다.</summary>
+            /// <summary>이 가방에서 침·모래시계의 대상이 될 수 있는가. 아니면 버튼를 걸지 않는다.</summary>
             public bool CanSupport;
             public int LevelCap;
             public bool Retained;
@@ -679,7 +679,7 @@ namespace SephPlanner.Plugin.Ui
                     "Detail", rect, skin, b * 0.8f, NativeSkin.TextDim, TextAlignmentOptions.MidlineRight);
                 Widgets.Fixed(_detail.rectTransform, b * 1.5f, b * 7f);
 
-                // 줄 안의 작은 단추. 줄 자체도 눌리지만 레이캐스트는 맨 앞의 것이 받으므로 여기를
+                // 줄 안의 작은 버튼. 줄 자체도 눌리지만 레이캐스트는 맨 앞의 것이 받으므로 여기를
                 // 누르면 줄의 강화 우선은 움직이지 않는다.
                 _retain = Widgets.Clickable("Retain", rect, skin, b * 0.8f, NativeSkin.TextDim, () => onRetain(_entry));
                 _retain.text = "사용 유지";
@@ -688,7 +688,7 @@ namespace SephPlanner.Plugin.Ui
                 _deactivation.text = "끄기 허용";
                 Widgets.Fixed(_deactivation.rectTransform, b * 1.5f, b * 4.2f);
                 // 침·모래시계가 있는 가방에서, 그 대상이 될 수 있는 줄에만 걸린다. 이름 자리는
-                // 남는 폭이라, 단추가 하나 늘 때마다 이름이 그만큼 잘린다. 같은 이유로 이름도 짧다.
+                // 남는 폭이라, 버튼가 하나 늘 때마다 이름이 그만큼 잘린다. 같은 이유로 이름도 짧다.
                 _support = Widgets.Clickable("Support", rect, skin, b * 0.8f, NativeSkin.TextDim, () => onSupport(_entry));
                 _support.text = "대상";
                 Widgets.Fixed(_support.rectTransform, b * 1.5f, b * 2.2f);
@@ -703,7 +703,7 @@ namespace SephPlanner.Plugin.Ui
             public Entry Entry => _entry;
             public RectTransform Rect => _background.rectTransform;
 
-            /// <summary>레벨 제한 단추의 자리. 우클릭을 여기서 받아 한 단계 내린다.</summary>
+            /// <summary>레벨 제한 버튼의 자리. 우클릭을 여기서 받아 한 단계 내린다.</summary>
             public RectTransform CapRect => _cap.rectTransform;
 
             public void Show(Entry entry)

@@ -1070,7 +1070,7 @@ namespace SephPlanner.Plugin
             PadInput.InUse() ? "View 또는 start 로 닫기" : Describe(key) + " 또는 ESC 로 닫기";
 
         /// <summary>
-        /// 패드로 창을 여닫는다. 어느 단추이고 왜 그 단추 하나뿐인지는 <see cref="PadShortcut"/>에
+        /// 패드로 창을 여닫는다. 어느 버튼이고 왜 그 버튼 하나뿐인지는 <see cref="PadShortcut"/>에
         /// 적혀 있다.
         ///
         /// <b>창 안은 이미 컨트롤러로 다룬다.</b> 우리 창이 게임의 컨트롤 스택에 올라가므로
@@ -1093,7 +1093,7 @@ namespace SephPlanner.Plugin
         }
 
         /// <summary>
-        /// 설정 창의 동작 탭이 내주는 단추들. <b>패드에는 F 키가 없다</b> - 단축키로만 되던 일이
+        /// 설정 창의 동작 탭이 내주는 버튼들. <b>패드에는 F 키가 없다</b> - 단축키로만 되던 일이
         /// 닿을 자리가 있어야 한다. 마우스가 있어야 뜻이 서는 이동 모드는 넣지 않고, 불투명도는
         /// 표시 설정에 이미 줄이 있다.
         /// </summary>
@@ -1206,7 +1206,7 @@ namespace SephPlanner.Plugin
             // 하나만 적는다 - 그 창 안에 나머지가 전부 있다.
             if (pad)
             {
-                _guide = "가방·상자 창을 열고 View(뒤로) 단추로 SephPlanner 창";
+                _guide = "가방·상자 창을 열고 View(뒤로) 버튼로 SephPlanner 창";
                 return _guide;
             }
 
@@ -1355,7 +1355,7 @@ namespace SephPlanner.Plugin
             return mouse != null ? mouse.position.ReadValue() : (Vector2)Input.mousePosition;
         }
 
-        /// <summary>오른쪽 단추가 이 프레임에 눌렸는가. 커서와 같은 길로 읽는다.</summary>
+        /// <summary>오른쪽 버튼가 이 프레임에 눌렸는가. 커서와 같은 길로 읽는다.</summary>
         private static bool RightClicked()
         {
             var mouse = UnityEngine.InputSystem.Mouse.current;

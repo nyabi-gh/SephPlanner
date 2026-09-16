@@ -142,7 +142,7 @@ namespace SephPlanner.Plugin
 
         /// <summary>
         /// 단계를 하나 올리거나(양수) 내린다(음수). 0 을 지나거나 끝을 넘으면 지정 없음이라,
-        /// 어느 쪽 단추 하나로도 켜고 끌 수 있고 반대쪽 끝까지 돌아가지 않는다.
+        /// 어느 쪽 버튼 하나로도 켜고 끌 수 있고 반대쪽 끝까지 돌아가지 않는다.
         /// </summary>
         public void StepPin(int entityId, int direction)
         {
