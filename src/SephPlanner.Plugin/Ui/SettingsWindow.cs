@@ -27,10 +27,23 @@ namespace SephPlanner.Plugin.Ui
         public Func<string> Warning;
     }
 
+    /// <summary>
+    /// 단추 하나로 되는 일. 패드에는 F 키가 없어서, 단축키로만 되던 것들이 닿을 자리가
+    /// 여기여야 한다(<see cref="SephPlanner.Plugin.PadShortcut"/>).
+    /// </summary>
+    internal sealed class ActionRow
+    {
+        public string Label;
+        public Action Run;
+    }
+
     /// <summary>표시 설정과 단축키를 고르는 창. 단축키로 열고 닫는다.</summary>
     internal sealed class SettingsWindow : PlannerWindow
     {
+        private enum Tab { Display, Keys, Actions }
+
         private readonly Func<List<OptionRow>> _source;
+        private readonly Func<List<ActionRow>> _actions;
         private readonly List<Row> _rows = new List<Row>();
         private readonly List<(OptionRow Option, TextMeshProUGUI Value)> _keys =
             new List<(OptionRow, TextMeshProUGUI)>();
@@ -44,17 +57,38 @@ namespace SephPlanner.Plugin.Ui
         private GameObject _tabFocus;
         private GameObject _general;
         private GameObject _shortcuts;
+        private GameObject _actionList;
+        private GameObject _actionFocus;
         private TextMeshProUGUI _note;
         private LayoutElement _noteSize;
         private TextMeshProUGUI _cancel;
-        private bool _showKeys;
+        private Tab _tab;
         private string _result = "";
 
-        public SettingsWindow(Func<List<OptionRow>> source) => _source = source;
+        public SettingsWindow(Func<List<OptionRow>> source, Func<List<ActionRow>> actions)
+        {
+            _source = source;
+            _actions = actions;
+        }
 
         protected override string Title => "SephPlanner 설정";
         protected override float WidthRatio => 38f;
-        protected override GameObject DefaultFocus => _tabFocus;
+
+        /// <summary>
+        /// 패드로 연 창은 동작 탭이 먼저다. 그 사람에게 이 창은 설정하는 곳이 아니라 F8 을
+        /// 대신 눌러 주는 곳이라, 탭 줄을 지나 내려가야 닿으면 연 이유에서 한 칸 멀어진다.
+        /// </summary>
+        protected override GameObject DefaultFocus =>
+            _tab == Tab.Actions && _actionFocus != null ? _actionFocus : _tabFocus;
+
+        /// <summary>다음에 열 때 동작 탭을 펴 둔다. 패드로 여는 길이 여기로 들어온다.</summary>
+        public void ShowActions()
+        {
+            if (_tab == Tab.Actions) return;
+
+            _tab = Tab.Actions;
+            if (_actionList != null) Show(Tab.Actions);
+        }
 
         protected override void BuildBody(RectTransform content)
         {
@@ -63,8 +97,9 @@ namespace SephPlanner.Plugin.Ui
             _controls = controls.gameObject.AddComponent<CanvasGroup>();
             var tabs = Widgets.Rect("Tabs", controls);
             Widgets.Row(tabs, S(1f));
-            _tabFocus = Button(tabs, "표시 설정", 9f, () => ShowKeys(false)).gameObject;
-            Button(tabs, "단축키", 9f, () => ShowKeys(true));
+            _tabFocus = Button(tabs, "표시 설정", 8f, () => Show(Tab.Display)).gameObject;
+            Button(tabs, "단축키", 8f, () => Show(Tab.Keys));
+            Button(tabs, "동작", 8f, () => Show(Tab.Actions));
 
             var general = Widgets.Rect("General", controls);
             Widgets.Column(general, S(0.25f));
@@ -90,6 +125,16 @@ namespace SephPlanner.Plugin.Ui
                 Button(line, "기본값", 4f, () => Change(option, option.Reset));
                 _keys.Add((option, value));
             }
+            var actions = Widgets.Rect("Actions", controls);
+            Widgets.Column(actions, S(0.25f));
+            _actionList = actions.gameObject;
+            _actionFocus = null;
+            foreach (var action in _actions())
+            {
+                var button = Button(actions, action.Label, 0f, () => Run(action));
+                _actionFocus ??= button.gameObject;
+            }
+
             _note = Widgets.Paragraph("ShortcutNote", content, Skin, S(0.75f), NativeSkin.TextDim);
             _noteSize = Widgets.Fixed(_note.rectTransform, S(1.1f));
             var cancelRow = Widgets.Rect("CancelRow", content);
@@ -97,7 +142,7 @@ namespace SephPlanner.Plugin.Ui
             _cancel = Button(cancelRow, "지정 취소", 8f, CancelCapture);
             var cancelButton = _cancel.GetComponent<Button>();
             cancelButton.navigation = new Navigation { mode = Navigation.Mode.None };
-            ShowKeys(_showKeys);
+            Show(_tab);
         }
 
         private TextMeshProUGUI Button(RectTransform parent, string text, float width, Action click)
@@ -105,16 +150,27 @@ namespace SephPlanner.Plugin.Ui
             var button = Widgets.Clickable("Button", parent, Skin, S(0.9f), NativeSkin.TextBright, () => click());
             button.text = text;
             button.alignment = TextAlignmentOptions.Center;
-            Widgets.Fixed(button.rectTransform, S(1.5f), S(width));
+            Widgets.Fixed(button.rectTransform, S(1.5f), width > 0f ? S(width) : -1f);
             return button;
         }
 
-        private void ShowKeys(bool show)
+        private void Show(Tab tab)
         {
-            _showKeys = show;
-            _general.SetActive(!show);
-            _shortcuts.SetActive(show);
+            _tab = tab;
+            _general.SetActive(tab == Tab.Display);
+            _shortcuts.SetActive(tab == Tab.Keys);
+            _actionList.SetActive(tab == Tab.Actions);
             Refresh();
+        }
+
+        /// <summary>
+        /// 창을 먼저 닫고 실행한다. 자동 배치도 미리보기도 격자를 보면서 하는 것이라 창이 덮고
+        /// 있으면 결과를 볼 수 없고, 창이 열려 있는 동안에는 게임 시간도 멈춰 있다.
+        /// </summary>
+        private void Run(ActionRow action)
+        {
+            Close();
+            action.Run();
         }
 
         private void BeginCapture(OptionRow option)
@@ -213,13 +269,25 @@ namespace SephPlanner.Plugin.Ui
             if (_controls != null) _controls.interactable = !_capture.BlocksShortcuts;
             if (_cancel != null) _cancel.transform.parent.gameObject.SetActive(_capture.Capturing);
             if (_note == null) return;
-            SetHint("ESC로 닫기 · 키 지정 중에는 ESC로 취소");
-            _note.text = !_showKeys ? "단축키는 위의 단축키 탭에서 변경할 수 있습니다."
-                : _capture.Capturing ? "누른 키를 먼저 놓고 원하는 키를 누르세요. Ctrl·Alt·Shift 조합 가능(좌우 구분). ESC는 취소입니다."
-                : (_result.Length > 0 ? _result + "\n" : "") +
-                  (_selected != null && _selected.Warning().Length > 0 ? _selected.Warning() + "\n" : "") +
-                  "키 이름을 눌러 지정합니다. !는 충돌 가능성 또는 미지정 안내입니다. 다른 모드의 키는 확인하지 않습니다.";
+            // 패드에는 ESC 가 없다. 게임이 그 자리로 쓰는 것은 start 이고, 연 단추로도 닫힌다.
+            SetHint(PadInput.InUse()
+                ? "View 또는 start 로 닫기"
+                : "ESC로 닫기 · 키 지정 중에는 ESC로 취소");
+            _note.text = Note();
             Widgets.FitHeight(_note, _noteSize, S(WidthRatio - 1.9f));
+        }
+
+        private string Note()
+        {
+            if (_tab == Tab.Display) return "단축키는 위의 단축키 탭에서 변경할 수 있습니다.";
+            if (_tab == Tab.Actions)
+                return "누르면 이 창을 닫고 실행합니다. 패드는 게임 창이 떠 있는 동안 " +
+                       "View(뒤로) 단추로 이 창을 엽니다. 단축키 지정은 키보드만 받습니다.";
+            if (_capture.Capturing)
+                return "누른 키를 먼저 놓고 원하는 키를 누르세요. Ctrl·Alt·Shift 조합 가능(좌우 구분). ESC는 취소입니다.";
+            return (_result.Length > 0 ? _result + "\n" : "") +
+                   (_selected != null && _selected.Warning().Length > 0 ? _selected.Warning() + "\n" : "") +
+                   "키 이름을 눌러 지정합니다. !는 충돌 가능성 또는 미지정 안내입니다. 다른 모드의 키는 확인하지 않습니다.";
         }
 
         /// <summary>한 줄. 이름표와 좌우 화살표, 그리고 지금 고른 값.</summary>

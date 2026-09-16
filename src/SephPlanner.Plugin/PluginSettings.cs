@@ -71,6 +71,7 @@ namespace SephPlanner.Plugin
         public ConfigEntry<float> Opacity { get; }
         public ConfigEntry<bool> Recommendations { get; }
         public ConfigEntry<bool> MultiplayerAutoPlace { get; }
+        public ConfigEntry<bool> PadWindow { get; }
         public ConfigEntry<string> DiagnosticConsent { get; }
         public ConfigEntry<bool> DiagnosticChoiceMade { get; }
         public ConfigEntry<bool> UpdateCheck { get; }
@@ -179,6 +180,14 @@ namespace SephPlanner.Plugin
                 "멀티플레이 세션에서도 자동 배치를 허용한다(실험). 방을 연 쪽이든 참가한 쪽이든 " +
                 "동작한다. 동기화가 검증되지 않았고 개발사도 잠가 두는 편이 안전하다고 했으므로, " +
                 "같이 하는 사람의 동의를 얻고 켠다.");
+
+            // 패드에는 게임이 안 쓰는 단추가 하나도 없다. 유일한 빈틈이 게임 창이 떠 있는
+            // 동안의 View 인데, 그 자리에서만 듣게 하면 게임 동작과 겹치지 않는다
+            // (docs/RESEARCH.md 의 "패드 단축키", <see cref="PadShortcut"/>).
+            PadWindow = config.Bind(
+                "NativePanel", "PadOpensWindow", true,
+                "게임패드의 View(뒤로) 단추로 SephPlanner 창을 엽니다. 가방·상자 같은 게임 창이 " +
+                "떠 있는 동안에만 듣습니다 - 그때는 이 단추가 게임에서 아무 일도 하지 않습니다.");
 
             // 게임이 쓰지 않는 키로 고른다. 게임은 수정키를 보지 않으므로 Ctrl+Alt 를 붙여도
             // 글자 키는 게임 조작을 함께 발동시킨다(docs/RESEARCH.md 의 "게임 단축키").
@@ -301,6 +310,7 @@ namespace SephPlanner.Plugin
                 Switch("시작할 때 업데이트 확인", UpdateCheck),
                 Steps("갱신 주기", PollInterval, PollSteps,
                     new[] { "0.15초", "0.25초", "0.5초", "1초" }),
+                Switch("패드 View 단추로 창 열기", PadWindow),
                 Key("접기/펼치기", ExpandKey),
                 Key("자동 배치", AutoPlaceKey),
                 Key("후보 미리보기", PreviewKey),

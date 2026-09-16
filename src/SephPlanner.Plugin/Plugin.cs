@@ -87,7 +87,7 @@ namespace SephPlanner.Plugin
         {
             _settings = new PluginSettings(Config, Logger.LogInfo, () => OpenDiagnosticConsent(null));
             _prefs = PluginPreferences.Load(Logger.LogWarning);
-            _window = new SettingsWindow(_settings.Rows);
+            _window = new SettingsWindow(_settings.Rows, WindowActions);
             _build = new BuildWindow(_prefs, CurrentBuild);
             _diagnosticWindow = new DiagnosticConsentWindow(ChooseDiagnosticConsent, CancelDiagnostic);
             _noteWindow = new DiagnosticNoteWindow(FinishDiagnostic, CancelDiagnostic);
@@ -197,17 +197,12 @@ namespace SephPlanner.Plugin
             if (_settings.SettingsKey.Value.IsDown()) ToggleWindow(_window, _settings.SettingsKey, "설정 창");
             if (_settings.BuildKey.Value.IsDown()) ToggleWindow(_build, _settings.BuildKey, "빌드 창");
             if (_build.IsOpen && !_window.IsOpen && RightClicked()) _build.RightClick(Cursor());
+            HandlePadInput();
             if (_settings.Panel.Value)
             {
                 if (_settings.PreviewKey.Value.IsDown()) CyclePreview();
                 if (_settings.HideKey.Value.IsDown()) ToggleHidden();
-                if (_settings.ExpandKey.Value.IsDown())
-                {
-                    _expanded = !_expanded;
-
-                    // 접으면 안내 줄이 사라진다. 접는 순간만큼은 어떻게 되돌리는지 보여야 한다.
-                    Report(Guide());
-                }
+                if (_settings.ExpandKey.Value.IsDown()) ToggleExpand();
                 if (_settings.AutoPlaceKey.Value.IsDown()) AutoPlace();
                 if (_settings.OpacityKey.Value.IsDown()) _settings.CycleOpacity();
                 if (_settings.MoveKey.Value.IsDown()) ToggleMove();
@@ -559,8 +554,11 @@ namespace SephPlanner.Plugin
             Report(message, AutoPlaceNoticeSeconds);
         }
 
-        private bool AnyWindowOpen() =>
-            _window.IsOpen || _build.IsOpen || _diagnosticWindow.IsOpen || _noteWindow.IsOpen || _updateWindow.IsOpen;
+        private bool AnyWindowOpen() => _window.IsOpen || _build.IsOpen || AnsweringWindowOpen();
+
+        /// <summary>물음에 답해야 닫히는 창. 진단 동의와 업데이트가 그렇다.</summary>
+        private bool AnsweringWindowOpen() =>
+            _diagnosticWindow.IsOpen || _noteWindow.IsOpen || _updateWindow.IsOpen;
 
         private static Version CurrentVersion() => typeof(SephPlannerPlugin).Assembly.GetName().Version;
 
@@ -1042,7 +1040,7 @@ namespace SephPlanner.Plugin
         {
             try
             {
-                window.Toggle(Describe(key) + " 또는 ESC 로 닫기");
+                window.Toggle(CloseHint(key));
 
                 if (window.Blocker.Length > 0)
                 {
@@ -1066,6 +1064,54 @@ namespace SephPlanner.Plugin
                 // 창은 곁다리다. 여기서 터져도 표시와 자동 배치는 계속 돌아야 한다.
                 Logger.LogError(label + " 실패: " + ex);
             }
+        }
+
+        private static string CloseHint(ConfigEntry<KeyboardShortcut> key) =>
+            PadInput.InUse() ? "View 또는 start 로 닫기" : Describe(key) + " 또는 ESC 로 닫기";
+
+        /// <summary>
+        /// 패드로 창을 여닫는다. 어느 단추이고 왜 그 단추 하나뿐인지는 <see cref="PadShortcut"/>에
+        /// 적혀 있다.
+        ///
+        /// <b>창 안은 이미 컨트롤러로 다룬다.</b> 우리 창이 게임의 컨트롤 스택에 올라가므로
+        /// (<see cref="Ui.PlannerPanel"/>) 스틱으로 옮기고 A 로 누르는 것이 게임의 다른 창과
+        /// 똑같다. 그래서 여기서 할 일은 "여는 길"을 하나 내주는 것뿐이다.
+        /// </summary>
+        private void HandlePadInput()
+        {
+            var action = PadShortcut.Decide(
+                _settings.PadWindow.Value, PadInput.OpenPressed(), PadInput.GameUiOpen(),
+                _window.IsOpen, _build.IsOpen, AnsweringWindowOpen());
+
+            if (action == PadWindowAction.Open)
+            {
+                _window.ShowActions();
+                ToggleWindow(_window, _settings.SettingsKey, "설정 창");
+            }
+            else if (action == PadWindowAction.CloseSettings) _window.Close();
+            else if (action == PadWindowAction.CloseBuild) _build.Close();
+        }
+
+        /// <summary>
+        /// 설정 창의 동작 탭이 내주는 단추들. <b>패드에는 F 키가 없다</b> - 단축키로만 되던 일이
+        /// 닿을 자리가 있어야 한다. 마우스가 있어야 뜻이 서는 이동 모드는 넣지 않고, 불투명도는
+        /// 표시 설정에 이미 줄이 있다.
+        /// </summary>
+        private List<ActionRow> WindowActions() => new List<ActionRow>
+        {
+            new ActionRow { Label = "자동 배치", Run = AutoPlace },
+            new ActionRow { Label = "후보 미리보기", Run = CyclePreview },
+            new ActionRow { Label = "접기 / 펼치기", Run = ToggleExpand },
+            new ActionRow { Label = "숨기기 / 다시 보기", Run = ToggleHidden },
+            new ActionRow { Label = "빌드 창", Run = () => ToggleWindow(_build, _settings.BuildKey, "빌드 창") },
+        };
+
+        private void ToggleExpand()
+        {
+            _expanded = !_expanded;
+
+            // 접으면 안내 줄이 사라진다. 접는 순간만큼은 어떻게 되돌리는지 보여야 한다.
+            Report(Guide());
         }
 
         /// <summary>
@@ -1123,6 +1169,7 @@ namespace SephPlanner.Plugin
         private bool _guideAutoPlace;
         private bool _guideOffers;
         private int _guideShortcuts = -1;
+        private bool _guidePad;
 
         private string Guide() => Guide(_runner?.State);
 
@@ -1143,15 +1190,25 @@ namespace SephPlanner.Plugin
             var autoPlace = AutoPlaceAvailability(
                 _lastSnapshot, state, _currentPlacementFingerprint, _currentCatalogGeneration).Allowed;
             var shortcuts = _settings.ShortcutRevision;
+            var pad = _settings.PadWindow.Value && PadInput.InUse();
 
             if (_guideExpanded == _expanded && _guideAutoPlace == autoPlace &&
-                _guideOffers == offers && _guideShortcuts == shortcuts)
+                _guideOffers == offers && _guideShortcuts == shortcuts && _guidePad == pad)
                 return _guide;
 
             _guideExpanded = _expanded;
             _guideAutoPlace = autoPlace;
             _guideOffers = offers;
             _guideShortcuts = shortcuts;
+            _guidePad = pad;
+
+            // 패드로 놀고 있으면 키 이름 여덟 개는 읽어 줘야 소용이 없다. 닿을 수 있는 길
+            // 하나만 적는다 - 그 창 안에 나머지가 전부 있다.
+            if (pad)
+            {
+                _guide = "가방·상자 창을 열고 View(뒤로) 단추로 SephPlanner 창";
+                return _guide;
+            }
 
             var text = Describe(_settings.ExpandKey) + (_expanded ? " 접기" : " 펼치기");
             if (autoPlace) text += "   " + Describe(_settings.AutoPlaceKey) + " 자동 배치";

@@ -1441,6 +1441,44 @@ leftArrow rightArrow upArrow downArrow   leftCtrl leftShift
 **F 키는 하나도 쓰지 않는다.** 그래서 인게임 단축키는 F 키로 잡는다(F7 접고 펴기, F8 자동 배치,
 F9 덤프, F10 인벤토리 덤프). 단축키를 새로 정할 일이 생기면 이 목록을 먼저 본다.
 
+### 패드 단축키 - 빈 단추가 없다
+
+같은 `sharedassets0.assets` 의 `GameControls` 에서 패드 바인딩도 뽑았다(2026-09-16). 키보드와
+달리 **게임이 패드 단추를 하나도 남기지 않고 쓴다.**
+
+| 단추 | Player | LT 를 누르는 동안(`Magic_Joystick`) | UI |
+|---|---|---|---|
+| A / B / X / Y | Dash / - / Fire / UseItem | 퀵캐스트 1·2·3·4 | Submit / Cancel / ThrowItem / RotateItem |
+| dpad 위·오른·아래·왼 | 퀵슬롯 다음 / 프리셋 창 / 패시브 창 / Reload | 퀵캐스트 8·6·5·7 | Navigate |
+| LB / RB | SubFire / 상호작용 | | PrevTab / NextTab·EngraveTablet |
+| LT / RT | 캐스트 모드 / 퀵캐스트1 | | PrevTab2 / NextTab2·ShowDetail |
+| start / select | CancelAction / 지도 | | CloseControl·RebindReject / **없음** |
+| L3 / R3 | 능력치 창 / 캐릭터 창 | | **없음** |
+| 스틱 | 이동 / 조준 | | Navigate·스크롤 |
+
+**F 키에 해당하는 빈자리가 없다.** 우리는 입력을 가져가지 않으므로(HUD 무입력 보장) 어느 단추를
+잡아도 누를 때마다 게임 동작이 함께 난다. 조합키도 소용이 없다 - 키보드에서와 같은 이유다.
+
+**빈틈은 하나다.** `select`(View/뒤로)는 UI 액션 맵에 아예 없고, Player 맵의 지도 열기는
+`HandleOnOpenMapPanel` 이 **`UIManager.CurrentControlStack == null` 일 때만** 연다. 즉 가방·상자·
+우리 창처럼 컨트롤 스택에 무엇이 올라가 있는 동안 이 단추는 게임에서 아무 일도 하지 않는다.
+그 조건을 그대로 우리 조건으로 삼았다(`PadShortcut`). L3·R3 도 UI 맵에는 없지만 능력치 창은
+`ControlCombine` 갈래가 있어 다른 창 위에서도 열리므로 안전하지 않다.
+
+**읽는 길은 마우스와 같다** - `UnityEngine.InputSystem.Gamepad.current`. 구식 `Input` 의 조이스틱
+KeyCode 는 쓰지 않는다. BepInEx 의 `UnityInput` 은 구식과 새 입력 시스템 두 구현 중 하나로 잡히는데
+새 쪽에는 조이스틱 단추가 아예 없고, 구식도 단추 번호가 기기마다 다르다. 지금 무엇으로 놀고
+있는지는 `ControlsChangeHandler.Current.PlayerInput.currentControlScheme`(`"Gamepad"` 또는
+`"Keyboard&Mouse"`)이 답한다 - 같은 클래스의 `IsUsingKeyboardAndMouse` 는 조작이 한 번 바뀌어야
+채워져서 켜자마자는 기본값 `false`(=패드)로 보인다. 글리프가 필요해지면
+`ControllerManager.Instance.GetController("DualShock")` 처럼 게임이 들고 있는 아이콘 셋을 쓴다.
+
+**창 안은 이미 컨트롤러로 된다.** 우리 창이 컨트롤 스택에 올라가고(`PlannerPanel`) 단추가 전부
+`Selectable` 이라, 스틱으로 옮기고 A 로 누르는 것이 게임의 다른 창과 똑같다. `defaultSelectable`
+에 초점을 줄 곳을 넣어 두는 것까지 이미 있었다. 그래서 패드 지원에서 실제로 없던 것은 **여는
+길** 하나였다. 아직 마우스가 있어야 하는 자리는 셋이다 - 이동 모드(커서 따라가기), 빌드 창의
+우클릭(★·레벨 제한 내리기), HUD 툴팁 호버.
+
 ### 기본값을 옮겨도 설정 파일이 이긴다
 
 단축키를 F 키로 옮겼는데 게임에서는 그대로 Ctrl+Alt+P 가 먹었다. **BepInEx 는 설정 파일에
