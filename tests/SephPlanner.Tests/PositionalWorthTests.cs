@@ -144,13 +144,6 @@ public class PositionalWorthTests
         Assert.Equal(new GridPos(1, 0), PlacementSolver.Solve(problem).CharmPositions[1]);
     }
 
-    /// <summary>
-    /// 게임 <c>SearchPlanet</c>은 <c>PLANET</c> 카테고리에 더해 그 칸의 Charm 이
-    /// <c>Charm_SummonGreenBat</c> 일 것을 요구한다. 카탈로그의 <c>PLANET</c> 열하나 가운데 넷 -
-    /// 망원경 자신, 혜성, 악보 '은하', 붉은행성 관찰일지 - 이 그 타입이 아니므로, 카테고리만 보면
-    /// 망원경이 거대화하지도 못할 것을 감싸고 앉는다. 두 칸짜리 격자라 이웃은 하나뿐이고,
-    /// 그 하나가 진짜 행성일 때만 점수가 오른다.
-    /// </summary>
     /// <summary>두 칸짜리 격자에 망원경과 이웃 하나. 차이는 거대화 몫뿐이다.</summary>
     private static double ScoreBesideTelescope(CharmDefinition neighbour)
     {
@@ -160,11 +153,19 @@ public class PositionalWorthTests
         return PlacementSolver.Solve(problem).Score;
     }
 
+    /// <summary>
+    /// 게임 <c>SearchPlanet</c>은 <c>PLANET</c> 카테고리에 더해 그 칸의 Charm 이
+    /// <c>Charm_SummonGreenBat</c>일 것을 요구한다. 카탈로그의 <c>PLANET</c> 열하나 가운데 넷 -
+    /// 망원경 자신, 혜성, 악보 '은하', 붉은행성 관찰일지 - 이 그 타입이 아니므로, 카테고리만 보면
+    /// 망원경이 거대화하지도 못할 것을 감싸고 앉는다.
+    ///
+    /// <b>반대로 하위 클래스는 놓치면 안 된다.</b> 게임은 <c>is</c> 로 보므로
+    /// <c>Charm_SummonRedPlanet</c>도 거대화 대상이고, 타입 <b>이름</b>으로 견주면 진짜 행성을
+    /// 떨어뜨리게 된다. 그래서 판정은 덤프가 해서 <see cref="CharmDefinition.IsSummonPlanet"/>로 싣는다.
+    /// </summary>
     [Fact]
     public void ATelescopeOnlyCountsPlanetsTheGameCanEnlarge()
     {
-        static double Score(CharmDefinition neighbour) => ScoreBesideTelescope(neighbour);
-
         var planet = PlanetDef();
         var lookalike = new CharmDefinition
         {
@@ -172,10 +173,18 @@ public class PositionalWorthTests
             Behavior = "Charm_FlamePlanet",
             Categories = { "PLANET" },
         };
+        var subclass = new CharmDefinition
+        {
+            MaxLevel = 5,
+            Behavior = "Charm_SummonRedPlanet",
+            IsSummonPlanet = true,
+            Categories = { "PLANET" },
+        };
 
         var step = PositionalWorth.EnhanceStep * new CharmSlot { Definition = planet }.Worth.LevelStep;
         Assert.True(step > 0);
-        Assert.Equal(step, Score(planet) - Score(lookalike), 6);
+        Assert.Equal(step, ScoreBesideTelescope(planet) - ScoreBesideTelescope(lookalike), 6);
+        Assert.Equal(step, ScoreBesideTelescope(subclass) - ScoreBesideTelescope(lookalike), 6);
     }
 
     /// <summary>

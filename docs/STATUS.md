@@ -65,8 +65,10 @@ F2 콤보는 추천 OFF에서도 배치에 영향을 준다. `끄기 허용` 변
 "행성 빌드에서 망원경 주변으로 행성이 배치되지 않는다"는 제보를 보고 찾은 것이다.
 
 게임의 `Charm_PlanetModule.SearchPlanet` 은 이웃 여덟 칸에서 **둘**을 본다 - `Entity.categories`
-에 `PLANET` 이 있을 것, 그리고 **그 칸의 `Charm` 이 `Charm_SummonGreenBat` 일 것**. 우리는 앞의
-하나만 보고 있었다. 카탈로그의 `PLANET` 열하나 가운데 넷(거대 망원경 자신, 혜성, 악보 '은하',
+에 `PLANET` 이 있을 것, 그리고 **그 칸의 `Charm` 이 `Charm_SummonGreenBat`(하위 클래스 포함)
+일 것**. 우리는 앞의 하나만 보고 있었다. 뒤의 판정은 `is` 라서 이름 비교로 옮기면
+`Charm_SummonRedPlanet` 같은 하위 클래스를 떨어뜨리므로, 덤프가 `is` 로 판정해
+`IsSummonPlanet` 으로 싣고 솔버는 그것을 읽는다. 카탈로그의 `PLANET` 열하나 가운데 넷(거대 망원경 자신, 혜성, 악보 '은하',
 붉은행성 관찰일지)이 그 타입이 아니므로, 행성 빌드에서 흔히 들고 다니는 그 넷이 망원경의 이웃
 여덟 칸을 진짜 행성과 똑같은 값으로 차지하고 있었다. 1.0.33 디컴파일로 확인했고
 (`PositionalWorth.NeighborEnhanceWorth`), 시험 하나를 더했다.

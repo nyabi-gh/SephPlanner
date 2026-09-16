@@ -94,6 +94,14 @@ namespace SephPlanner.Core.Model
         public string NeighborEnhanceCategory { get; set; } = "";
 
         /// <summary>
+        /// 게임이 거대화할 수 있는 소환 행성인가(<c>charm is Charm_SummonGreenBat</c>).
+        /// <b>타입 이름으로 견주면 안 된다</b> - 게임의 <c>SearchPlanet</c> 은 <c>is</c> 로 보므로
+        /// 하위 클래스(<c>Charm_SummonRedPlanet</c>)도 대상이고, 이름 비교는 그것을 놓친다.
+        /// 그래서 판정은 게임 타입을 아는 덤프 쪽에서 하고 결과만 싣는다.
+        /// </summary>
+        public bool IsSummonPlanet { get; set; }
+
+        /// <summary>
         /// 소환 행성이 레벨마다 쏘는 피해량(게임 <c>Charm_SummonGreenBat.damageByLevel</c>).
         /// 거대 망원경의 거대화가 그 행성의 <b>레벨 몇 칸짜리인지를 이 표의 비율로</b> 잰다 -
         /// 피해량을 값어치로 옮기지는 않는다. 소환 행성이 아니면 비어 있다.

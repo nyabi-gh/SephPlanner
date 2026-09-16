@@ -254,6 +254,14 @@ public sealed class PlanReplayTests : IDisposable
         // 거대화 크기가 예전 어림값으로 물러서므로, 그때 모은 자료의 결과가 그대로 나온다.
         var replay = RoundTrip(Capture());
         replay.CatalogVersion = 22;
+
+        // 번호만 내리면 형식 검사만 지날 뿐이다. 그때 모은 자료에는 이 항목이 아예 없으므로
+        // 비워 두고 재생해야 "빠지면 옛 어림값으로 물러선다" 를 실제로 지난다.
+        foreach (var charm in replay.Catalog!.Charms!)
+        {
+            charm.SummonDamageByLevel.Clear();
+            charm.IsSummonPlanet = false;
+        }
         var plan = replay.Rebuild(true);
         Assert.Empty(replay.Expected!.Differences(ReplayResult.From(plan)));
     }

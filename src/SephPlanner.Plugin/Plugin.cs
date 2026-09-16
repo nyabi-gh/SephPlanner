@@ -342,8 +342,18 @@ namespace SephPlanner.Plugin
             {
                 var capture = new DiagnosticCapture(_diagnosticLog, Logger.LogWarning);
                 var avatar = GameReader.FindLocalPlayer();
+
+                // 구역 하나가 터져도 파일은 남지만, 그 사실이 로그와 보고서 요약에도 있어야 한다.
+                void DumpSectionFailed(object message)
+                {
+                    Logger.LogWarning(message);
+                    capture.Warn("inventory-dump.txt", message?.ToString() ?? "");
+                }
+
                 capture.Collect("inventory-dump.txt", () => avatar?.Inventory == null ? null :
-                    InventoryDiagnostics.Write(avatar.Inventory, avatar, _settings.OfferRadius.Value, capture.DirectoryPath), legacy: true);
+                    InventoryDiagnostics.Write(
+                        avatar.Inventory, avatar, _settings.OfferRadius.Value, capture.DirectoryPath,
+                        DumpSectionFailed), legacy: true);
                 capture.Collect("inventory-snapshot.json", () => avatar?.Inventory == null ? null :
                     InventoryDiagnostics.WriteSnapshot(GameReader.Read(_settings.OfferRadius.Value), capture.DirectoryPath), legacy: true);
                 capture.Collect("plan.replay", () =>

@@ -136,6 +136,7 @@ namespace SephPlanner.Plugin
                     GrowthRewardEntityId = charm is Charm_GrowthStatusInstance reward && reward.reward != null
                         ? reward.reward.id : 0,
                     NeighborEnhanceCategory = NeighborEnhanceCategory(charm),
+                    IsSummonPlanet = charm is Charm_SummonGreenBat,
                     SummonDamageByLevel = SummonDamageByLevel(charm),
                     LineCategories = LineCategories(charm),
                     Categories = entity.categories ?? new List<string>(),

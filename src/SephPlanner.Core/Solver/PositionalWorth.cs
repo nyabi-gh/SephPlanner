@@ -29,8 +29,8 @@ namespace SephPlanner.Core.Solver
         /// <b>잰 값이 아니다.</b> 헌신의 휘장의 혼돈 모드(<c>SetChaoticMode</c>)는 능력치 수치가
         /// 아니라 소환물의 동작을 바꾸는 것이라 정적 데이터로 크기가 안 나온다. 방향(모아 두는
         /// 쪽이 낫다)만은 확실하므로 크기는 가장 보수적인 어림으로 두었다 - 레벨 한 칸이면 콤보
-        /// 한 단계(<see cref="Worth.ComboThreshold"/> = 3.4)의 1/3 남짓이라, 실제로 잰 값을
-        /// 뒤집지 못한다.
+        /// 한 단계(<see cref="Worth.ComboThreshold"/>, 기본 2.59)의 5분의 2 남짓이라, 실제로 잰
+        /// 값을 뒤집지 못한다.
         ///
         /// <b>망원경 쪽은 이제 잰다</b>(<see cref="EnlargeSteps"/>). 이 값은 휘장의 것이고,
         /// 행성의 피해량 표가 없는 옛 카탈로그에서 물러설 자리로도 쓴다.
@@ -142,11 +142,15 @@ namespace SephPlanner.Core.Solver
         }
 
         /// <summary>
-        /// 이웃 강화가 실제로 걸리는 charm 타입. 지금은 거대 망원경 하나뿐이라
-        /// <see cref="CharmDefinition.NeighborEnhanceCategory"/> 와 짝을 이룬다 - 카탈로그도 그
-        /// 카테고리를 <c>Charm_PlanetModule</c> 에만 채운다(<c>ItemCatalog</c>).
+        /// 이웃 강화가 실제로 걸리는 charm 타입. 카탈로그 23 부터는
+        /// <see cref="CharmDefinition.IsSummonPlanet"/> 가 답하고, 이 이름은 그 항목이 없는
+        /// 옛 자료에서만 쓴다 - <b>이름 비교로는 하위 클래스를 놓치기 때문에</b> 새 자료에서는
+        /// 쓰지 않는다(게임은 <c>is</c> 로 보고 <c>Charm_SummonRedPlanet</c> 도 거대화한다).
         /// </summary>
         private const string EnhanceableBehavior = "Charm_SummonGreenBat";
+
+        private static bool Enlargeable(CharmDefinition definition) =>
+            definition.IsSummonPlanet || definition.Behavior == EnhanceableBehavior;
 
         /// <summary>
         /// 거대한 망원경(<c>Charm_PlanetModule</c>)처럼 이웃 여덟 칸의 같은 카테고리 아티팩트를
@@ -154,7 +158,8 @@ namespace SephPlanner.Core.Solver
         ///
         /// <b>카테고리만으로는 대상이 되지 않는다.</b> 게임의 <c>SearchPlanet</c> 은 그 칸의
         /// <c>Entity.categories</c> 에 <c>PLANET</c> 이 있고 <b>그 칸의 Charm 이
-        /// <c>Charm_SummonGreenBat</c> 일 때만</b> <c>SetEnhancement</c> 를 부른다(1.0.33 디컴파일).
+        /// <c>Charm_SummonGreenBat</c>(하위 클래스 포함) 일 때만</b> <c>SetEnhancement</c> 를
+        /// 부른다(1.0.33 디컴파일).
         /// 카탈로그의 <c>PLANET</c> 열하나 가운데 넷 - 거대 망원경 자신, 혜성, 악보 '은하',
         /// 붉은행성 관찰일지 - 이 그 타입이 아니다. 카테고리만 보면 망원경이 거대화하지도 못할 것
         /// 옆에 앉아 진짜 행성이 설 자리를 가져간다.
@@ -173,7 +178,7 @@ namespace SephPlanner.Core.Solver
             {
                 if (!neighbors.TryGetValue(cell.Offset(dx, dy), out var neighbor)) continue;
                 if (neighbor == charm || neighbor.IsFiller || neighbor.IsDormant) continue;
-                if (neighbor.Definition.Behavior != EnhanceableBehavior) continue;
+                if (!Enlargeable(neighbor.Definition)) continue;
                 if (!neighbor.Definition.Categories.Contains(category)) continue;
 
                 worth += EnlargeSteps(neighbor) * neighbor.Worth.LevelStep;
@@ -200,7 +205,11 @@ namespace SephPlanner.Core.Solver
             var damage = planet.Definition.SummonDamageByLevel;
             if (damage.Count < 2 || damage[0] <= 0) return EnhanceStep;
 
-            var step = (damage[damage.Count - 1] - damage[0]) / (double)(damage.Count - 1);
+            // 게임은 표를 SafeRandomAccess(maxLevel) 로 읽으므로 상한 위의 남는 칸은 보지 않는다.
+            var top = Math.Min(planet.Definition.MaxLevel, damage.Count - 1);
+            if (top < 1) return EnhanceStep;
+
+            var step = (damage[top] - damage[0]) / (double)top;
             if (step <= 0) return EnhanceStep;
 
             return 0.5 * damage[0] / step;

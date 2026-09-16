@@ -103,10 +103,37 @@ namespace SephPlanner.Plugin
             return count;
         }
 
-        public static string Write(GridInventory inv, PlayerAvatar player, float offerRadius, string directory = null)
+        /// <summary>
+        /// 가방을 있는 그대로 적는다. <b>한 구역이 터져도 파일은 남긴다</b> - 이 덤프는 무너진
+        /// 상태를 적으러 오는 것이라, 그때 터지는 구역 하나에 나머지까지 잃으면 정작 필요할 때
+        /// 자료가 없다. 제보 5915982c 에서 Item 이 끊긴 아티팩트 하나에 걸려 세 번 다 저장되지
+        /// 않았다. 터진 구역은 그 사실을 파일에 적고 <paramref name="log"/> 로도 알린다.
+        /// </summary>
+        /// <param name="log">
+        /// 구역 하나가 터졌을 때 알릴 곳. 파일은 그대로 저장되므로 이것이 없으면 실패가 파일
+        /// 안에만 남아, 보고서 요약에는 "저장됨" 으로만 보인다.
+        /// </param>
+        public static string Write(
+            GridInventory inv, PlayerAvatar player, float offerRadius, string directory = null,
+            System.Action<object> log = null)
         {
             var text = new StringBuilder();
-            Section(text, "머리", () =>
+
+            void Section(string name, System.Action write)
+            {
+                try
+                {
+                    write();
+                }
+                catch (System.Exception ex)
+                {
+                    text.AppendLine();
+                    text.AppendLine($"[{name} 실패] {ex}");
+                    log?.Invoke($"진단 덤프의 [{name}] 구역이 실패해 그 자리만 비워 두고 남깁니다: {ex}");
+                }
+            }
+
+            Section("머리", () =>
             {
                 text.AppendLine(PluginIdentity.Describe());
                 text.AppendLine();
@@ -114,7 +141,7 @@ namespace SephPlanner.Plugin
                                 $"SubBag={inv.numberOfSubBagStorage} Potion={inv.numberOfPotionStorage}");
             });
 
-            Section(text, "inventoryMatrix", () =>
+            Section("inventoryMatrix", () =>
             {
                 text.AppendLine();
                 text.AppendLine("[inventoryMatrix]");
@@ -138,7 +165,7 @@ namespace SephPlanner.Plugin
                 }
             });
 
-            Section(text, "stoneTablets", () =>
+            Section("stoneTablets", () =>
             {
                 text.AppendLine();
                 text.AppendLine("[stoneTablets]");
@@ -152,7 +179,7 @@ namespace SephPlanner.Plugin
                 }
             });
 
-            Section(text, "engravings", () =>
+            Section("engravings", () =>
             {
                 text.AppendLine();
                 text.AppendLine("[engravings]");
@@ -166,7 +193,7 @@ namespace SephPlanner.Plugin
                 }
             });
 
-            Section(text, "levelMatrix", () =>
+            Section("levelMatrix", () =>
             {
                 text.AppendLine();
                 text.AppendLine("[levelMatrix]");
@@ -174,34 +201,16 @@ namespace SephPlanner.Plugin
                     text.AppendLine($"  ({pair.Key.x},{pair.Key.y}) = {pair.Value}");
             });
 
-            Section(text, "offers", () => WriteOffers(text, inv, player, offerRadius));
-            Section(text, "효과 상호작용 검증", () => EffectStateDiagnostics.Append(text, inv, player));
-            Section(text, "화면", () => UiDiagnostics.Write(text));
-            Section(text, "perf", () => FrameCost.Write(text));
+            Section("offers", () => WriteOffers(text, inv, player, offerRadius));
+            Section("효과 상호작용 검증", () => EffectStateDiagnostics.Append(text, inv, player));
+            Section("화면", () => UiDiagnostics.Write(text));
+            Section("perf", () => FrameCost.Write(text));
 
             directory ??= PlannerData.DataDirectory;
             Directory.CreateDirectory(directory);
             var path = Path.Combine(directory, FileName);
             File.WriteAllText(path, text.ToString());
             return path;
-        }
-
-        /// <summary>
-        /// 한 구역이 터져도 파일은 남긴다. 이 덤프는 무너진 상태를 적으러 오는 것이라, 그때 터지는
-        /// 구역 하나에 나머지까지 잃으면 정작 필요할 때 자료가 없다 - 제보 5915982c 에서 Item 이
-        /// 끊긴 아티팩트 하나에 걸려 세 번 다 저장되지 않았다. 터진 구역은 그 사실을 파일에 적는다.
-        /// </summary>
-        private static void Section(StringBuilder text, string name, System.Action write)
-        {
-            try
-            {
-                write();
-            }
-            catch (System.Exception ex)
-            {
-                text.AppendLine();
-                text.AppendLine($"[{name} 실패] {ex}");
-            }
         }
     }
 }

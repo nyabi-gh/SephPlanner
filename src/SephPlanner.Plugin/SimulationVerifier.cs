@@ -45,8 +45,8 @@ namespace SephPlanner.Plugin
             for (var i = 0; i < tablets.Count; i++)
             {
                 if (result.Applied[i] != tablets[i].IsApplied)
-                    return Collapsed(inv, grid, tablets, result) ??
-                           $"석판 {tablets[i].entityID} 적용 여부 {result.Applied[i]} != {tablets[i].IsApplied}";
+                    return $"석판 {tablets[i].entityID} 적용 여부 {result.Applied[i]} != {tablets[i].IsApplied}" +
+                           Collapsed(inv, grid, tablets, result);
 
                 if (!result.Applied[i]) continue;
 
@@ -58,10 +58,14 @@ namespace SephPlanner.Plugin
         }
 
         /// <summary>
-        /// 게임이 계산해 둔 효과가 통째로 비었는가. 게임은 맞바꿈·회전 끝에 레벨 행렬을 다시
-        /// 만드는데, 그것이 도중에 예외로 멈추면 석판이 전부 비적용이 되고 칸 레벨이 0 으로 남는다
-        /// (제보 5915982c, 2026-09-15). 그때 첫 번째 차이만 적으면 화면에는
-        /// "석판 2053 적용 여부 True != False" 만 떠서 무슨 일이 난 것인지 읽을 수 없다.
+        /// 어긋남에 덧붙일 한 마디. 게임은 맞바꿈·회전 끝에 레벨 행렬을 다시 만드는데, 그것이
+        /// 도중에 예외로 멈추면 석판이 전부 비적용이 되고 칸 레벨이 0 으로 남는다(제보 5915982c,
+        /// 2026-09-15). 그 상태에서 어긋남만 적으면 화면에는 "석판 2053 적용 여부 True != False"
+        /// 만 떠서 무슨 일이 난 것인지 읽을 수 없다.
+        ///
+        /// <b>어긋남을 대신하지 않고 덧붙이기만 한다.</b> 여기에는 "조금 전까지 효과가 있었다" 는
+        /// 근거가 없어서 - <c>ApplyPlanRoutine.Collapsed</c> 는 그것을 들고 있다 - 아직 아무 석판도
+        /// 발동하지 않은 초반 판과 구별되지 않기 때문이다. 어느 석판이 어긋났는지는 그대로 남는다.
         ///
         /// 어긋남을 찾았을 때만 부른다 - 칸마다 레벨 행렬을 훑는다.
         /// </summary>
@@ -71,19 +75,19 @@ namespace SephPlanner.Plugin
             var applied = 0;
             for (var i = 0; i < tablets.Count; i++)
             {
-                if (tablets[i].IsApplied) return null;
+                if (tablets[i].IsApplied) return "";
                 if (result.Applied[i]) applied++;
             }
-            if (applied == 0) return null;
+            if (applied == 0) return "";
 
             for (var index = 0; index < grid.Storage; index++)
             {
                 var position = grid.ToPosition(index);
-                if (LookupLevel(inv, (sbyte)position.X, (sbyte)position.Y) != 0) return null;
+                if (LookupLevel(inv, (sbyte)position.X, (sbyte)position.Y) != 0) return "";
             }
 
-            return $"게임이 계산한 가방 효과가 비어 있습니다 - 석판 {tablets.Count}개가 전부 비적용이고 " +
-                   "칸 레벨도 전부 0 입니다. 동기화 중이면 곧 사라지고, 계속 남으면 방을 나갔다 들어오세요.";
+            return $" - 게임이 계산한 가방 효과가 비어 있습니다(석판 {tablets.Count}개가 전부 비적용, " +
+                   "칸 레벨도 전부 0). 동기화 중이면 곧 사라지고, 계속 남으면 방을 나갔다 들어오세요.";
         }
 
         private static void AddTablet(
@@ -139,16 +143,14 @@ namespace SephPlanner.Plugin
 
         private static int LookupLevel(GridInventory inv, sbyte x, sbyte y)
         {
-            foreach (var pair in inv.levelMatrix)
-                if (pair.Key.x == x && pair.Key.y == y) return pair.Value;
-            return 0;
+            inv.levelMatrix.TryGetValue(new ItemPosition(x, y), out var level);
+            return level;
         }
 
         private static bool LookupDisabled(GridInventory inv, sbyte x, sbyte y)
         {
-            foreach (var pair in inv.disableMatrix)
-                if (pair.Key.x == x && pair.Key.y == y) return pair.Value > 0;
-            return false;
+            inv.disableMatrix.TryGetValue(new ItemPosition(x, y), out var disabled);
+            return disabled > 0;
         }
 
         private static GridOccupancy BuildOccupancy(GridInventory inv)

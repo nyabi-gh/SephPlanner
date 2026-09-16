@@ -28,23 +28,30 @@ namespace SephPlanner.Plugin
             // 끊겼는지도 그래서 알 수 없었다. 게임의 레벨 재계산이 멈춘 자리도 같은 항목으로 보인다.
             var ordered = new List<Charm_Basic>();
             var severed = new List<string>();
+
+            // 열거 순서는 이 절이 남기려는 증거 자체다. 끊긴 자리를 빼고 적으면 몇 번째가 끊겼는지가
+            // 사라지므로, 아래 절들에서만 빼고 순서에는 null 로 자리를 남긴다.
+            var enumeration = new List<int?>();
             foreach (var pair in inventory.charms)
             {
                 var charm = pair.Value;
                 if (charm == null || charm.Item == null)
                 {
-                    severed.Add($"({pair.Key.x},{pair.Key.y}) " + (charm == null
+                    severed.Add($"[{enumeration.Count}] ({pair.Key.x},{pair.Key.y}) " + (charm == null
                         ? "<null>"
                         : $"{charm.GetType().Name} idx=({charm.xIdx},{charm.yIdx}) Item=<null>"));
+                    enumeration.Add(null);
                     continue;
                 }
                 ordered.Add(charm);
+                enumeration.Add(charm.Item.InstanceID);
             }
+            text.AppendLine();
             text.AppendLine($"[끊긴 charms 항목] {severed.Count}개");
             foreach (var line in severed)
                 text.AppendLine("  " + line);
             text.AppendLine("[정렬 전 아티팩트 열거 순서]");
-            text.AppendLine(JsonConvert.SerializeObject(ordered.Select(charm => charm.Item.InstanceID)));
+            text.AppendLine(JsonConvert.SerializeObject(enumeration));
             ordered.Sort((left, right) => left.Order.CompareTo(right.Order));
             text.AppendLine("[콤보 전 갱신 순서와 관측 카테고리]");
             text.AppendLine(JsonConvert.SerializeObject(ordered.Select(charm => new

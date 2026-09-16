@@ -38,6 +38,7 @@ namespace SephPlanner.Core.Runtime
         private readonly bool _allowMultiplayer;
         private double _phaseUntil;
         private int _levelsBefore;
+        private bool? _collapsed;
 
         public ApplyPlanRoutine(
             ApplyPlanCommand command, IInventoryPort port, Func<double> now, bool allowMultiplayer)
@@ -74,8 +75,8 @@ namespace SephPlanner.Core.Runtime
 
         private const string CollapsedMessage =
             "게임이 계산한 칸 레벨이 전부 0 이 됐습니다 - 가방의 효과가 꺼진 상태입니다. " +
-            "손으로 옮겨도 같은 오류가 되풀이될 수 있으니 방을 나갔다 들어오거나 게임을 다시 시작해 확인하세요. " +
-            "F10 으로 진단을 남겨 주시면 원인을 찾는 데 도움이 됩니다.";
+            "동기화 중이면 곧 돌아오고, 그대로 남으면 손으로 옮겨도 같은 오류가 되풀이되니 " +
+            "방을 나갔다 들어오거나 게임을 다시 시작하세요. F10 으로 진단을 남겨 주시면 원인을 찾는 데 도움이 됩니다.";
 
         private const string UncertainMessage =
             "서버 반영 여부를 확인하지 못했습니다. 늦게 적용될 수 있어 추가 이동과 되돌리기를 멈췄습니다. " +
@@ -109,9 +110,9 @@ namespace SephPlanner.Core.Runtime
                 var undone = new Outcome();
                 var undo = Rollback(journal, undone);
                 while (Advance(undo, undone)) yield return null;
-                // 되돌리기가 아무 말도 하지 않았으면(되돌릴 걸음이 없었으면) 무너진 상태는
-                // 여기서만 알릴 수 있다.
-                Result = Join(moves.Failure, Undone(undone) ?? Collapsed(), RequiresResync ? UncertainMessage : null);
+                // 무너짐은 여기서 한 번만 붙인다. 되돌리기가 어느 가지로 빠져나가든 - 되돌릴
+                // 걸음이 없었든, 칸이 바뀌어 멈췄든 - 안내가 빠지지 않게 하려는 것이다.
+                Result = Join(moves.Failure, Undone(undone), Collapsed(), RequiresResync ? UncertainMessage : null);
                 yield break;
             }
 
@@ -133,7 +134,7 @@ namespace SephPlanner.Core.Runtime
                 var undo = Rollback(journal, undone);
                 while (Advance(undo, undone)) yield return null;
                 Result = Join(
-                    rotations.Failure, rotations.Note, Undone(undone) ?? Collapsed(),
+                    rotations.Failure, rotations.Note, Undone(undone), Collapsed(),
                     RequiresResync ? UncertainMessage : null);
                 yield break;
             }
@@ -152,9 +153,14 @@ namespace SephPlanner.Core.Runtime
             while (LevelDrift().Length > 0 && _now() < settle) yield return null;
 
             var drift = TargetDrift();
-            var levels = drift is null ? LevelDrift() : "";
-            Settled = drift is null && levels.Length == 0 && !RequiresResync;
-            Result = drift ?? $"자동 배치 완료 - 이동 {moves.Count}건, 회전 {rotations.Count}건" + levels;
+
+            // 레벨이 통째로 사라진 것을 LevelDrift 로 말하면 "계산에 없는 효과가 걸려 있다" 가
+            // 되는데, 그것은 사실과 반대다 - 걸린 것이 없어진 쪽이다.
+            var collapsed = Collapsed();
+            var levels = drift is null && collapsed is null ? LevelDrift() : "";
+            Settled = drift is null && collapsed is null && levels.Length == 0 && !RequiresResync;
+            Result = Join(
+                drift ?? $"자동 배치 완료 - 이동 {moves.Count}건, 회전 {rotations.Count}건" + levels, collapsed);
         }
 
         private string? TargetDrift()
@@ -229,7 +235,7 @@ namespace SephPlanner.Core.Runtime
 
         private string? Undone(Outcome outcome) =>
             outcome.Fault != null
-                ? $"되돌리는 중 오류가 나 인벤토리가 중간 상태로 남았습니다({outcome.Fault}). " + Recovery()
+                ? Join($"되돌리는 중 오류가 나 인벤토리가 중간 상태로 남았습니다({outcome.Fault}).", Recovery())
                 : outcome.Note;
 
         /// <summary>
@@ -261,14 +267,20 @@ namespace SephPlanner.Core.Runtime
         /// 2026-09-15 - 맞바꿈도 되돌리기도 같은 예외로 끝났다). 그 상태를 알아야 하는 이유는
         /// 안내가 달라지기 때문이다.
         /// </summary>
-        private string? Collapsed() => _levelsBefore > 0 && CountLevels() == 0 ? CollapsedMessage : null;
+        private string? Collapsed()
+        {
+            // 한 번의 실패 안에서 답이 바뀌지 않는다. 가지마다 다시 재면 격자를 몇 번씩 훑는다.
+            _collapsed ??= _levelsBefore > 0 && CountLevels() == 0;
+            return _collapsed.Value ? CollapsedMessage : null;
+        }
 
         /// <summary>
         /// 중간 상태가 남았을 때 무엇을 하라고 할 것인가. <b>손으로 정리하라는 말은 게임의 맞바꿈이
         /// 아직 도는 경우에만 맞다</b> - 수동 드래그도 같은 <c>Swap</c> 을 타므로, 그 경로가 깨진
-        /// 상태에서는 사람을 헛되이 붙잡는다.
+        /// 상태에서는 사람을 헛되이 붙잡는다. 무너졌으면 아무 말도 하지 않는다 - 무엇을 할지는
+        /// <see cref="Collapsed"/> 가 결과 끝에 한 번 붙인다.
         /// </summary>
-        private string Recovery() => Collapsed() ?? TidyMessage;
+        private string? Recovery() => Collapsed() is null ? TidyMessage : null;
 
         /// <summary>반복자가 값을 돌려줄 자리.</summary>
         private sealed class Outcome
@@ -487,8 +499,8 @@ namespace SephPlanner.Core.Runtime
 
                 if (!BudgetLeft())
                 {
-                    outcome.Note = $"되돌리기가 {PhaseTimeout:0}초 안에 끝나지 않아 인벤토리가 중간 상태로 남았습니다. " +
-                                   Recovery();
+                    outcome.Note = Join(
+                        $"되돌리기가 {PhaseTimeout:0}초 안에 끝나지 않아 인벤토리가 중간 상태로 남았습니다.", Recovery());
                     yield break;
                 }
 
@@ -502,8 +514,9 @@ namespace SephPlanner.Core.Runtime
                 var error = _port.Swap(step.To, step.From);
                 if (error != null)
                 {
-                    outcome.Note = $"되돌리기도 실패해 인벤토리가 중간 상태로 남았습니다({error}). " +
-                                   (RequiresResync ? UncertainMessage : Recovery());
+                    outcome.Note = Join(
+                        $"되돌리기도 실패해 인벤토리가 중간 상태로 남았습니다({error}).",
+                        RequiresResync ? UncertainMessage : Recovery());
                     yield break;
                 }
 
@@ -519,8 +532,9 @@ namespace SephPlanner.Core.Runtime
                 // 확인하지 않으면 거부된 되돌리기를 "원래 배치로 되돌렸습니다"로 보고하게 된다.
                 if (!_port.Alive || !Swapped(step.To, step.From, step.InstanceId, step.Displaced))
                 {
-                    outcome.Note = "되돌리기가 게임에 반영되지 않아 인벤토리가 중간 상태로 남았습니다. " +
-                                   (RequiresResync ? UncertainMessage : Recovery());
+                    outcome.Note = Join(
+                        "되돌리기가 게임에 반영되지 않아 인벤토리가 중간 상태로 남았습니다.",
+                        RequiresResync ? UncertainMessage : Recovery());
                     yield break;
                 }
                 RequiresResync = false;
@@ -534,8 +548,7 @@ namespace SephPlanner.Core.Runtime
                     yield break;
                 }
             }
-            // 자리는 돌아왔어도 효과가 죽어 있으면 "되돌렸다" 만으로는 사실이 아니다.
-            outcome.Note = Join("원래 배치로 되돌렸습니다.", Collapsed());
+            outcome.Note = "원래 배치로 되돌렸습니다.";
         }
 
         /// <summary>

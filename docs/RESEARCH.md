@@ -674,7 +674,7 @@ fixedMultiplyLevel)를 들고 있고, 배수는 석판과 같은 `multiplyLevelM
   | 아티팩트 | 게임 클래스 | 게임이 보는 것 |
   |---|---|---|
   | 북향의 금빛/파란 침 | `Charm_UpCharmDamage` | `(x+xOffset, y+yOffset)` 칸 하나. 기본은 바로 위 |
-  | 거대한 망원경 | `Charm_PlanetModule` | 이웃 여덟 칸에서 `Entity.categories` 에 `PLANET` 이 있고 **Charm 이 `Charm_SummonGreenBat`** 인 것 |
+  | 거대한 망원경 | `Charm_PlanetModule` | 이웃 여덟 칸에서 `Entity.categories` 에 `PLANET` 이 있고 **Charm 이 `Charm_SummonGreenBat`(하위 포함)** 인 것 |
   | 헌신의 휘장 | `Charm_CompanionChaos` | 같은 행 전체(`0..Width-1`)의 `ICompanionCharm` |
   | 캘세더니 열쇠 | `Charm_3Elemental_ByRow` | 자기 행 하나. `lineCategory[YIdx % 개수]` |
 
@@ -714,8 +714,15 @@ fixedMultiplyLevel)를 들고 있고, 배수는 석판과 같은 `multiplyLevelM
   **망원경은 대상 판정이 카테고리 하나가 아니다(2026-09-16).** `SearchPlanet` 은 이웃 칸의
   `Entity.categories` 에 `PLANET` 이 있는지 본 뒤 **그 칸의 `Charm` 이 `Charm_SummonGreenBat`
   인지 한 번 더 본다.** 둘 다 맞아야 `SetEnhancement(true)` 가 걸린다. 카탈로그의 `PLANET`
-  열하나 가운데 넷 - 거대 망원경 자신, 혜성, 악보 '은하', 붉은행성 관찰일지 - 이 그 타입이 아니라
-  거대화 대상이 아니다. 우리는 카테고리만 보고 있었다(제보 2026-09-16, `PositionalWorth`).
+  열하나 가운데 넷 - 거대 망원경 자신, 혜성(`Charm_PlanetComet`), 악보 '은하'
+  (`Charm_StatusInstance`), 붉은행성 관찰일지(`Charm_FlamePlanet`) - 이 그 타입이 아니라 거대화
+  대상이 아니다. 우리는 카테고리만 보고 있었다(제보 2026-09-16, `PositionalWorth`).
+
+  **그 판정은 `is` 다 - 하위 클래스도 대상이다.** 1.0.33 에 `Charm_SummonRedPlanet :
+  Charm_SummonGreenBat` 이 있다. 그래서 **타입 이름 문자열로 견주면 진짜 행성을 떨어뜨린다** -
+  카테고리만 보던 것의 정반대 실수다. 판정은 게임 타입을 아는 덤프에서 `is` 로 하고
+  (`CharmDefinition.IsSummonPlanet`, 카탈로그 23), 솔버는 그 값을 읽는다. 이름 비교는 그 항목이
+  없는 옛 자료에서만 물러설 자리로 남겼다.
 
   **거대화의 크기는 잰다(2026-09-16).** 거대화가 피해량을 얼마나 올리는지는 `GreenBat`이 쏘는
   자리에 있다.

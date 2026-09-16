@@ -14,6 +14,7 @@ namespace SephPlanner.Plugin
         public bool HasFailures { get; private set; }
         public Dictionary<string, string> Files { get; } = new Dictionary<string, string>(StringComparer.Ordinal);
         private readonly Dictionary<string, string> _status = new Dictionary<string, string>(StringComparer.Ordinal);
+        private readonly Dictionary<string, string> _partial = new Dictionary<string, string>(StringComparer.Ordinal);
         private readonly DiagnosticText _text;
         private readonly Action<object> _log;
         private readonly string _dataDirectory;
@@ -39,7 +40,9 @@ namespace SephPlanner.Plugin
                 }
                 var content = File.ReadAllText(path);
                 Files.Add(name, name == "inventory-dump.txt" ? _text.Redact(content) : content);
-                _status[name] = "저장됨";
+                _status[name] = _partial.TryGetValue(name, out var partial)
+                    ? "저장됨 (일부 실패: " + partial + ")"
+                    : "저장됨";
                 if (legacy) File.Copy(path, Path.Combine(_dataDirectory, name), true);
             }
             catch (Exception ex)
@@ -48,6 +51,17 @@ namespace SephPlanner.Plugin
                 _status[name] = _text.Redact("저장 실패: " + ex.Message);
                 _log("진단 " + name + " 저장 실패: " + ex);
             }
+        }
+
+        /// <summary>
+        /// 파일은 저장됐지만 일부가 빠졌다. <see cref="Collect"/> 가 "저장됨" 으로 덮어쓰지 않도록
+        /// 따로 들고 있다가 합친다 - 요약만 보는 사람에게 부분 실패가 보이지 않으면 없는 일이 된다.
+        /// </summary>
+        public void Warn(string name, string message)
+        {
+            HasFailures = true;
+            var text = _text.Redact(message);
+            _partial[name] = _partial.TryGetValue(name, out var existing) ? existing + " / " + text : text;
         }
 
         public void Finish(string producer, ReplayPreferences preferences, DiagnosticNote? note = null)
