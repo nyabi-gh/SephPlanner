@@ -208,6 +208,85 @@ public class PositionalWorthTests
         Assert.Equal(1.25 * levelStep, ScoreBesideTelescope(measured) - baseline, 6);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void APlanetCanYieldItsLevelCellWhileJoiningATelescope(bool useAdviceOptions)
+    {
+        var problem = PlanetWithRefill();
+        var before = PlacementSolver.Score(problem, Array.Empty<TabletPlacement>(), problem.CurrentCharms);
+        var options = useAdviceOptions ? SolverOptions.ForAdvice(default) : new SolverOptions();
+        options.VerifyIncrementalPolish = true;
+
+        var best = PlacementSolver.Solve(problem, options);
+
+        Assert.Equal(new GridPos(1, 0), best.CharmPositions[2]);
+        Assert.Equal(new GridPos(3, 0), best.CharmPositions[3]);
+        Assert.True(PriorityPlacement.Compare(best, before) > 0);
+        Assert.Equal(0.25, best.Score - before.Score, 8);
+        Assert.Empty(best.UnapprovedDeactivations);
+        Assert.Empty(best.InactiveCharms);
+        for (var pass = 0; pass < 3; pass++)
+        {
+            foreach (var pair in best.CharmPositions) problem.CurrentCharms[pair.Key] = pair.Value;
+            var next = PlacementSolver.Solve(problem, options);
+            Assert.Equal(best.Score, next.Score, 8);
+            Assert.All(best.CharmPositions, pair => Assert.Equal(pair.Value, next.CharmPositions[pair.Key]));
+            best = next;
+        }
+    }
+
+    [Theory]
+    [InlineData("helper-disabled")]
+    [InlineData("recipient-disabled")]
+    [InlineData("not-a-planet")]
+    [InlineData("refill-immovable")]
+    [InlineData("helper-deprioritized")]
+    public void APlanetIsNotDrawnToAnUnprofitableTelescopeCell(string reason)
+    {
+        var problem = PlanetWithRefill();
+        switch (reason)
+        {
+            case "helper-disabled":
+                problem.FixedEffects.Add(new FixedEffectCell { Position = new GridPos(0, 0), Disable = 1 });
+                break;
+            case "recipient-disabled":
+                problem.FixedEffects.Add(new FixedEffectCell { Position = new GridPos(1, 0), Disable = 1 });
+                break;
+            case "not-a-planet":
+                problem.Charms[1].Definition.Behavior = "Charm_PlanetComet";
+                break;
+            case "refill-immovable":
+                problem.Charms[2].Immovable = true;
+                break;
+            case "helper-deprioritized":
+                problem.Charms[0].Weight = 0.1;
+                break;
+        }
+
+        var best = PlacementSolver.Solve(problem, new SolverOptions { VerifyIncrementalPolish = true });
+
+        Assert.Equal(new GridPos(3, 0), best.CharmPositions[2]);
+        Assert.Equal(new GridPos(2, 0), best.CharmPositions[3]);
+        Assert.Empty(best.UnapprovedDeactivations);
+    }
+
+    private static PlacementProblem PlanetWithRefill()
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(4, 1, 4) };
+        var planet = PlanetDef();
+        planet.SummonDamageByLevel = new List<int> { 10, 14, 18, 22, 26, 30 };
+        problem.Charms.Add(new CharmSlot { InstanceId = 1, Definition = TelescopeDef(), Immovable = true });
+        problem.Charms.Add(new CharmSlot { InstanceId = 2, Definition = planet });
+        problem.Charms.Add(new CharmSlot { InstanceId = 3, Definition = Bystander() });
+        problem.CurrentCharms[1] = new GridPos(0, 0);
+        problem.CurrentCharms[2] = new GridPos(3, 0);
+        problem.CurrentCharms[3] = new GridPos(2, 0);
+        problem.FixedEffects.Add(new FixedEffectCell { Position = new GridPos(3, 0), Level = 4 });
+        problem.FixedEffects.Add(new FixedEffectCell { Position = new GridPos(2, 0), Level = 1 });
+        return problem;
+    }
+
     /// <summary>
     /// 헌신의 휘장(<c>Charm_CompanionChaos</c>)은 같은 행을 끝에서 끝까지 훑는다. 동료가 한 줄에
     /// 몰려 있는 격자에서는 그 줄에 선다.

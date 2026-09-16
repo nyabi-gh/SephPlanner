@@ -27,6 +27,7 @@
 
 ## 제보에서 시작한 수정
 
+- [망원경과 행성의 동시 재배정](TELESCOPE-PLACEMENT-2026-09-16.md) — 빈 고레벨 칸을 다른 아이템에 넘기는 이동 조합 누락
 - [F2 콤보·친타마니](FEEDBACK-2026-09-06.md)
 - [북향의 침·합작 추천](NORTH-NEEDLE-MIXER-REPORTS-2026-09-10.md)
 - [강화 대상 지정](SUPPORT-TARGET-REPORT-2026-09-13.md) — 침의 레어도 덤 편향과 마법서 값어치의 공백

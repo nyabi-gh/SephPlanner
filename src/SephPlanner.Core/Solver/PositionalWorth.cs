@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using SephPlanner.Core.Charms;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Tablets;
 
@@ -12,8 +13,7 @@ namespace SephPlanner.Core.Solver
     /// 않는다</b> - 게임이 자리만 보고 정한다. 그래서 솔버가 알아서 좋은 자리를 찾을 수 있다.
     ///
     /// 이웃이 <see cref="PlacementSolver"/>의 직전 반복 배정에서 오는 근사라는 점은 하얀 종이·
-    /// 조화의 수정과 같다. 이미 모여 있는 자리를 찾아갈 뿐, 이웃을 이 아티팩트 주위로 다시
-    /// 모으는 탐색까지는 하지 못한다.
+    /// 조화의 수정과 같다. 이웃 강화는 받는 쪽의 자리 배정에도 반영해 주변으로 모을 수 있다.
     /// </summary>
     public static class PositionalWorth
     {
@@ -177,14 +177,34 @@ namespace SephPlanner.Core.Solver
             foreach (var (dx, dy) in Around)
             {
                 if (!neighbors.TryGetValue(cell.Offset(dx, dy), out var neighbor)) continue;
-                if (neighbor == charm || neighbor.IsFiller || neighbor.IsDormant) continue;
-                if (!Enlargeable(neighbor.Definition)) continue;
-                if (!neighbor.Definition.Categories.Contains(category)) continue;
-
-                worth += EnlargeSteps(neighbor) * neighbor.Worth.LevelStep;
+                worth += EnhancementWorth(charm, neighbor);
             }
             return worth;
         }
+
+        // 배정할 때는 받는 쪽의 이동 이득도 센다. 최종 점수에는 주는 쪽에서 한 번만 더한다.
+        internal static double ReceivedEnhanceWorth(
+            CharmSlot charm, GridPos cell, IReadOnlyDictionary<GridPos, CharmSlot>? neighbors,
+            SimulationResult result, GridSpec grid, GridOccupancy occupancy)
+        {
+            if (neighbors is null || charm.IsFiller || charm.IsDormant || !Enlargeable(charm.Definition)) return 0;
+
+            var worth = 0.0;
+            foreach (var (dx, dy) in Around)
+            {
+                var helperCell = cell.Offset(dx, dy);
+                if (!neighbors.TryGetValue(helperCell, out var helper) || helper == charm ||
+                    helper.IsFiller || helper.IsDormant || helper.Definition.NeighborEnhanceCategory.Length == 0) continue;
+                if (PlacementSolver.Reason(helper, helperCell, result, grid, occupancy) != CharmInactiveReason.None) continue;
+                worth += CharmWorth.ApplyWeight(EnhancementWorth(helper, charm), helper.Weight);
+            }
+            return worth;
+        }
+
+        private static double EnhancementWorth(CharmSlot helper, CharmSlot target) =>
+            helper != target && !target.IsFiller && !target.IsDormant && Enlargeable(target.Definition) &&
+            target.Definition.Categories.Contains(helper.Definition.NeighborEnhanceCategory)
+                ? EnlargeSteps(target) * target.Worth.LevelStep : 0;
 
         /// <summary>
         /// 거대화 한 번이 그 행성의 <b>레벨 몇 칸</b>인가. 게임은 <c>GreenBat</c> 이 쏘는 순간

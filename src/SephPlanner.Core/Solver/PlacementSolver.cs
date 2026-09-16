@@ -1557,8 +1557,11 @@ namespace SephPlanner.Core.Solver
                     if (forcedCharm.HasValue &&
                         ((charm.InstanceId == forcedCharm.Value) != (free[cellIndex] == forcedCell)))
                         priority += 2 * unit * unit * unit;
+                    var value = Value(problem, charm, cell, result, occupancy, neighbors);
+                    if (usable) value += PositionalWorth.ReceivedEnhanceWorth(
+                        charm, cell, neighbors, result, problem.Grid, occupancy);
                     cost[row, column] = new AssignmentCost(priority,
-                        -Value(problem, charm, cell, result, occupancy, neighbors),
+                        -value,
                         Unsafe(cell, result) ? -1 : 0, Waste(charm, cell, result), -Anchors(problem, charm, cell));
                 }
             }
