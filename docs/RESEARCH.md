@@ -212,6 +212,16 @@ public void Swap(sbyte xLeft, sbyte yLeft, sbyte xRight, sbyte yRight)
 `ReleasePermission` 을 불러 바깥 스코프의 권한을 먼저 푼다. 중첩이 조용히 깨지는 것이 아니라
 바깥의 재계산 시점을 앗아가는 모양이다.
 
+**`ReleasePermission` 은 `charm.Item` 을 널 검사 없이 읽는다(1.0.33, 2026-09-16).** 레벨 행렬을
+다시 만드는 첫 루프가 `(bool)charm` 으로 charm 만 보고 `charm.Item.InstanceID` 를 그대로 읽는다.
+그 루프는 뒤따르는 `try` 블록 **밖**이라(그 `try` 는 `OnPreSetEffectRefreshed` 만 감싼다) 여기서
+터지면 레벨 행렬 재계산이 통째로 멈추고 칸 레벨이 0 인 채 남는다. 그리고 `Charm_Basic.Item` 은
+저장된 참조가 아니라 `Inventory.FindItem(xIdx, yIdx)` **계산 프로퍼티**다 - 그러니 "`Item` 이
+끊겼다" 는 **`charms` 의 charm 이 가리키는 칸에 `inventoryMatrix` 항목이 없다**, 곧 두 사전이
+어긋났다는 뜻이다. 제보 `5915982c` 가 그 상태였다(STATUS 의 "무너진 가방"). `LocalSwap` 은
+`inventoryMatrix`·`charms`·`NetworkxIdx` 를 한 자리에서 함께 맞추므로 맞바꿈 자체가 어긋냄을
+만들지는 않는다 - 그래서 새 `[끊긴 charms 항목]` 이 사전 키와 `charm.xIdx/yIdx` 를 나란히 적는다.
+
 **각도만 쓰면 화면이 따라오지 않는다(2026-09-11).** 게임의 `StoneTablet.Rotate` 는 두 가지를 한다.
 
 ```
@@ -708,7 +718,7 @@ fixedMultiplyLevel)를 들고 있고, 배수는 석판과 같은 `multiplyLevelM
   휘장은 크기를 재지 못했다. 혼돈 모드(`SetChaoticMode`)는 능력치가 아니라 소환물의 동작을
   바꾸는 것이라 정적 데이터에 수치가 없다. 방향(모아 두는 쪽이 낫다)만 확실하므로
   `PositionalWorth.EnhanceStep`을 **그 아티팩트의 레벨 한 칸**으로 두었다 - 콤보 한 단계(2.59)의
-  절반 남짓이라 잰 값을 뒤집지 못하는 크기다. `ComboProgress`와 같은 성격의 값이며, 재고 나면
+  5분의 2 남짓이라 잰 값을 뒤집지 못하는 크기다. `ComboProgress`와 같은 성격의 값이며, 재고 나면
   그 상수 하나만 고치면 된다. **망원경은 아래처럼 재게 됐으므로 이 값은 이제 휘장의 것이다.**
 
   **망원경은 대상 판정이 카테고리 하나가 아니다(2026-09-16).** `SearchPlanet` 은 이웃 칸의
