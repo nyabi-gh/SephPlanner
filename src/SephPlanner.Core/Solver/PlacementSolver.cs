@@ -73,7 +73,7 @@ namespace SephPlanner.Core.Solver
                     .Take(allowance).Select(candidate => candidate.Layout).ToList();
                 if (layouts.Count == 0) break;
                 remaining -= layouts.Count;
-                var improved = EvaluateLayouts(problem, layouts, options);
+                var improved = RefineLayouts(problem, layouts, best.CharmPositions, options);
                 if (PriorityPlacement.Compare(improved, best) <= 0) break;
                 best = improved;
             }
@@ -150,8 +150,28 @@ namespace SephPlanner.Core.Solver
         public static Arrangement EvaluateLayouts(
             PlacementProblem problem, IReadOnlyList<List<TabletPlacement>> layouts,
             SolverOptions? options = null)
+            => EvaluateLayouts(problem, layouts, options ?? new SolverOptions(), null);
+
+        internal static Arrangement RefineLayouts(
+            PlacementProblem problem, IReadOnlyList<List<TabletPlacement>> layouts,
+            IReadOnlyDictionary<int, GridPos> seed, SolverOptions options)
         {
-            options ??= new SolverOptions();
+            var fresh = EvaluateLayouts(problem, layouts, options);
+            var cells = Cells(problem);
+            var continuations = layouts.Where(layout =>
+            {
+                var occupied = new HashSet<GridPos>(layout.Select(tablet => tablet.Position));
+                return SeedFits(problem, seed, cells.Where(cell => !occupied.Contains(cell)).ToList(), null, default);
+            }).ToList();
+            if (continuations.Count == 0) return fresh;
+            var continued = EvaluateLayouts(problem, continuations, options, seed);
+            return PriorityPlacement.Compare(continued, fresh) > 0 ? continued : fresh;
+        }
+
+        private static Arrangement EvaluateLayouts(
+            PlacementProblem problem, IReadOnlyList<List<TabletPlacement>> layouts,
+            SolverOptions options, IReadOnlyDictionary<int, GridPos>? seed)
+        {
             CaptureProtectedActivation(problem);
 
             var cells = Cells(problem);
@@ -162,7 +182,7 @@ namespace SephPlanner.Core.Solver
             {
                 options.Cancellation.ThrowIfCancellationRequested();
 
-                var arrangement = Evaluate(problem, cells, layout, options);
+                var arrangement = Evaluate(problem, cells, layout, options, seed: seed);
                 evaluated.Add((layout, arrangement));
                 if (best != null && PriorityPlacement.Compare(arrangement, best) <= 0) continue;
 
@@ -176,7 +196,7 @@ namespace SephPlanner.Core.Solver
             if (bestLayout != null && options.PolishPasses > 0)
             {
                 options.Cancellation.ThrowIfCancellationRequested();
-                var polished = Evaluate(problem, cells, bestLayout, options, polish: true);
+                var polished = Evaluate(problem, cells, bestLayout, options, polish: true, seed: seed);
                 if (PriorityPlacement.Compare(polished, best) > 0) best = polished;
             }
             best = ImproveEmptySides(problem, cells, evaluated, best, options);
@@ -1080,7 +1100,8 @@ namespace SephPlanner.Core.Solver
 
         private static Arrangement Evaluate(
             PlacementProblem problem, List<GridPos> cells, List<TabletPlacement> layout, SolverOptions options,
-            bool polish = false, HashSet<GridPos>? reservedEmpty = null, int? forcedCharm = null, GridPos forcedCell = default)
+            bool polish = false, HashSet<GridPos>? reservedEmpty = null, int? forcedCharm = null, GridPos forcedCell = default,
+            IReadOnlyDictionary<int, GridPos>? seed = null)
         {
             var usable = reservedEmpty is null ? cells : cells.Where(cell => !reservedEmpty.Contains(cell)).ToList();
             var occupancy = OptimisticOccupancy(usable, layout, problem);
@@ -1091,11 +1112,22 @@ namespace SephPlanner.Core.Solver
             Dictionary<GridPos, CharmSlot>? neighbors = null;
             SimulationResult result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid, problem.FixedEffects);
 
+            // 석판을 다듬을 때 이미 찾은 이웃 관계에서 이어 간다. 충돌하는 배치는 새 배정으로 푼다.
+            if (seed is not null && SeedFits(problem, seed, free, forcedCharm, forcedCell))
+            {
+                positions = seed.ToDictionary(pair => pair.Key, pair => pair.Value);
+                occupancy = OccupancyFrom(layout, positions, problem);
+                neighbors = CharmsByCell(problem, positions);
+                result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid, problem.FixedEffects);
+            }
+
             var bestPositions = positions;
             var bestOccupancy = occupancy;
             var bestResult = result;
             var bestScore = new PlacementQuality(int.MaxValue, int.MaxValue, int.MaxValue,
                 0, 0, 0, double.NegativeInfinity, int.MaxValue, int.MaxValue, 0, problem.Scale.ScoreStep);
+            if (neighbors is not null)
+                bestScore = ScoreOf(problem, layout, positions, occupancy, result, neighbors);
 
             for (var iteration = 0; iteration < options.FixpointIterations; iteration++)
             {
@@ -1158,6 +1190,23 @@ namespace SephPlanner.Core.Solver
                 }
             }
             return Describe(problem, layout, bestPositions, bestOccupancy, bestResult);
+        }
+
+        private static bool SeedFits(
+            PlacementProblem problem, IReadOnlyDictionary<int, GridPos> seed, List<GridPos> free,
+            int? forcedCharm, GridPos forcedCell)
+        {
+            if (seed.Count != problem.Charms.Count || seed.Values.Distinct().Count() != seed.Count) return false;
+            foreach (var charm in problem.Charms)
+            {
+                if (!seed.TryGetValue(charm.InstanceId, out var cell) || !problem.Grid.Contains(cell)) return false;
+                if (charm.Immovable)
+                {
+                    if (!problem.CurrentCharms.TryGetValue(charm.InstanceId, out var pinned) || cell != pinned) return false;
+                }
+                else if (!free.Contains(cell)) return false;
+            }
+            return !forcedCharm.HasValue || seed[forcedCharm.Value] == forcedCell;
         }
 
         /// <summary>
