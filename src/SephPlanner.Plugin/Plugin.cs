@@ -18,7 +18,7 @@ namespace SephPlanner.Plugin
     /// 세피리아 상태를 읽어 게임 HUD에 배치와 추천을 표시하고, 싱글플레이에서는 제안된 배치를
     /// 게임 자체의 이동 경로로 적용한다. 멀티 세션에서는 읽기만 한다.
     /// </summary>
-    [BepInPlugin(PluginGuid, "SephPlanner", "0.4.9")]
+    [BepInPlugin(PluginGuid, "SephPlanner", "0.4.10")]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001", Justification = "Unity의 OnDestroy에서 계산 작업을 정리합니다.")]
     public sealed class SephPlannerPlugin : BaseUnityPlugin
     {

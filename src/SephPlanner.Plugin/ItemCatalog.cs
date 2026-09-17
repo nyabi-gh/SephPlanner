@@ -455,11 +455,11 @@ namespace SephPlanner.Plugin
             return lines;
         }
 
-        // 게임에 설정된 언어로 표시 이름을 담아 둔다. HUD가 그대로 보여준다.
+        // 마법서의 연결된 마법 이름과 일반 아이템의 키워드 치환도 게임과 동일하게 적용한다.
         private static Dictionary<string, string> DisplayName(ItemEntity entity)
         {
             var names = new Dictionary<string, string>();
-            var text = entity.aName?.ToString();
+            var text = entity.Name;
             if (!string.IsNullOrEmpty(text)) names["current"] = text;
             return names;
         }

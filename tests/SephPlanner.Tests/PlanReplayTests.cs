@@ -279,6 +279,15 @@ public sealed class PlanReplayTests : IDisposable
     }
 
     [Fact]
+    public void CatalogVersion24StillReplaysAfterDisplayNamesChanged()
+    {
+        var replay = RoundTrip(Capture());
+        replay.CatalogVersion = 24;
+
+        Assert.Empty(replay.Expected!.Differences(ReplayResult.From(replay.Rebuild(true))));
+    }
+
+    [Fact]
     public void DifferentModelRequiresExplicitComparisonAndStillChecksResults()
     {
         var capture = Capture();
