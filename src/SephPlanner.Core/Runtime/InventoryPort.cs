@@ -24,6 +24,9 @@ namespace SephPlanner.Core.Runtime
         /// <summary>지금 멀티플레이 세션인가. 적용을 시작한 뒤 동료가 접속했을 수 있어 걸음마다 본다.</summary>
         bool IsMultiplayerSession { get; }
 
+        /// <summary>서버의 아이템과 효과 객체 연결이 깨졌다면 이유. 참가자의 동기화 중간 상태는 검사하지 않는다.</summary>
+        string? StateError { get; }
+
         /// <summary>그 칸에 지금 있는 인스턴스. 비어 있으면 0.</summary>
         int InstanceAt(GridPos cell);
 

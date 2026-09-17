@@ -39,6 +39,7 @@ namespace SephPlanner.Core.Runtime
         private double _phaseUntil;
         private int _levelsBefore;
         private bool? _collapsed;
+        private string? _stateFailure;
 
         public ApplyPlanRoutine(
             ApplyPlanCommand command, IInventoryPort port, Func<double> now, bool allowMultiplayer)
@@ -61,7 +62,7 @@ namespace SephPlanner.Core.Runtime
         /// <summary>끝났을 때 사람이 읽을 한 줄. 반복자가 끝나기 전에는 비어 있다.</summary>
         public string Result { get; private set; } = "";
 
-        /// <summary>이미 보낸 쓰기의 반영 여부가 불명확하다. 같은 인벤토리에 추가 쓰기를 보내면 안 된다.</summary>
+        /// <summary>쓰기 반영이 불명확하거나 효과 연결이 깨졌다. 같은 인벤토리에 추가 쓰기를 보내면 안 된다.</summary>
         public bool RequiresResync { get; private set; }
         public string? DiagnosticError { get; private set; }
 
@@ -89,6 +90,11 @@ namespace SephPlanner.Core.Runtime
         /// </summary>
         public IEnumerator Run()
         {
+            if (InvalidState() != null)
+            {
+                Result = _stateFailure!;
+                yield break;
+            }
             NewPhase();
             _levelsBefore = CountLevels();
             var journal = new List<Step>();
@@ -105,7 +111,7 @@ namespace SephPlanner.Core.Runtime
             {
                 if (RequiresResync)
                 {
-                    Result = Join(moves.Failure, UncertainMessage);
+                    Result = Join(moves.Failure, _stateFailure == null ? UncertainMessage : null);
                     yield break;
                 }
                 var undone = new Outcome();
@@ -113,7 +119,8 @@ namespace SephPlanner.Core.Runtime
                 while (Advance(undo, undone)) yield return null;
                 // 무너짐은 여기서 한 번만 붙인다. 되돌리기가 어느 가지로 빠져나가든 - 되돌릴
                 // 걸음이 없었든, 칸이 바뀌어 멈췄든 - 안내가 빠지지 않게 하려는 것이다.
-                Result = Join(moves.Failure, Undone(undone), Collapsed(), RequiresResync ? UncertainMessage : null);
+                Result = Join(moves.Failure, Undone(undone), Collapsed(),
+                    RequiresResync && _stateFailure == null ? UncertainMessage : null);
                 yield break;
             }
 
@@ -136,7 +143,7 @@ namespace SephPlanner.Core.Runtime
                 while (Advance(undo, undone)) yield return null;
                 Result = Join(
                     rotations.Failure, rotations.Note, Undone(undone), Collapsed(),
-                    RequiresResync ? UncertainMessage : null);
+                    RequiresResync && _stateFailure == null ? UncertainMessage : null);
                 yield break;
             }
 
@@ -287,6 +294,17 @@ namespace SephPlanner.Core.Runtime
         /// </summary>
         private string? Recovery() => Collapsed() is null ? TidyMessage : null;
 
+        private string? InvalidState()
+        {
+            var error = _port.StateError;
+            if (error == null) return null;
+            DiagnosticError ??= error;
+            RequiresResync = true;
+            _stateFailure = "가방의 아이템과 효과 연결이 어긋나 추가 이동과 되돌리기를 중단했습니다. " +
+                "방에 재접속하거나 게임을 다시 시작하세요. " + error;
+            return _stateFailure;
+        }
+
         /// <summary>반복자가 값을 돌려줄 자리.</summary>
         private sealed class Outcome
         {
@@ -429,10 +447,24 @@ namespace SephPlanner.Core.Runtime
                 }
 
                 Progress = $"자동 배치 중 - 이동 {outcome.Count + 1}번째 반영 대기";
+                var stateError = InvalidState();
+                if (stateError != null)
+                {
+                    outcome.Failure = stateError;
+                    yield break;
+                }
                 RequiresResync = !_port.WritesLandImmediately;
                 var error = _port.Swap(from, to);
+                stateError = InvalidState();
+                if (stateError != null)
+                {
+                    outcome.Failure = stateError;
+                    yield break;
+                }
                 if (error != null)
                 {
+                    if (_port.WritesLandImmediately && Swapped(from, to, target.InstanceId, expected))
+                        journal.Add(new Step(from, to, target.InstanceId, expected));
                     outcome.Failure = $"이동 중 오류({error})가 나 자동 배치를 중단했습니다.";
                     yield break;
                 }
@@ -517,7 +549,19 @@ namespace SephPlanner.Core.Runtime
                     yield break;
                 }
                 RequiresResync = !_port.WritesLandImmediately;
+                var stateError = InvalidState();
+                if (stateError != null)
+                {
+                    outcome.Note = stateError;
+                    yield break;
+                }
                 var error = _port.Swap(step.To, step.From);
+                stateError = InvalidState();
+                if (stateError != null)
+                {
+                    outcome.Note = stateError;
+                    yield break;
+                }
                 if (error != null)
                 {
                     outcome.Note = Join(

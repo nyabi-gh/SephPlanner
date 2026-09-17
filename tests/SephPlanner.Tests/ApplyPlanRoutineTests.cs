@@ -26,12 +26,15 @@ public class ApplyPlanRoutineTests
         public bool Alive { get; set; } = true;
         public bool WritesLandImmediately { get; set; } = true;
         public bool IsMultiplayerSession { get; set; }
+        public string? StateError { get; set; }
 
         /// <summary>참가자 모드에서 쓰기가 반영되기까지 걸리는 시간(초).</summary>
         public double Latency { get; set; }
         public int PressIncrement { get; set; } = 1;
         public bool IgnoreHostRotation { get; set; }
         public Action<int>? BeforeSwap { get; set; }
+        public Action<int>? AfterSwap { get; set; }
+        public HashSet<int> ErrorsAfterSwap { get; } = new();
 
         /// <summary>몇 번째 맞바꿈(0부터)을 게임이 조용히 거부하는지. 오류 없이 돌아오고 아무것도 안 바뀐다.</summary>
         public HashSet<int> RejectedSwaps { get; } = new();
@@ -86,8 +89,9 @@ public class ApplyPlanRoutineTests
                 Cells.TryGetValue(to, out var b);
                 Put(to, a);
                 Put(from, b);
+                AfterSwap?.Invoke(index);
             });
-            return null;
+            return ErrorsAfterSwap.Contains(index) ? "교환 후 오류" : null;
         }
 
         public bool TryFindTablet(int instanceId, out GridPos cell, out int rotation, out bool rotatable)
@@ -574,6 +578,60 @@ public class ApplyPlanRoutineTests
         AssertContains("되돌리기도 실패해", routine.Result);
         AssertContains("손으로 정리한 뒤", routine.Result);
         Assert.DoesNotContain("칸 레벨이 전부 0", routine.Result);
+    }
+
+    [Fact]
+    public void BrokenEffectLinksStopFurtherWritesEvenWhenEnchantmentLevelsRemain()
+    {
+        var (inventory, clock) = Host();
+        inventory.Cells[At(0, 0)] = 10;
+        inventory.Cells[At(1, 0)] = 11;
+        inventory.Levels[At(1, 0)] = 1;
+        inventory.AfterSwap = _ => inventory.StateError = "모래시계 효과 연결 불일치";
+        inventory.ErrorsAfterSwap.Add(0);
+
+        var routine = Routine(Command(Charm(10, At(0, 0), At(2, 0)), Charm(11, At(1, 0), At(3, 0))), inventory, clock);
+        Drive(routine, inventory, clock);
+
+        Assert.Equal(1, inventory.SwapCount);
+        Assert.True(routine.RequiresResync);
+        Assert.False(routine.Settled);
+        Assert.Contains("효과 연결", routine.Result);
+        Assert.Contains("재접속", routine.Result);
+        Assert.DoesNotContain("손으로 정리", routine.Result);
+    }
+
+    [Fact]
+    public void AnAlreadyBrokenEffectLinkIsRejectedBeforeAnyWrite()
+    {
+        var (inventory, clock) = Host();
+        inventory.Cells[At(0, 0)] = 10;
+        inventory.StateError = "효과 객체 누락";
+        var routine = Routine(Command(Charm(10, At(0, 0), At(2, 0))), inventory, clock);
+
+        Drive(routine, inventory, clock);
+
+        Assert.Equal(0, inventory.SwapCount);
+        Assert.True(routine.RequiresResync);
+        Assert.Contains("재접속", routine.Result);
+    }
+
+    [Fact]
+    public void ACompletedSwapThatReportsAnErrorIsIncludedInRollback()
+    {
+        var (inventory, clock) = Host();
+        inventory.Cells[At(0, 0)] = 10;
+        inventory.Cells[At(1, 0)] = 11;
+        inventory.ErrorsAfterSwap.Add(1);
+        var routine = Routine(Command(Charm(10, At(0, 0), At(2, 0)), Charm(11, At(1, 0), At(3, 0))), inventory, clock);
+
+        Drive(routine, inventory, clock);
+
+        Assert.Equal(10, inventory.Cells[At(0, 0)]);
+        Assert.Equal(11, inventory.Cells[At(1, 0)]);
+        Assert.Equal(4, inventory.SwapCount);
+        Assert.False(routine.RequiresResync);
+        Assert.False(routine.Settled);
     }
 
     /// <summary>자리는 돌아왔어도 효과가 죽어 있으면 "되돌렸다" 만으로는 사실이 아니다.</summary>

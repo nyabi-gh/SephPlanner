@@ -35,7 +35,7 @@ namespace SephPlanner.Plugin
 
         public static bool RecoveryRequired => _uncertainInventory != null;
         public const string RecoveryMessage =
-            "이전 명령의 서버 반영이 불확실해 자동 배치를 잠갔습니다. 방에 재접속한 뒤 시도하세요.";
+            "이전 자동 배치의 반영 상태나 가방의 효과 연결을 확인하지 못해 자동 배치를 잠갔습니다. 방에 재접속하거나 게임을 다시 시작하세요.";
 
         /// <summary>
         /// 적용이 진행 중인가. 클라이언트에서는 여러 프레임에 걸치므로, 겹쳐 시작하면 두 적용기가
@@ -265,6 +265,31 @@ namespace SephPlanner.Plugin
             public bool WritesLandImmediately => NetworkServer.active;
             public bool IsMultiplayerSession => GameReader.IsMultiplayerSession();
 
+            public string StateError
+            {
+                get
+                {
+                    if (!WritesLandImmediately || _inventory == null) return null;
+                    foreach (var pair in _inventory.charms)
+                    {
+                        var charm = pair.Value;
+                        var item = _inventory.FindItem(pair.Key);
+                        if (charm == null || charm.Inventory != _inventory ||
+                            charm.xIdx != pair.Key.x || charm.yIdx != pair.Key.y ||
+                            item == null || item.Charm != charm)
+                            return $"아티팩트 효과 연결 불일치: ({pair.Key.x},{pair.Key.y})";
+                    }
+                    foreach (var pair in _inventory.inventoryMatrix)
+                    {
+                        var item = pair.Value;
+                        if (item == null || item.Charm == null) continue;
+                        if (!_inventory.charms.TryGetValue(pair.Key, out var charm) || charm != item.Charm)
+                            return $"아이템의 효과 객체 누락: ({pair.Key.x},{pair.Key.y}), 인스턴스 {item.InstanceID}";
+                    }
+                    return null;
+                }
+            }
+
             public int InstanceAt(GridPos cell)
             {
                 foreach (var pair in _inventory.inventoryMatrix)
@@ -286,14 +311,31 @@ namespace SephPlanner.Plugin
 
             public string Swap(GridPos from, GridPos to)
             {
+                Exception displayError = null;
                 try
                 {
-                    _inventory.Swap((sbyte)from.X, (sbyte)from.Y, (sbyte)to.X, (sbyte)to.Y);
+                    var events = EventSystem.current;
+                    var selected = events == null ? null : events.currentSelectedGameObject;
+                    var icon = selected == null ? null : selected.GetComponent<UI_NewInventoryIcon>();
+                    if (!WritesLandImmediately || icon == null || icon.Inventory != _inventory) selected = null;
+                    InventorySelectionTransaction.Run(selected,
+                        () => events == null ? null : events.currentSelectedGameObject,
+                        value => events.SetSelectedGameObject(value),
+                        () => _inventory != null && events != null && EventSystem.current == events && selected != null &&
+                              selected.activeInHierarchy && icon != null && icon.Inventory == _inventory &&
+                              StateError == null,
+                        () => _inventory.Swap((sbyte)from.X, (sbyte)from.Y, (sbyte)to.X, (sbyte)to.Y),
+                        ex =>
+                        {
+                            displayError = ex;
+                            UnityEngine.Debug.LogWarning("자동 배치 후 선택 표시 복원 실패: " + ex);
+                        });
+                    if (displayError != null) DiagnosticError ??= displayError.ToString();
                     return null;
                 }
                 catch (Exception ex)
                 {
-                    DiagnosticError ??= ex.ToString();
+                    DiagnosticError ??= ex + (displayError == null ? "" : "\n선택 표시 복원 실패: " + displayError);
                     return ex.Message;
                 }
             }

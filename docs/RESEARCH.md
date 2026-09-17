@@ -223,9 +223,12 @@ public void Swap(sbyte xLeft, sbyte yLeft, sbyte xRight, sbyte yRight)
 터지면 레벨 행렬 재계산이 통째로 멈추고 칸 레벨이 0 인 채 남는다. 그리고 `Charm_Basic.Item` 은
 저장된 참조가 아니라 `Inventory.FindItem(xIdx, yIdx)` **계산 프로퍼티**다 - 그러니 "`Item` 이
 끊겼다" 는 **`charms` 의 charm 이 가리키는 칸에 `inventoryMatrix` 항목이 없다**, 곧 두 사전이
-어긋났다는 뜻이다. 제보 `5915982c` 가 그 상태였다(STATUS 의 "무너진 가방"). `LocalSwap` 은
-`inventoryMatrix`·`charms`·`NetworkxIdx` 를 한 자리에서 함께 맞추므로 맞바꿈 자체가 어긋냄을
-만들지는 않는다 - 그래서 새 `[끊긴 charms 항목]` 이 사전 키와 `charm.xIdx/yIdx` 를 나란히 적는다.
+어긋났다는 뜻이다. 제보 `5915982c` 가 그 상태였다(STATUS 의 "무너진 가방").
+`LocalSwap`이 한 메서드에서 두 사전을 갱신해도 원자적이지는 않다. `inventoryMatrix` 변경이
+동기 UI 콜백을 호출하므로 그 콜백에서 예외가 나면 뒤따르는 `charms`·좌표 갱신을 건너뛴다.
+제보 `d464e92d` 조사에서는 목적지 선택 상세가 활성 모래시계의 이전 좌표를 읽는 경로로
+이 상태를 재현했다. `[끊긴 charms 항목]`은 사전 키와 `charm.xIdx/yIdx`를 나란히 적는다.
+[교환 중 선택 상세 조회 조사와 수정](notes/INVENTORY-SELECTION-2026-09-18.md) 참고.
 
 **각도만 쓰면 화면이 따라오지 않는다(2026-09-11).** 게임의 `StoneTablet.Rotate` 는 두 가지를 한다.
 
