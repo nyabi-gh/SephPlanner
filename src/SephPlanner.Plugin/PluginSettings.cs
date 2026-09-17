@@ -187,9 +187,8 @@ namespace SephPlanner.Plugin
             // 잠가 두는 편이 안전하다고 답했다(docs/LEGAL.md "받은 답변").
             MultiplayerAutoPlace = config.Bind(
                 "NativePanel", "MultiplayerAutoPlace", false,
-                "멀티플레이 세션에서도 자동 배치를 허용한다(실험). 방을 연 쪽이든 참가한 쪽이든 " +
-                "동작한다. 동기화가 검증되지 않았고 개발사도 잠가 두는 편이 안전하다고 했으므로, " +
-                "같이 하는 사람의 동의를 얻고 켠다.");
+                "멀티플레이 세션에서도 자동 배치를 허용한다. 방을 연 쪽이든 참가한 쪽이든 " +
+                "동작한다. 기본은 꺼짐이며 같이 하는 사람의 동의를 얻고 켠다.");
 
             PadWindow = config.Bind(
                 "NativePanel", "PadOpensWindow", true,
@@ -306,7 +305,7 @@ namespace SephPlanner.Plugin
                 Switch("획득·합성·인챈트·제거 추천", Recommendations),
                 Steps("주변 아이템 탐색 범위", OfferRadius, RadiusSteps,
                     new[] { "좁게", "보통", "넓게", "아주 넓게" }),
-                Switch("멀티 자동 배치(실험)", MultiplayerAutoPlace),
+                Switch("멀티 자동 배치", MultiplayerAutoPlace),
                 new OptionRow
                 {
                     Label = "진단 서버 전송",

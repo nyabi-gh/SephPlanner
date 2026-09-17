@@ -25,8 +25,7 @@ namespace SephPlanner.Plugin
     /// 시험된다. 여기 남는 것은 쓰기 전의 사전 검증과, 게임 타입을 <see cref="IInventoryPort"/>
     /// 로 감싸는 것뿐이다.
     ///
-    /// 멀티 세션은 기본으로 잠그고 설정으로만 연다(실험). 동기화가 검증되지 않았고 개발사도
-    /// 잠가 두는 편이 안전하다고 답했기 때문이다(docs/LEGAL.md).
+    /// 멀티 세션은 기본으로 잠그고, 함께 플레이하는 사람의 동의를 받은 뒤 설정에서 연다.
     /// </summary>
     internal static class PlanApplier
     {
@@ -140,7 +139,7 @@ namespace SephPlanner.Plugin
                     return Denied("계획의 상태 지문이 없어 자동 배치를 실행하지 않습니다.");
 
                 if (GameReader.IsMultiplayerSession() && !allowMultiplayer)
-                    return Denied("멀티플레이 세션에서는 자동 배치를 실행하지 않습니다. 설정에서 열 수 있습니다(실험).");
+                    return Denied("멀티플레이 세션에서는 자동 배치를 실행하지 않습니다. 설정에서 열 수 있습니다.");
 
                 // 호스트면 서버 로컬에서 끝나고, 참가자면 Command 로 서버에 간다. 둘 다 아니면
                 // 쓰기가 나갈 곳이 없다.

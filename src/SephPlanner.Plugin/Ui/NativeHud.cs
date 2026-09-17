@@ -609,7 +609,7 @@ namespace SephPlanner.Plugin.Ui
             if (snapshot.IsMultiplayer)
             {
                 warnings.Add(multiplayerAutoPlace
-                    ? "멀티플레이 세션 - 자동 배치 허용됨 (실험). 같이 하는 사람의 동의를 받으세요."
+                    ? "멀티플레이 세션 - 자동 배치 허용됨. 같이 하는 사람의 동의를 받으세요."
                     : "멀티플레이 세션 - 제안만 표시합니다.");
             }
             return string.Join("\n", warnings);
