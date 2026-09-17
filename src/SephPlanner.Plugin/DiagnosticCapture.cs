@@ -64,16 +64,17 @@ namespace SephPlanner.Plugin
             _partial[name] = _partial.TryGetValue(name, out var existing) ? existing + " / " + text : text;
         }
 
-        public void Finish(string producer, ReplayPreferences preferences, DiagnosticNote? note = null)
+        public void Finish(string producer, ReplayPreferences preferences, DiagnosticNote? note = null, object? incident = null, string? incidentLog = null)
         {
             note ??= DiagnosticNote.None;
-            Files["sephplanner.log"] = _text.Snapshot();
+            Files["sephplanner.log"] = incidentLog ?? _text.Snapshot();
             Files["report.json"] = JsonConvert.SerializeObject(new
             {
                 Version = DiagnosticArchive.SchemaVersion,
                 ReportId = Id.ToString("N"),
                 CapturedUtc = DateTime.UtcNow.ToString("O"),
                 Producer = producer,
+                Incident = incident,
                 CoreBuild = PlanReplay.CurrentCoreBuild,
                 // 사용자가 직접 적은 것이다. 가리지 않고 그대로 보낸다.
                 Note = note.IsEmpty ? null : new { note.Category, note.CategoryLabel, note.Text },

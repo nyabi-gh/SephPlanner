@@ -510,6 +510,7 @@ public class ApplyPlanRoutineTests
         Assert.True(routine.Settled);
         Assert.Equal(10, inventory.Cells[At(2, 0)]);
         Assert.Equal("자동 배치 완료 - 이동 1건, 회전 0건", routine.Result);
+        Assert.Null(routine.DiagnosticError);
         Assert.False(routine.RequiresResync);
     }
 
@@ -529,6 +530,7 @@ public class ApplyPlanRoutineTests
         Assert.False(routine.Settled);
         Assert.Equal(10, inventory.Cells[At(2, 0)]);
         AssertContains("칸 레벨이 전부 0", routine.Result);
+        Assert.Contains("칸 레벨이 전부 0", routine.DiagnosticError!);
         Assert.DoesNotContain("계산에 없는 효과", routine.Result);
     }
 

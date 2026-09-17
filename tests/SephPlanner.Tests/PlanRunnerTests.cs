@@ -12,6 +12,28 @@ public class PlanRunnerTests
         Array.Empty<TabletDefinition>(), Array.Empty<CharmDefinition>());
 
     [Fact]
+    public void FirstCalculationFailureKeepsItsInputWithoutAPublishedReplay()
+    {
+        PlanBuildOperation build = (
+            GameSnapshot _, ICatalog _1, PlanPreferences _2,
+            out PlanBlocker blocker, Plan? _3, LayoutCache _4, bool settled, CancellationToken _5) =>
+        {
+            blocker = PlanBlocker.None;
+            throw new InvalidOperationException("첫 계산 실패");
+        };
+        using var runner = new PlanRunner(EmptyCatalog, build);
+        runner.Submit(Snapshot(7), PlanPreferences.None, "failed-catalog");
+        Assert.True(SpinWait.SpinUntil(() => runner.State.Error is not null, TimeSpan.FromSeconds(5)));
+        Assert.Null(runner.CaptureReplay());
+        var failure = Assert.IsType<PlanFailure>(runner.TakeFailure());
+        Assert.Equal(7, failure.Snapshot.Inventory!.Storage);
+        Assert.Equal("failed-catalog", failure.CatalogGeneration);
+        Assert.Contains("System.InvalidOperationException", failure.Detail);
+        Assert.Equal("배치 계산", failure.Stage);
+        Assert.Null(runner.TakeFailure());
+    }
+
+    [Fact]
     public void DisposingCancelsRunningWorkAndDropsPendingWork()
     {
         using var started = new ManualResetEventSlim();
@@ -127,6 +149,12 @@ public class PlanRunnerTests
         Assert.True(SpinWait.SpinUntil(() => runner.State.Error is not null, TimeSpan.FromSeconds(5)));
         Assert.False(runner.State.IsCurrent);
         Assert.Same(first, runner.State.Latest);
+        var failure = Assert.IsType<PlanFailure>(runner.TakeFailure());
+        Assert.Equal(2, failure.Snapshot.Inventory!.Storage);
+        Assert.Contains("System.InvalidOperationException: broken", failure.Detail);
+        Assert.Contains(nameof(FailureDoesNotMakeThePreviousPlanCurrentAndCanRetry), failure.Detail);
+        Assert.Equal("catalog", failure.CatalogGeneration);
+        Assert.Null(runner.TakeFailure());
 
         runner.Submit(Snapshot(2), PlanPreferences.None, "catalog");
         Assert.True(SpinWait.SpinUntil(
@@ -288,6 +316,9 @@ public class PlanRunnerTests
         Assert.True(state.IsCurrent);
         Assert.False(state.AdviceIsCurrent);
         Assert.NotNull(state.Latest);
+        var failure = Assert.IsType<PlanFailure>(runner.TakeFailure());
+        Assert.Equal("추천 계산", failure.Stage);
+        Assert.Contains("System.InvalidOperationException: 조언 실패", failure.Detail);
     }
 
     /// <summary>

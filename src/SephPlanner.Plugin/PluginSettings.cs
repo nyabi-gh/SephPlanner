@@ -74,6 +74,11 @@ namespace SephPlanner.Plugin
         public ConfigEntry<bool> PadWindow { get; }
         public ConfigEntry<string> DiagnosticConsent { get; }
         public ConfigEntry<bool> DiagnosticChoiceMade { get; }
+        public ConfigEntry<string> AutomaticDiagnosticConsent { get; }
+        public ConfigEntry<string> AutomaticDiagnosticChoice { get; }
+        private readonly Action _reviewAutomaticDiagnostics;
+        public static string AutomaticDiagnosticKey => AutomaticDiagnosticPolicy.ConsentKey(new Uri(DiagnosticUploadClient.DefaultEndpoint));
+        public bool AutomaticDiagnosticAllowed => AutomaticDiagnosticConsent.Value == AutomaticDiagnosticKey;
         public ConfigEntry<bool> UpdateCheck { get; }
         private readonly Action _reviewDiagnostics;
 
@@ -117,11 +122,16 @@ namespace SephPlanner.Plugin
         private static ConfigDescription Ranged(string description, float min, float max) =>
             new ConfigDescription(description, new AcceptableValueRange<float>(min, max));
 
-        public PluginSettings(ConfigFile config, Action<string> log, Action reviewDiagnostics)
+        public PluginSettings(ConfigFile config, Action<string> log, Action reviewDiagnostics, Action reviewAutomaticDiagnostics)
         {
             _config = config;
             _log = log;
             _reviewDiagnostics = reviewDiagnostics;
+            _reviewAutomaticDiagnostics = reviewAutomaticDiagnostics;
+            AutomaticDiagnosticConsent = config.Bind("Diagnostics", "AutomaticUploadConsent", "",
+                "오류 자동 전송에 별도로 동의한 항목과 수신처. F3에서 철회할 수 있습니다.");
+            AutomaticDiagnosticChoice = config.Bind("Diagnostics", "AutomaticUploadChoice", "",
+                "자동 전송 안내에 답한 버전. 플러그인 버전만 바뀌면 다시 묻지 않습니다.");
             DiagnosticConsent = config.Bind("Diagnostics", "UploadConsent", "",
                 "F10 진단을 비공개 서버로 전송하는 데 동의한 대상과 항목 버전. F3에서 변경합니다.");
             DiagnosticChoiceMade = config.Bind("Diagnostics", "UploadChoiceMade", false,
@@ -304,6 +314,13 @@ namespace SephPlanner.Plugin
                     Read = () => DiagnosticUploadAllowed ? 1 : 0,
                     Write = i => { if (i == 0) SetDiagnosticConsent(false); else _reviewDiagnostics(); },
                 },
+                new OptionRow
+                {
+                    Label = "오류 진단 자동 전송",
+                    Choices = new[] { "꺼짐", "켜짐" },
+                    Read = () => AutomaticDiagnosticAllowed ? 1 : 0,
+                    Write = i => { if (i == 0) SetAutomaticDiagnosticConsent(false); else _reviewAutomaticDiagnostics(); },
+                },
                 Switch("시작할 때 업데이트 확인", UpdateCheck),
                 Steps("가방 확인 간격", PollInterval, PollSteps,
                     new[] { "0.15초", "0.25초", "0.5초", "1초" }),
@@ -329,6 +346,23 @@ namespace SephPlanner.Plugin
             MarginX.Value = DefaultPanelMargin;
             MarginY.Value = DefaultPanelMargin;
             _config.Save();
+        }
+
+        public void SetAutomaticDiagnosticConsent(bool allowed)
+        {
+            var previousChoice = AutomaticDiagnosticChoice.Value;
+            try
+            {
+                AutomaticDiagnosticConsent.Value = allowed ? AutomaticDiagnosticKey : "";
+                AutomaticDiagnosticChoice.Value = AutomaticDiagnosticKey;
+                _config.Save();
+            }
+            catch
+            {
+                AutomaticDiagnosticConsent.Value = "";
+                AutomaticDiagnosticChoice.Value = previousChoice;
+                throw;
+            }
         }
 
         public void SetDiagnosticConsent(bool allowed)

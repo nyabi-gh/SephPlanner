@@ -63,6 +63,7 @@ namespace SephPlanner.Core.Runtime
 
         /// <summary>이미 보낸 쓰기의 반영 여부가 불명확하다. 같은 인벤토리에 추가 쓰기를 보내면 안 된다.</summary>
         public bool RequiresResync { get; private set; }
+        public string? DiagnosticError { get; private set; }
 
         /// <summary>
         /// 계획대로 다 놓였고 레벨까지 예상과 같다. <b>이때만</b> 부르는 쪽이 "지금 놓인 것이 곧
@@ -158,6 +159,7 @@ namespace SephPlanner.Core.Runtime
             // 예상도 전부 0이면 정상 배치다. 예상과 다른 소실만 별도 복구 안내를 붙인다.
             var collapsed = drift is null && levels.Length == 0 ? null : Collapsed();
             if (collapsed != null) levels = "";
+            if (levels.Length > 0) DiagnosticError ??= levels;
             Settled = drift is null && collapsed is null && levels.Length == 0 && !RequiresResync;
             Result = Join(
                 drift ?? $"자동 배치 완료 - 이동 {moves.Count}건, 회전 {rotations.Count}건" + levels, collapsed);
@@ -188,6 +190,7 @@ namespace SephPlanner.Core.Runtime
             }
             catch (Exception ex)
             {
+                DiagnosticError ??= ex.ToString();
                 return $"자동 배치 결과를 확인하지 못했습니다({ex.Message}). 현재 배치를 확인하세요.";
             }
         }
@@ -196,7 +199,7 @@ namespace SephPlanner.Core.Runtime
         /// 안쪽 반복자를 한 걸음 돌린다. 참가자 세션에서는 걸음 사이가 수 초라 그동안 인벤토리가
         /// 파괴될 수 있고(죽음, 층 이동, 접속 끊김), 그때 읽기가 던지는 예외가 여기서 잡힌다.
         /// </summary>
-        private static bool Advance(IEnumerator routine, Outcome outcome)
+        private bool Advance(IEnumerator routine, Outcome outcome)
         {
             try
             {
@@ -204,6 +207,7 @@ namespace SephPlanner.Core.Runtime
             }
             catch (Exception ex)
             {
+                DiagnosticError ??= ex.ToString();
                 outcome.Fault = ex.Message;
                 return false;
             }
@@ -271,6 +275,7 @@ namespace SephPlanner.Core.Runtime
         {
             // 한 번의 실패 안에서 답이 바뀌지 않는다. 가지마다 다시 재면 격자를 몇 번씩 훑는다.
             _collapsed ??= _levelsBefore > 0 && CountLevels() == 0;
+            if (_collapsed.Value) DiagnosticError ??= CollapsedMessage;
             return _collapsed.Value ? CollapsedMessage : null;
         }
 
@@ -348,6 +353,7 @@ namespace SephPlanner.Core.Runtime
             }
             catch (Exception ex)
             {
+                DiagnosticError ??= ex.ToString();
                 return $". 적용 뒤 레벨을 확인하지 못했습니다({ex.Message})";
             }
         }
@@ -729,6 +735,7 @@ namespace SephPlanner.Core.Runtime
             }
             catch (Exception ex)
             {
+                DiagnosticError ??= ex.ToString();
                 // 아직 아무것도 쓰지 않았다. 회전만 포기하면 이동을 되돌릴지 호출자가 정한다.
                 return $"회전 준비 중 오류가 났습니다({ex.Message}).";
             }

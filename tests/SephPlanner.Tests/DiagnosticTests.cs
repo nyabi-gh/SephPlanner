@@ -11,6 +11,68 @@ namespace SephPlanner.Tests;
 public sealed class DiagnosticTests
 {
     [Fact]
+    public void AutomaticReportKeepsIncidentLogWhenGameStateCollectionFails()
+    {
+        using var directory = new DiagnosticTestDirectory();
+        var log = new DiagnosticText();
+        log.Append(@"오류: C:\Users\Someone\game\file.cs");
+        var atFailure = log.Snapshot();
+        log.Append("나중에 발생한 로그");
+        var capture = new DiagnosticCapture(log, _ => { }, directory.Path);
+        capture.Collect("inventory-snapshot.json", () => throw new InvalidOperationException("읽기 실패"));
+        capture.Finish("검증용", ReplayPreferences.From(PlanPreferences.None),
+            incident: new { Trigger = "automatic", Detail = "계산 실패" }, incidentLog: atFailure);
+        using var stream = new MemoryStream(DiagnosticArchive.Create(capture.Files));
+        var files = DiagnosticArchive.Read(stream);
+        Assert.DoesNotContain("Someone", files["sephplanner.log"]);
+        Assert.DoesNotContain("나중에 발생한 로그", files["sephplanner.log"]);
+        using var report = JsonDocument.Parse(files["report.json"]);
+        Assert.Equal("automatic", report.RootElement.GetProperty("Incident").GetProperty("Trigger").GetString());
+        Assert.True(capture.HasFailures);
+    }
+
+    [Fact]
+    public void AutomaticReportsShareManualThrottleAndDoNotSpendBudgetWhenLimited()
+    {
+        var now = TimeSpan.Zero;
+        var throttle = new DiagnosticUploadThrottle(TimeSpan.FromMinutes(1), () => now);
+        var policy = new AutomaticDiagnosticPolicy();
+        Assert.True(throttle.TryStart(out _));
+        Assert.False(policy.TryAccept("오류", throttle));
+        now += TimeSpan.FromMinutes(1);
+        Assert.True(policy.TryAccept("오류", throttle));
+        Assert.False(throttle.TryStart(out _));
+        now += TimeSpan.FromMinutes(1);
+        Assert.False(policy.TryAccept("오류", throttle));
+        Assert.True(throttle.TryStart(out _));
+    }
+
+    [Fact]
+    public void AutomaticReportsHaveABoundedSessionBudget()
+    {
+        var now = TimeSpan.Zero;
+        var throttle = new DiagnosticUploadThrottle(TimeSpan.FromMinutes(1), () => now);
+        var policy = new AutomaticDiagnosticPolicy();
+        for (var i = 0; i < AutomaticDiagnosticPolicy.SessionLimit; i++)
+        {
+            now += TimeSpan.FromMinutes(1);
+            Assert.True(policy.TryAccept("오류 " + i, throttle));
+        }
+        now += TimeSpan.FromMinutes(1);
+        Assert.False(policy.TryAccept("다른 오류", throttle));
+        Assert.False(policy.TryAccept("오류 0", throttle));
+    }
+
+    [Fact]
+    public void ManualConsentCannotAuthorizeAutomaticReports()
+    {
+        var endpoint = new Uri(DiagnosticUploadClient.DefaultEndpoint);
+        Assert.NotEqual(DiagnosticUploadClient.ConsentKey(endpoint), AutomaticDiagnosticPolicy.ConsentKey(endpoint));
+        Assert.NotEqual(AutomaticDiagnosticPolicy.ConsentKey(endpoint),
+            AutomaticDiagnosticPolicy.ConsentKey(new Uri("https://example.test/api/v1/reports")));
+    }
+
+    [Fact]
     public void UploadThrottleRejectsBurstsWithoutExtendingTheWait()
     {
         var now = TimeSpan.Zero;

@@ -62,7 +62,7 @@ namespace SephPlanner.Plugin
         /// 계획이므로, 부르는 쪽이 그것으로 다음 재계산을 건너뛴다.
         /// </param>
         public static IEnumerator Apply(
-            ApplyPlanCommand command, bool allowMultiplayer, Action<string, bool> report)
+            ApplyPlanCommand command, bool allowMultiplayer, Action<string, bool> report, Action<string> diagnostic = null)
         {
             if (RecoveryRequired)
             {
@@ -82,6 +82,7 @@ namespace SephPlanner.Plugin
                 var setup = Prepare(command, allowMultiplayer);
                 if (setup.Failure != null)
                 {
+                    if (setup.DiagnosticError != null) diagnostic?.Invoke(setup.DiagnosticError);
                     report(setup.Failure, false);
                     yield break;
                 }
@@ -91,8 +92,9 @@ namespace SephPlanner.Plugin
                 // 단계마다 프레임을 쓰는데, 호스트의 적용은 키를 누른 그 프레임에 통째로 끝나야
                 // 한다 - 중간에 프레임이 끼면 그 사이에 게임 상태가 바뀔 수 있고, 그러면
                 // 원자적이라는 전제가 무너진다.
+                var port = new GridInventoryPort(setup.Inventory);
                 _routine = new ApplyPlanRoutine(
-                    command, new GridInventoryPort(setup.Inventory), () => Time.unscaledTime, allowMultiplayer);
+                    command, port, () => Time.unscaledTime, allowMultiplayer);
                 var run = _routine.Run();
                 while (run.MoveNext())
                 {
@@ -100,6 +102,8 @@ namespace SephPlanner.Plugin
                     _uncertainInventory = _routine.RequiresResync ? inventory : null;
                     yield return run.Current;
                 }
+                var detail = port.DiagnosticError ?? _routine.DiagnosticError;
+                if (detail != null) diagnostic?.Invoke(detail);
                 report(_routine.Result, _routine.Settled);
             }
             finally
@@ -114,6 +118,7 @@ namespace SephPlanner.Plugin
         private sealed class Preparation
         {
             public string Failure;
+            public string DiagnosticError;
             public GridInventory Inventory;
         }
 
@@ -160,7 +165,11 @@ namespace SephPlanner.Plugin
             }
             catch (Exception ex)
             {
-                return Denied($"자동 배치를 준비하다 오류가 나 아무것도 바꾸지 않았습니다({ex.Message}).");
+                return new Preparation
+                {
+                    Failure = $"자동 배치를 준비하다 오류가 나 아무것도 바꾸지 않았습니다({ex.Message}).",
+                    DiagnosticError = ex.ToString(),
+                };
             }
         }
 
@@ -246,6 +255,7 @@ namespace SephPlanner.Plugin
         private sealed class GridInventoryPort : IInventoryPort
         {
             private readonly GridInventory _inventory;
+            public string DiagnosticError { get; private set; }
 
             public GridInventoryPort(GridInventory inventory)
             {
@@ -284,6 +294,7 @@ namespace SephPlanner.Plugin
                 }
                 catch (Exception ex)
                 {
+                    DiagnosticError ??= ex.ToString();
                     return ex.Message;
                 }
             }
@@ -317,6 +328,7 @@ namespace SephPlanner.Plugin
                 }
                 catch (Exception ex)
                 {
+                    DiagnosticError ??= ex.ToString();
                     return ex.Message;
                 }
             }
@@ -348,6 +360,7 @@ namespace SephPlanner.Plugin
                 }
                 catch (Exception ex)
                 {
+                    DiagnosticError ??= ex.ToString();
                     try
                     {
                         using (new GridInventory.Permission(_inventory))
@@ -359,6 +372,7 @@ namespace SephPlanner.Plugin
                     }
                     catch (Exception restore)
                     {
+                        DiagnosticError += "\n되돌리기 실패: " + restore;
                         return $"회전 중 오류가 났고 되돌리기도 실패했습니다({ex.Message} / {restore.Message}).";
                     }
                 }
@@ -405,6 +419,7 @@ namespace SephPlanner.Plugin
                     }
                     catch (Exception ex)
                     {
+                        DiagnosticError ??= ex.ToString();
                         // 알림이 실패해도 각도는 이미 맞다. 화면만 낡은 채로 두고 넘어간다.
                         UnityEngine.Debug.LogWarning("석판 회전 알림 실패: " + ex.Message);
                     }

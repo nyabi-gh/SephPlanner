@@ -21,6 +21,18 @@ namespace SephPlanner.Core.Runtime
         Plan placement, GameSnapshot snapshot, ICatalog catalog, PlanPreferences preferences,
         LayoutCache layouts, CancellationToken cancellation);
 
+    public sealed class PlanFailure
+    {
+        public string Stage { get; set; } = "";
+        public string Detail { get; set; } = "";
+        public string OccurredUtc { get; set; } = "";
+        public GameSnapshot Snapshot { get; set; } = null!;
+        public ReplayPreferences Preferences { get; set; } = null!;
+        public string CatalogGeneration { get; set; } = "";
+        public ICatalog Catalog { get; set; } = null!;
+        public System.Collections.Generic.List<PlanTarget> PreviousTargets { get; set; } = new System.Collections.Generic.List<PlanTarget>();
+    }
+
     public sealed class PlanRunState
     {
         public Plan? Latest { get; set; }
@@ -125,6 +137,34 @@ namespace SephPlanner.Core.Runtime
         private GameSnapshot? _replaySnapshot;
         private PlanPreferences? _replayPreferences;
         private System.Collections.Generic.List<PlanTarget>? _replayPreviousTargets;
+        private PlanFailure? _failure;
+
+        public PlanFailure? TakeFailure()
+        {
+            lock (_gate)
+            {
+                var failure = _failure;
+                _failure = null;
+                return failure;
+            }
+        }
+
+        private void RecordFailure(Request request, Exception failure)
+        {
+            _failure ??= new PlanFailure
+            {
+                Stage = request.Advice ? "추천 계산" : "배치 계산",
+                Detail = failure.ToString(),
+                OccurredUtc = DateTime.UtcNow.ToString("O"),
+                Snapshot = request.Snapshot,
+                Preferences = ReplayPreferences.From(request.Preferences),
+                CatalogGeneration = request.CatalogGeneration,
+                Catalog = _catalog,
+                PreviousTargets = new System.Collections.Generic.List<PlanTarget>(
+                    request.Previous?.Targets ?? new System.Collections.Generic.List<PlanTarget>()),
+            };
+        }
+
         private string? _error;
         private string? _adviceError;
         private PlanBlocker _blocker;
@@ -406,6 +446,7 @@ namespace SephPlanner.Core.Runtime
                 _disposed = true;
                 _running?.Cancellation.Cancel();
                 _latest = null;
+                _failure = null;
                 _snapshot = null;
                 _applied = null;
                 _appliedBefore = null;
@@ -548,6 +589,7 @@ namespace SephPlanner.Core.Runtime
             _placementPublished = request.Generation;
             if (failure is not null)
             {
+                RecordFailure(request, failure);
                 _error = failure.Message;
                 _blocker = PlanBlocker.None;
                 _retryAfterUtc = DateTime.UtcNow + _retryDelay;
@@ -586,6 +628,7 @@ namespace SephPlanner.Core.Runtime
             if (failure is not null)
             {
                 // 배치는 멀쩡하다. 조언 칸만 낡은 채로 두고 그 사실을 적는다.
+                RecordFailure(request, failure);
                 _adviceError = failure.Message;
                 return;
             }
