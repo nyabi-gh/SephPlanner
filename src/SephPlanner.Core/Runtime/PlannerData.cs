@@ -56,8 +56,9 @@ namespace SephPlanner.Core.Runtime
         ///      아티팩트들이 레어도 어림값으로만 평가된다.
         /// v23: 소환 행성의 레벨별 피해량을 담는다. 거대 망원경의 거대화 크기를 이 표의 비율로
         ///      재며, 없으면 예전처럼 레벨 한 칸이라는 어림값으로 물러선다.
+        /// v24: 합성 재료에서 제외할 석판의 버리기 금지 속성을 담는다.
         /// </summary>
-        public const int CatalogVersion = 23;
+        public const int CatalogVersion = 24;
 
         /// <summary>플러그인이 생성하고 진단 도구가 읽는 데이터 위치.</summary>
         public static string DataDirectory =>

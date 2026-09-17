@@ -42,6 +42,9 @@ namespace SephPlanner.Core.Model
         public Rarity Rarity { get; set; }
         public bool IsRotatable { get; set; }
 
+        /// <summary>게임의 버리기 금지 속성. 합성 창도 이 속성이 있는 재료를 받지 않는다.</summary>
+        public bool CannotDiscard { get; set; }
+
         /// <summary>참이면 질의가 프리팹이 아니라 런 도중 인스턴스별로 정해진다.</summary>
         public bool IsCustom { get; set; }
 

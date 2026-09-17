@@ -110,6 +110,7 @@ F10 덤프가 딕셔너리를 있는 그대로 보여준다(덤프 머리에 `Po
   이름      = 플레이어가 직접 입력
   비용      = TabletMix.mixCost (기본 200골드). UI_TabletMixPanel 이 HasMoney/SubMoney 로 받는다
   제약      = 재료의 엔티티가 2101 이면 안 된다 - 합성 석판은 다시 합성하지 못한다
+              합성 창은 cannotThrow 속성이 참인 아이템도 받지 않는다
   사용 제한 = 사람마다 층에 한 번 (TabletMix.LocalUsed, guid 로 판정)
 ```
 
@@ -140,6 +141,10 @@ F10 덤프가 딕셔너리를 있는 그대로 보여준다(덤프 머리에 `Po
 
 어느 둘을 합치면 좋은지는 `TabletMixAdvisor`가 답한다. 후보 추천과 같은 방식이다 - 합친 상태로
 배치를 다시 풀어 점수 증가분을 본다. 재료 둘이 사라지고 칸이 하나 비는 것까지 증가분에 들어간다.
+
+재료 선택에는 `UI_TabletMixPanel.AddItemToMix`의 제한도 반영한다. 이 창은 버릴 수 없는
+아이템(`ItemEntity.cannotThrow`)을 거절한다. 해골의 시작 석판인 저주(12000)가 여기에 해당하며,
+`TabletDefinition.CannotDiscard`로 읽어 합성 후보에서만 제외한다. 배치와 효과 계산에는 그대로 남긴다.
 
 **회전이 답의 일부다.** 합성이 재료의 회전을 결과 질의에 구워 넣으므로 "무엇과 무엇을"만으로는
 결과가 정해지지 않는다. 그래서 `TabletQuery.Rotated`가 게임의 `GetRotatedQuery`와 같은 일을 한다 -

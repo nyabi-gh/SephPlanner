@@ -151,6 +151,73 @@ public class TabletMixAdvisorTests
         Assert.All(plan.Mixes, entry => Assert.False(entry.Affordable));
     }
 
+    [Theory]
+    [InlineData(12000)]
+    [InlineData(12002)]
+    public void NonDiscardableTabletsStayInTheLayoutButNeverBecomeMixMaterials(int entityId)
+    {
+        var catalog = Catalog().Export();
+        var curse = new TabletDefinition
+        {
+            Id = "Curse",
+            EntityId = entityId,
+            IsRotatable = true,
+            Query = "CHECKERBOARD2 1\nCHECKERBOARD -1",
+            Names = { ["current"] = "저주" },
+        };
+        catalog.Tablets!.Add(curse);
+        var snapshot = Snapshot(new MixerState { Cost = 200 });
+        snapshot.Inventory!.Tablets.Add(new PlacedTablet
+        {
+            DefinitionId = entityId,
+            InstanceId = 3,
+            Position = new GridPos(4, 0),
+            IsApplied = true,
+            IsRotatable = true,
+        });
+        var unrestricted = PlanBuilder.Build(snapshot, catalog.Restore())!;
+        Assert.Contains(unrestricted.Mixes, mix => mix.InstanceA == 3 || mix.InstanceB == 3);
+        foreach (var cell in unrestricted.Current.CellLevels)
+            snapshot.Inventory.LevelMatrix[$"{cell.Key.X},{cell.Key.Y}"] = cell.Value;
+        foreach (var item in snapshot.Inventory.Items)
+        {
+            item.EffectiveLevel = unrestricted.Current.Levels[item.Position];
+            item.IsActive = !unrestricted.Current.DisabledCells.Contains(item.Position);
+        }
+        foreach (var cell in unrestricted.Current.DisabledCells)
+            snapshot.Inventory.DisabledCells.Add($"{cell.X},{cell.Y}");
+        foreach (var tablet in snapshot.Inventory.Tablets)
+            tablet.IsApplied = unrestricted.Current.AppliedTablets[tablet.InstanceId];
+
+        curse.CannotDiscard = true;
+        var restored = System.Text.Json.JsonSerializer.Deserialize<ReplayCatalog>(
+            Newtonsoft.Json.JsonConvert.SerializeObject(catalog))!;
+        var restricted = PlanBuilder.Build(snapshot, restored.Restore())!;
+
+        var advice = Assert.Single(restricted.Mixes);
+        Assert.Equal(1, advice.InstanceA);
+        Assert.Equal(2, advice.InstanceB);
+        Assert.True(restricted.Verification.Passed, Newtonsoft.Json.JsonConvert.SerializeObject(restricted.Verification));
+        Assert.Contains(restricted.Targets, target => target.IsTablet && target.InstanceId == 3);
+        Assert.Contains(restricted.Best.Tablets, tablet => tablet.Definition.EntityId == entityId);
+        Assert.Equal(unrestricted.Current.Score, restricted.Current.Score);
+        Assert.Equal(unrestricted.Best.Score, restricted.Best.Score);
+    }
+
+    [Theory]
+    [InlineData(300)]
+    [InlineData(301)]
+    public void OneNonDiscardableMaterialLeavesNoMixablePair(int entityId)
+    {
+        var catalog = Catalog();
+        catalog.Tablet(entityId)!.CannotDiscard = true;
+
+        var plan = PlanBuilder.Build(Snapshot(new MixerState { Cost = 200 }), catalog)!;
+
+        Assert.Empty(plan.Mixes);
+        Assert.Equal(2, plan.Best.Tablets.Count);
+    }
+
     private static Catalog Catalog() => new(
         new[]
         {

@@ -86,6 +86,7 @@ namespace SephPlanner.Plugin
                     EntityId = entity.id,
                     Rarity = (Rarity)(int)entity.rarity,
                     IsRotatable = tablet.isRotatable,
+                    CannotDiscard = entity.cannotThrow,
                     IsCustom = tablet.isCustomTablet,
                     Names = DisplayName(entity),
                     Query = tablet.query ?? "",

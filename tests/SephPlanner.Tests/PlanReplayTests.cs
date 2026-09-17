@@ -267,6 +267,18 @@ public sealed class PlanReplayTests : IDisposable
     }
 
     [Fact]
+    public void CatalogVersion23StillReplaysWithoutTabletDiscardRestrictions()
+    {
+        var json = Newtonsoft.Json.Linq.JObject.Parse(JsonConvert.SerializeObject(Capture()));
+        json["CatalogVersion"] = 23;
+        foreach (var tablet in json["Catalog"]!["Tablets"]!.Cast<Newtonsoft.Json.Linq.JObject>())
+            tablet.Remove("CannotDiscard");
+        var replay = System.Text.Json.JsonSerializer.Deserialize<PlanReplay>(json.ToString())!;
+
+        Assert.Empty(replay.Expected!.Differences(ReplayResult.From(replay.Rebuild(true))));
+    }
+
+    [Fact]
     public void DifferentModelRequiresExplicitComparisonAndStillChecksResults()
     {
         var capture = Capture();

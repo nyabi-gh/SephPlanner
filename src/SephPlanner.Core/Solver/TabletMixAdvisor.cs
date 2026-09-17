@@ -283,7 +283,7 @@ namespace SephPlanner.Core.Solver
             var materials = new List<(MixMaterial, TabletSlot)>();
             foreach (var slot in problem.Tablets)
             {
-                if (slot.Definition.EntityId == TabletMix.ResultEntityId) continue;
+                if (slot.Definition.CannotDiscard || slot.Definition.EntityId == TabletMix.ResultEntityId) continue;
 
                 var rotation = problem.CurrentTablets.TryGetValue(slot.InstanceId, out var current)
                     ? current.Rotation
