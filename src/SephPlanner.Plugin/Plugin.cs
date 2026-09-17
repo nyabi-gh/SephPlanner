@@ -935,7 +935,7 @@ namespace SephPlanner.Plugin
         /// </summary>
         private void UpdateNativePanel()
         {
-            if (!_settings.Panel.Value || _hidden)
+            if (!_settings.Panel.Value || _hidden || AnsweringWindowOpen())
             {
                 _hud.SetVisible(false);
                 return;
