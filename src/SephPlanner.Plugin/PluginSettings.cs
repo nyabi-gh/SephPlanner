@@ -191,8 +191,8 @@ namespace SephPlanner.Plugin
                 "동작한다. 기본은 꺼짐이며 같이 하는 사람의 동의를 얻고 켠다.");
 
             PadWindow = config.Bind(
-                "NativePanel", "PadOpensWindow", true,
-                "게임패드의 View(뒤로) 버튼으로 SephPlanner 창을 엽니다. 가방·상자 같은 게임 창이 " +
+                "NativePanel", "PadOpensWindow", false,
+                "기본은 꺼짐입니다. 켜면 게임패드의 View(뒤로) 버튼으로 SephPlanner 창을 엽니다. 가방·상자 같은 게임 창이 " +
                 "떠 있고 지도가 닫혀 있는 동안에만 듣습니다.");
 
             // 게임이 쓰지 않는 키로 고른다. 게임은 수정키를 보지 않으므로 Ctrl+Alt 를 붙여도
