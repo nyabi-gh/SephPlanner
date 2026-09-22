@@ -1,4 +1,4 @@
-using SephPlanner.Core.Model;
+﻿using SephPlanner.Core.Model;
 
 namespace SephPlanner.Core.Solver
 {
@@ -6,6 +6,10 @@ namespace SephPlanner.Core.Solver
     /// 콤보와 피해 보너스를 아티팩트 레벨 단위로 옮기는 환산값. 셋 다 <c>--measure</c> 로 실측했다.
     ///
     /// 아티팩트 하나하나의 값어치는 여기가 아니라 <see cref="CharmWorth"/>가 답한다.
+    ///
+    /// <b>채점에는 쓰지 않는다.</b> 여기는 <see cref="WorthScale.Default"/>로 가는 위임이라
+    /// 카탈로그가 잰 눈금을 모른다. 점수를 매기는 자리는 판의 <see cref="PlacementProblem.Scale"/>을
+    /// 받아 써야 한다 - 두 눈금을 섞으면 같은 줄 세우기 안에서 서로 다른 자로 잰 값이 더해진다.
     /// </summary>
     public static class Worth
     {

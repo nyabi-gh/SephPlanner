@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -209,7 +209,7 @@ namespace SephPlanner.Core.Solver
                     entry.Solved = outcome.Solved;
                 }
                 EvaluateCombo(
-                    entry, comboCounts, combos, priorityCategories, presetCharms,
+                    entry, problem.Scale, comboCounts, combos, priorityCategories, presetCharms,
                     outcome?.DisplacedCharm);
                 advice.Add(entry);
             }
@@ -237,6 +237,7 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         private static void EvaluateCombo(
             OfferAdvice advice,
+            WorthScale scale,
             IReadOnlyDictionary<string, int>? comboCounts,
             Func<string, ComboDefinition?>? combos,
             IReadOnlyCollection<string>? priorityCategories,
@@ -285,7 +286,7 @@ namespace SephPlanner.Core.Solver
 
                 comboCounts.TryGetValue(category, out var current);
                 var next = Math.Max(0, current + pair.Value);
-                var change = ComboValue(combo, next) - ComboValue(combo, current);
+                var change = ComboValue(combo, next, scale) - ComboValue(combo, current, scale);
                 if (Math.Abs(change) < 0.000001) continue;
 
                 if (CrossesUp(combo, current, next)) advice.ComboCompletes = true;
@@ -298,12 +299,17 @@ namespace SephPlanner.Core.Solver
             advice.ComboText = string.Join(" ", parts);
         }
 
-        private static double ComboValue(ComboDefinition combo, int count)
+        /// <summary>
+        /// 콤보 가치는 <see cref="Rank"/>에서 배치 점수와 더해져 줄 세우기가 되므로, 배치를
+        /// 채점한 것과 같은 눈금으로 재야 한다. 카탈로그가 잰 눈금은 기본값과 다르다
+        /// (제보들에서 콤보 2.1768 대 2.59).
+        /// </summary>
+        private static double ComboValue(ComboDefinition combo, int count, WorthScale scale)
         {
             var total = 0.0;
             var cap = combo.Thresholds.Count == 0 ? 0 : combo.Thresholds.Max();
             for (var current = 0; current < Math.Min(count, cap); current++)
-                total += Worth.OfComboStep(combo, current, out _, out _);
+                total += scale.OfComboStep(combo, current, out _, out _);
             return total;
         }
 

@@ -1,4 +1,4 @@
-using SephPlanner.Core.Model;
+﻿using SephPlanner.Core.Model;
 using SephPlanner.Core.Solver;
 using SephPlanner.Core.Tablets;
 
@@ -159,6 +159,25 @@ public class OfferAdvisorTests
         Assert.False(advice[0].ComboCompletes);
         Assert.Equal("잉걸불 3/5", advice[0].ComboText);
         Assert.True(advice[0].ComboBonus > 0);
+    }
+
+    /// <summary>
+    /// 콤보 가치는 <c>Rank</c> 에서 배치 점수와 더해져 줄 세우기가 되므로, 배치를 채점한 것과
+    /// 같은 눈금으로 재야 한다. 기본 눈금으로 재면 카탈로그가 잰 눈금과 어긋난 값이 순위에
+    /// 섞인다(제보들에서 콤보 2.1768 대 2.59).
+    /// </summary>
+    [Fact]
+    public void TheComboBonusIsMeasuredWithTheProblemScale()
+    {
+        var problem = BaseProblem();
+        problem.Scale = new WorthScale { ComboThreshold = 1.0, ComboProgress = 0.125 };
+        var candidates = new List<OfferCandidate> { Charm("ember", "EMBER") };
+        var counts = new Dictionary<string, int> { ["EMBER"] = 4 };
+
+        var advice = OfferAdvisor.Rank(problem, candidates, gold: 0, counts, FindCombo);
+
+        Assert.True(advice[0].ComboCompletes);
+        Assert.Equal(problem.Scale.ComboThreshold, advice[0].ComboBonus, 9);
     }
 
     [Fact]
