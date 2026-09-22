@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -220,7 +220,7 @@ namespace SephPlanner.Plugin.Ui
 
             _presetStatus.text = preset != null
                 ? PluginPreferences.Summary(preset)
-                : "게임에서 프리셋 코드를 복사한 뒤 누르세요.";
+                : "게임에서 빌드 코드를 복사한 뒤 누르세요.";
             _presetStatus.color = NativeSkin.TextDim;
         }
 
