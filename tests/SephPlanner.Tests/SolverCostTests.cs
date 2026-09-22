@@ -1,4 +1,4 @@
-using SephPlanner.Core.Model;
+﻿using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
 using SephPlanner.Core.Solver;
@@ -160,6 +160,30 @@ public class SolverCostTests
         Assert.Same(first, cache.Baseline(problem, SolverOptions.ForAdvice(default)));
         Assert.NotSame(first, cache.Baseline(problem, new SolverOptions { BeamWidth = 32 }));
         Assert.NotSame(first, cache.Baseline(FullBag(charmCount: 12, spare: 6), advice));
+    }
+
+    /// <summary>
+    /// 앞보기가 기준 배치를 밀어내지 않는다.
+    ///
+    /// 후보 추천은 후보마다 지금 판의 기준 배치(<c>BestTrial</c>)와 늘어난 판의 기준 배치
+    /// (<c>GainOf</c>)를 번갈아 묻는다. 자리가 하나였을 때는 둘이 서로를 밀어내 후보마다 두 판이
+    /// 다시 풀렸고, 빔은 이미 찾아 둔 것을 쓰므로 <see cref="LayoutCache.Searches"/>는 그 낭비를
+    /// 한 번도 세지 못했다.
+    /// </summary>
+    [Fact]
+    public void LookingAheadDoesNotEvictTheBaseline()
+    {
+        var problem = FullBag(charmCount: 12, spare: 6);
+        var cache = new LayoutCache();
+        var lookahead = new Lookahead(problem);
+        Assert.True(lookahead.Available);
+
+        OfferAdvisor.Rank(
+            problem, Candidates(charms: 4, tablets: 0), int.MaxValue,
+            layouts: cache, lookahead: lookahead);
+
+        // 지금 판 하나, 늘어난 판 하나. 후보 수를 따라 늘기 시작하면 그때가 회귀다.
+        Assert.Equal(2, cache.BaselineSolves);
     }
 
     /// <summary>

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -61,9 +61,22 @@ namespace SephPlanner.Core.Solver
         private readonly Dictionary<string, Entry> _yardsticks = new Dictionary<string, Entry>(StringComparer.Ordinal);
         private long _clock;
 
-        private PlacementProblem? _baselineProblem;
-        private string _baselineKey = "";
-        private Arrangement? _baseline;
+        /// <summary>
+        /// 기준 배치를 들고 있을 자리 수. 한 계획 안에서 지금 판과 <see cref="Lookahead"/>의
+        /// 늘어난 판을 후보마다 번갈아 물어 오므로, 자리가 하나면 둘이 서로를 밀어내 후보마다
+        /// 두 판이 다시 풀린다. 조언이 예산을 덮어써 강도가 갈리는 경우까지 두 판씩 잡아 넷이다.
+        /// </summary>
+        private const int BaselineLimit = 4;
+
+        private sealed class Baselined
+        {
+            public PlacementProblem? Problem;
+            public string Key = "";
+            public Arrangement? Value;
+            public long Used;
+        }
+
+        private readonly List<Baselined> _baselines = new List<Baselined>();
 
         /// <summary>실제로 돈 탐색 횟수. 돌려 쓰기가 듣고 있는지 재는 자리다.</summary>
         public int Searches { get; private set; }
@@ -72,14 +85,18 @@ namespace SephPlanner.Core.Solver
         public int Reuses { get; private set; }
 
         /// <summary>
+        /// 기준 배치를 실제로 푼 횟수. 빔을 돌려 쓰면 <see cref="Searches"/>가 안 오르므로,
+        /// 기준 배치가 몇 번 풀렸는지는 여기서만 보인다.
+        /// </summary>
+        public int BaselineSolves { get; private set; }
+
+        /// <summary>
         /// 새 계획을 시작한다. 빔은 두고 채점한 것만 버린다 - 기준 배치와 잣대는 지금 배치와
         /// 직전 계획을 보고 고른 배치라, 넘겨 쓰면 그때의 앵커로 이번 답을 고르게 된다.
         /// </summary>
         public void BeginPlan()
         {
-            _baseline = null;
-            _baselineProblem = null;
-            _baselineKey = "";
+            _baselines.Clear();
             _yardsticks.Clear();
         }
 
@@ -95,26 +112,43 @@ namespace SephPlanner.Core.Solver
         /// 기억해 둔 것은 판도 탐색 강도도 그대로일 때만 돌려준다. 어느 한쪽이라도 다르면 조용히
         /// 남의 답을 받는 대신 다시 푼다 - 기준과 후보가 다른 잣대로 풀리는 것이 애초에 막으려는
         /// 일이므로, 여기서 그것을 되살리면 안 된다.
+        ///
+        /// <b>판 하나로는 모자란다.</b> 한 계획 안에서 묻는 판이 지금 판과 늘어난 판 둘이라,
+        /// 자리가 하나면 번갈아 서로를 밀어낸다(<see cref="BaselineLimit"/>).
         /// </summary>
         public Arrangement Baseline(PlacementProblem problem, SolverOptions options)
         {
             var key = ScoringKey(problem, options);
-            if (_baseline is not null && ReferenceEquals(_baselineProblem, problem) && _baselineKey == key)
+            foreach (var kept in _baselines)
             {
+                if (!ReferenceEquals(kept.Problem, problem) || kept.Key != key) continue;
+                kept.Used = ++_clock;
                 Reuses++;
-                return _baseline;
+                return kept.Value!;
             }
 
-            // 남의 판을 붙들고 있지 않도록 먼저 놓는다.
-            _baseline = null;
-            _baselineProblem = null;
-            _baselineKey = "";
-
+            BaselineSolves++;
             var solved = PlacementSolver.EvaluateLayouts(problem, Of(problem, options), options);
-            _baselineProblem = problem;
-            _baselineKey = key;
-            _baseline = solved;
+            Remember(problem, key, solved);
             return solved;
+        }
+
+        private void Remember(PlacementProblem problem, string key, Arrangement solved)
+        {
+            if (_baselines.Count >= BaselineLimit)
+            {
+                var oldest = 0;
+                for (var i = 1; i < _baselines.Count; i++)
+                    if (_baselines[i].Used < _baselines[oldest].Used) oldest = i;
+                _baselines.RemoveAt(oldest);
+            }
+            _baselines.Add(new Baselined
+            {
+                Problem = problem,
+                Key = key,
+                Value = solved,
+                Used = ++_clock,
+            });
         }
 
         public List<List<TabletPlacement>> Of(PlacementProblem problem, SolverOptions options)
