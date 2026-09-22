@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using Mirror;
@@ -136,7 +136,7 @@ namespace SephPlanner.Plugin
                     return Denied("계획을 만든 카탈로그가 더 이상 최신이 아니어서 자동 배치를 실행하지 않습니다.");
                 if (command.ExpectedPlacementFingerprint.Length == 0 ||
                     command.ExpectedPlanningContextFingerprint.Length == 0)
-                    return Denied("계획의 상태 지문이 없어 자동 배치를 실행하지 않습니다.");
+                    return Denied("계획이 어떤 게임 상태에서 나온 것인지 확인할 수 없어 자동 배치를 실행하지 않습니다.");
 
                 if (GameReader.IsMultiplayerSession() && !allowMultiplayer)
                     return Denied("멀티플레이 세션에서는 자동 배치를 실행하지 않습니다. 설정에서 열 수 있습니다.");

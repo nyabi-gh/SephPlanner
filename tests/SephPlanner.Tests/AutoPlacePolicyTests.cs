@@ -1,4 +1,4 @@
-using SephPlanner.Core.Planning;
+﻿using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
 
 namespace SephPlanner.Tests;
@@ -81,7 +81,13 @@ public class AutoPlacePolicyTests
     {
         var context = Context();
         context.Runner!.Latest!.RequestGeneration++;
-        Assert.False(AutoPlacePolicy.Evaluate(context).Allowed);
+
+        var decision = AutoPlacePolicy.Evaluate(context);
+
+        Assert.False(decision.Allowed);
+
+        // 잠깐 뒤면 저절로 풀리는 거절이다. 내부 용어로 적으면 눌러도 아무 일이 없는 것으로 읽힌다.
+        Assert.Contains("잠시 뒤 다시 누르세요", decision.Reason);
     }
 
     [Fact]

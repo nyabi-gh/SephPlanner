@@ -1,4 +1,4 @@
-using SephPlanner.Core.Planning;
+﻿using SephPlanner.Core.Planning;
 using SephPlanner.Core.Solver;
 
 namespace SephPlanner.Core.Runtime
@@ -63,7 +63,7 @@ namespace SephPlanner.Core.Runtime
             var plan = state.Latest;
             if (plan is null) return AutoPlaceDecision.Deny("옮길 것이 없습니다.");
             if (plan.RequestGeneration <= 0 || plan.RequestGeneration != state.PublishedGeneration)
-                return AutoPlaceDecision.Deny("최신 요청과 계획의 generation이 달라 자동 배치를 잠갔습니다.");
+                return AutoPlaceDecision.Deny("지금 보이는 계획이 최신 요청의 것이 아닙니다. 잠시 뒤 다시 누르세요.");
             if (!context.CatalogVerified || plan.CatalogGeneration != context.CatalogGeneration)
                 return AutoPlaceDecision.Deny(
                     "석판 효과 계산을 검증하지 못해 자동 배치를 사용할 수 없습니다. ‘아이템 데이터 다시 읽기’(기본 F9)를 실행하세요.");
