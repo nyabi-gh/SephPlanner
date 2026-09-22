@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 using SephPlanner.Core.Runtime;
@@ -141,15 +141,11 @@ namespace SephPlanner.Plugin
             var viewer = ui.GetElement<UI_InventoryViewer>();
             if (viewer == null || !viewer.IsOpened) return null;
 
-            if (_viewerInventory == null)
-            {
-                _viewerInventory = typeof(UI_InventoryViewer).GetProperty(
-                    "Inventory", BindingFlags.NonPublic | BindingFlags.Instance);
-            }
-            return _viewerInventory?.GetValue(viewer, null) as GridInventory;
+            return ViewerInventory?.GetValue(viewer, null) as GridInventory;
         }
 
-        private static PropertyInfo _viewerInventory;
+        private static readonly PropertyInfo ViewerInventory =
+            GameBinding.Property(typeof(UI_InventoryViewer), "Inventory");
 
         /// <summary>
         /// 마지막으로 훑은 세피라이트들의 상태. 왜 어떤 선택지가 추천에 안 들어왔는지는 거리와

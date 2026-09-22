@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using BepInEx.Configuration;
@@ -366,9 +366,19 @@ namespace SephPlanner.Plugin
 
         public void SetDiagnosticConsent(bool allowed)
         {
-            DiagnosticConsent.Value = allowed ? DiagnosticUploadClient.ConsentKey(new Uri(DiagnosticUploadClient.DefaultEndpoint)) : "";
-            DiagnosticChoiceMade.Value = true;
-            _config.Save();
+            var previousChoice = DiagnosticChoiceMade.Value;
+            try
+            {
+                DiagnosticConsent.Value = allowed ? DiagnosticUploadClient.ConsentKey(new Uri(DiagnosticUploadClient.DefaultEndpoint)) : "";
+                DiagnosticChoiceMade.Value = true;
+                _config.Save();
+            }
+            catch
+            {
+                DiagnosticConsent.Value = "";
+                DiagnosticChoiceMade.Value = previousChoice;
+                throw;
+            }
         }
 
         public void SavePanelMargin(float x, float y)

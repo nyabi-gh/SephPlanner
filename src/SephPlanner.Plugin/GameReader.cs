@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Mirror;
 using SephPlanner.Core.Model;
@@ -133,9 +133,7 @@ namespace SephPlanner.Plugin
         }
 
         private static readonly System.Reflection.FieldInfo AltarRemaining =
-            typeof(AltarOfEnchant).GetField(
-                "localRemaining",
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            GameBinding.Field(typeof(AltarOfEnchant), "localRemaining");
 
         /// <summary>
         /// 지금 인챈트를 걸 수 있는 기회. 제단도 없고 창도 닫혀 있으면 <c>null</c> 이다.
@@ -313,9 +311,7 @@ namespace SephPlanner.Plugin
         }
 
         private static readonly System.Reflection.FieldInfo GrowthCounter =
-            typeof(Charm_GrowthStatusInstance).GetField(
-                "questCounter",
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            GameBinding.Field(typeof(Charm_GrowthStatusInstance), "questCounter");
 
         /// <summary>
         /// 성장 아티팩트가 목표까지 얼마나 왔는지. 읽지 못하면 <c>null</c> 이다.
@@ -360,12 +356,8 @@ namespace SephPlanner.Plugin
         internal static GridSpec GridOf(GridInventory inv) =>
             new GridSpec(inv.Width, inv.Height, inv.CurrentInventoryStorage);
 
-        private static int LookupMatrix(SyncDictionary<ItemPosition, int> matrix, sbyte x, sbyte y)
-        {
-            foreach (var pair in matrix)
-                if (pair.Key.x == x && pair.Key.y == y) return pair.Value;
-            return 0;
-        }
+        private static int LookupMatrix(SyncDictionary<ItemPosition, int> matrix, sbyte x, sbyte y) =>
+            matrix.TryGetValue(new ItemPosition(x, y), out var value) ? value : 0;
 
         private static string CellKey(int x, int y) => x + "," + y;
     }
