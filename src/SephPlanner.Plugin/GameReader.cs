@@ -31,7 +31,11 @@ namespace SephPlanner.Plugin
 
             // 성장 진행도는 게임이 화면으로 보낼 때만 손에 들어온다. 아바타가 바뀌면 다시 붙는다.
             GrowthProgressWatch.Follow(avatar);
-            if (avatar == null || avatar.Inventory == null || avatar.IsDead) return snapshot;
+            if (avatar == null || avatar.Inventory == null || avatar.IsDead)
+            {
+                FixedEffectLayer.Forget();
+                return snapshot;
+            }
 
             snapshot.Run = ReadRun(avatar);
 
@@ -64,14 +68,7 @@ namespace SephPlanner.Plugin
                 };
             }
 
-            var issue = SimulationVerifier.Check(avatar.Inventory);
-            return new RuntimeSimulationCheck
-            {
-                Status = issue == null
-                    ? PlanVerificationStatus.Passed
-                    : PlanVerificationStatus.Failed,
-                Reason = issue == null ? "" : "시뮬레이터 불일치: " + issue,
-            };
+            return SimulationVerifier.Check(avatar.Inventory);
         }
 
         internal static PlayerAvatar FindLocalPlayer()
@@ -296,64 +293,9 @@ namespace SephPlanner.Plugin
             foreach (var pair in inv.currentSetEffectCount)
                 state.ComboCounts[pair.Key] = pair.Value;
 
-            state.FixedEffects.AddRange(ReadFixedEffects(inv));
+            state.FixedEffects.AddRange(FixedEffectLayer.Get(inv).Cells);
 
             return state;
-        }
-
-        /// <summary>
-        /// 호스트는 고정 각인 원본을 읽고, 참가자는 동기화된 신비 좌표와 실제 효과 정의로 복원한다.
-        /// </summary>
-        internal static List<FixedEffectCell> ReadFixedEffects(GridInventory inv)
-        {
-            var effects = ReadFixedEngravings(inv);
-            // 친타마니가 사라진 뒤에도 좌표에 남으며, 참가자에게도 동기화되는 보너스다.
-            foreach (var pair in inv.dungeonTempLevels)
-            {
-                if (pair.Value == 0) continue;
-                effects.Add(new FixedEffectCell
-                {
-                    Position = new GridPos(pair.Key.x, pair.Key.y),
-                    Level = pair.Value,
-                });
-            }
-            return effects;
-        }
-
-        private static List<FixedEffectCell> ReadFixedEngravings(GridInventory inv)
-        {
-            if (!NetworkServer.active)
-            {
-                if (!inv.currentSetEffectCount.TryGetValue("MYSTIC", out var count) || count <= 0)
-                    return new List<FixedEffectCell>();
-                var rule = ItemCatalog.LoadMysticRule();
-                if (rule == null) return new List<FixedEffectCell>();
-                var positions = new List<GridPos>();
-                foreach (var position in inv.mysticPositions)
-                    positions.Add(new GridPos(position.x, position.y));
-                return MysticEngravings.Resolve(rule, count, positions, GridOf(inv));
-            }
-            var cells = new Dictionary<GridPos, FixedEffectCell>();
-            foreach (var engraving in inv.fixedEngravingsOnServer)
-            {
-                if (engraving == null) continue;
-                foreach (var pair in engraving.fixedLevel) At(cells, pair.Key).Level += pair.Value;
-                foreach (var pair in engraving.fixedDisable) At(cells, pair.Key).Disable += pair.Value;
-                foreach (var pair in engraving.fixedIgnoreCriteria) At(cells, pair.Key).IgnoreCriteria += pair.Value;
-                foreach (var pair in engraving.fixedMultiplyLevel) At(cells, pair.Key).Multiply += pair.Value;
-            }
-            return new List<FixedEffectCell>(cells.Values);
-        }
-
-        private static FixedEffectCell At(Dictionary<GridPos, FixedEffectCell> cells, ItemPosition position)
-        {
-            var key = new GridPos(position.x, position.y);
-            if (!cells.TryGetValue(key, out var cell))
-            {
-                cell = new FixedEffectCell { Position = key };
-                cells[key] = cell;
-            }
-            return cell;
         }
 
         /// <summary>

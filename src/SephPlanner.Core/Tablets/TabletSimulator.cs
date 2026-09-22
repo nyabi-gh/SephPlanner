@@ -51,6 +51,10 @@ namespace SephPlanner.Core.Tablets
         public bool IsDisabled(GridPos position) =>
             Contains(position) && _disable[_grid.ToIndex(position.X, position.Y)] > 0;
 
+        /// <summary>겹쳐 쌓인 비활성 수. 게임의 <c>disableMatrix</c>와 같은 기준이라 되뺄 때 쓴다.</summary>
+        public int DisableAt(GridPos position) =>
+            Contains(position) ? _disable[_grid.ToIndex(position.X, position.Y)] : 0;
+
         public int IgnoreCriteriaAt(GridPos position) =>
             Contains(position) ? _ignore[_grid.ToIndex(position.X, position.Y)] : 0;
 

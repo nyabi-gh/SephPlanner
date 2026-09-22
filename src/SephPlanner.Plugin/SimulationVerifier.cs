@@ -15,47 +15,55 @@ namespace SephPlanner.Plugin
     /// Core 의 석판 시뮬레이터를 게임의 실제 적용 결과와 대조한다.
     /// 게임이 이미 계산해 둔 <c>IsApplied</c>와 <c>EffectRange</c>, 그리고 <c>levelMatrix</c>가 정답지다.
     ///
-    /// 질의가 맞아도 고정 각인 누락이나 동기화 도중에는 최종 행렬이 다를 수 있어 함께 대조한다.
+    /// 못 읽은 입력이 있으면 어긋남이 아니라 <see cref="PlanVerificationStatus.Unavailable"/>이다.
+    /// 우리가 눈을 감은 것과 게임이 다른 것을 같은 이름으로 부르면, 참가자 자리에서는 눈을 감은
+    /// 쪽이 영원히 어긋남으로 올라간다.
     /// </summary>
     internal static class SimulationVerifier
     {
-        /// <summary>마지막 대조에서 확인한 석판 수. 검증이 실제로 돌았는지 판단하는 근거다.</summary>
         public static int LastCheckedTablets { get; private set; }
+        public static int LastFixedCells { get; private set; }
 
-        /// <summary>일치하면 null, 어긋나면 첫 번째 차이를 설명하는 문자열.</summary>
-        public static string Check(GridInventory inv)
+        public static RuntimeSimulationCheck Check(GridInventory inv)
         {
-            var grid = new GridSpec(inv.Width, inv.Height, inv.CurrentInventoryStorage);
-            var occupancy = BuildOccupancy(inv);
+            var layer = FixedEffectLayer.Get(inv);
+            var view = layer.View;
+            LastCheckedTablets = view.Placements.Count;
+            LastFixedCells = layer.Cells.Count;
 
-            var placements = new List<TabletPlacement>();
-            var tablets = new List<StoneTablet>();
-            var seenTablets = new HashSet<int>();
-            foreach (var tablet in inv.stoneTablets.Values)
+            if (layer.Pending.Length > 0) return Result(PlanVerificationStatus.Unavailable, layer.Pending);
+            if (layer.Blocker.Length > 0) return Result(PlanVerificationStatus.Failed, layer.Blocker);
+
+            var result = TabletSimulator.Run(view.Placements, view.Occupancy, view.Grid, layer.Cells);
+
+            for (var i = 0; i < view.Tablets.Count; i++)
             {
-                AddTablet(tablet, seenTablets, tablets, placements);
-            }
-            foreach (var tablet in inv.engravings)
-                AddTablet(tablet, seenTablets, tablets, placements);
-            LastCheckedTablets = placements.Count;
-
-            // 고정 각인 몫까지 넣어야 게임 levelMatrix 와 같은 기준으로 견주게 된다.
-            var result = TabletSimulator.Run(placements, occupancy, grid, GameReader.ReadFixedEffects(inv));
-
-            for (var i = 0; i < tablets.Count; i++)
-            {
-                if (result.Applied[i] != tablets[i].IsApplied)
-                    return $"석판 {tablets[i].entityID} 적용 여부 {result.Applied[i]} != {tablets[i].IsApplied}" +
-                           Collapsed(inv, grid, tablets, result);
+                if (result.Applied[i] != view.Tablets[i].IsApplied)
+                {
+                    return Result(PlanVerificationStatus.Failed,
+                        $"석판 {view.Tablets[i].entityID} 적용 여부 {result.Applied[i]} != {view.Tablets[i].IsApplied}" +
+                        Collapsed(inv, view, result));
+                }
 
                 if (!result.Applied[i]) continue;
 
-                var difference = CompareEffects(placements[i], grid, tablets[i]);
-                if (difference != null) return $"석판 {tablets[i].entityID} {difference}";
+                var difference = CompareEffects(view.Placements[i], view.Grid, view.Tablets[i]);
+                if (difference != null)
+                    return Result(PlanVerificationStatus.Failed, $"석판 {view.Tablets[i].entityID} {difference}");
             }
 
-            return CompareMatrices(inv, grid, result);
+            var mismatch = CompareMatrices(inv, view, result);
+            return mismatch == null
+                ? Result(PlanVerificationStatus.Passed, "")
+                : Result(PlanVerificationStatus.Failed, mismatch);
         }
+
+        private static RuntimeSimulationCheck Result(PlanVerificationStatus status, string reason) =>
+            new RuntimeSimulationCheck
+            {
+                Status = status,
+                Reason = status == PlanVerificationStatus.Failed ? "시뮬레이터 불일치: " + reason : reason,
+            };
 
         /// <summary>
         /// 어긋남에 덧붙일 한 마디. 게임은 맞바꿈·회전 끝에 레벨 행렬을 다시 만드는데, 그것이
@@ -65,62 +73,34 @@ namespace SephPlanner.Plugin
         ///
         /// <b>어긋남을 대신하지 않고 덧붙이기만 한다.</b> 여기에는 "조금 전까지 효과가 있었다" 는
         /// 근거가 없어서 - <c>ApplyPlanRoutine.Collapsed</c> 는 그것을 들고 있다 - 아직 아무 석판도
-        /// 발동하지 않은 초반 판과 구별되지 않기 때문이다. 어느 석판이 어긋났는지는 그대로 남는다.
-        ///
-        /// 어긋남을 찾았을 때만 부른다 - 칸마다 레벨 행렬을 훑는다.
+        /// 발동하지 않은 초반 판과 구별되지 않기 때문이다.
         /// </summary>
-        private static string Collapsed(
-            GridInventory inv, GridSpec grid, List<StoneTablet> tablets, SimulationResult result)
+        private static string Collapsed(GridInventory inv, InventoryView view, SimulationResult result)
         {
             var applied = 0;
-            for (var i = 0; i < tablets.Count; i++)
+            for (var i = 0; i < view.Tablets.Count; i++)
             {
-                if (tablets[i].IsApplied) return "";
+                if (view.Tablets[i].IsApplied) return "";
                 if (result.Applied[i]) applied++;
             }
             if (applied == 0) return "";
 
-            for (var index = 0; index < grid.Storage; index++)
+            for (var index = 0; index < view.Grid.Storage; index++)
             {
-                var position = grid.ToPosition(index);
+                var position = view.Grid.ToPosition(index);
                 if (LookupLevel(inv, (sbyte)position.X, (sbyte)position.Y) != 0) return "";
             }
 
-            return $" - 게임이 계산한 가방 효과가 비어 있습니다(석판 {tablets.Count}개가 전부 비적용, " +
+            return $" - 게임이 계산한 가방 효과가 비어 있습니다(석판 {view.Tablets.Count}개가 전부 비적용, " +
                    "칸 레벨도 전부 0). 동기화 중이면 곧 사라지고, 계속 남으면 방을 나갔다 들어오세요.";
         }
 
-        private static void AddTablet(
-            StoneTablet tablet, HashSet<int> seen,
-            List<StoneTablet> tablets, List<TabletPlacement> placements)
+        private static string CompareMatrices(GridInventory inv, InventoryView view, SimulationResult result)
         {
-            if (tablet == null || !seen.Add(tablet.instanceID)) return;
-            tablets.Add(tablet);
-            placements.Add(new TabletPlacement
+            for (var index = 0; index < view.Grid.Storage; index++)
             {
-                Definition = new TabletDefinition(),
-                Position = new GridPos(tablet.xIdx, tablet.yIdx),
-                Rotation = tablet.rotation,
-                InstanceQuery = tablet.GetQuery(tablet.instanceID) ?? "",
-                InstanceConditionQuery = tablet.GetConditionQuery(tablet.instanceID) ?? "",
-            });
-        }
-
-        private static string CompareMatrices(GridInventory inv, GridSpec grid, SimulationResult result)
-        {
-            var enchants = new Dictionary<GridPos, int>();
-            foreach (var pair in inv.inventoryMatrix)
-            {
-                var item = pair.Value;
-                if (item == null || item.StoneTablet != null) continue;
-                var position = new GridPos(pair.Key.x, pair.Key.y);
-                enchants[position] = GameReader.EnchantOf(item.InstanceID);
-            }
-
-            for (var index = 0; index < grid.Storage; index++)
-            {
-                var position = grid.ToPosition(index);
-                enchants.TryGetValue(position, out var enchant);
+                var position = view.Grid.ToPosition(index);
+                view.Enchants.TryGetValue(position, out var enchant);
                 var ours = result.EffectiveLevel(position, enchant);
                 var theirs = LookupLevel(inv, (sbyte)position.X, (sbyte)position.Y);
                 if (ours != theirs)
@@ -151,20 +131,6 @@ namespace SephPlanner.Plugin
         {
             inv.disableMatrix.TryGetValue(new ItemPosition(x, y), out var disabled);
             return disabled > 0;
-        }
-
-        private static GridOccupancy BuildOccupancy(GridInventory inv)
-        {
-            // 조건 판정의 AnyItem 은 석판이 놓인 칸도 아이템으로 센다.
-            var occupancy = new GridOccupancy();
-            foreach (var pair in inv.inventoryMatrix)
-            {
-                var instance = pair.Value;
-                if (instance == null) continue;
-                var isCharm = instance.Entity != null && instance.Entity.type == EItemType.Charm;
-                occupancy.AddItem(new GridPos(pair.Key.x, pair.Key.y), isCharm);
-            }
-            return occupancy;
         }
 
         private static string CompareEffects(TabletPlacement placement, GridSpec grid, StoneTablet tablet)

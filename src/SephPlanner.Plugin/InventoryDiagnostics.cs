@@ -1,7 +1,9 @@
 using System.IO;
 using System.Text;
+using Mirror;
 using Newtonsoft.Json;
 using SephPlanner.Core.Runtime;
+using SephPlanner.Core.Tablets;
 using UnityEngine;
 
 namespace SephPlanner.Plugin
@@ -12,6 +14,14 @@ namespace SephPlanner.Plugin
     /// </summary>
     internal static class InventoryDiagnostics
     {
+        private static int Severed(System.Collections.Generic.IEnumerable<StoneTablet> tablets)
+        {
+            var count = 0;
+            foreach (var tablet in tablets)
+                if (tablet == null) count++;
+            return count;
+        }
+
         private const string FileName = "inventory-dump.txt";
         private const string SnapshotFileName = "inventory-snapshot.json";
 
@@ -139,6 +149,8 @@ namespace SephPlanner.Plugin
                 text.AppendLine();
                 text.AppendLine($"Width={inv.Width} Height={inv.Height} Storage={inv.CurrentInventoryStorage} " +
                                 $"SubBag={inv.numberOfSubBagStorage} Potion={inv.numberOfPotionStorage}");
+                text.AppendLine($"서버={NetworkServer.active} 클라이언트={NetworkClient.active} " +
+                                $"석판각인권={inv.tabletEngravingCount}");
             });
 
             Section("inventoryMatrix", () =>
@@ -168,11 +180,15 @@ namespace SephPlanner.Plugin
             Section("stoneTablets", () =>
             {
                 text.AppendLine();
-                text.AppendLine("[stoneTablets]");
+                text.AppendLine($"[stoneTablets] {inv.stoneTablets.Count}개, 끊긴 참조 {Severed(inv.stoneTablets.Values)}개");
                 foreach (var pair in inv.stoneTablets)
                 {
                     var tablet = pair.Value;
-                    if (tablet == null) continue;
+                    if (tablet == null)
+                    {
+                        text.AppendLine($"  ({pair.Key.x},{pair.Key.y}) <null>");
+                        continue;
+                    }
                     text.AppendLine(
                         $"  ({pair.Key.x},{pair.Key.y}) entity={tablet.entityID} instance={tablet.instanceID} " +
                         $"rot={tablet.rotation} applied={tablet.IsApplied} custom={tablet.isCustomTablet}");
@@ -182,10 +198,14 @@ namespace SephPlanner.Plugin
             Section("engravings", () =>
             {
                 text.AppendLine();
-                text.AppendLine("[engravings]");
+                text.AppendLine($"[engravings] {inv.engravings.Count}개, 끊긴 참조 {Severed(inv.engravings)}개");
                 foreach (var engraving in inv.engravings)
                 {
-                    if (engraving == null) continue;
+                    if (engraving == null)
+                    {
+                        text.AppendLine("  <null>");
+                        continue;
+                    }
                     text.AppendLine(
                         $"  ({engraving.xIdx},{engraving.yIdx}) entity={engraving.entityID} " +
                         $"instance={engraving.instanceID} rot={engraving.rotation} " +
@@ -199,6 +219,16 @@ namespace SephPlanner.Plugin
                 text.AppendLine("[levelMatrix]");
                 foreach (var pair in inv.levelMatrix)
                     text.AppendLine($"  ({pair.Key.x},{pair.Key.y}) = {pair.Value}");
+            });
+
+            Section("고정 효과", () =>
+            {
+                var layer = FixedEffectLayer.Get(inv);
+                text.AppendLine();
+                text.AppendLine($"[고정 효과] {(NetworkServer.active ? "서버 원본" : "게임 행렬에서 되뺌")}");
+                text.AppendLine("  " + FixedEffectResidual.Describe(layer.Cells, limit: 64));
+                if (layer.Blocker.Length > 0) text.AppendLine("  막힘: " + layer.Blocker);
+                if (layer.Pending.Length > 0) text.AppendLine("  보류: " + layer.Pending);
             });
 
             Section("offers", () => WriteOffers(text, inv, player, offerRadius));

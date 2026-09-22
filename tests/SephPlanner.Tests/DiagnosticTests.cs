@@ -56,11 +56,26 @@ public sealed class DiagnosticTests
         for (var i = 0; i < AutomaticDiagnosticPolicy.SessionLimit; i++)
         {
             now += TimeSpan.FromMinutes(1);
-            Assert.True(policy.TryAccept("오류 " + i, throttle));
+            Assert.True(policy.TryAccept("오류 " + (char)('A' + i), throttle));
         }
         now += TimeSpan.FromMinutes(1);
         Assert.False(policy.TryAccept("다른 오류", throttle));
-        Assert.False(policy.TryAccept("오류 0", throttle));
+        Assert.False(policy.TryAccept("오류 A", throttle));
+    }
+
+    [Fact]
+    public void SameErrorWithDifferentCellsCountsOnce()
+    {
+        var now = TimeSpan.Zero;
+        var throttle = new DiagnosticUploadThrottle(TimeSpan.FromMinutes(1), () => now);
+        var policy = new AutomaticDiagnosticPolicy();
+
+        now += TimeSpan.FromMinutes(1);
+        Assert.True(policy.TryAccept("칸 (1,1) 레벨 0 != 게임 1", throttle));
+        now += TimeSpan.FromMinutes(1);
+        Assert.False(policy.TryAccept("칸 (2,0) 레벨 0 != 게임 3", throttle));
+        now += TimeSpan.FromMinutes(1);
+        Assert.True(policy.TryAccept("칸 (2,0) 배수 0 != 게임 2", throttle));
     }
 
     [Fact]

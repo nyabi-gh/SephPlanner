@@ -519,7 +519,8 @@ num += allDamageBonusByLevel.SafeRandomAccess(CurrentLevelToIdx()) * (float)num2
 배치 보너스는 이 파이프라인 뒤에 돌지만 레벨을 바꾸지 않는다(아래 참고).
 
 인챈트는 그대로 읽어 스냅샷에 싣는다. `globalItemStatTable`이 `SyncDictionary`라 클라이언트에도
-값이 있다. 예전에는 게임이 보고한 레벨에서 석판 몫을 빼서 역산했는데, 4단계의 배수가 걸린 칸에서는
+값이 있다 - 게임의 `UI_CharmTooltip`·`UI_ShopPanel`·`UI_SephiriteRewardPanel`도 참가자 자리에서
+같은 표를 읽는다. 예전에는 게임이 보고한 레벨에서 석판 몫을 빼서 역산했는데, 4단계의 배수가 걸린 칸에서는
 나눗셈이 떨어지지 않아 근사값이 됐다.
 
 ### 인챈트를 거는 자리 (2026-09-15)
@@ -576,40 +577,43 @@ if (icon.Item.Charm.maxLevel > 0)
 그래서 각인은 배치 탐색의 대상이 아니라 주어진 조건이다. `PlacementProblem.FixedTablets`에 담아
 효과 계산에는 언제나 함께 넣되, 배치 후보에서 자리를 빼앗지는 않는다.
 
-### 고정 각인과 참가자의 신비 복원
+### 고정 각인은 서버에만 있다 (2026-09-22)
 
 **고정 각인**(`fixedEngravingsOnServer`)은 서버에만 있는 `List<FixedEngraving>`이다. 각 원소는
 질의가 아니라 **절대 좌표로 이미 풀린 효과 딕셔너리**(fixedLevel/fixedDisable/fixedIgnoreCriteria/
 fixedMultiplyLevel)를 들고 있고, 배수는 석판과 같은 `multiplyLevelMatrix`에 쌓인다.
+만들 때 한 번 구워지므로 **아이템을 옮겨도 변하지 않는다.**
 
-정체의 대표가 **신비(MYSTIC) 콤보**다. `ComboEffect_Mystic`이 임계값마다 석판 12002를 고정
-각인으로 심는다. 커뮤니티의 다른 자동배치 모드가 "신비 콤보 ×2 미반영" 버그를 겪은 원인이
-바로 이것이다.
+만드는 길은 셋이다.
 
-싱글은 호스트 모드라 이 목록을 그대로 읽을 수 있다. `GameReader.ReadFixedEffects`가 칸 효과로
-합쳐 스냅샷(`FixedEffects`)에 싣고, `TabletSimulator`가 행렬에 먼저 깔고 시작한다.
-`SimulationVerifier`도 같은 기준으로 대조한다.
+- **신비(MYSTIC) 콤보.** `ComboEffect_Mystic`이 임계값마다 석판 12002를 심는다. 커뮤니티의 다른
+  자동배치 모드가 "신비 콤보 ×2 미반영" 버그를 겪은 원인이 이것이다.
+- **가방의 석판 각인.** `tabletEngravingCount > 0`이면 `UI_CharacterStatusPanel.OnItemLongClicked`가
+  석판을 길게 눌렀을 때 `CmdCreateFixedEngravingFromInventory(tablet)`을 보낸다. 서버는 효과를
+  구운 뒤 **`ForceRemoveItem`으로 석판을 가방에서 지운다.**
+- **보상 석판 각인.** 같은 자리에서 세피라이트 보상의 석판을 `CmdCreateFixedEngravingFromExternalItem`
+  으로 바로 각인한다. **그 석판은 가방에 들어오지도 않는다.**
 
-**참가자는 신비 각인만 공개된 상태로 복원한다**(2026-09-05 수정). 설치된 1.0.30의
-`ComboEffect_Mystic.OnEnableEffect`, `FixedEngraving.ApplyEffect`, `GridInventory`를 다시
-디컴파일해 확인했다. `mysticPositions`는 `SyncList<ItemPosition>`, `currentSetEffectCount`는
-`SyncDictionary<string,int>`다. 신비 프리팹의 `first/firstEngravingCount`에 따라 앞쪽 좌표를,
-`second/secondEngravingCount`에 따라 그 다음 좌표를 사용한다. 두 번째 단계는 첫 번째에 더해진다.
+`fixedEngravingsOnServer`는 `GridInventory`의 `InitSyncObject` 목록에 없고 SyncVar도 Rpc도 없다.
+`FixedEngraving`은 NetworkBehaviour 도 아니다. 그래서 **참가자는 세 길을 모두 볼 수 없으며**,
+각인된 석판은 가방에서도 사라지므로 되짚을 단서도 남지 않는다.
 
-임계값·개수·각인의 석판 번호를 상수로 박지 않고 실제 콤보 프리팹에서 읽는다. 그 석판의
-`query/conditionQuery`를 사용해 회전 0의 고정 효과를 만든다. 현재 로컬 카탈로그의 석판 12002는
-`O MUL/2`, 조건 없음이다. 일반 석판의 `GetQuery/GetConditionQuery`는 이 필드를 그대로 돌려주며,
-인스턴스별 질의가 필요한 커스텀 석판은 복원하지 않는다. 조건이 있는 신비 각인도 과거 생성 시점의
-점유 상태를 알 수 없어 지원하지 않는다. 동기화되지 않은 좌표를 (0,0)으로 대체하지 않는다.
+그래서 참가자 자리에서는 원인을 읽는 대신 **결과에서 되뺀다**(`FixedEffectResidual`). 게임의 네
+행렬에서 보이는 석판·각인과 인챈트로 설명되는 몫을 빼고 남는 것을 고정 효과 층으로 쓴다. 배수는
+마지막에 곱해지므로 먼저 나누며, 나누어떨어지지 않으면 트랜잭션 도중이라 그 관측을 버린다.
+우리가 만든 비활성·제한 해제·배수가 게임보다 많으면 고정 효과로 덮지 않고 어긋남으로 알린다.
 
-호스트에서는 원본 목록만 사용하므로 신비를 두 번 더하지 않는다. 최종 레벨의 차이를 역산해
-보정하는 방식이 아니며, 다른 미지원 고정 각인의 불일치는 계속 검출된다. `multiplyLevelMatrix`와
-`ignoreCriteriaMatrix`도 SyncDictionary이므로 실시간 검증에서 대조한다. 레벨 0인 칸에서도
-누락된 배수·제한 해제를 잡아야 새 아이템을 옮긴 뒤의 계산을 믿을 수 있다.
+되뺀 값은 정의상 행렬과 맞으므로 진짜 고정 효과인지는 **성질로 가른다**(`FixedEffectTracker`).
+석판이 그대로인 채 아이템 배치만 달라졌는데 값이 달라지면 고정 효과가 아니라 시뮬레이터의
+오차다. 한 번은 보상 석판 각인과 구별되지 않아 연속 두 번부터 알린다.
 
-사용자 스크린샷의 (3,1) 레벨 3/게임 6과 동일한 합성 테스트에서, 신비 복원 전에는 행렬과
-아이템 레벨 검증이 각각 한 번 실패하고 복원 뒤 모두 통과한다. 스크린샷 시점의 실제 F10 자료는
-아직 받지 못했으므로 그 판의 전체 재생 및 수정 DLL의 실기 확인과 구분한다.
+호스트는 원본 목록(과 `dungeonTempLevels`)을 그대로 쓰고, 같은 순간의 되뺀 값과 대조해 되빼기
+자체를 검증한다. 2026-09-05에 넣었던 신비 전용 복원(`MysticEngravings`)은 이 경로가 대신하므로
+지웠다.
+
+2026-09-22 제보 `c44e9d2e`가 이 경로다. 참가자 세션에서 석판 13개가 모두 각인돼 가방에서
+사라졌고 `levelMatrix`에는 레벨이 남아 7칸이 어긋났다. 되뺀 층을 넣으면 그 자료의 어긋난 칸이
+0이 된다. 실기 확인은 아직이다.
 
 ### 배치 보너스는 레벨과 무관했다
 

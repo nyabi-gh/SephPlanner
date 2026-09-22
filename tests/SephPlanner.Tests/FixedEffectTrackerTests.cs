@@ -1,0 +1,114 @@
+using SephPlanner.Core.Model;
+using SephPlanner.Core.Tablets;
+
+namespace SephPlanner.Tests;
+
+/// <summary>
+/// 되뺀 층은 정의상 행렬과 맞으므로, 채택 여부는 "아이템을 옮겨도 그대로인가"로 가른다.
+/// </summary>
+public class FixedEffectTrackerTests
+{
+    private static FixedEffectResidualResult Extracted(params (int X, int Y, int Level)[] cells)
+    {
+        var result = new FixedEffectResidualResult { Status = FixedEffectResidualStatus.Extracted };
+        foreach (var cell in cells)
+            result.Cells.Add(new FixedEffectCell { Position = new GridPos(cell.X, cell.Y), Level = cell.Level });
+        return result;
+    }
+
+    [Fact]
+    public void TheFirstReadingIsAdopted()
+    {
+        var tracker = new FixedEffectTracker();
+
+        tracker.Observe(Extracted((0, 0, 1)), sources: "t@0,0", arrangement: "a");
+
+        Assert.True(tracker.Trustworthy);
+        Assert.Equal("", tracker.Reason);
+        Assert.Single(tracker.Layer);
+    }
+
+    [Fact]
+    public void StayingTheSameAcrossArrangementsConfirmsIt()
+    {
+        var tracker = new FixedEffectTracker();
+
+        tracker.Observe(Extracted((0, 0, 1)), "t@0,0", "a");
+        tracker.Observe(Extracted((0, 0, 1)), "t@0,0", "b");
+
+        Assert.True(tracker.ConfirmedAcrossArrangements);
+        Assert.True(tracker.Trustworthy);
+        Assert.False(tracker.Contradicted);
+    }
+
+    [Fact]
+    public void ChangingWithTheArrangementIsReportedAsOurError()
+    {
+        var tracker = new FixedEffectTracker();
+
+        tracker.Observe(Extracted((0, 0, 1)), "t@0,0", "a");
+        tracker.Observe(Extracted((0, 0, 2)), "t@0,0", "b");
+        Assert.False(tracker.Contradicted);
+
+        tracker.Observe(Extracted((0, 0, 3)), "t@0,0", "c");
+
+        Assert.True(tracker.Contradicted);
+        Assert.False(tracker.Trustworthy);
+        Assert.Contains("배치", tracker.Reason);
+    }
+
+    [Fact]
+    public void AnEngravedTabletChangesTheLayerWithoutBlame()
+    {
+        var tracker = new FixedEffectTracker();
+
+        tracker.Observe(Extracted((0, 0, 1)), "t@0,0", "a");
+        tracker.Observe(Extracted((0, 0, 1), (1, 0, 2)), sources: "", arrangement: "b");
+        tracker.Observe(Extracted((0, 0, 1), (1, 0, 2)), sources: "", arrangement: "c");
+
+        Assert.False(tracker.Contradicted);
+        Assert.True(tracker.Trustworthy);
+        Assert.Equal(2, tracker.Layer.Count);
+    }
+
+    [Fact]
+    public void AMidTransactionReadingKeepsTheLayer()
+    {
+        var tracker = new FixedEffectTracker();
+        tracker.Observe(Extracted((0, 0, 1)), "t@0,0", "a");
+
+        tracker.Observe(
+            new FixedEffectResidualResult { Status = FixedEffectResidualStatus.Unsettled, Reason = "정리 중" },
+            "t@0,0", "b");
+
+        Assert.True(tracker.Trustworthy);
+        Assert.Single(tracker.Layer);
+        Assert.Equal("정리 중", tracker.Reason);
+    }
+
+    [Fact]
+    public void OverproductionIsNeverAbsorbed()
+    {
+        var tracker = new FixedEffectTracker();
+        tracker.Observe(Extracted((0, 0, 1)), "t@0,0", "a");
+
+        tracker.Observe(
+            new FixedEffectResidualResult { Status = FixedEffectResidualStatus.Overproduced, Reason = "칸 (0, 0)" },
+            "t@0,0", "b");
+
+        Assert.True(tracker.Contradicted);
+        Assert.False(tracker.Trustworthy);
+    }
+
+    [Fact]
+    public void ANewRunStartsFromNothing()
+    {
+        var tracker = new FixedEffectTracker();
+        tracker.Observe(Extracted((0, 0, 1)), "t@0,0", "a");
+
+        tracker.Reset();
+
+        Assert.Empty(tracker.Layer);
+        Assert.False(tracker.Trustworthy);
+    }
+}

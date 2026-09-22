@@ -33,6 +33,7 @@ namespace SephPlanner.Plugin
         private string _simulationReason = "실시간 시뮬레이션 검증이 아직 완료되지 않았습니다.";
         private string _lastSephiriteReport;
         private int _verifiedTablets;
+        private int _verifiedFixedCells;
 
         private readonly NativeHud _hud = new NativeHud();
         private readonly PadInput _pad = new PadInput();
@@ -855,10 +856,14 @@ namespace SephPlanner.Plugin
 
             // 일치할 때 아무것도 남기지 않으면 검증이 돌았는지조차 알 수 없다.
             var checkedTablets = SimulationVerifier.LastCheckedTablets;
-            if (verification.Status == PlanVerificationStatus.Passed && checkedTablets > _verifiedTablets)
+            var fixedCells = SimulationVerifier.LastFixedCells;
+            if (verification.Status == PlanVerificationStatus.Passed &&
+                (checkedTablets > _verifiedTablets || fixedCells > _verifiedFixedCells))
             {
-                _verifiedTablets = checkedTablets;
-                Logger.LogInfo($"시뮬레이터 검증 통과 - 석판 {checkedTablets}개와 칸별 레벨까지 일치");
+                if (checkedTablets > _verifiedTablets) _verifiedTablets = checkedTablets;
+                if (fixedCells > _verifiedFixedCells) _verifiedFixedCells = fixedCells;
+                Logger.LogInfo(
+                    $"시뮬레이터 검증 통과 - 석판 {checkedTablets}개, 고정 효과 {fixedCells}칸과 칸별 레벨까지 일치");
             }
         }
 
