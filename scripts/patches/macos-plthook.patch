@@ -1,0 +1,106 @@
+diff --git a/src/nix/plthook/plthook_osx.c b/src/nix/plthook/plthook_osx.c
+index 2ad99ab..e2bcc4a 100644
+--- a/src/nix/plthook/plthook_osx.c
++++ b/src/nix/plthook/plthook_osx.c
+@@ -43,6 +43,8 @@
+ #include <errno.h>
+ #include <mach/mach.h>
+ #include <mach-o/dyld.h>
++#include <mach-o/fat.h>
++#include <arpa/inet.h>
+ #include <sys/mman.h>
+ #include <mach-o/fixup-chains.h>
+ #include "plthook.h"
+@@ -674,6 +676,7 @@ typedef struct {
+     uint32_t seg_index; // i
+     uint16_t page_index; // j
+     off_t offset;
++    off_t file_offset;
+ } chained_fixups_iter_t;
+ 
+ typedef struct {
+@@ -692,12 +695,12 @@ typedef struct {
+     off_t offset;
+ } chianed_fixups_entry_t;
+ 
+-static int chained_fixups_iter_init(chained_fixups_iter_t *iter, const char *image_name, const struct dyld_chained_starts_in_image *starts_offset);
++static int chained_fixups_iter_init(chained_fixups_iter_t *iter, const char *image_name, const struct mach_header *mh, const struct dyld_chained_starts_in_image *starts_offset);
+ static void chained_fixups_iter_deinit(chained_fixups_iter_t *iter);
+ static int chained_fixups_iter_rewind(chained_fixups_iter_t *iter);
+ static int chained_fixups_iter_next(chained_fixups_iter_t *iter, chianed_fixups_entry_t *entry);
+ 
+-static int chained_fixups_iter_init(chained_fixups_iter_t *iter, const char *image_name, const struct dyld_chained_starts_in_image *starts)
++static int chained_fixups_iter_init(chained_fixups_iter_t *iter, const char *image_name, const struct mach_header *mh, const struct dyld_chained_starts_in_image *starts)
+ {
+     memset(iter, 0, sizeof(*iter));
+     iter->fp = fopen(image_name, "r");
+@@ -707,6 +710,24 @@ static int chained_fixups_iter_init(chained_fixups_iter_t *iter, const char *ima
+     }
+     iter->image_name = image_name;
+     iter->starts = starts;
++    struct fat_header fat;
++    if (fread(&fat, sizeof(fat), 1, iter->fp) == 1 && ntohl(fat.magic) == FAT_MAGIC) {
++        uint32_t narch = ntohl(fat.nfat_arch);
++        for (uint32_t i = 0; i < narch; i++) {
++            struct fat_arch arch;
++            if (fread(&arch, sizeof(arch), 1, iter->fp) != 1) break;
++            if ((cpu_type_t)ntohl(arch.cputype) == mh->cputype) {
++                iter->file_offset = ntohl(arch.offset);
++                break;
++            }
++        }
++        if (iter->file_offset == 0) {
++            set_errmsg("Cannot find the running architecture in %s", image_name);
++            fclose(iter->fp);
++            iter->fp = NULL;
++            return PLTHOOK_INVALID_FILE_FORMAT;
++        }
++    }
+     return 0;
+ }
+ 
+@@ -778,7 +799,7 @@ next_page:
+     if (offset == 0) {
+         offset = seg->segment_offset + j * seg->page_size + seg->page_start[j];
+     }
+-    if (fseeko(iter->fp, offset, SEEK_SET) != 0) {
++    if (fseeko(iter->fp, iter->file_offset + offset, SEEK_SET) != 0) {
+         set_errmsg("failed to seek to %lld in %s", offset, iter->image_name);
+         return PLTHOOK_INVALID_FILE_FORMAT;
+     }
+@@ -820,7 +841,7 @@ static int read_chained_fixups(data_t *d, const struct mach_header *mh, const ch
+     chained_fixups_iter_t iter = {NULL, };
+     chianed_fixups_entry_t entry;
+ 
+-    rv = chained_fixups_iter_init(&iter, image_name, starts);
++    rv = chained_fixups_iter_init(&iter, image_name, mh, starts);
+     if (rv != 0) {
+         return rv;
+     }
+@@ -1171,3 +1192,14 @@ static void set_errmsg(const char *fmt, ...)
+     vsnprintf(errmsg, sizeof(errmsg) - 1, fmt, ap);
+     va_end(ap);
+ }
++
++void *plthook_handle_by_name(const char *name) {
++    uint32_t cnt = _dyld_image_count();
++    for (uint32_t idx = 0; idx < cnt; idx++) {
++        const char *image_name = idx ? _dyld_get_image_name(idx) : NULL;
++        if (image_name && strstr(image_name, name)) {
++            return dlopen(image_name, RTLD_LAZY | RTLD_NOLOAD);
++        }
++    }
++    return NULL;
++}
+diff --git a/src/nix/plthook/plthook.h b/src/nix/plthook/plthook.h
+index 11e137e..5d2d52d 100644
+--- a/src/nix/plthook/plthook.h
++++ b/src/nix/plthook/plthook.h
+@@ -58,6 +58,7 @@ int plthook_enum(plthook_t *plthook, unsigned int *pos, const char **name_out, v
+ int plthook_replace(plthook_t *plthook, const char *funcname, void *funcaddr, void **oldfunc);
+ void plthook_close(plthook_t *plthook);
+ const char *plthook_error(void);
++void *plthook_handle_by_name(const char *name);
+ 
+ /* enumerate entries with memory protection information (bitwise-OR of PROT_READ, PROT_WRITE and PROT_EXEC)
+  *

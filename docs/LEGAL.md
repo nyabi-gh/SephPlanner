@@ -72,7 +72,8 @@
 | 구성요소 | 라이선스 | 왜 문제가 없나 |
 |---|---|---|
 | BepInEx 5.4.23.5 (배포물에 담김) | MIT | 재배포를 허용한다. 원문과 출처를 함께 담는다 |
-| Unity Doorstop 4.5.0 = `winhttp.dll` (배포물에 담김) | LGPL v2.1 | 고치지 않은 바이너리라 원문과 소스 위치를 함께 담으면 된다. 우리 코드는 여기에 링크하지 않는다 |
+| Unity Doorstop = Windows의 `winhttp.dll`, macOS의 `libdoorstop.dylib` | LGPL v2.1 | Windows 원본과 macOS 수정 빌드의 라이선스·소스·패치를 함께 안내한다. 우리 코드는 여기에 링크하지 않는다 |
+| plthook (macOS Doorstop 안에 포함) | BSD 형식 | 라이선스 원문과 수정 소스의 위치를 함께 안내한다 |
 | HarmonyX, MonoMod, Mono.Cecil (BepInEx 안에 담김) | MIT | 각 원문을 함께 담는다 |
 | `BepInEx.Core` NuGet 5.4.21 (빌드 참조) | MIT | 컴파일에만 쓰고 배포물에 넣지 않는다 |
 | 게임 어셈블리, Unity, Mirror, Newtonsoft.Json | - | `<Private>false</Private>`로 참조만 하고 배포물에 넣지 않는다 |
@@ -86,11 +87,12 @@ BepInEx 를 잘못 받는 것이었다. 라이선스를 하나씩 확인했다.
 - **`winhttp.dll` 은 BepInEx 가 아니라 Unity Doorstop 이다.** BepInEx 5.4.23.5 는 Doorstop
   **4.5.0** 을 담고 있고(`.doorstop_version`, 파일 버전 4.5.0.0), Doorstop 은 3.x 까지 CC0 였다가
   **4.x 부터 LGPL v2.1** 이다. 그러니 "BepInEx 는 MIT 니까 다 된다"는 반만 맞다.
-- LGPL 은 고치지 않은 바이너리 재배포를 막지 않는다. 라이선스 원문을 함께 주고, 소스를 받을 수
-  있는 곳을 알리면 된다(제4조 - 배포한 곳과 같은 곳에서 소스를 받을 수 있으면 충족). 우리 DLL 은
-  Doorstop 에 링크하지 않고 같은 zip 에 나란히 담길 뿐이라 제6조의 재링크 의무는 오지 않는다.
-- 그래서 배포물의 `제3자-라이선스` 폴더에 다섯 원문과 `NOTICE.txt`(무엇이 어디서 왔고 소스가
-  어디 있는지)를 담는다. 저장소에서는 `third-party/` 다.
+- Windows용 Doorstop은 원본 바이너리다. macOS용은 범용 바이너리의 arm64 부분을 올바르게 읽도록
+  plthook을 고쳐 다시 빌드한다. 소스의 고정 커밋과 패치, 재현 빌드 절차는
+  `third-party/NOTICE.txt`와 `scripts/build-macos-loader.sh`에 적는다. 우리 DLL은 Doorstop에
+  링크하지 않고 같은 ZIP에 나란히 담긴다.
+- 그래서 배포물의 `제3자-라이선스` 폴더에 라이선스 원문과 `NOTICE.txt`(무엇이 어디서 왔고
+  소스가 어디 있는지)를 담는다. 저장소에서는 `third-party/`다.
 
 **공개로 바뀌면서 비공개의 대가 둘이 사라졌다.**
 

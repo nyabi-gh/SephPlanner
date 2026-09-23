@@ -208,6 +208,7 @@ internal sealed class DiagnosticTestServer : IAsyncDisposable
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/reports");
         request.Headers.Add("X-SephPlanner-Report-Id", id.ToString("N"));
         request.Headers.Add("X-SephPlanner-SHA256", hash ?? DiagnosticArchive.Hash(archive));
+        request.Headers.ExpectContinue = true;
         request.Content = new ByteArrayContent(archive);
         request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
         return await Client.SendAsync(request);

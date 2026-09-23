@@ -13,7 +13,8 @@ public class UpdateTests
     {
         Assert.Equal(new Version(0, 3, 9), UpdateClient.Normalize(new Version(0, 3, 9, 0)));
         Assert.Equal("0.3.9", UpdateClient.Format(new Version(0, 3, 9, 0)));
-        Assert.Equal(new Uri("https://github.com/nyabi-gh/SephPlanner/releases/download/v0.3.9/SephPlanner-v0.3.9.zip"),
+        var asset = OperatingSystem.IsMacOS() ? "SephPlanner-macos-v0.3.9.zip" : "SephPlanner-v0.3.9.zip";
+        Assert.Equal(new Uri("https://github.com/nyabi-gh/SephPlanner/releases/download/v0.3.9/" + asset),
             UpdateClient.AssetOf(new Version(0, 3, 9, 0)));
     }
 

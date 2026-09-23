@@ -13,11 +13,11 @@ $overlay = Join-Path $zipRoot "게임 폴더에 복사"
 
 # 로더를 함께 담는다. 사용자가 직접 받다가 엉뚱한 파일을 고르는 일이 잦았고(x86/x64, Mono/IL2CPP,
 # 6 베타), 그것이 설치 실패의 가장 흔한 이유였다. 라이선스는 third-party/NOTICE.txt 에
-# 적혀 있다 - BepInEx 는 MIT, 함께 든 winhttp.dll(Unity Doorstop 4.5.0)은 LGPL v2.1 이다.
+# 적혀 있다 - BepInEx 는 MIT, Unity Doorstop은 LGPL v2.1 이다.
 $bepinexVersion = "5.4.23.5"
-$bepinexAsset = "BepInEx_win_x64_$bepinexVersion.zip"
+$bepinexAsset = if ($IsMacOS) { "BepInEx_macos_universal_$bepinexVersion.zip" } else { "BepInEx_win_x64_$bepinexVersion.zip" }
 $bepinexUrl = "https://github.com/BepInEx/BepInEx/releases/download/v$bepinexVersion/$bepinexAsset"
-$bepinexSha256 = "82f9878551030f54657792c0740d9d51a09500eeae1fba21106b0c441e6732c4"
+$bepinexSha256 = if ($IsMacOS) { "01c2ae782eb016dfd6c345a18dbd2dcafffb3d9d318449d6486689f426b4a323" } else { "82f9878551030f54657792c0740d9d51a09500eeae1fba21106b0c441e6732c4" }
 $version = ([xml](Get-Content (Join-Path $root "Directory.Build.props"))).Project.PropertyGroup.Version |
     Where-Object { $_ } | Select-Object -First 1
 
@@ -89,20 +89,32 @@ try {
     Invoke-DotNet @("build", $pluginProject, "-c", "Release", "--no-restore", "-p:DeployToGame=false") "플러그인 빌드 실패"
 
     # 게임 폴더에 그대로 부을 한 벌을 먼저 짓는다. 받는 사람이 할 일은 한 폴더의 내용을 옮기는 것뿐이다.
-    Expand-Archive (Get-BepInEx) $overlay
+    if ($IsMacOS) {
+        & bash (Join-Path $PSScriptRoot "build-macos-loader.sh")
+        if ($LASTEXITCODE -ne 0) { throw "macOS 로더 빌드 실패" }
+        Copy-Item (Join-Path $artifacts "macos-loader/*") $overlay -Recurse -Force
+    }
+    else {
+        Expand-Archive (Get-BepInEx) $overlay
+    }
     $plugins = Join-Path $overlay "BepInEx/plugins"
     New-Item -ItemType Directory -Force $plugins | Out-Null
 
     $pluginOut = Join-Path $root "src/SephPlanner.Plugin/bin/Release"
     Copy-Item (Join-Path $pluginOut "SephPlanner.Plugin.dll") $plugins
     Copy-Item (Join-Path $pluginOut "SephPlanner.Core.dll") $plugins
-    Copy-Item (Join-Path $root "docs/INSTALL.txt") (Join-Path $zipRoot "설치안내.txt")
+    $installGuide = if ($IsMacOS) { "docs/INSTALL-macos.txt" } else { "docs/INSTALL.txt" }
+    Copy-Item (Join-Path $root $installGuide) (Join-Path $zipRoot "설치안내.txt")
     Copy-Item (Join-Path $root "LICENSE") (Join-Path $zipRoot "LICENSE.txt")
 
     # 남의 것을 담았으므로 그쪽 라이선스 원문과 소스 위치도 함께 나간다.
     $notices = Join-Path $zipRoot "제3자-라이선스"
     New-Item -ItemType Directory -Force $notices | Out-Null
     Copy-Item (Join-Path $thirdParty "*.txt") $notices
+    if ($IsMacOS) {
+        Copy-Item (Join-Path $PSScriptRoot "build-macos-loader.sh") (Join-Path $notices "build-macos-loader.sh")
+        Copy-Item (Join-Path $PSScriptRoot "patches/macos-plthook.patch") (Join-Path $notices "macos-plthook.patch")
+    }
 
     $commit = (& git -C $root rev-parse HEAD).Trim()
     $managedDir = (& dotnet msbuild $pluginProject -nologo -getProperty:SephiriaManagedDir).Trim()
@@ -124,7 +136,10 @@ try {
                 version = [string]$bepinexVersion
                 asset = [string]$bepinexAsset
                 sha256 = [string]$bepinexSha256
+                sourceCommit = if ($IsMacOS) { "f4c1b1103a32884b7440d9681c60cc5d619f284f" } else { $null }
             }
+            doorstopSourceCommit = if ($IsMacOS) { "8e66ca0b189d4c443ba9e7c4f5aac8105582a91c" } else { $null }
+            plthookSourceCommit = if ($IsMacOS) { "24c69df003310fb91f9c2950b5a659ff70e9dfb9" } else { $null }
         }
         gameAssembly = [ordered]@{
             fileVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($gameAssembly).FileVersion
@@ -133,7 +148,8 @@ try {
         files = @($files)
     } | ConvertTo-Json -Depth 4 | Set-Content (Join-Path $zipRoot "manifest.json") -Encoding UTF8
 
-    $zip = Join-Path $artifacts "SephPlanner-v$version.zip"
+    $assetName = if ($IsMacOS) { "SephPlanner-macos-v$version.zip" } else { "SephPlanner-v$version.zip" }
+    $zip = Join-Path $artifacts $assetName
     if (Test-Path $zip) { Remove-Item $zip }
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     [System.IO.Compression.ZipFile]::CreateFromDirectory(
@@ -146,14 +162,25 @@ try {
             "SephPlanner/게임 폴더에 복사/BepInEx/plugins/SephPlanner.Plugin.dll",
             "SephPlanner/게임 폴더에 복사/BepInEx/plugins/SephPlanner.Core.dll",
             "SephPlanner/게임 폴더에 복사/BepInEx/core/BepInEx.dll",
-            "SephPlanner/게임 폴더에 복사/winhttp.dll",
-            "SephPlanner/게임 폴더에 복사/doorstop_config.ini",
             "SephPlanner/설치안내.txt",
             "SephPlanner/LICENSE.txt",
             "SephPlanner/제3자-라이선스/NOTICE.txt",
             "SephPlanner/제3자-라이선스/BepInEx-LICENSE.txt",
             "SephPlanner/제3자-라이선스/Doorstop-LICENSE.txt",
             "SephPlanner/manifest.json")
+        if ($IsMacOS) {
+            $required += @(
+                "SephPlanner/게임 폴더에 복사/run_bepinex.sh",
+                "SephPlanner/게임 폴더에 복사/libdoorstop.dylib",
+                "SephPlanner/제3자-라이선스/Plthook-LICENSE.txt",
+                "SephPlanner/제3자-라이선스/build-macos-loader.sh",
+                "SephPlanner/제3자-라이선스/macos-plthook.patch")
+        }
+        else {
+            $required += @(
+                "SephPlanner/게임 폴더에 복사/winhttp.dll",
+                "SephPlanner/게임 폴더에 복사/doorstop_config.ini")
+        }
         foreach ($entry in $required) {
             if (-not ($archive.Entries | Where-Object { $_.FullName.Replace("\", "/") -eq $entry })) {
                 throw "릴리스 파일 누락: $entry"
