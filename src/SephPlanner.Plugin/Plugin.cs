@@ -237,6 +237,8 @@ namespace SephPlanner.Plugin
                 if (_settings.HideKey.Value.IsDown()) ToggleHidden();
                 if (_settings.ExpandKey.Value.IsDown()) ToggleExpand();
                 if (_settings.AutoPlaceKey.Value.IsDown()) AutoPlace();
+                if (_settings.PinUpKey.Value.IsDown()) StepSelectedPin(1);
+                if (_settings.PinDownKey.Value.IsDown()) StepSelectedPin(-1);
                 if (_settings.OpacityKey.Value.IsDown()) _settings.CycleOpacity();
                 if (_settings.MoveKey.Value.IsDown()) ToggleMove();
                 if (_moving) _hud.DragTo(Cursor());
@@ -1490,6 +1492,26 @@ namespace SephPlanner.Plugin
 
             // 적용 결과가 화면에 바로 보이도록 다음 폴링을 기다리지 않는다.
             _nextPoll = 0;
+        }
+
+        /// <summary>가방에서 고른 아티팩트의 강화칸 우선을 한 단계 옮긴다. 빌드 창의 좌·우클릭과 같은 규칙이다.</summary>
+        private void StepSelectedPin(int direction)
+        {
+            var entityId = GameReader.SelectedCharm();
+            if (entityId == 0)
+            {
+                Report("가방을 열고 아티팩트에 커서를 올리거나 선택한 뒤 누르세요.");
+                return;
+            }
+
+            _prefs.StepPin(entityId, direction);
+            var definition = _runner != null ? CatalogSource.Get()?.Charm(entityId) : null;
+            var name = definition != null ? Naming.Of(definition.Names, definition.Id, "아티팩트") : "아티팩트";
+            var level = _prefs.PinLevel(entityId);
+            var weight = PlanPreferences.WeightOf(level).ToString("0.##");
+            Report(level > 0 ? $"{name}: 강화칸 우선 {level}단계({weight}배)"
+                : level < 0 ? $"{name}: 강화칸 양보 {-level}단계({weight}배)"
+                : $"{name}: 강화칸 우선·양보 해제");
         }
 
         private Plan CurrentPlan()

@@ -94,6 +94,8 @@ namespace SephPlanner.Plugin
         public ConfigEntry<KeyboardShortcut> SettingsKey { get; }
         public ConfigEntry<KeyboardShortcut> BuildKey { get; }
         public ConfigEntry<KeyboardShortcut> PreviewKey { get; }
+        public ConfigEntry<KeyboardShortcut> PinUpKey { get; }
+        public ConfigEntry<KeyboardShortcut> PinDownKey { get; }
 
         private readonly Action<string> _log;
         private readonly ConfigFile _config;
@@ -232,6 +234,15 @@ namespace SephPlanner.Plugin
                 "후보를 차례로 미리보는 단축키. 그 후보를 집었을 때의 격자를 대신 보여주고, " +
                 "마지막 다음은 미리보기 없음으로 돌아온다.");
 
+            // 기본 키가 없다. 남은 F 키는 F11(창 모드 전환)·F12(Steam 스크린샷)와 겹칠 수 있어,
+            // 쓰는 사람이 F3 에서 고른다.
+            PinUpKey = config.Bind(
+                "NativePanel", "PinUpKey", KeyboardShortcut.Empty,
+                "가방에서 고른 아티팩트의 강화칸 우선을 한 단계 올린다. 빌드 창의 좌클릭과 같다.");
+            PinDownKey = config.Bind(
+                "NativePanel", "PinDownKey", KeyboardShortcut.Empty,
+                "가방에서 고른 아티팩트의 강화칸 우선을 한 단계 내린다(양보). 빌드 창의 우클릭과 같다.");
+
             _shortcuts.Add(ExpandKey);
             _shortcuts.Add(AutoPlaceKey);
             _shortcuts.Add(OpacityKey);
@@ -240,6 +251,8 @@ namespace SephPlanner.Plugin
             _shortcuts.Add(SettingsKey);
             _shortcuts.Add(BuildKey);
             _shortcuts.Add(PreviewKey);
+            _shortcuts.Add(PinUpKey);
+            _shortcuts.Add(PinDownKey);
             _shortcuts.Add(DumpKey);
             _shortcuts.Add(InventoryDumpKey);
 
@@ -335,6 +348,8 @@ namespace SephPlanner.Plugin
                 Key("자동 배치", AutoPlaceKey),
                 Key("후보 미리보기", PreviewKey),
                 Key("빌드 설정 창", BuildKey),
+                Key("고른 아이템 강화칸 우선 올리기", PinUpKey),
+                Key("고른 아이템 강화칸 우선 내리기", PinDownKey),
                 Key("불투명도 바꾸기", OpacityKey),
                 Key("플래너 화면 이동", MoveKey),
                 Key("화면 숨기기/보이기", HideKey),

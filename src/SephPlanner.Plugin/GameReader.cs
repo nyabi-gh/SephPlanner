@@ -6,6 +6,7 @@ using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
 using SephPlanner.Core.Tablets;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 namespace SephPlanner.Plugin
 {
@@ -69,6 +70,22 @@ namespace SephPlanner.Plugin
             }
 
             return SimulationVerifier.Check(avatar.Inventory);
+        }
+
+        /// <summary>
+        /// 가방에서 게임이 지금 선택으로 보는 칸의 아티팩트 번호. 커서를 올리거나 패드로 고른 칸이다.
+        /// 가방이 닫혀 있거나, 내 가방이 아니거나, 아티팩트가 아니면 0 이다.
+        /// </summary>
+        public static int SelectedCharm()
+        {
+            var selected = EventSystem.current == null ? null : EventSystem.current.currentSelectedGameObject;
+            var icon = selected == null ? null : selected.GetComponent<UI_NewInventoryIcon>();
+            var avatar = FindLocalPlayer();
+            if (icon == null || avatar == null || avatar.Inventory == null || icon.Inventory != avatar.Inventory) return 0;
+
+            var item = icon.Item;
+            var entity = item?.Entity;
+            return entity != null && entity.type == EItemType.Charm ? item.EntityID : 0;
         }
 
         internal static PlayerAvatar FindLocalPlayer()
