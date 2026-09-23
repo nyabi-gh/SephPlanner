@@ -18,7 +18,7 @@ namespace SephPlanner.Plugin
     /// 세피리아 상태를 읽어 게임 HUD에 배치와 추천을 표시하고, 싱글플레이에서는 제안된 배치를
     /// 게임 자체의 이동 경로로 적용한다. 멀티 세션에서는 읽기만 한다.
     /// </summary>
-    [BepInPlugin(PluginGuid, "SephPlanner", "0.4.14")]
+    [BepInPlugin(PluginGuid, "SephPlanner", "0.4.15")]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001", Justification = "Unity의 OnDestroy에서 계산 작업을 정리합니다.")]
     public sealed class SephPlannerPlugin : BaseUnityPlugin
     {
@@ -256,8 +256,8 @@ namespace SephPlanner.Plugin
         }
 
         /// <summary>
-        /// 카탈로그가 없는 채로 남았으면 다음 런 시작에 한 번 더 시도한다. 부팅 때의 확인은
-        /// 한 번뿐이라, 그때 실패하면 F9 를 누르기 전까지 아무것도 되지 않는다.
+        /// 카탈로그가 없는 채로 남았으면 다음 런 시작에 한 번 더 시도한다. 데이터베이스 준비
+        /// 신호는 한 번뿐이라, 그때 실패하면 F9 를 누르기 전까지 아무것도 되지 않는다.
         /// </summary>
         private void ArmCatalogRetry(GameSnapshot snapshot)
         {
