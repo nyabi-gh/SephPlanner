@@ -208,6 +208,8 @@ internal sealed class DiagnosticTestServer : IAsyncDisposable
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/reports");
         request.Headers.Add("X-SephPlanner-Report-Id", id.ToString("N"));
         request.Headers.Add("X-SephPlanner-SHA256", hash ?? DiagnosticArchive.Hash(archive));
+        // 서버가 너무 큰 본문을 다 받기 전에 거절하면 macOS 에서는 보내던 연결이 끊겨 응답 대신
+        // 소켓 오류가 난다. 헤더만 먼저 보내고 거절을 본문 앞에서 받는다.
         request.Headers.ExpectContinue = true;
         request.Content = new ByteArrayContent(archive);
         request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
