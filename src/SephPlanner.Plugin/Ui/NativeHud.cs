@@ -948,15 +948,13 @@ namespace SephPlanner.Plugin.Ui
         }
 
         /// <summary>
-        /// 합성기에 넣기 전에 맞춰 두어야 하는 회전. 사람이 손으로 돌려야 하는 일이라 빠뜨리면
-        /// 답이 반쪽이 된다. 줄에 붙는 짧은 표이고, 어느 석판을 몇 도 돌리는지는
+        /// 합성 창에서 손으로 돌려야 하는 횟수. 빠뜨리면 답이 반쪽이 된다. 어느 석판을 돌리는지는
         /// <see cref="Explain.Turn"/>가 쪽지에서 말한다.
         /// </summary>
         private static string RotationTag(MixAdvice advice)
         {
-            if (advice.RotationA == 0 && advice.RotationB == 0) return "";
-
-            return Tint($"회전 {advice.RotationA * 90}°/{advice.RotationB * 90}°", NativeSkin.Amber) + "  ";
+            var tag = Explain.TurnTag(advice);
+            return tag.Length == 0 ? "" : Tint(tag, NativeSkin.Amber) + "  ";
         }
 
         /// <summary>

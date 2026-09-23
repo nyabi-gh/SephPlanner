@@ -92,12 +92,82 @@ public class TabletMixAdvisorTests
     }
 
     [Fact]
-    public void ALockedMaterialOnlyMixesAtTheAngleItSitsAt()
+    public void ALockedMaterialAlwaysMixesUnturnedWhateverItsBagAngle()
     {
+        // 합성 창의 아이콘은 돌릴 수 없는 석판의 회전을 0 으로 되돌린다(UI_ItemIcon.UpdateIcon).
         var locked = Material(2, "RIGHT 3", rotatable: false, rotation: 1);
 
-        Assert.Null(TabletMix.Of(Material(1, "RIGHT 2"), 0, locked, 0));
-        Assert.NotNull(TabletMix.Of(Material(1, "RIGHT 2"), 0, locked, 1));
+        Assert.NotNull(TabletMix.Of(Material(1, "RIGHT 2"), 0, locked, 0));
+        Assert.Null(TabletMix.Of(Material(1, "RIGHT 2"), 0, locked, 1));
+        Assert.Equal(new[] { 0 }, TabletMix.Rotations(locked));
+    }
+
+    [Theory]
+    [InlineData(0, 0, 0, 0)]
+    [InlineData(0, 1, 1, 0)]
+    [InlineData(1, 0, 0, 1)]
+    [InlineData(0, 2, 0, 2)]
+    public void TurnsCountFromTheAngleEachTabletSitsAtInTheBag(int bagA, int bagB, int turnsA, int turnsB)
+    {
+        // 제자리 질의는 어느 회전이든 결과가 같아 사이 각도 0 이 뽑힌다. 창은 가방 방향으로
+        // 받으므로, 가방에서 이미 어긋나 있으면 그만큼 돌려 맞춰야 하고 덜 누르는 쪽을 돌린다.
+        var advice = Assert.Single(TabletMixAdvisor.Rank(Bag(("A", bagA), ("B", bagB)), new Catalog([], []), 0, 100));
+
+        Assert.Equal(0, advice.RotationB - advice.RotationA);
+        Assert.Equal(turnsA, advice.TurnsA);
+        Assert.Equal(turnsB, advice.TurnsB);
+        Assert.False(advice.AnyOfSameKind);
+    }
+
+    [Fact]
+    public void TwoOfTheSameTabletGiveOneRowNotTwo()
+    {
+        var advice = TabletMixAdvisor.Rank(Bag(("A", 0), ("B", 0), ("B", 0)), new Catalog([], []), 0, 100);
+
+        var mix = Assert.Single(advice, entry => entry.NameA == "A" && entry.NameB == "B");
+        Assert.True(mix.AnyOfSameKind);
+        Assert.False(mix.TurnsDependOnPick);
+        Assert.Contains("어느 것을 넣어도", Explain.Join(Explain.Mix(mix)));
+    }
+
+    [Fact]
+    public void SameTabletsFacingDifferentWaysAreDescribedByShapeNotClicks()
+    {
+        var advice = TabletMixAdvisor.Rank(Bag(("A", 0), ("B", 0), ("B", 1)), new Catalog([], []), 0, 100);
+
+        var mix = Assert.Single(advice, entry => entry.NameA == "A" && entry.NameB == "B");
+        Assert.True(mix.TurnsDependOnPick);
+        Assert.Equal("회전 확인", Explain.TurnTag(mix));
+        Assert.Contains("모양이 되게 맞추세요", Explain.Turn(mix));
+    }
+
+    private static PlacementProblem Bag(params (string Name, int Rotation)[] tablets)
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(4, 4, 16) };
+        for (var id = 1; id <= 6; id++)
+        {
+            problem.Charms.Add(new CharmSlot { InstanceId = id });
+            problem.CurrentCharms[id] = problem.Grid.ToPosition(id - 1);
+        }
+        for (var i = 0; i < tablets.Length; i++)
+        {
+            var (name, rotation) = tablets[i];
+            var instance = 100 + i;
+            problem.Tablets.Add(new TabletSlot
+            {
+                InstanceId = instance,
+                Rotatable = true,
+                Definition = new TabletDefinition
+                {
+                    EntityId = name == "A" ? 300 : 301,
+                    Id = name,
+                    Query = name == "A" ? "O 1" : "O 2",
+                    Names = { ["current"] = name },
+                },
+            });
+            problem.CurrentTablets[instance] = new TabletSpot(problem.Grid.ToPosition(8 + i), rotation);
+        }
+        return problem;
     }
 
     [Fact]

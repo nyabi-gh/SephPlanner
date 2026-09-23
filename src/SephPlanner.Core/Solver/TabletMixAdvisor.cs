@@ -14,9 +14,35 @@ namespace SephPlanner.Core.Solver
         public string NameA { get; set; } = "";
         public string NameB { get; set; } = "";
 
-        /// <summary>재료를 합성기에 넣기 전에 맞춰 두어야 하는 회전. 사람이 따라 해야 한다.</summary>
+        /// <summary>
+        /// 합성 창 안에서 재료가 놓여 있어야 하는 회전. 둘 다 돌릴 수 있으면 사이 각도만 뜻이
+        /// 있어 A 를 0 으로 둔다. 사람에게 보일 값은 <see cref="TurnsA"/>·<see cref="TurnsB"/>다.
+        /// </summary>
         public int RotationA { get; set; }
         public int RotationB { get; set; }
+
+        public bool RotatableA { get; set; }
+        public bool RotatableB { get; set; }
+
+        /// <summary>
+        /// 합성 창에 넣은 뒤 우클릭할 횟수. 창은 가방에 놓인 방향으로 받아오므로 이 쌍의 두 석판이
+        /// 가방에서 놓인 방향에 달려 있다. 한쪽만 돌리도록 고른다.
+        /// </summary>
+        public int TurnsA { get; set; }
+        public int TurnsB { get; set; }
+
+        /// <summary>같은 석판이 여럿이라 어느 것을 넣어도 결과가 같다.</summary>
+        public bool AnyOfSameKind { get; set; }
+
+        /// <summary>
+        /// 같은 석판이 가방에서 서로 다른 방향으로 놓여 있어, 돌릴 횟수가 어느 것을 넣느냐에 따라
+        /// 다르다. 화면에 어느 것인지 짚을 수 없으므로 이때는 횟수 대신 모양으로 말한다.
+        /// </summary>
+        public bool TurnsDependOnPick { get; set; }
+
+        /// <summary>같은 석판 둘로 만든 같은 합성인지 가르는 열쇠와, 그 순서로 적은 돌릴 횟수.</summary>
+        internal string Kind { get; set; } = "";
+        internal (int, int) KindTurns { get; set; }
 
         /// <summary>합성했을 때의 점수 증가분. 재료 둘이 사라지고 결과 하나가 생기는 것까지 반영된다.</summary>
         public double Gain { get; set; }
@@ -113,7 +139,7 @@ namespace SephPlanner.Core.Solver
             foreach (var entry in advice) entry.Affordable = cost <= gold;
 
             // 증가분이 같은 쌍이 여럿일 때 인스턴스 번호로 갈라야 제안이 흔들리지 않는다.
-            var shown = advice
+            var shown = OnePerKind(advice)
                 .OrderByDescending(entry => entry.RankedGain)
                 .ThenBy(entry => entry.InstanceA)
                 .ThenBy(entry => entry.InstanceB)
@@ -129,6 +155,77 @@ namespace SephPlanner.Core.Solver
                 .ThenBy(entry => entry.InstanceB)
                 .ToList();
         }
+
+        /// <summary>
+        /// 같은 석판 둘로 만든 같은 합성은 한 줄로 합친다. 화면은 이름만 보여 주므로 둘은 사람
+        /// 눈에 같은 줄이고, 세 줄뿐인 자리에서 다른 조합을 밀어낸다.
+        /// </summary>
+        private static List<MixAdvice> OnePerKind(List<MixAdvice> advice)
+        {
+            var kept = new List<MixAdvice>();
+            foreach (var group in advice.GroupBy(entry => entry.Kind))
+            {
+                var members = group
+                    .OrderByDescending(entry => entry.RankedGain)
+                    .ThenBy(entry => entry.TurnsA + entry.TurnsB)
+                    .ThenBy(entry => entry.InstanceA)
+                    .ThenBy(entry => entry.InstanceB)
+                    .ToList();
+                var first = members[0];
+                first.AnyOfSameKind = members.Count > 1;
+                first.TurnsDependOnPick = members.Any(entry => entry.KindTurns != first.KindTurns);
+                kept.Add(first);
+            }
+            return kept;
+        }
+
+        /// <summary>
+        /// 사람이 따라 할 몫을 적는다. 합성 창은 돌릴 수 있는 석판을 가방에 놓인 방향으로 받고
+        /// 우클릭 한 번에 한 칸씩 돌리며, 돌릴 수 없는 석판은 0 으로 받는다(<c>UI_TabletMixPanel</c>).
+        /// </summary>
+        private static void Instruct(MixAdvice advice, MixMaterial a, MixMaterial b)
+        {
+            advice.RotatableA = a.Rotatable;
+            advice.RotatableB = b.Rotatable;
+
+            int shapeA = advice.RotationA, shapeB = advice.RotationB;
+            if (a.Rotatable && b.Rotatable)
+            {
+                var turnB = Mod(advice.RotationB - advice.RotationA + a.CurrentRotation - b.CurrentRotation);
+                if (turnB <= 2) advice.TurnsB = turnB;
+                else advice.TurnsA = Mod(-turnB);
+                shapeA = 0;
+                shapeB = Mod(advice.RotationB - advice.RotationA);
+            }
+            else
+            {
+                if (a.Rotatable) advice.TurnsA = Mod(advice.RotationA - a.CurrentRotation);
+                if (b.Rotatable) advice.TurnsB = Mod(advice.RotationB - b.CurrentRotation);
+            }
+
+            var kindA = KindOf(a);
+            var kindB = KindOf(b);
+            var turns = (advice.TurnsA, advice.TurnsB);
+            if (string.CompareOrdinal(kindA, kindB) > 0)
+            {
+                (kindA, kindB) = (kindB, kindA);
+                turns = (turns.Item2, turns.Item1);
+                if (a.Rotatable && b.Rotatable) shapeB = Mod(-shapeB);
+                else (shapeA, shapeB) = (shapeB, shapeA);
+            }
+            if (kindA == kindB)
+            {
+                if (a.Rotatable) shapeB = System.Math.Min(shapeB, Mod(-shapeB));
+                if (turns.Item1 > turns.Item2) turns = (turns.Item2, turns.Item1);
+            }
+            advice.Kind = kindA + "|" + kindB + "|" + shapeA + "," + shapeB;
+            advice.KindTurns = turns;
+        }
+
+        private static string KindOf(MixMaterial material) =>
+            material.EntityId + "|" + material.Rotatable + "|" + material.ConditionQuery + "|" + material.Query;
+
+        private static int Mod(int rotation) => ((rotation % TabletRotation.Steps) + TabletRotation.Steps) % TabletRotation.Steps;
 
         /// <summary>
         /// 짐작으로 뽑힌 쌍을 제대로 푼다. 기준 점수가 배치 후보 전부에서 나왔으므로 증가분도
@@ -230,6 +327,7 @@ namespace SephPlanner.Core.Solver
                 }
             }
 
+            if (best is not null) Instruct(best, a.Material, b.Material);
             return best;
         }
 

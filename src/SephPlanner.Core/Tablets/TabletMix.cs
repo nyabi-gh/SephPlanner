@@ -12,7 +12,10 @@ namespace SephPlanner.Core.Tablets
         public readonly string ConditionQuery;
         public readonly bool Rotatable;
 
-        /// <summary>지금 놓여 있는 회전. 돌릴 수 없는 석판은 이 각도로만 합성에 들어간다.</summary>
+        /// <summary>
+        /// 가방에 놓인 회전. 합성 창은 돌릴 수 있는 석판을 이 각도로 받아오므로, 사람이 창에서
+        /// 몇 번 돌려야 하는지의 출발점이다(<c>UI_CharacterStatusPanel</c> → <c>AddItemToMix</c>).
+        /// </summary>
         public readonly int CurrentRotation;
 
         public MixMaterial(
@@ -64,8 +67,8 @@ namespace SephPlanner.Core.Tablets
             // 합성으로 만든 석판은 재료가 되지 못한다. 게임 CanMixTablet 이 2101 을 걸러낸다.
             if (a.EntityId == ResultEntityId || b.EntityId == ResultEntityId) return null;
 
-            if (!a.Rotatable && rotationA != a.CurrentRotation) return null;
-            if (!b.Rotatable && rotationB != b.CurrentRotation) return null;
+            if (!a.Rotatable && rotationA != 0) return null;
+            if (!b.Rotatable && rotationB != 0) return null;
 
             var conditionA = TabletQuery.Rotated(a.ConditionQuery, rotationA);
             var conditionB = TabletQuery.Rotated(b.ConditionQuery, rotationB);
@@ -84,7 +87,8 @@ namespace SephPlanner.Core.Tablets
         }
 
         /// <summary>
-        /// 재료가 놓일 수 있는 회전. 돌릴 수 없는 석판은 지금 자리 그대로만 합쳐진다.
+        /// 합성 창에서 재료가 놓일 수 있는 회전. 돌릴 수 없는 석판은 가방에서 어떻게 놓였든 창의
+        /// 아이콘이 0 으로 되돌린다(<c>UI_ItemIcon.UpdateIcon</c>).
         ///
         /// 둘 다 돌릴 수 있으면 결과도 돌릴 수 있으므로, 절대 회전이 아니라 <b>둘 사이의 각도</b>
         /// 만 결과를 가른다. 그래서 한쪽을 0 으로 고정해도 나올 수 있는 모양은 다 나온다.
@@ -93,7 +97,7 @@ namespace SephPlanner.Core.Tablets
         {
             if (!material.Rotatable)
             {
-                yield return material.CurrentRotation;
+                yield return 0;
                 yield break;
             }
             for (var rotation = 0; rotation < 4; rotation++) yield return rotation;

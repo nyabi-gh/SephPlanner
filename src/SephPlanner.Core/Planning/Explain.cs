@@ -263,9 +263,9 @@ namespace SephPlanner.Core.Planning
                 $"{advice.NameA} 와(과) {advice.NameB} 을(를) 합칩니다. 재료 둘은 사라집니다.",
             };
 
-            var turn = Turn(advice);
-            if (turn.Length > 0)
-                lines.Add($"합성기에 넣기 전에 {turn} 만큼 돌려 두어야 이 결과가 나옵니다.");
+            lines.Add(Turn(advice));
+            if (advice.AnyOfSameKind && !advice.TurnsDependOnPick)
+                lines.Add("같은 석판이 여러 개면 어느 것을 넣어도 결과가 같습니다.");
 
             lines.Add(advice.Rotatable
                 ? "결과는 돌릴 수 있습니다 (재료가 둘 다 돌아가므로)."
@@ -296,16 +296,39 @@ namespace SephPlanner.Core.Planning
         }
 
         /// <summary>
-        /// 합성 전에 재료를 돌려 놓아야 하는 각도. 돌릴 것이 없으면 빈 문자열이라, 이 값 하나로
-        /// 돌릴 것이 있는지까지 답한다. 문장으로 감싸는 것은 부르는 쪽 몫이다.
+        /// 합성 창에서 할 일. 창은 석판을 가방에 놓인 방향 그대로 받고 우클릭 한 번에 90° 돌린다.
+        /// 같은 석판이 방향을 달리해 여럿이면 어느 것을 넣을지에 따라 횟수가 달라지므로 모양으로 말한다.
         /// </summary>
         public static string Turn(MixAdvice advice)
         {
-            var parts = new List<string>();
-            if (advice.RotationA != 0) parts.Add($"{advice.NameA} {advice.RotationA * 90}°");
-            if (advice.RotationB != 0) parts.Add($"{advice.NameB} {advice.RotationB * 90}°");
-            return string.Join(", ", parts);
+            if (!advice.RotatableA && !advice.RotatableB) return "두 석판 모두 돌릴 수 없어 그대로 합칩니다.";
+
+            if (advice.TurnsDependOnPick)
+            {
+                var shape = advice.RotatableA && advice.RotatableB
+                    ? $"{advice.NameB} 이(가) {advice.NameA} 보다 우클릭 {Steps(advice.RotationB - advice.RotationA)}번만큼 더 돌아간 모양"
+                    : advice.RotatableA
+                        ? $"{advice.NameA} 이(가) 처음 모양에서 우클릭 {Steps(advice.RotationA)}번 돌아간 모양"
+                        : $"{advice.NameB} 이(가) 처음 모양에서 우클릭 {Steps(advice.RotationB)}번 돌아간 모양";
+                return "같은 석판이 가방에서 서로 다른 방향으로 놓여 있어, 몇 번 돌릴지는 어느 것을 넣느냐에 " +
+                       $"따라 다릅니다. 합성 창에서 {shape}이 되게 맞추세요(우클릭 한 번에 90°).";
+            }
+
+            if (advice.TurnsA == 0 && advice.TurnsB == 0) return "합성 창에 들어간 방향 그대로 합치면 됩니다.";
+
+            var name = advice.TurnsA > 0 ? advice.NameA : advice.NameB;
+            var turns = advice.TurnsA > 0 ? advice.TurnsA : advice.TurnsB;
+            return $"합성 창에서 {name} 을(를) 우클릭해 {turns}번 돌린 뒤 합치세요(한 번에 90°). " +
+                   "합성 창은 석판을 가방에 놓인 방향 그대로 받아옵니다.";
         }
+
+        /// <summary>합성 추천 줄에 붙는 짧은 표. 자세한 것은 <see cref="Turn"/>이 쪽지에서 말한다.</summary>
+        public static string TurnTag(MixAdvice advice) =>
+            advice.TurnsDependOnPick ? "회전 확인"
+            : advice.TurnsA + advice.TurnsB > 0 ? $"회전 {advice.TurnsA + advice.TurnsB}번"
+            : "";
+
+        private static int Steps(int rotation) => ((rotation % 4) + 4) % 4;
 
         public static string Join(IReadOnlyList<string> lines) => string.Join(Environment.NewLine, lines);
     }
