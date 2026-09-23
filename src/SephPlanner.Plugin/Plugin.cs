@@ -40,6 +40,7 @@ namespace SephPlanner.Plugin
         private SettingsWindow _window;
         private BuildWindow _build;
         private PluginPreferences _prefs;
+        private bool _newRunPending;
         private PlanRunner _runner;
         private GameSnapshot _lastSnapshot;
         private DiagnosticConsentWindow _diagnosticWindow;
@@ -117,6 +118,7 @@ namespace SephPlanner.Plugin
             };
             Logger.LogEvent += CaptureOwnLog;
             GameBinding.LogTo(Logger.LogWarning);
+            HorayModAPI.OnStartSessionClientside += StartSession;
 
             // 실행기는 카탈로그가 준비된 뒤에 생기고 F9 뒤에는 새로 지어진다. 지금 것을 그때그때
             // 묻게 해 두면 계측 쪽이 그 수명을 몰라도 된다.
@@ -816,6 +818,7 @@ namespace SephPlanner.Plugin
 
                 ReportSephirites(snapshot);
                 ArmCatalogRetry(snapshot);
+                ForgetLastRun(snapshot);
 
                 step = FrameCost.Now;
                 FeedNativePanel(snapshot);
@@ -829,6 +832,35 @@ namespace SephPlanner.Plugin
                 _nextPoll = Time.unscaledTime + 5f;
             }
             FrameCost.FinishPoll(started);
+        }
+
+        /// <summary>
+        /// 게임이 세션을 세울 때 부른다(<c>DungeonManager.MarkSessionStartedForClients</c>, 참가자는
+        /// <c>OnStartClient</c>). 저장된 판을 이어 하면 <paramref name="isSaved"/> 가 참이라 지정을 둔다.
+        /// </summary>
+        private void StartSession(bool isSaved)
+        {
+            if (!isSaved) _newRunPending = true;
+        }
+
+        /// <summary>
+        /// 새 판의 가방이 처음 읽힐 때 지난 판의 지정을 정리한다. 세션 신호는 아바타보다 먼저 올 수
+        /// 있어 가방이 읽힐 때까지 미룬다 - 빈 가방으로 정리하면 시작 아이템의 지정까지 지운다.
+        /// </summary>
+        private void ForgetLastRun(GameSnapshot snapshot)
+        {
+            if (!_newRunPending || snapshot.Inventory == null) return;
+            _newRunPending = false;
+            if (!_settings.ForgetOnNewRun.Value) return;
+
+            var present = new HashSet<int>();
+            foreach (var item in snapshot.Inventory.Items) present.Add(item.DefinitionId);
+            foreach (var tablet in snapshot.Inventory.Tablets) present.Add(tablet.DefinitionId);
+            var forgotten = _prefs.ForgetAbsent(present);
+            if (forgotten == 0) return;
+
+            Logger.LogInfo($"새 판 - 가방에 없는 아이템 {forgotten}종의 지정을 정리했습니다.");
+            Report($"지난 판의 지정 {forgotten}개를 정리했습니다. F3의 ‘새 판에서 지난 판 지정 정리’로 끌 수 있습니다.");
         }
 
         /// <summary>
@@ -1552,6 +1584,7 @@ namespace SephPlanner.Plugin
             _updateCancellation?.Dispose();
             _updateClient?.Dispose();
             Logger.LogEvent -= CaptureOwnLog;
+            HorayModAPI.OnStartSessionClientside -= StartSession;
             if (_moving && _settings != null && _hud.IsAlive)
             {
                 var margin = _hud.Margin;

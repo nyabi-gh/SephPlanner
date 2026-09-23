@@ -71,6 +71,7 @@ namespace SephPlanner.Plugin
         public ConfigEntry<float> Opacity { get; }
         public ConfigEntry<bool> Recommendations { get; }
         public ConfigEntry<bool> MultiplayerAutoPlace { get; }
+        public ConfigEntry<bool> ForgetOnNewRun { get; }
         public ConfigEntry<bool> PadWindow { get; }
         public ConfigEntry<string> DiagnosticConsent { get; }
         public ConfigEntry<bool> DiagnosticChoiceMade { get; }
@@ -182,6 +183,11 @@ namespace SephPlanner.Plugin
                 "NativePanel", "Recommendations", true,
                 "무엇을 집을지에 대한 후보 추천을 계산할지. 끄면 가리는 것이 아니라 계산 자체를 " +
                 "건너뛴다. 점수와 배치 제안은 그대로 남는다.");
+
+            ForgetOnNewRun = config.Bind(
+                "NativePanel", "ForgetDesignationsOnNewRun", true,
+                "새 판이 시작되면 가방에 없는 아이템의 강화칸 우선·양보·사용 유지 같은 지정을 지운다. " +
+                "빌드 코드와 콤보 우선은 남는다. 끄면 지정이 판을 넘어 이어진다.");
 
             // 기본은 꺼짐이다. 개발사가 금지한 것은 아니고, 인벤토리 동기화 구현을 바꾸는 중이라
             // 잠가 두는 편이 안전하다고 답했다(docs/LEGAL.md "받은 답변").
@@ -303,6 +309,7 @@ namespace SephPlanner.Plugin
                     new[] { "아주 좁게", "좁게", "보통", "넓게", "아주 넓게" }),
                 Steps("불투명도", Opacity, OpacitySteps, new[] { "55%", "70%", "85%", "100%" }),
                 Switch("획득·합성·인챈트·제거 추천", Recommendations),
+                Switch("새 판에서 지난 판 지정 정리", ForgetOnNewRun),
                 Steps("주변 아이템 탐색 범위", OfferRadius, RadiusSteps,
                     new[] { "좁게", "보통", "넓게", "아주 넓게" }),
                 Switch("멀티 자동 배치", MultiplayerAutoPlace),

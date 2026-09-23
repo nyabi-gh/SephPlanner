@@ -313,7 +313,15 @@ GridInventory.DoClickAction(ItemPosition)             // 서버면 Local, 아니
 `Assembly-CSharp`에 `HorayModAPI` 정적 클래스가 있다. 개발사가 직접 넣은 모드 훅으로,
 "The MOD System is still under development" 안내와 https://teamhoray.com/mod-api 링크,
 데이터베이스 로드·세션 시작·`GridInventoryStartPermission`/`EndPermission` 등의 이벤트를 제공한다.
-아직 초기 단계라 쓰지는 않지만, 게임이 모드를 공식적으로 상정하고 있다는 근거다.
+게임이 모드를 공식적으로 상정하고 있다는 근거다.
+
+**새 판 신호로 `OnStartSessionClientside(isSaved)` 를 쓴다(2026-09-23, 게임 1.0.33).** 서버의
+`HorayNetworkManager.NewGame` 이 `MarkSessionStartedForClients` 를 부르고, 그것이 `RpcStartSession`
+으로 호스트를 포함한 모든 클라이언트에, 늦게 들어온 참가자에게는 `OnStartClient` 로 이 이벤트를
+보낸다. 같은 세션을 두 번 알리지 않게 게임이 `sessionSerial` 로 막는다. `isSaved` 는
+`CurrentRun` 의 `FloorCount > 0`, 즉 저장된 판을 이어 할 때 참이다. 세션은 로비에서 시작해
+사망하면 `RestartGame` 으로 새로 선다. 플러그인은 거짓일 때 가방이 읽힐 때까지 기다렸다가
+가방에 없는 아이템의 직접 지정을 지운다. 실기 확인은 아직이다.
 
 ### 멀티플레이는 기본으로 잠그고, 켜면 호스트와 참가자 양쪽에서 돈다
 

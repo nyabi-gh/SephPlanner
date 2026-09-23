@@ -26,6 +26,45 @@ public sealed class PluginPreferencesTests : IDisposable
         Assert.False(Load().IsDeactivationAllowed(9));
     }
     [Fact]
+    public void ANewRunForgetsDesignationsForItemsNotInTheBagButKeepsTheBuild()
+    {
+        var prefs = Load();
+        prefs.StepPin(1, 1);
+        prefs.StepPin(2, -1);
+        prefs.StepLevelCap(3, 1, 5);
+        prefs.ToggleHold(4);
+        prefs.ToggleSupportTarget(5);
+        prefs.ToggleRetain(6);
+        prefs.ToggleDeactivation(7);
+        prefs.StepPin(8, 1);
+        prefs.ToggleRetain(8);
+        prefs.TogglePriority("MAGITECH");
+
+        Assert.Equal(7, prefs.ForgetAbsent(new HashSet<int> { 8 }));
+
+        var restored = Load();
+        var planning = restored.ToPreferences(false);
+        Assert.Equal(new Dictionary<int, int> { [8] = 1 }, planning.PinnedCharms);
+        Assert.Equal(new HashSet<int> { 8 }, planning.RetainedCharms);
+        Assert.Empty(planning.LevelCaps);
+        Assert.Empty(planning.HeldCharms);
+        Assert.Empty(planning.SupportTargets);
+        Assert.Empty(planning.DeactivationAllowed);
+        Assert.True(restored.IsPriority("MAGITECH"));
+    }
+
+    [Fact]
+    public void ANewRunWithNothingToForgetDoesNotRewriteTheSettings()
+    {
+        var prefs = Load();
+        prefs.StepPin(1, 1);
+        var revision = prefs.Revision;
+
+        Assert.Equal(0, prefs.ForgetAbsent(new HashSet<int> { 1 }));
+        Assert.Equal(revision, prefs.Revision);
+    }
+
+    [Fact]
     public void ASupportTargetSurvivesAReloadAndClearsWithTheBuild()
     {
         var prefs = Load();

@@ -235,6 +235,45 @@ namespace SephPlanner.Plugin
             Changed();
         }
 
+        /// <summary>
+        /// 가방에 없는 아이템의 직접 지정을 지우고, 지운 아이템 종류 수를 돌려준다. 지정은 아이템
+        /// 종류별이라 판을 넘어 남는데, 지난 판의 ★ 가 다음 판의 배치와 획득 추천을 끌어당긴다는
+        /// 제보가 이어져 새 판마다 부른다. 판을 넘는 빌드 방향은 빌드 코드와 콤보 우선이 맡으므로
+        /// 그 둘은 건드리지 않는다.
+        /// </summary>
+        public int ForgetAbsent(ICollection<int> present)
+        {
+            var forgotten = new HashSet<int>();
+            Forget(PinnedLevels, present, forgotten);
+            Forget(LevelCaps, present, forgotten);
+            Forget(HeldCharms, present, forgotten);
+            Forget(SupportTargets, present, forgotten);
+            Forget(RetainedCharms, present, forgotten);
+            Forget(DeactivationAllowed, present, forgotten);
+            if (forgotten.Count > 0) Changed();
+            return forgotten.Count;
+        }
+
+        private static void Forget(Dictionary<int, int> designations, ICollection<int> present, HashSet<int> forgotten)
+        {
+            var absent = new List<int>();
+            foreach (var entityId in designations.Keys)
+                if (!present.Contains(entityId)) absent.Add(entityId);
+            foreach (var entityId in absent)
+            {
+                designations.Remove(entityId);
+                forgotten.Add(entityId);
+            }
+        }
+
+        private static void Forget(List<int> designations, ICollection<int> present, HashSet<int> forgotten) =>
+            designations.RemoveAll(entityId =>
+            {
+                if (present.Contains(entityId)) return false;
+                forgotten.Add(entityId);
+                return true;
+            });
+
         /// <summary>가져온 빌드가 무엇을 알려 주는지 한 줄로.</summary>
         public static string Summary(BuildPreset preset)
         {
