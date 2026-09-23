@@ -1,6 +1,6 @@
 ﻿# SephPlanner
 
-[![누적 다운로드](https://img.shields.io/github/downloads/nyabi-gh/SephPlanner/total?style=for-the-badge&logo=github&logoColor=white&label=%EB%8B%A4%EC%9A%B4%EB%A1%9C%EB%93%9C&labelColor=1e1b2e&color=77d8b0)](https://github.com/nyabi-gh/SephPlanner/releases) [![최신 릴리스](https://img.shields.io/github/v/release/nyabi-gh/SephPlanner?style=for-the-badge&logo=github&logoColor=white&label=%EC%B5%9C%EC%8B%A0&labelColor=1e1b2e&color=b9a7f5)](https://github.com/nyabi-gh/SephPlanner/releases/latest) [![지원 플랫폼](https://img.shields.io/badge/%ED%94%8C%EB%9E%AB%ED%8F%BC-Windows-8bbcf2?style=for-the-badge&labelColor=1e1b2e)](#설치)
+[![누적 다운로드](https://img.shields.io/github/downloads/nyabi-gh/SephPlanner/total?style=for-the-badge&logo=github&logoColor=white&label=%EB%8B%A4%EC%9A%B4%EB%A1%9C%EB%93%9C&labelColor=1e1b2e&color=77d8b0)](https://github.com/nyabi-gh/SephPlanner/releases) [![최신 릴리스](https://img.shields.io/github/v/release/nyabi-gh/SephPlanner?style=for-the-badge&logo=github&logoColor=white&label=%EC%B5%9C%EC%8B%A0&labelColor=1e1b2e&color=b9a7f5)](https://github.com/nyabi-gh/SephPlanner/releases/latest) [![지원 플랫폼](https://img.shields.io/badge/%ED%94%8C%EB%9E%AB%ED%8F%BC-Windows%20%7C%20macOS-8bbcf2?style=for-the-badge&labelColor=1e1b2e)](#설치)
 
 세피리아(Sephiria)의 석판·아티팩트 배치를 계산하고 게임 화면에 보여 주는 비공식 도우미입니다. 제안된 배치를 손으로 따라 옮기거나 `F8`로 적용할 수 있으며, 상자·상점·세피라이트의 후보와 석판 합성, 인챈트 대상도 추천합니다.
 
@@ -8,13 +8,13 @@ TEAM HORAY와 제휴·후원·공식 승인 관계가 없는 무료 팬 제작 �
 
 **[안정 버전 다운로드](https://github.com/nyabi-gh/SephPlanner/releases/latest) · [전체 버전·변경 사항](https://github.com/nyabi-gh/SephPlanner/releases) · [오류 제보](https://github.com/nyabi-gh/SephPlanner/issues) · [문의](#문의)**
 
-Windows용 Steam 세피리아에 설치하며, 게임은 별도로 필요합니다. 배포 ZIP에는 BepInEx 5.4.23.5(win_x64, Mono)가 포함되어 있습니다.
+Windows와 macOS용 Steam 세피리아에 설치하며, 게임은 별도로 필요합니다. 플랫폼별 배포 ZIP에는 해당 운영체제용 BepInEx가 포함됩니다.
 
-`Pre-release`가 붙은 시험 버전은 전체 버전 목록에서 확인할 수 있습니다. 설치할 파일은 각 릴리스의 `SephPlanner-v버전.zip`입니다.
+`Pre-release`가 붙은 시험 버전은 전체 버전 목록에서 확인할 수 있습니다. Windows 설치 파일은 `SephPlanner-v버전.zip`, macOS 설치 파일은 `SephPlanner-macos-v버전.zip`입니다.
 
 ## 설치
 
-### 처음 설치하는 경우
+### Windows에서 처음 설치하는 경우
 
 1. 게임을 종료합니다.
 2. [Releases](https://github.com/nyabi-gh/SephPlanner/releases)에서 `SephPlanner-v버전.zip`을 받습니다. GitHub가 표시하는 `Source code (zip)`은 설치 파일이 아닙니다.
@@ -38,6 +38,14 @@ Sephiria/
 ```
 
 ZIP에는 `설치안내.txt`, 사용 조건인 `LICENSE.txt`, 제3자 라이선스, 파일 확인용 `manifest.json`도 들어 있습니다. 게임 파일은 포함하지 않습니다.
+
+### macOS에서 처음 설치하는 경우
+
+1. 게임을 종료하고 [Releases](https://github.com/nyabi-gh/SephPlanner/releases)에서 `SephPlanner-macos-v버전.zip`을 받습니다.
+2. 압축을 풀어 `게임 폴더에 복사` 안의 내용물을 Steam의 세피리아 게임 폴더에 복사합니다. `Sephiria.app` 안이 아니라 그 옆에 `BepInEx`, `libdoorstop.dylib`, `run_bepinex.sh`가 있어야 합니다.
+3. 터미널에서 `chmod +x "<게임 폴더>/run_bepinex.sh"`를 실행합니다.
+4. Steam의 세피리아 **속성 → 일반 → 시작 옵션**에 `"<게임 폴더>/run_bepinex.sh" %command%`를 입력합니다. `<게임 폴더>`를 실제 전체 경로로 바꿉니다.
+5. Steam에서 게임을 실행하고 세이브를 골라 들어갑니다. 첫 아이템 데이터는 게임에 들어간 뒤 자동으로 만들어집니다. 자세한 내용과 제거 방법은 [macOS 설치 안내](docs/INSTALL-macos.txt)에 있습니다.
 
 ### 이미 BepInEx를 사용하거나 이전 버전에서 업데이트하는 경우
 

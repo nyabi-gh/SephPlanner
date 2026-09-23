@@ -26,7 +26,6 @@ namespace SephPlanner.Plugin
 
         private PluginSettings _settings;
         private float _nextPoll;
-        private bool _catalogChecked;
         private bool _catalogRetryArmed;
         private bool _inRun;
         private PlanVerificationStatus _simulationVerification;
@@ -119,6 +118,7 @@ namespace SephPlanner.Plugin
             Logger.LogEvent += CaptureOwnLog;
             GameBinding.LogTo(Logger.LogWarning);
             HorayModAPI.OnStartSessionClientside += StartSession;
+            HorayModAPI.OnAllDatabasesReady += ArmCatalogRefresh;
 
             // 실행기는 카탈로그가 준비된 뒤에 생기고 F9 뒤에는 새로 지어진다. 지금 것을 그때그때
             // 묻게 해 두면 계측 쪽이 그 수명을 몰라도 된다.
@@ -248,13 +248,6 @@ namespace SephPlanner.Plugin
                 _hud.UpdateHover(Cursor(), !_hidden && !_moving && !AnyWindowOpen());
             }
 
-            // 리소스는 부팅 직후 준비되므로 첫 프레임에 확인한다.
-            if (!_catalogChecked)
-            {
-                _catalogChecked = true;
-                _catalogRetryArmed = true;
-            }
-
             if (_catalogRetryArmed && !_dumping)
             {
                 _catalogRetryArmed = false;
@@ -272,6 +265,8 @@ namespace SephPlanner.Plugin
             if (inRun && !_inRun) _catalogRetryArmed = true;
             _inRun = inRun;
         }
+
+        private void ArmCatalogRefresh() => _catalogRetryArmed = true;
 
         private bool _dumping;
 
@@ -1607,6 +1602,7 @@ namespace SephPlanner.Plugin
             _updateClient?.Dispose();
             Logger.LogEvent -= CaptureOwnLog;
             HorayModAPI.OnStartSessionClientside -= StartSession;
+            HorayModAPI.OnAllDatabasesReady -= ArmCatalogRefresh;
             if (_moving && _settings != null && _hud.IsAlive)
             {
                 var margin = _hud.Margin;

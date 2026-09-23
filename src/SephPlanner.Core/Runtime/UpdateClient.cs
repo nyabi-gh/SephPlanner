@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -34,7 +35,8 @@ namespace SephPlanner.Core.Runtime
         public static Uri LatestRelease => new Uri(Repository + "/releases/latest");
 
         public static Uri AssetOf(Version version) =>
-            new Uri(Repository + "/releases/download/v" + Format(version) + "/" + AssetPrefix + Format(version) + ".zip");
+            new Uri(Repository + "/releases/download/v" + Format(version) + "/" +
+                (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? "SephPlanner-macos-v" : AssetPrefix) + Format(version) + ".zip");
 
         /// <summary>
         /// 버전은 세 자리로만 견준다. 어셈블리 버전은 <c>0.3.9.0</c> 이고 태그는 <c>0.3.9</c> 인데,

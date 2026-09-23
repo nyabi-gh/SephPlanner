@@ -22,6 +22,11 @@ $env:SEPHIRIA_DIR = "D:\SteamLibrary\steamapps\common\Sephiria"
 dotnet build
 ```
 
+macOS에서는 기본 Steam 경로의 `Sephiria.app/Contents/Resources/Data/Managed`를 참조한다.
+다른 라이브러리에 설치했다면 `SEPHIRIA_DIR`에 `Sephiria.app`의 상위 게임 폴더를 지정한다.
+macOS용 BepInEx와 Doorstop 로더는 `scripts/build-macos-loader.sh`로 빌드하며,
+결과는 `artifacts/macos-loader/`에 놓인다. Xcode 명령줄 도구와 .NET SDK가 필요하다.
+
 일반 빌드는 게임 폴더를 변경하지 않는다. 빌드 결과를 설치된 게임에 복사하려면 명시적으로 배치한다.
 
 ```powershell
@@ -117,11 +122,13 @@ dotnet run --project src/SephPlanner.DataTool
 ```powershell
 scripts/make-release.ps1
 # -> artifacts/SephPlanner-v{버전}.zip
+# macOS에서 실행하면 artifacts/SephPlanner-macos-v{버전}.zip
 ```
 
-배포물에는 플러그인 DLL 두 개와 BepInEx 5.4.23.5(win_x64, Mono), 설치 안내와 라이선스가
-들어간다. 릴리스 전에 포맷, 테스트, 빌드를 검증하고 커밋과 파일 해시가 적힌 `manifest.json`을
-만든다. 게임 파일은 넣지 않는다.
+배포물에는 플러그인 DLL 두 개와 플랫폼에 맞는 BepInEx, 설치 안내와 라이선스가 들어간다.
+macOS 배포물은 `build-macos-loader.sh`가 고정한 BepInEx·Doorstop·plthook 소스와
+`scripts/patches/macos-plthook.patch`를 사용한다. 릴리스 전에 포맷, 테스트, 빌드를 검증하고
+커밋과 파일 해시가 적힌 `manifest.json`을 만든다. 게임 파일은 넣지 않는다.
 
 zip은 이 저장소의 Releases 에 올린다. 변경 기록은 CHANGELOG.md 가 정본이고, 릴리스 본문은
 `make-release.ps1`이 그 절을 그대로 뽑아 `artifacts/release-notes-v{버전}.md`로 내준다 - 손으로
@@ -138,7 +145,7 @@ zip은 이 저장소의 Releases 에 올린다. 변경 기록은 CHANGELOG.md �
 있으므로 `git fetch --tags` 의 clobber 경고는 정상이고 `--force` 로 맞추지 않는다.**
 
 **zip 의 이름과 `manifest.json` 은 게임 안 업데이트가 읽는다.** 플러그인은 `releases/latest` 가
-가리키는 태그 `v{버전}` 에서 `SephPlanner-v{버전}.zip` 을 받고, 안의 `manifest.json` 으로 버전과
+가리키는 태그 `v{버전}` 에서 운영체제에 맞는 ZIP을 받고, 안의 `manifest.json` 으로 버전과
 DLL 둘의 SHA-256 을 대조한다(`UpdateClient`·`UpdatePackage`). 자산 이름·zip 안 경로·manifest
 의 `version`/`files` 모양을 바꾸면 이미 깔린 판의 업데이트가 끊긴다. 시험 버전은 `Pre-release`
 로 올려야 안정판 사용자에게 안내되지 않는다.

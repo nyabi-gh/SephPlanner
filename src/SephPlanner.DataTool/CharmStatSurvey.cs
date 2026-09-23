@@ -12,7 +12,7 @@ public static class CharmStatSurvey
 {
     public static int Run(string gameDirectory)
     {
-        var path = Path.Combine(gameDirectory, "Sephiria_Data", "Managed", "Assembly-CSharp.dll");
+        var path = Path.Combine(GameLocator.ManagedDir(gameDirectory), "Assembly-CSharp.dll");
         if (!File.Exists(path))
         {
             Console.Error.WriteLine($"게임 어셈블리를 찾지 못했습니다: {path}");

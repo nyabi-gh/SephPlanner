@@ -13,7 +13,9 @@
       이 경로의 DLL은 참조만 하고 저장소에 커밋하지 않는다.
     -->
     <SephiriaDir Condition="'$(SephiriaDir)' == '' AND '$(SEPHIRIA_DIR)' != ''">$(SEPHIRIA_DIR)</SephiriaDir>
+    <SephiriaDir Condition="'$(SephiriaDir)' == '' AND $([MSBuild]::IsOSPlatform('OSX'))">$(HOME)/Library/Application Support/Steam/steamapps/common/Sephiria</SephiriaDir>
     <SephiriaDir Condition="'$(SephiriaDir)' == ''">D:\SteamLibrary\steamapps\common\Sephiria</SephiriaDir>
-    <SephiriaManagedDir>$(SephiriaDir)\Sephiria_Data\Managed</SephiriaManagedDir>
+    <SephiriaManagedDir Condition="Exists('$(SephiriaDir)/Sephiria.app/Contents/Resources/Data/Managed')">$(SephiriaDir)/Sephiria.app/Contents/Resources/Data/Managed</SephiriaManagedDir>
+    <SephiriaManagedDir Condition="'$(SephiriaManagedDir)' == ''">$(SephiriaDir)/Sephiria_Data/Managed</SephiriaManagedDir>
   </PropertyGroup>
 </Project>

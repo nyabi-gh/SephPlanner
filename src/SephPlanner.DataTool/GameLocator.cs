@@ -34,6 +34,9 @@ public static class GameLocator
 
     private static IEnumerable<string> SteamRoots()
     {
+        if (OperatingSystem.IsMacOS())
+            yield return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                "Library", "Application Support", "Steam");
         yield return @"C:\Program Files (x86)\Steam";
         yield return @"C:\Program Files\Steam";
         foreach (var d in DriveInfo.GetDrives().Where(d => d.IsReady))
@@ -51,6 +54,13 @@ public static class GameLocator
             yield return m.Groups[1].Value.Replace("\\\\", "\\");
     }
 
+    private static string DataDir(string gameDir) =>
+        Directory.Exists(Path.Combine(gameDir, "Sephiria.app"))
+            ? Path.Combine(gameDir, "Sephiria.app", "Contents", "Resources", "Data")
+            : Path.Combine(gameDir, "Sephiria_Data");
+
     public static string LocalizationDir(string gameDir) =>
-        Path.Combine(gameDir, "Sephiria_Data", "StreamingAssets", "Localization");
+        Path.Combine(DataDir(gameDir), "StreamingAssets", "Localization");
+
+    public static string ManagedDir(string gameDir) => Path.Combine(DataDir(gameDir), "Managed");
 }
