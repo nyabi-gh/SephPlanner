@@ -14,7 +14,7 @@
 
 ### Contributors
 
-- @jooinjang 님이 macOS 지원과 위 수정을 기여해 주셨습니다(#1).
+- @jooinjang 님이 macOS 지원과 위 수정에 기여해 주셨습니다(#1).
 
 ## 0.4.14
 
