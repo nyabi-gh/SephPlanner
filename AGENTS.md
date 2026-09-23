@@ -7,4 +7,4 @@
 - **Language**: Documentation, code comments, and anything the player sees are Korean. Commit messages and pull request text are English.
 - **Run `scripts/check.ps1` Before Committing**: CI cannot build the plugin, because that needs the game assemblies. A change that breaks only the plugin passes CI green.
 - **Ask When Ambiguous**: Do not make arbitrary assumptions when requirements or details are unclear. Always ask the user for clarification.
-- **Changelog Format**: Write `CHANGELOG.md` and release notes as `### Added` / `### Changed` / `### Fixed` bullet lists. Keep each entry to one or two plain sentences describing what changed for the player. No implementation detail, no benchmark numbers, no bold-per-bullet.
+- **Changelog Format**: Write the changes in `CHANGELOG.md` and release notes as `### Added` / `### Changed` / `### Fixed` bullet lists. Keep each entry to one or two plain sentences describing what changed for the player. No implementation detail, no benchmark numbers, no bold-per-bullet. Other sections, such as `### Contributors` crediting outside contributors, may follow when needed.
