@@ -23,7 +23,9 @@ BepInEx 5.4.23.5 (macOS, Mono)
 라이선스  MIT - BepInEx-LICENSE.txt
 원본      https://github.com/BepInEx/BepInEx/tree/f4c1b1103a32884b7440d9681c60cc5d619f284f
           공식 macOS ZIP SHA-256 01c2ae782eb016dfd6c345a18dbd2dcafffb3d9d318449d6486689f426b4a323
-          Apple Silicon 수정이 들어간 위 소스에서 core DLL을 다시 빌드했습니다.
+          위 소스에서 core DLL을 다시 빌드했습니다. 공식 5.4.23.5 core DLL은 Apple Silicon
+          Mac에서 플러그인을 불러오지 못하며, 그 수정(BepInEx #1402)은 아직 정식 릴리스에
+          없습니다. 같은 소스에는 macOS arm64 크래시 수정(#1288)도 들어 있습니다.
 
 
 Unity Doorstop 4.5.0

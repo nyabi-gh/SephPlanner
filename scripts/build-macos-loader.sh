@@ -43,6 +43,7 @@ git -C "$work/doorstop" apply "$root/scripts/patches/macos-plthook.patch"
 
 dotnet_bin="$(command -v dotnet || true)"
 if [[ -z "$dotnet_bin" ]]; then dotnet_bin="$artifacts/dotnet/dotnet"; fi
+# 공식 5.4.23.5 core DLL 은 Apple Silicon 에서 체인로더가 서지 않는다(BepInEx #1402). 고정 커밋에서 다시 짓는다.
 "$dotnet_bin" build "$work/bepinex/BepInEx.Preloader/BepInEx.Preloader.csproj" -c Release -v:q
 
 sdk="${MACOS_SDK:-$(xcrun --sdk macosx --show-sdk-path)}"
