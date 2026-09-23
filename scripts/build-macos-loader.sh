@@ -58,10 +58,10 @@ sources=(
     "$work/doorstop/src/nix/plthook/plthook_osx.c"
 )
 for arch in arm64 x86_64; do
-    clang -isysroot "$sdk" -arch "$arch" -mmacosx-version-min=11.0 -dynamiclib -fPIC \
+    xcrun clang -isysroot "$sdk" -arch "$arch" -mmacosx-version-min=11.0 -dynamiclib -fPIC \
         -o "$work/libdoorstop-$arch.dylib" "${sources[@]}"
 done
-lipo -create "$work/libdoorstop-arm64.dylib" "$work/libdoorstop-x86_64.dylib" \
+xcrun lipo -create "$work/libdoorstop-arm64.dylib" "$work/libdoorstop-x86_64.dylib" \
     -output "$work/libdoorstop.dylib"
 
 mkdir -p "$work/output"

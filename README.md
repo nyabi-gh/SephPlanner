@@ -43,7 +43,7 @@ ZIP에는 `설치안내.txt`, 사용 조건인 `LICENSE.txt`, 제3자 라이선�
 
 1. 게임을 종료하고 [Releases](https://github.com/nyabi-gh/SephPlanner/releases)에서 `SephPlanner-macos-v버전.zip`을 받습니다.
 2. 압축을 풀어 `게임 폴더에 복사` 안의 내용물을 Steam의 세피리아 게임 폴더에 복사합니다. `Sephiria.app` 안이 아니라 그 옆에 `BepInEx`, `libdoorstop.dylib`, `run_bepinex.sh`가 있어야 합니다.
-3. 터미널에서 `chmod +x "<게임 폴더>/run_bepinex.sh"`를 실행합니다.
+3. 터미널에서 `xattr -c "<게임 폴더>/libdoorstop.dylib" "<게임 폴더>/run_bepinex.sh"`와 `chmod +x "<게임 폴더>/run_bepinex.sh"`를 실행합니다. 첫 줄을 건너뛰면 macOS가 인터넷에서 받은 `libdoorstop.dylib`를 막아 도우미 없이 게임이 켜집니다.
 4. Steam의 세피리아 **속성 → 일반 → 시작 옵션**에 `"<게임 폴더>/run_bepinex.sh" %command%`를 입력합니다. `<게임 폴더>`를 실제 전체 경로로 바꿉니다.
 5. Steam에서 게임을 실행하고 세이브를 골라 들어갑니다. 첫 아이템 데이터는 게임에 들어간 뒤 자동으로 만들어집니다. 자세한 내용과 제거 방법은 [macOS 설치 안내](docs/INSTALL-macos.txt)에 있습니다.
 

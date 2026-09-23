@@ -8,8 +8,11 @@ SephPlanner macOS 설치 안내
 2. Steam에서 세피리아 우클릭 → 관리 → 로컬 파일 보기로 게임 폴더를 엽니다.
 3. "게임 폴더에 복사" 안의 내용물을 게임 폴더에 복사합니다. Sephiria.app 안이 아니라
    Sephiria.app과 나란히 BepInEx, libdoorstop.dylib, run_bepinex.sh가 있어야 합니다.
-4. 터미널에서 게임 폴더의 run_bepinex.sh에 실행 권한을 줍니다.
+4. 터미널에서 로더 파일의 격리 표시를 풀고 run_bepinex.sh에 실행 권한을 줍니다.
+   인터넷에서 받은 파일이라 이 과정을 건너뛰면 macOS가 "libdoorstop.dylib에 악성 코드가
+   없음을 확인할 수 없습니다"라며 막고, 게임은 도우미 없이 켜집니다.
 
+   xattr -c "<게임 폴더>/libdoorstop.dylib" "<게임 폴더>/run_bepinex.sh"
    chmod +x "<게임 폴더>/run_bepinex.sh"
 
 5. Steam의 세피리아 → 속성 → 일반 → 시작 옵션에 아래처럼 입력합니다. <게임 폴더>는
