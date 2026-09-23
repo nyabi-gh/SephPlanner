@@ -1,7 +1,7 @@
 SephPlanner macOS 설치 안내
 ==========================
 
-세피리아 Steam macOS판에 설치하는 비공식 도우미입니다. 게임이 설치돼 있어야 합니다.
+세피 플래너는 세피리아 Steam macOS판에 설치하는 비공식 컴패니언입니다. 게임이 설치돼 있어야 합니다.
 이 ZIP에는 macOS용 BepInEx와 SephPlanner가 함께 들어 있습니다. 게임 파일은 없습니다.
 
 1. 게임을 종료하고 ZIP을 풉니다.
@@ -10,7 +10,7 @@ SephPlanner macOS 설치 안내
    Sephiria.app과 나란히 BepInEx, libdoorstop.dylib, run_bepinex.sh가 있어야 합니다.
 4. 터미널에서 로더 파일의 격리 표시를 풀고 run_bepinex.sh에 실행 권한을 줍니다.
    인터넷에서 받은 파일이라 이 과정을 건너뛰면 macOS가 "libdoorstop.dylib에 악성 코드가
-   없음을 확인할 수 없습니다"라며 막고, 게임은 도우미 없이 켜집니다.
+   없음을 확인할 수 없습니다"라며 막고, 게임은 세피 플래너 없이 켜집니다.
 
    xattr -c "<게임 폴더>/libdoorstop.dylib" "<게임 폴더>/run_bepinex.sh"
    chmod +x "<게임 폴더>/run_bepinex.sh"
@@ -21,7 +21,7 @@ SephPlanner macOS 설치 안내
    "<게임 폴더>/run_bepinex.sh" %command%
 
 6. Steam에서 게임을 실행합니다. 첫 실행에는 세이브를 골라 게임에 들어간 뒤
-   아이템 데이터가 자동으로 만들어집니다. 탐험에 들어가면 배치 도우미가 나타납니다.
+   아이템 데이터가 자동으로 만들어집니다. 탐험에 들어가면 세피 플래너가 나타납니다.
 
 이미 작동하는 macOS용 BepInEx를 사용 중이라면 게임을 종료하고
 "게임 폴더에 복사/BepInEx/plugins"의 SephPlanner.Plugin.dll과 SephPlanner.Core.dll

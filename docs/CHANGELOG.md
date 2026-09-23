@@ -4,7 +4,7 @@
 
 ### Added
 
-- macOS Steam판 세피리아에서 배치 도우미를 설치하고 사용할 수 있습니다. 릴리스의
+- macOS Steam판 세피리아에서 세피 플래너를 설치하고 사용할 수 있습니다. 릴리스의
   `SephPlanner-macos-v버전.zip`을 받으면 됩니다.
 
 ### Fixed
