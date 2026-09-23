@@ -107,6 +107,7 @@ namespace SephPlanner.Plugin
             }
             finally
             {
+                FixedEffectLayer.Invalidate();
                 if (_routine != null)
                     _uncertainInventory = _routine.RequiresResync ? inventory : null;
                 _running = false;

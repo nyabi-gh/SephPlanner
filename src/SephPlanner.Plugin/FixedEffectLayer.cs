@@ -40,6 +40,16 @@ namespace SephPlanner.Plugin
             _frame = -1;
         }
 
+        /// <summary>
+        /// 프레임 캐시만 버리고 추적 기록은 둔다. 호스트의 자동 배치는 한 프레임 안에 끝나므로,
+        /// 그 뒤 같은 프레임의 검증이 배치 전 뷰를 받지 않게 쓰기가 끝나면 부른다.
+        /// </summary>
+        internal static void Invalidate()
+        {
+            _cached = null;
+            _frame = -1;
+        }
+
         internal static FixedEffectLayerState Get(GridInventory inv)
         {
             if (_cached != null && _frame == Time.frameCount && ReferenceEquals(_inventory, inv)) return _cached;
