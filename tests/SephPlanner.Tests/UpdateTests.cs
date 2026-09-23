@@ -13,9 +13,10 @@ public class UpdateTests
     {
         Assert.Equal(new Version(0, 3, 9), UpdateClient.Normalize(new Version(0, 3, 9, 0)));
         Assert.Equal("0.3.9", UpdateClient.Format(new Version(0, 3, 9, 0)));
-        var asset = OperatingSystem.IsMacOS() ? "SephPlanner-macos-v0.3.9.zip" : "SephPlanner-v0.3.9.zip";
-        Assert.Equal(new Uri("https://github.com/nyabi-gh/SephPlanner/releases/download/v0.3.9/" + asset),
-            UpdateClient.AssetOf(new Version(0, 3, 9, 0)));
+        Assert.Equal(new Uri("https://github.com/nyabi-gh/SephPlanner/releases/download/v0.3.9/SephPlanner-v0.3.9.zip"),
+            UpdateClient.AssetOf(new Version(0, 3, 9, 0), mac: false));
+        Assert.Equal(new Uri("https://github.com/nyabi-gh/SephPlanner/releases/download/v0.3.9/SephPlanner-macos-v0.3.9.zip"),
+            UpdateClient.AssetOf(new Version(0, 3, 9, 0), mac: true));
     }
 
     [Theory]
@@ -34,7 +35,7 @@ public class UpdateTests
             response.Headers.Location = new Uri(location, UriKind.RelativeOrAbsolute);
             return Task.FromResult(response);
         });
-        using var client = new UpdateClient(handler);
+        using var client = new UpdateClient(handler, mac: false);
         var latest = await client.CheckAsync(new Version(0, 3, 9, 0), CancellationToken.None);
         Assert.Equal(expected == null ? null : Version.Parse(expected), latest);
         Assert.Equal(1, handler.Calls);
@@ -53,15 +54,17 @@ public class UpdateTests
             response.Headers.Location = new Uri(location, UriKind.RelativeOrAbsolute);
             return Task.FromResult(response);
         });
-        using var client = new UpdateClient(handler);
+        using var client = new UpdateClient(handler, mac: false);
         await Assert.ThrowsAsync(failure, () => client.CheckAsync(new Version(0, 3, 9), CancellationToken.None));
     }
 
-    [Fact]
-    public async Task DownloadFollowsTheAssetRedirectAndReturnsTheBytes()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DownloadFollowsTheAssetRedirectAndReturnsTheBytes(bool mac)
     {
         var payload = Encoding.UTF8.GetBytes("zip bytes");
-        var asset = UpdateClient.AssetOf(new Version(0, 3, 10));
+        var asset = UpdateClient.AssetOf(new Version(0, 3, 10), mac);
         var storage = new Uri("https://release-assets.githubusercontent.com/some/path?token=x");
         var handler = new DiagnosticHandler((request, _) =>
         {
@@ -75,7 +78,7 @@ public class UpdateTests
             Assert.Equal(storage, request.RequestUri);
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(payload) });
         });
-        using var client = new UpdateClient(handler);
+        using var client = new UpdateClient(handler, mac);
         Assert.Equal(payload, await client.DownloadAsync(new Version(0, 3, 10), CancellationToken.None));
         Assert.Equal(2, handler.Calls);
     }
@@ -91,7 +94,7 @@ public class UpdateTests
             redirect.Headers.Location = new Uri(location);
             return Task.FromResult(redirect);
         });
-        using var client = new UpdateClient(handler);
+        using var client = new UpdateClient(handler, mac: false);
         await Assert.ThrowsAsync<HttpRequestException>(() => client.DownloadAsync(new Version(0, 3, 10), CancellationToken.None));
         Assert.Equal(1, handler.Calls);
     }
@@ -105,12 +108,12 @@ public class UpdateTests
             redirect.Headers.Location = new Uri(request.RequestUri + "/again");
             return Task.FromResult(redirect);
         });
-        using (var client = new UpdateClient(looping))
+        using (var client = new UpdateClient(looping, mac: false))
             await Assert.ThrowsAsync<HttpRequestException>(() => client.DownloadAsync(new Version(0, 3, 10), CancellationToken.None));
         Assert.Equal(6, looping.Calls);
 
         var missing = new DiagnosticHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)));
-        using (var client = new UpdateClient(missing))
+        using (var client = new UpdateClient(missing, mac: false))
             await Assert.ThrowsAsync<HttpRequestException>(() => client.DownloadAsync(new Version(0, 3, 10), CancellationToken.None));
     }
 
@@ -123,7 +126,7 @@ public class UpdateTests
             content.Headers.ContentLength = UpdateClient.MaximumAssetBytes + 1L;
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = content });
         });
-        using var client = new UpdateClient(handler);
+        using var client = new UpdateClient(handler, mac: false);
         await Assert.ThrowsAsync<InvalidDataException>(() => client.DownloadAsync(new Version(0, 3, 10), CancellationToken.None));
     }
 

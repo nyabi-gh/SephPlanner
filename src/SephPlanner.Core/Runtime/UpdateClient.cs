@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Net;
 using System.Net.Http;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -19,24 +18,27 @@ namespace SephPlanner.Core.Runtime
     {
         public const string Repository = "https://github.com/nyabi-gh/SephPlanner";
         public const string AssetPrefix = "SephPlanner-v";
+        public const string MacAssetPrefix = "SephPlanner-macos-v";
         public const int MaximumAssetBytes = 32 * 1024 * 1024;
         private const int MaximumRedirects = 5;
         private const string TagPrefix = "/releases/tag/v";
         private readonly HttpClient _http;
+        private readonly bool _mac;
 
-        public UpdateClient() : this(new HttpClientHandler { AllowAutoRedirect = false }) { }
+        public UpdateClient(bool mac) : this(new HttpClientHandler { AllowAutoRedirect = false }, mac) { }
 
-        public UpdateClient(HttpMessageHandler handler)
+        public UpdateClient(HttpMessageHandler handler, bool mac)
         {
+            _mac = mac;
             _http = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
             _http.DefaultRequestHeaders.UserAgent.ParseAdd("SephPlanner");
         }
 
         public static Uri LatestRelease => new Uri(Repository + "/releases/latest");
 
-        public static Uri AssetOf(Version version) =>
+        public static Uri AssetOf(Version version, bool mac) =>
             new Uri(Repository + "/releases/download/v" + Format(version) + "/" +
-                (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? "SephPlanner-macos-v" : AssetPrefix) + Format(version) + ".zip");
+                (mac ? MacAssetPrefix : AssetPrefix) + Format(version) + ".zip");
 
         /// <summary>
         /// 버전은 세 자리로만 견준다. 어셈블리 버전은 <c>0.3.9.0</c> 이고 태그는 <c>0.3.9</c> 인데,
@@ -64,7 +66,7 @@ namespace SephPlanner.Core.Runtime
         /// </summary>
         public async Task<byte[]> DownloadAsync(Version version, CancellationToken cancellation)
         {
-            var location = AssetOf(version);
+            var location = AssetOf(version, _mac);
             for (var hop = 0; ; hop++)
             {
                 using var request = new HttpRequestMessage(HttpMethod.Get, location);

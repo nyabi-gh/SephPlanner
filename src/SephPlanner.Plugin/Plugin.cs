@@ -126,7 +126,7 @@ namespace SephPlanner.Plugin
             Logger.LogInfo(PluginIdentity.Describe());
 
             _updateWindow = new UpdateWindow(StartUpdateInstall, () => Logger.LogInfo("업데이트를 미뤘습니다. 다음 실행 때 다시 묻습니다."));
-            _updateClient = new UpdateClient();
+            _updateClient = new UpdateClient(Application.platform == RuntimePlatform.OSXPlayer);
             Guarded(FinishPreviousUpdate, "업데이트 정리");
             if (_settings.UpdateCheck.Value) StartUpdateCheck();
         }
