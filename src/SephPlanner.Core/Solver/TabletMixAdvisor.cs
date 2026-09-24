@@ -35,6 +35,12 @@ namespace SephPlanner.Core.Solver
         public bool AnyOfSameKind { get; set; }
 
         /// <summary>
+        /// 재료 둘이 같은 석판이다. 합성 창에서 어느 쪽이 A 인지 짚을 수 없고, 한쪽을 돌리느냐
+        /// 다른 쪽을 돌리느냐에 따라 결과가 달라질 수 있어 횟수 대신 두 석판의 사이 각도로 말한다.
+        /// </summary>
+        public bool SameKind { get; set; }
+
+        /// <summary>
         /// 같은 석판이 가방에서 서로 다른 방향으로 놓여 있어, 돌릴 횟수가 어느 것을 넣느냐에 따라
         /// 다르다. 화면에 어느 것인지 짚을 수 없으므로 이때는 횟수 대신 모양으로 말한다.
         /// </summary>
@@ -213,6 +219,7 @@ namespace SephPlanner.Core.Solver
                 if (a.Rotatable && b.Rotatable) shapeB = Mod(-shapeB);
                 else (shapeA, shapeB) = (shapeB, shapeA);
             }
+            advice.SameKind = kindA == kindB;
             if (kindA == kindB)
             {
                 if (a.Rotatable) shapeB = System.Math.Min(shapeB, Mod(-shapeB));

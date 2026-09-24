@@ -138,7 +138,55 @@ public class TabletMixAdvisorTests
         var mix = Assert.Single(advice, entry => entry.NameA == "A" && entry.NameB == "B");
         Assert.True(mix.TurnsDependOnPick);
         Assert.Equal("회전 확인", Explain.TurnTag(mix));
-        Assert.Contains("모양이 되게 맞추세요", Explain.Turn(mix));
+        Assert.Contains("A과(와) B이(가) 같은 방향이 되게 맞추세요", Explain.Turn(mix));
+        Assert.DoesNotContain("0번", Explain.Turn(mix));
+    }
+
+    /// <summary>
+    /// 같은 석판 둘은 합성 창에서 어느 쪽이 어느 것인지 짚을 수 없다. 한쪽을 한 번 돌리면 같은
+    /// 방향이 되고 다른 쪽을 한 번 돌리면 반대 방향이 되므로, "B 를 1번" 은 반쯤 틀린 안내였다
+    /// (제보 dcd4ef12 의 쌍성 + 쌍성).
+    /// </summary>
+    [Fact]
+    public void TwoOfTheSameTabletAreToldByTheirAngleNotClicks()
+    {
+        var turned = Assert.Single(TabletMixAdvisor.Rank(Bag(("B", 0), ("B", 1)), new Catalog([], []), 0, 100));
+        Assert.True(turned.SameKind);
+        Assert.Equal("회전 확인", Explain.TurnTag(turned));
+        Assert.Contains("두 B이(가) 같은 방향이 되게", Explain.Turn(turned));
+        Assert.DoesNotContain("번 돌린", Explain.Turn(turned));
+        Assert.StartsWith("B 둘을 합칩니다", Explain.Mix(turned)[0]);
+
+        var aligned = Assert.Single(TabletMixAdvisor.Rank(Bag(("B", 1), ("B", 1)), new Catalog([], []), 0, 100));
+        Assert.Equal("", Explain.TurnTag(aligned));
+        Assert.Contains("그대로 합치면", Explain.Turn(aligned));
+    }
+
+    [Fact]
+    public void AShapeWithoutTurnsIsCalledTheUnturnedShape()
+    {
+        var advice = new MixAdvice
+        {
+            NameA = "쌍성",
+            NameB = "동시성",
+            RotatableA = true,
+            RotatableB = false,
+            TurnsDependOnPick = true,
+        };
+
+        Assert.Contains("쌍성이 돌리지 않은 처음 모양이 되게", Explain.Turn(advice));
+        Assert.DoesNotContain("0번", Explain.Turn(advice));
+    }
+
+    [Theory]
+    [InlineData("쌍성", "쌍성과", "쌍성을", "쌍성이")]
+    [InlineData("방어수", "방어수와", "방어수를", "방어수가")]
+    [InlineData("A", "A과(와)", "A을(를)", "A이(가)")]
+    public void ParticlesFollowTheLastSyllable(string name, string and, string obj, string subject)
+    {
+        Assert.Equal(and, Explain.With(name, "과", "와"));
+        Assert.Equal(obj, Explain.With(name, "을", "를"));
+        Assert.Equal(subject, Explain.With(name, "이", "가"));
     }
 
     private static PlacementProblem Bag(params (string Name, int Rotation)[] tablets)
