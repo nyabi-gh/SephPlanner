@@ -58,8 +58,10 @@ namespace SephPlanner.Core.Runtime
         ///      재며, 없으면 예전처럼 레벨 한 칸이라는 어림값으로 물러선다.
         /// v24: 합성 재료에서 제외할 석판의 버리기 금지 속성을 담는다.
         /// v25: 아이템 이름을 게임의 표시 이름으로 다시 수집한다.
+        /// v26: 콤보 발동 단계에서 게임이 읽지 않는 구형 <c>setStatus</c> 단계를 뺀다. 그 단계(대부분
+        ///      3·5, 신비 3·5·6)에도 문턱 가치가 붙고 있었다.
         /// </summary>
-        public const int CatalogVersion = 25;
+        public const int CatalogVersion = 26;
 
         /// <summary>플러그인이 생성하고 진단 도구가 읽는 데이터 위치.</summary>
         public static string DataDirectory =>

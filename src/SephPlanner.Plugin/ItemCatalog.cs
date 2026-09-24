@@ -147,7 +147,11 @@ namespace SephPlanner.Plugin
         }
 
         /// <summary>
-        /// 일반 능력치·구형 세트 효과의 단계와 게임 공통 콤보 데이터의 특수 단계를 합친다.
+        /// 일반 능력치 단계와 게임 공통 콤보 데이터의 특수 단계를 합친다.
+        ///
+        /// 구형 세트 효과(<c>ItemCategoryEntity.setStatus</c>)는 넣지 않는다. 게임은 그 목록을 읽지
+        /// 않는데(1.0.33 디컴파일, 참조가 선언뿐), 에셋에는 2~6 단계로 남아 있어 효과 없는 3·5
+        /// (신비는 3·5·6)에도 문턱 가치가 붙었다.
         /// </summary>
         public static List<ComboDefinition> LoadCombos()
         {
@@ -165,8 +169,6 @@ namespace SephPlanner.Plugin
                     foreach (var stat in combo.addStatByCombo)
                         if (stat.comboCount > 0) thresholds.Add(stat.comboCount);
                 }
-                foreach (var target in category.setStatus)
-                    if (target.itemCount > 0) thresholds.Add(target.itemCount);
 
                 var definition = ComboCatalogBuilder.Build(category.id, thresholds, () => EffectLines(combo));
                 if (definition.Thresholds.Count == 0) continue;

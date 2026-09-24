@@ -30,7 +30,7 @@ namespace SephPlanner.Core.Runtime
         ///
         /// 읽던 값의 뜻이 바뀌거나 사라지는 변경이면 여기에 남기지 말고 잘라낸다.
         /// </summary>
-        private static readonly int[] SupportedCatalogVersions = { PlannerData.CatalogVersion, 24, 23, 22, 21, 20 };
+        private static readonly int[] SupportedCatalogVersions = { PlannerData.CatalogVersion, 25, 24, 23, 22, 21, 20 };
         public string CoreBuild { get; set; } = "";
         public string Producer { get; set; } = "";
         public string CapturedUtc { get; set; } = "";

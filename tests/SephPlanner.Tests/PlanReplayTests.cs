@@ -338,6 +338,16 @@ public sealed class PlanReplayTests : IDisposable
         Assert.Empty(replay.Expected!.Differences(ReplayResult.From(replay.Rebuild(true))));
     }
 
+    /// <summary>형식 26 은 콤보 단계에서 효과 없는 구형 단계를 뺐을 뿐이다. 25 로 모은 제보는 제 카탈로그로 그대로 풀린다.</summary>
+    [Fact]
+    public void CatalogVersion25StillReplaysAfterLegacyComboStagesWereDropped()
+    {
+        var replay = RoundTrip(Capture());
+        replay.CatalogVersion = 25;
+
+        Assert.Empty(replay.Expected!.Differences(ReplayResult.From(replay.Rebuild(true))));
+    }
+
     [Fact]
     public void DifferentModelRequiresExplicitComparisonAndStillChecksResults()
     {

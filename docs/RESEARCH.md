@@ -1224,13 +1224,20 @@ selectionSeedOffset)`으로 내용을 정한다. **고르기 전에 무엇이 �
 - 카테고리 정의는 `Resources.LoadAll<ItemCategoryEntity>("ItemCategory")`. `id`, 로컬라이즈된
   `categoryName`, 그리고 발동 효과가 있다. 효과는 두 세대가 공존한다: 신형은 `comboEffectPrefab`의
   `ComboEffectBase.addStatByCombo[]`(원소마다 `comboCount` 임계값), 구형은 `setStatus[]`
-  (`itemCount` 임계값). 임계값은 둘을 합쳐 모은다. `CatalogDump`가 `combos.json`으로 덤프한다.
-  **그런데 1.0.33 에서 `setStatus` 는 아무도 읽지 않는다**(2026-09-24 디컴파일). 선언 말고는
-  참조가 없고, 구형 효과를 담는 `setEffectInstancesServer` 에는 추가하는 코드가 없으며
-  `GetSetTargetByItemCount` 를 부르는 곳도 없다. 예전에 "게임이 양쪽을 다 쓴다" 고 적었던 것은
-  틀렸다. 그래서 효과 설명이 없는 단계(신비의 3·5·6, 여러 콤보의 3·5)는 아무 효과 없는 단계일 수
-  있고, 그 단계에도 콤보 가치가 붙고 있다. 어느 출처에서 온 단계인지는 카탈로그가 합쳐 저장해
-  아직 가르지 못했다 - 출처를 따로 적어 다시 수집해야 확정된다.
+  (`itemCount` 임계값). `CatalogDump`가 `combos.json`으로 덤프한다.
+  **1.0.33 에서 `setStatus` 는 아무도 읽지 않는다**(2026-09-24 디컴파일). 선언 말고는 참조가 없고,
+  구형 효과를 담는 `setEffectInstancesServer` 에는 추가하는 코드가 없으며 `GetSetTargetByItemCount`
+  를 부르는 곳도 없다. 예전에 "게임이 양쪽을 다 쓰므로 둘을 합쳐 모은다" 고 적었던 것은 틀렸다.
+
+  에셋(`resources.assets` 의 카테고리 22개, `sharedassets0.assets` 의 콤보 프리팹)을 직접 읽어
+  확인했다. 13개 카테고리의 `setStatus` 가 2~6 단계로 남아 있고, 그중 `addStatByCombo` 와 특수
+  단계에 없는 것 - 12개 콤보의 3·5, 신비의 3·5·6 - 이 효과 없는 단계였다. 그 단계에도 문턱
+  가치(2.18레벨)가 붙어, 2→3·4→5 한 걸음을 "완성"으로 쳐서 다가가기(0.27)보다 1.9레벨 크게 봤다.
+  빌드 창의 진행도 게임 패널과 달랐다(게임 2/4, 우리 2/3). 보관 제보 28건 중 5건의 점수가 달라지고
+  그중 1건(`ca26eeb4`)은 배치가 바뀌었다. 콤보 가치 눈금(`ComboWorthMeasure`)은 `addStatByCombo`
+  만 쟀으므로 오염되지 않았다. 카탈로그 형식 26 부터 `setStatus` 를 단계에 넣지 않는다.
+  **게임에서 새로 지은 카탈로그로는 아직 확인하지 않았다.** 신비 프리팹 값(2 에 1칸, 4 에 2칸,
+  석판 12002)도 이 에셋에서 확인됐다.
 - 개수 판정은 `GridInventory.SearchSetEffectInInventory`(서버). **배치 위치·레벨·활성 여부와
   무관하게 격자에 있는 아티팩트 전체로 카테고리를 센다.** 그래서 콤보는 배치 최적화가 아니라
   **후보 추천**에만 영향을 준다.
