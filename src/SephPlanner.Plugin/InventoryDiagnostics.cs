@@ -227,6 +227,15 @@ namespace SephPlanner.Plugin
                 text.AppendLine();
                 text.AppendLine($"[고정 효과] {(NetworkServer.active ? "서버 원본" : "게임 행렬에서 되뺌")}");
                 text.AppendLine("  " + FixedEffectResidual.Describe(layer.Cells, limit: 64));
+                if (layer.ComboEngraving != null)
+                {
+                    var rule = layer.ComboEngraving;
+                    inv.currentSetEffectCount.TryGetValue(rule.Category, out var count);
+                    var positions = new StringBuilder();
+                    foreach (var position in rule.Positions) positions.Append(' ').Append(position);
+                    text.AppendLine($"  콤보 각인 {rule.Category} {count}개: " +
+                                    FixedEffectResidual.Describe(layer.Engraved, limit: 64) + $" (좌표{positions})");
+                }
                 if (layer.Blocker.Length > 0) text.AppendLine("  막힘: " + layer.Blocker);
                 if (layer.Pending.Length > 0) text.AppendLine("  보류: " + layer.Pending);
             });

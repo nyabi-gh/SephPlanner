@@ -270,7 +270,8 @@ namespace SephPlanner.Core.Solver
 
             var placements = new List<TabletPlacement>(layout);
             var occupancy = OccupancyFrom(placements, positions, problem);
-            var result = TabletSimulator.Run(WithFixed(problem, placements), occupancy, problem.Grid, problem.FixedEffects);
+            var result = TabletSimulator.Run(
+                WithFixed(problem, placements), occupancy, problem.Grid, Effects(problem, positions));
 
             return Describe(problem, placements, positions, occupancy, result);
         }
@@ -289,6 +290,11 @@ namespace SephPlanner.Core.Solver
             all.AddRange(problem.FixedTablets);
             return all;
         }
+
+        /// <summary>이 배정에서 칸에 걸릴 고정 효과. 콤보 각인이 없으면 언제나 같은 한 벌이다.</summary>
+        private static IReadOnlyList<FixedEffectCell> Effects(
+            PlacementProblem problem, Dictionary<int, GridPos> positions) =>
+            problem.ComboEngraving is null ? problem.FixedEffects : problem.EffectsFor(CharmsByCell(problem, positions));
 
         private static List<TabletPlacement>? Layout(
             PlacementProblem problem, Dictionary<int, TabletSpot> spots)
@@ -521,6 +527,8 @@ namespace SephPlanner.Core.Solver
             private readonly PolishOccupancy _occupancy;
             private readonly SimulationResult _settled;
             private readonly SimulationResult _trial;
+            private IReadOnlyList<FixedEffectCell> _settledEffects;
+            private IReadOnlyList<FixedEffectCell> _trialEffects;
 
             private readonly bool _verify;
 
@@ -532,6 +540,7 @@ namespace SephPlanner.Core.Solver
                 _occupancy = new PolishOccupancy(problem.Grid);
                 _settled = new SimulationResult(problem.Grid, _all.Count);
                 _trial = new SimulationResult(problem.Grid, _all.Count);
+                _settledEffects = _trialEffects = problem.FixedEffects;
                 _watchers = new List<int>?[problem.Grid.Width * problem.Grid.Height];
 
                 var cells = new List<GridPos>();
@@ -562,22 +571,32 @@ namespace SephPlanner.Core.Solver
                 foreach (var charm in _problem.Charms)
                     if (positions.TryGetValue(charm.InstanceId, out var position))
                         _occupancy.Put(position, PolishOccupancy.StateOf(charm));
-                TabletSimulator.RunInto(_all, _occupancy, _settled, _problem.FixedEffects);
+                _settledEffects = _trialEffects = Effects(_problem, positions);
+                TabletSimulator.RunInto(_all, _occupancy, _settled, _settledEffects);
             }
 
             /// <summary>
             /// <see cref="Move"/>와 같은 교환을 점유에 반영하고, 그 배치의 효과 행렬을 돌려준다.
             /// 돌려주는 것은 읽기 전용이며 다음 호출에 덮어써질 수 있다.
+            ///
+            /// 교환이 콤보 수를 바꿔 각인 단계가 달라지면 조건 칸과 무관하게 행렬이 달라진다.
+            /// 단계마다 같은 목록을 돌려받으므로 참조로 견준다.
             /// </summary>
             public SimulationResult Swap(
                 GridPos from, CharmSlot? occupant, GridPos to, CharmSlot charm,
-                List<TabletPlacement> layout, Dictionary<int, GridPos> positions)
+                List<TabletPlacement> layout, Dictionary<int, GridPos> positions,
+                Dictionary<GridPos, CharmSlot> byCell)
             {
                 var leaving = PolishOccupancy.StateOf(occupant);
                 var arriving = PolishOccupancy.StateOf(charm);
                 var changed = Put(from, leaving) | Put(to, arriving);
+                if (_problem.ComboEngraving is not null)
+                {
+                    _trialEffects = _problem.EffectsFor(byCell);
+                    changed |= !ReferenceEquals(_trialEffects, _settledEffects);
+                }
                 MatrixChanged = changed;
-                if (changed) TabletSimulator.RunInto(_all, _occupancy, _trial, _problem.FixedEffects);
+                if (changed) TabletSimulator.RunInto(_all, _occupancy, _trial, _trialEffects);
 
                 var used = changed ? _trial : _settled;
                 if (_verify) Verify(layout, positions, used);
@@ -593,7 +612,7 @@ namespace SephPlanner.Core.Solver
                 List<TabletPlacement> layout, Dictionary<int, GridPos> positions, SimulationResult used)
             {
                 var full = OccupancyFrom(layout, positions, _problem);
-                var matrix = TabletSimulator.Run(_all, full, _problem.Grid, _problem.FixedEffects);
+                var matrix = TabletSimulator.Run(_all, full, _problem.Grid, Effects(_problem, positions));
                 for (var y = 0; y < _problem.Grid.Height; y++)
                     for (var x = 0; x < _problem.Grid.Width; x++)
                     {
@@ -618,10 +637,15 @@ namespace SephPlanner.Core.Solver
             {
                 _occupancy.Put(from, PolishOccupancy.StateOf(charm));
                 _occupancy.Put(to, PolishOccupancy.StateOf(occupant));
+                _trialEffects = _settledEffects;
             }
 
             /// <summary>받아들인 교환을 정착시킨다.</summary>
-            public void Accept() => TabletSimulator.RunInto(_all, _occupancy, _settled, _problem.FixedEffects);
+            public void Accept()
+            {
+                _settledEffects = _trialEffects;
+                TabletSimulator.RunInto(_all, _occupancy, _settled, _settledEffects);
+            }
 
             /// <summary>
             /// 칸 하나를 고치고, 그 때문에 <b>판정이 뒤집히는 석판이 있는지</b> 답한다. 점유가
@@ -1035,7 +1059,7 @@ namespace SephPlanner.Core.Solver
             occupancy.Clear();
             foreach (var placement in layout) occupancy.Take(placement.Position);
             var result = model.Simulation;
-            TabletSimulator.RunInto(WithFixed(problem, layout), occupancy, result, problem.FixedEffects);
+            TabletSimulator.RunInto(WithFixed(problem, layout), occupancy, result, problem.EffectsFor(null));
 
             var used = model.Used;
             var groups = model.Groups;
@@ -1139,7 +1163,8 @@ namespace SephPlanner.Core.Solver
 
             Dictionary<int, GridPos> positions = new Dictionary<int, GridPos>();
             Dictionary<GridPos, CharmSlot>? neighbors = null;
-            SimulationResult result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid, problem.FixedEffects);
+            // 아직 배정이 없어 콤보 각인은 지금 수로 둔다. 배정이 나오면 그 배치의 수로 다시 푼다.
+            SimulationResult result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid, problem.EffectsFor(null));
 
             // 석판을 다듬을 때 이미 찾은 이웃 관계에서 이어 간다. 충돌하는 배치는 새 배정으로 푼다.
             if (seed is not null && SeedFits(problem, seed, free, forcedCharm, forcedCell))
@@ -1147,7 +1172,7 @@ namespace SephPlanner.Core.Solver
                 positions = seed.ToDictionary(pair => pair.Key, pair => pair.Value);
                 occupancy = OccupancyFrom(layout, positions, problem);
                 neighbors = CharmsByCell(problem, positions);
-                result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid, problem.FixedEffects);
+                result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid, problem.EffectsFor(neighbors));
             }
 
             var bestPositions = positions;
@@ -1170,7 +1195,7 @@ namespace SephPlanner.Core.Solver
                 // 배정이 바뀔 때마다 그 배치 기준으로 다시 시뮬레이션한다. 반복이 소진돼 수렴하지
                 // 못하고 빠져나가도, result 는 언제나 마지막 positions 와 같은 상태를 보고 있어야
                 // 보고되는 점수가 실제 배치의 점수가 된다.
-                result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid, problem.FixedEffects);
+                result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid, problem.EffectsFor(neighbors));
 
                 // 조건부 아티팩트는 배정과 조건이 서로 물려 2주기로 진동할 수 있고, 반복이 나쁜
                 // 쪽 위상에서 끝날 수 있다. 마지막을 그대로 돌려주면 같은 판의 점수가 폴링마다
@@ -1193,8 +1218,10 @@ namespace SephPlanner.Core.Solver
                 (!forcedCharm.HasValue || current[forcedCharm.Value] == forcedCell))
             {
                 var currentOccupancy = OccupancyFrom(layout, current, problem);
-                var currentResult = TabletSimulator.Run(WithFixed(problem, layout), currentOccupancy, problem.Grid, problem.FixedEffects);
-                var currentScore = ScoreOf(problem, layout, current, currentOccupancy, currentResult, CharmsByCell(problem, current));
+                var currentNeighbors = CharmsByCell(problem, current);
+                var currentResult = TabletSimulator.Run(
+                    WithFixed(problem, layout), currentOccupancy, problem.Grid, problem.EffectsFor(currentNeighbors));
+                var currentScore = ScoreOf(problem, layout, current, currentOccupancy, currentResult, currentNeighbors);
                 if (currentScore.CompareTo(bestScore) > 0)
                 {
                     bestPositions = new Dictionary<int, GridPos>(current);
@@ -1282,7 +1309,7 @@ namespace SephPlanner.Core.Solver
                         byCell.TryGetValue(to, out var occupant);
                         Move(positions, byCell, charm, from, occupant, to);
 
-                        var trialResult = scratch.Swap(from, occupant, to, charm, layout, positions);
+                        var trialResult = scratch.Swap(from, occupant, to, charm, layout, positions, byCell);
                         scoring.Begin(from, to, scratch.MatrixChanged);
                         var trial = ScoreOf(
                             problem, layout, positions, scratch.Occupancy, trialResult, byCell, familiarity, scoring);
@@ -1292,7 +1319,8 @@ namespace SephPlanner.Core.Solver
                         {
                             // 호출자에게 넘기는 것은 작업 공간이 아니라 새로 지은 것이다.
                             occupancy = OccupancyFrom(layout, positions, problem);
-                            result = TabletSimulator.Run(WithFixed(problem, layout), occupancy, problem.Grid, problem.FixedEffects);
+                            result = TabletSimulator.Run(
+                                WithFixed(problem, layout), occupancy, problem.Grid, problem.EffectsFor(byCell));
                             scratch.Accept();
                             // 정착한 행렬이 달라졌을 수 있다. 기억해 둔 것은 통째로 버린다.
                             scoring.Forget();
@@ -1388,7 +1416,8 @@ namespace SephPlanner.Core.Solver
                         }
                         if (forcedCharm.HasValue && trial[forcedCharm.Value] != forcedCell) continue;
                         var trialOccupancy = OccupancyFrom(layout, trial, problem);
-                        var trialResult = TabletSimulator.Run(WithFixed(problem, layout), trialOccupancy, problem.Grid, problem.FixedEffects);
+                        var trialResult = TabletSimulator.Run(
+                            WithFixed(problem, layout), trialOccupancy, problem.Grid, problem.EffectsFor(neighbors));
                         if (!CanUse(problem, helper, trial[helper.InstanceId], trialResult, trialOccupancy, neighbors)) continue;
                         if (connected.Any(other => DirectedCharmSupport.HasConnection(other) &&
                             !DirectedCharmSupport.IsConnected(other, trial[other.InstanceId], trialResult,

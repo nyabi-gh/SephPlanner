@@ -1,0 +1,240 @@
+using SephPlanner.Core.Charms;
+using SephPlanner.Core.Model;
+using SephPlanner.Core.Solver;
+using SephPlanner.Core.Tablets;
+
+namespace SephPlanner.Tests;
+
+/// <summary>
+/// 신비 콤보 각인은 콤보 수를 따라 서버가 심었다 지운다. 제보 <c>ca26eeb4</c> 에서는 신비 4개일 때의
+/// ×2 세 칸을 고정 효과로 받아, 하얀 종이를 옮겨 신비를 3개로 떨어뜨리는 배치에 사라질 두 칸을
+/// 믿고 아티팩트를 놓았다.
+/// </summary>
+public class ComboEngravingTests
+{
+    /// <summary>게임 프리팹 값과 같은 단계(2 에 1칸, 4 에 2칸 더).</summary>
+    private static ComboEngravingRule Mystic(params GridPos[] positions)
+    {
+        var rule = new ComboEngravingRule { Category = "MYSTIC", Query = "O MUL/2" };
+        rule.Tiers.Add(new ComboEngravingTier { Threshold = 2, Count = 1 });
+        rule.Tiers.Add(new ComboEngravingTier { Threshold = 4, Count = 2 });
+        rule.Positions.AddRange(positions);
+        return rule;
+    }
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(1, 0)]
+    [InlineData(2, 1)]
+    [InlineData(3, 1)]
+    [InlineData(4, 3)]
+    [InlineData(9, 3)]
+    public void EachThresholdPlantsTheNextPositions(int count, int cells)
+    {
+        var grid = new GridSpec(6, 5, 29);
+        var rule = Mystic(new GridPos(5, 1), new GridPos(2, 4), new GridPos(0, 2), new GridPos(3, 3));
+
+        var planted = ComboEngravings.Cells(rule, ComboEngravings.StageAt(rule, count), grid);
+
+        Assert.Equal(cells, planted.Count);
+        Assert.All(planted, cell => Assert.Equal(2, cell.Multiply));
+        var expected = new[] { new GridPos(5, 1), new GridPos(2, 4), new GridPos(0, 2) }.Take(cells);
+        Assert.Equal(expected, planted.Select(cell => cell.Position));
+    }
+
+    [Fact]
+    public void MissingPositionsAreNotInvented()
+    {
+        var rule = Mystic(new GridPos(1, 0));
+
+        var planted = ComboEngravings.Cells(rule, ComboEngravings.StageAt(rule, 4), new GridSpec(3, 1, 3));
+
+        Assert.Equal(new[] { new GridPos(1, 0) }, planted.Select(cell => cell.Position));
+    }
+
+    [Fact]
+    public void TheResidualLosesExactlyTheLiveEngravings()
+    {
+        var residual = new FixedEffectResidualResult
+        {
+            Status = FixedEffectResidualStatus.Extracted,
+            Cells =
+            {
+                new FixedEffectCell { Position = new GridPos(5, 1), Multiply = 2 },
+                new FixedEffectCell { Position = new GridPos(2, 4), Multiply = 4 },
+                new FixedEffectCell { Position = new GridPos(0, 0), Level = 3 },
+            },
+        };
+        var engraved = new List<FixedEffectCell>
+        {
+            new() { Position = new GridPos(5, 1), Multiply = 2 },
+            new() { Position = new GridPos(2, 4), Multiply = 2 },
+        };
+
+        var permanent = ComboEngravings.Without(residual, engraved);
+
+        Assert.Equal(FixedEffectResidualStatus.Extracted, permanent.Status);
+        Assert.True(FixedEffectResidual.Same(permanent.Cells, new List<FixedEffectCell>
+        {
+            new() { Position = new GridPos(2, 4), Multiply = 2 },
+            new() { Position = new GridPos(0, 0), Level = 3 },
+        }));
+    }
+
+    /// <summary>콤보 수와 행렬은 따로 동기화된다. 아직 심기지 않은 각인은 어긋남이 아니라 기다릴 일이다.</summary>
+    [Fact]
+    public void AnEngravingTheMatrixDoesNotShowYetIsUnsettled()
+    {
+        var residual = new FixedEffectResidualResult { Status = FixedEffectResidualStatus.Extracted };
+        var engraved = new List<FixedEffectCell> { new() { Position = new GridPos(1, 0), Multiply = 2 } };
+
+        Assert.Equal(FixedEffectResidualStatus.Unsettled, ComboEngravings.Without(residual, engraved).Status);
+    }
+
+    /// <summary>
+    /// 1x5 격자. 신비 둘 사이의 하얀 종이가 신비를 3개로 만들어 문턱 3을 넘기고, 그 단계의 각인이
+    /// (4,0) 에 ×2 를 심는다. 종이가 사이를 떠나면 각인도 사라져야 한다.
+    /// </summary>
+    private static PlacementProblem Sandwich()
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(5, 1, 5) };
+        problem.Charms.Add(new CharmSlot { InstanceId = 1, Definition = new CharmDefinition { MaxLevel = 5, Categories = { "MYSTIC" } } });
+        problem.Charms.Add(new CharmSlot { InstanceId = 2, Definition = new CharmDefinition { MaxLevel = 5, Behavior = "Charm_WhitePaper" } });
+        problem.Charms.Add(new CharmSlot { InstanceId = 3, Definition = new CharmDefinition { MaxLevel = 5, Categories = { "MYSTIC" } } });
+        problem.Charms.Add(new CharmSlot { InstanceId = 4, Enchant = 1, Definition = new CharmDefinition { MaxLevel = 5 } });
+        problem.CurrentCharms[1] = new GridPos(0, 0);
+        problem.CurrentCharms[2] = new GridPos(1, 0);
+        problem.CurrentCharms[3] = new GridPos(2, 0);
+        problem.CurrentCharms[4] = new GridPos(4, 0);
+        problem.ComboCounts = new Dictionary<string, int> { ["MYSTIC"] = 3 };
+
+        var rule = new ComboEngravingRule { Category = "MYSTIC", Query = "O MUL/2", Positions = { new GridPos(4, 0) } };
+        rule.Tiers.Add(new ComboEngravingTier { Threshold = 3, Count = 1 });
+        problem.ComboEngraving = rule;
+        return problem;
+    }
+
+    [Fact]
+    public void BreakingTheComboRemovesItsEngravingFromTheScore()
+    {
+        var problem = Sandwich();
+        var none = new List<TabletPlacement>();
+
+        var kept = PlacementSolver.Score(problem, none, problem.CurrentCharms);
+        var broken = PlacementSolver.Score(problem, none, new Dictionary<int, GridPos>
+        {
+            [1] = new GridPos(0, 0),
+            [2] = new GridPos(3, 0),
+            [3] = new GridPos(2, 0),
+            [4] = new GridPos(4, 0),
+        });
+
+        Assert.Equal(2, kept.CellLevels[new GridPos(4, 0)]);
+        Assert.Equal(1, broken.CellLevels[new GridPos(4, 0)]);
+    }
+
+    /// <summary>
+    /// 계획이 기대한 칸 레벨은 그 배치에서 게임이 셀 콤보 수로 심을 각인과 맞아야 한다. 자동 배치
+    /// 뒤의 레벨 대조가 바로 이것이라, 어긋나면 "계산에 없는 효과" 로 제보된다.
+    /// </summary>
+    [Fact]
+    public void ASolvedLayoutExpectsOnlyTheEngravingsItsOwnCountPlants()
+    {
+        var flipped = 0;
+        for (var seed = 0; seed < 40; seed++)
+        {
+            var problem = MysticBoard(seed);
+            var rule = problem.ComboEngraving!;
+            var best = PlacementSolver.Solve(problem);
+
+            var count = CountAt(problem, best.CharmPositions);
+            var stage = ComboEngravings.StageAt(rule, count);
+            if (stage != ComboEngravings.StageAt(rule, problem.ComboCounts!["MYSTIC"])) flipped++;
+
+            var fixedOnly = MysticBoard(seed);
+            fixedOnly.ComboEngraving = null;
+            fixedOnly.FixedEffects.AddRange(ComboEngravings.Cells(rule, stage, problem.Grid));
+            var rescored = PlacementSolver.Score(fixedOnly, best.Tablets, best.CharmPositions);
+
+            Assert.Equal(rescored.CellLevels.OrderBy(pair => pair.Key.Y).ThenBy(pair => pair.Key.X),
+                best.CellLevels.OrderBy(pair => pair.Key.Y).ThenBy(pair => pair.Key.X));
+        }
+
+        // 단계가 바뀌는 판이 하나도 없으면 이 대조는 아무것도 검사하지 않은 것이다.
+        Assert.True(flipped > 0);
+    }
+
+    /// <summary>
+    /// 다듬기의 증분 경로도 단계를 따라가야 한다. 교환이 조건 칸을 건드리지 않아도 콤보 수를
+    /// 바꾸면 행렬이 달라지므로, 전체 재계산과의 대조가 그 자리를 잡는다.
+    /// </summary>
+    [Fact]
+    public void TheIncrementalPolishFollowsTheEngravingStage()
+    {
+        for (var seed = 0; seed < 40; seed++)
+        {
+            var verified = PlacementSolver.Solve(MysticBoard(seed), new SolverOptions { VerifyIncrementalPolish = true });
+            var plain = PlacementSolver.Solve(MysticBoard(seed), new SolverOptions());
+
+            Assert.Equal(plain.Score, verified.Score, 12);
+            Assert.Equal(plain.CharmPositions.OrderBy(pair => pair.Key).ToList(),
+                verified.CharmPositions.OrderBy(pair => pair.Key).ToList());
+        }
+    }
+
+    private static int CountAt(PlacementProblem problem, IReadOnlyDictionary<int, GridPos> positions) =>
+        ComboCounting.CountAll(problem.Charms.Where(charm => positions.ContainsKey(charm.InstanceId))
+            .ToDictionary(charm => positions[charm.InstanceId], charm => charm)).GetValueOrDefault("MYSTIC");
+
+    /// <summary>
+    /// 신비와 하얀 종이를 섞은 무작위 판. 종이가 신비 사이에 서느냐로 문턱을 넘나들게 하고,
+    /// 값진 아티팩트를 섞어 각인 칸이 탐나게 한다.
+    /// </summary>
+    private static PlacementProblem MysticBoard(int seed)
+    {
+        var random = new Random(seed * 7919 + 3);
+        var width = 4 + random.Next(2);
+        var height = 2 + random.Next(2);
+        var storage = width * height - random.Next(2);
+        var problem = new PlacementProblem { Grid = new GridSpec(width, height, storage) };
+
+        if (random.Next(2) == 0)
+            problem.Tablets.Add(new TabletSlot
+            {
+                InstanceId = 900,
+                Definition = new TabletDefinition { Id = "t", EntityId = 700, Query = "RIGHT 1", ConditionQuery = "O CHARM" },
+            });
+
+        var charms = storage - problem.Tablets.Count - random.Next(2);
+        for (var index = 0; index < charms; index++)
+        {
+            var definition = new CharmDefinition { Id = "c" + index, EntityId = 200 + index, MaxLevel = 5 };
+            var kind = index < 3 ? index : random.Next(8);
+            if (kind <= 1 || kind == 3) definition.Categories.Add("MYSTIC");
+            else if (kind == 2) definition.Behavior = "Charm_WhitePaper";
+            problem.Charms.Add(new CharmSlot
+            {
+                InstanceId = index,
+                Enchant = random.Next(0, 2),
+                Definition = definition,
+                Worth = new CharmWorth { ByLevel = Enumerable.Range(0, 6).Select(level => (double)level * random.Next(1, 6)).ToArray() },
+            });
+        }
+
+        var cells = Enumerable.Range(0, storage).Select(problem.Grid.ToPosition).OrderBy(_ => random.Next()).ToList();
+        var at = 0;
+        foreach (var tablet in problem.Tablets)
+            problem.CurrentTablets[tablet.InstanceId] = new TabletSpot(cells[at++], 0);
+        foreach (var charm in problem.Charms)
+            if (at < cells.Count) problem.CurrentCharms[charm.InstanceId] = cells[at++];
+
+        problem.ComboCounts = new Dictionary<string, int> { ["MYSTIC"] = CountAt(problem, problem.CurrentCharms) };
+        var positions = Enumerable.Range(0, storage).Select(problem.Grid.ToPosition).OrderBy(_ => random.Next()).Take(3);
+        var rule = new ComboEngravingRule { Category = "MYSTIC", Query = "O MUL/2" };
+        rule.Tiers.Add(new ComboEngravingTier { Threshold = 3, Count = 1 });
+        rule.Tiers.Add(new ComboEngravingTier { Threshold = 4, Count = 2 });
+        rule.Positions.AddRange(positions);
+        problem.ComboEngraving = rule;
+        return problem;
+    }
+}

@@ -605,12 +605,27 @@ if (icon.Item.Charm.maxLevel > 0)
 **고정 각인**(`fixedEngravingsOnServer`)은 서버에만 있는 `List<FixedEngraving>`이다. 각 원소는
 질의가 아니라 **절대 좌표로 이미 풀린 효과 딕셔너리**(fixedLevel/fixedDisable/fixedIgnoreCriteria/
 fixedMultiplyLevel)를 들고 있고, 배수는 석판과 같은 `multiplyLevelMatrix`에 쌓인다.
-만들 때 한 번 구워지므로 **아이템을 옮겨도 변하지 않는다.**
+만들 때 한 번 구워지므로 **아이템을 옮겨도 변하지 않는다. 단, 신비 콤보 각인은 예외다** - 아래.
 
 만드는 길은 셋이다.
 
-- **신비(MYSTIC) 콤보.** `ComboEffect_Mystic`이 임계값마다 석판 12002를 심는다. 커뮤니티의 다른
+- **신비(MYSTIC) 콤보.** `ComboEffect_Mystic`이 임계값마다 석판 12002(`O MUL/2`)를 심는다. 커뮤니티의 다른
   자동배치 모드가 "신비 콤보 ×2 미반영" 버그를 겪은 원인이 이것이다.
+  **이 각인은 배치를 따라 생기고 사라진다.** `ReleasePermission` 이 가방에 쓸 때마다
+  `SearchSetEffectInInventory` 로 콤보를 전부 껐다 켜고, 꺼질 때 `OnDisableEffect` 가 각인을 지우며
+  켜질 때 그 순간의 신비 수로 다시 심는다. 단계는 코드 기본값(2/5, 1칸/3칸)이 아니라 **프리팹 값
+  - 2 에 1칸, 4 에 2칸 더**다(카탈로그의 콤보 설명 "무작위 1칸"/"무작위 2칸"과 같다). 칸은
+  `mysticPositions[i]`(판마다 `UnitAvatar.RandomID` 로 정해지는 SyncList, 참가자도 읽는다)의 앞에서부터
+  쓴다. 모든 아티팩트가 활성 여부와 무관하게 세어지므로(`charms` 는 가방의 아티팩트 전부) 하얀 종이·침·
+  열쇠의 자리가 신비 수를 바꾸면 각인 수도 바뀐다. 게임도 이 각인만은 `createdByExternalSystem`
+  으로 표시해 판을 저장할 때 빼고 적는다(`PlayerSpawner`).
+
+  그래서 이 몫은 고정 층에서 떼어 **배치마다 그 배치의 신비 수로 다시 푼다**(`ComboEngravingRule`,
+  `PlacementProblem.EffectsFor`). 수는 게임 수에서 지금 자리를 우리 방식으로 센 것을 빼고 그 배치를
+  센 것을 더한다 - 지금 배치에서는 게임 수와 정확히 같다. 호스트는 원본에서 `createdByExternalSystem`
+  을 빼고, 참가자는 되뺀 층에서 지금 수의 몫을 뺀 뒤 추적기에 넘긴다. 0.4.17 제보 `ca26eeb4` 는 신비
+  4개일 때의 ×2 세 칸을 고정 효과로 받은 계획이 하얀 종이를 옮겨 신비를 3개로 떨어뜨렸고, 사라진 두
+  칸에 둔 아티팩트가 정확히 어긋난 두 칸이었다.
 - **가방의 석판 각인.** `tabletEngravingCount > 0`이면 `UI_CharacterStatusPanel.OnItemLongClicked`가
   석판을 길게 눌렀을 때 `CmdCreateFixedEngravingFromInventory(tablet)`을 보낸다. 서버는 효과를
   구운 뒤 **`ForceRemoveItem`으로 석판을 가방에서 지운다.**
@@ -636,7 +651,7 @@ fixedMultiplyLevel)를 들고 있고, 배수는 석판과 같은 `multiplyLevelM
 
 호스트는 원본 목록(과 `dungeonTempLevels`)을 그대로 쓰고, 같은 순간의 되뺀 값과 대조해 되빼기
 자체를 검증한다. 2026-09-05에 넣었던 신비 전용 복원(`MysticEngravings`)은 이 경로가 대신하므로
-지웠다.
+지웠다가, 신비 각인이 배치를 따라 바뀐다는 것이 드러나 규칙으로 다시 들였다(위).
 
 2026-09-22 제보 `c44e9d2e`가 이 경로다. 참가자 세션에서 석판 13개가 모두 각인돼 가방에서
 사라졌고 `levelMatrix`에는 레벨이 남아 7칸이 어긋났다. 되뺀 층을 넣으면 그 자료의 어긋난 칸이

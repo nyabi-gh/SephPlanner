@@ -528,6 +528,7 @@ namespace SephPlanner.Core.Solver
                 Tablets = new List<TabletSlot>(problem.Tablets),
                 FixedTablets = problem.FixedTablets,
                 FixedEffects = problem.FixedEffects,
+                ComboEngraving = problem.ComboEngraving,
                 ComboCounts = problem.ComboCounts,
                 Combos = problem.Combos,
                 PriorityCategories = problem.PriorityCategories,

@@ -130,9 +130,16 @@ namespace SephPlanner.Core.Runtime
         public Dictionary<string, int> ComboCounts { get; set; } = new Dictionary<string, int>();
 
         /// <summary>
-        /// 고정 각인과 친타마니가 칸에 남긴 효과. 참가자는 신비 각인만 공개된 좌표로 복원한다.
+        /// 고정 각인과 친타마니가 칸에 남긴 효과. <see cref="ComboEngraving"/> 이 있으면 콤보 각인
+        /// 몫은 여기 없다 - 배치를 따라 생기고 사라지기 때문이다.
         /// </summary>
         public List<FixedEffectCell> FixedEffects { get; set; } = new List<FixedEffectCell>();
+
+        /// <summary>
+        /// 신비 콤보 각인의 규칙과 좌표. 0.4.18 전 자료에는 없고, 그때는 그 각인이 <see cref="FixedEffects"/>
+        /// 에 섞여 있다.
+        /// </summary>
+        public ComboEngravingRule? ComboEngraving { get; set; }
     }
 
     public sealed class PlacedItem

@@ -10,7 +10,18 @@ namespace SephPlanner.Plugin
     internal sealed class FixedEffectLayerState
     {
         public InventoryView View { get; set; }
+
+        /// <summary>배치와 무관한 고정 효과. 콤보 각인은 빠져 있다.</summary>
         public IReadOnlyList<FixedEffectCell> Cells { get; set; } = new List<FixedEffectCell>();
+
+        /// <summary>콤보 각인 규칙. 읽지 못했으면 null 이고, 그때는 그 각인이 <see cref="Cells"/> 에 섞여 있다.</summary>
+        public ComboEngravingRule ComboEngraving { get; set; }
+
+        /// <summary>지금 콤보 수에서 살아 있는 콤보 각인 몫.</summary>
+        public IReadOnlyList<FixedEffectCell> Engraved { get; set; } = new List<FixedEffectCell>();
+
+        /// <summary>지금 칸에 걸린 것 전부. 게임 행렬과 대조할 때 쓴다.</summary>
+        public IReadOnlyList<FixedEffectCell> All { get; set; } = new List<FixedEffectCell>();
 
         /// <summary>계산을 믿을 수 없는 이유. 우리 쪽 어긋남이라 알릴 값이다.</summary>
         public string Blocker { get; set; } = "";
@@ -23,6 +34,11 @@ namespace SephPlanner.Plugin
     /// 칸에 박힌 고정 효과를 구한다. 호스트는 <c>fixedEngravingsOnServer</c> 원본을 읽고,
     /// 참가자는 게임 행렬에서 되뺀다(<see cref="FixedEffectResidual"/>).
     ///
+    /// 신비 콤보 각인은 따로 든다. 게임은 가방에 쓸 때마다 콤보를 껐다 켜며 그 각인을 지우고
+    /// 다시 심으므로, 배치가 신비 수를 바꾸면 칸도 따라 바뀐다. 게임도 판을 저장할 때 그 각인
+    /// (<c>createdByExternalSystem</c>)만은 빼고 적는다. 양쪽 모두 규칙과 동기화된 좌표로 지금
+    /// 몫을 풀어 고정 층에서 뺀다.
+    ///
     /// 호스트에서는 원본과 되뺀 값을 대조해 되빼기 자체를 검증한다.
     /// </summary>
     internal static class FixedEffectLayer
@@ -32,6 +48,9 @@ namespace SephPlanner.Plugin
         private static GridInventory _inventory;
         private static GridSpec _grid;
         private static int _frame = -1;
+
+        private static ComboEngravingTemplate _template;
+        private static bool _templateUnsupported;
 
         /// <summary>
         /// 추적기의 셈이 바뀐 까닭을 남길 곳. 진단 묶음에 들어가는 것은 플러그인 로그뿐이다.
@@ -78,14 +97,24 @@ namespace SephPlanner.Plugin
         {
             var state = new FixedEffectLayerState { View = view };
 
+            var rule = ComboRule(inv);
+            state.ComboEngraving = rule;
+            if (rule != null)
+            {
+                inv.currentSetEffectCount.TryGetValue(rule.Category, out var count);
+                state.Engraved = ComboEngravings.Cells(rule, ComboEngravings.StageAt(rule, count), view.Grid);
+            }
+
             var observed = TabletSimulator.Run(view.Placements, view.Occupancy, view.Grid);
-            var residual = FixedEffectResidual.Extract(view.Grid, observed, view.Matrices(inv));
+            var residual = ComboEngravings.Without(
+                FixedEffectResidual.Extract(view.Grid, observed, view.Matrices(inv)), state.Engraved);
             Tracker.Observe(residual, view.Sources, view.Arrangement);
             if (Tracker.Note.Length > 0) Log?.Invoke(Tracker.Note);
 
             if (NetworkServer.active)
             {
-                state.Cells = HostFixedEffects(inv);
+                state.Cells = HostFixedEffects(inv, rule != null);
+                state.All = ComboEngravings.Combine(state.Cells, state.Engraved);
                 if (residual.Status == FixedEffectResidualStatus.Extracted &&
                     !FixedEffectResidual.Same(state.Cells, residual.Cells))
                 {
@@ -95,6 +124,7 @@ namespace SephPlanner.Plugin
             }
 
             state.Cells = Tracker.Layer;
+            state.All = ComboEngravings.Combine(state.Cells, state.Engraved);
             if (view.Severed > 0)
             {
                 state.Pending = $"석판·각인 참조 {view.Severed}개를 읽지 못했습니다. 방에 재접속하면 다시 읽습니다.";
@@ -105,12 +135,13 @@ namespace SephPlanner.Plugin
             return state;
         }
 
-        private static List<FixedEffectCell> HostFixedEffects(GridInventory inv)
+        private static List<FixedEffectCell> HostFixedEffects(GridInventory inv, bool withoutComboEngravings)
         {
             var cells = new Dictionary<GridPos, FixedEffectCell>();
             foreach (var engraving in inv.fixedEngravingsOnServer)
             {
                 if (engraving == null) continue;
+                if (withoutComboEngravings && engraving.createdByExternalSystem) continue;
                 foreach (var pair in engraving.fixedLevel) At(cells, pair.Key).Level += pair.Value;
                 foreach (var pair in engraving.fixedDisable) At(cells, pair.Key).Disable += pair.Value;
                 foreach (var pair in engraving.fixedIgnoreCriteria) At(cells, pair.Key).IgnoreCriteria += pair.Value;
@@ -129,6 +160,57 @@ namespace SephPlanner.Plugin
             foreach (var cell in cells.Values)
                 if (grid.Contains(cell.Position) && !IsEmpty(cell)) result.Add(cell);
             return result;
+        }
+
+        /// <summary>
+        /// 이 판의 콤보 각인 규칙. 문턱과 석판은 프리팹 값이라 한 번만 읽고, 좌표는 판마다 달라
+        /// 매번 읽는다. 프리팹 값은 코드의 기본값과 다르다(신비는 2 에 1칸, 4 에 2칸 더).
+        /// </summary>
+        private static ComboEngravingRule ComboRule(GridInventory inv)
+        {
+            var template = Template();
+            if (template == null) return null;
+
+            var rule = new ComboEngravingRule { Category = MysticCategory, Query = template.Query };
+            rule.Tiers.AddRange(template.Tiers);
+            foreach (var position in inv.mysticPositions) rule.Positions.Add(new GridPos(position.x, position.y));
+            return rule;
+        }
+
+        private static ComboEngravingTemplate Template()
+        {
+            if (_template != null || _templateUnsupported) return _template;
+
+            var category = ItemDatabase.FindItemCategory(MysticCategory);
+            if (category == null) return null;
+
+            var effect = category.comboEffectPrefab != null
+                ? category.comboEffectPrefab.GetComponent<ComboEffect_Mystic>() : null;
+            var entity = effect != null ? ItemDatabase.FindItemById(effect.stoneTabletEntityID) : null;
+            var tablet = entity != null && entity.resourcePrefab != null
+                ? entity.resourcePrefab.GetComponent<StoneTablet>() : null;
+
+            // 조건이 있는 각인은 심는 순간의 점유로 갈려 규칙으로 풀 수 없고, 사용자 석판은
+            // 인스턴스마다 질의가 다르다. 그런 게임 버전에서는 예전처럼 고정 층에 섞어 둔다.
+            if (tablet == null || tablet.isCustomTablet || !string.IsNullOrEmpty(tablet.conditionQuery))
+            {
+                _templateUnsupported = true;
+                Log?.Invoke("신비 콤보 각인 규칙을 읽지 못했습니다. 그 각인은 고정 효과로 다룹니다.");
+                return null;
+            }
+
+            _template = new ComboEngravingTemplate { Query = tablet.query ?? "" };
+            _template.Tiers.Add(new ComboEngravingTier { Threshold = effect.first, Count = effect.firstEngravingCount });
+            _template.Tiers.Add(new ComboEngravingTier { Threshold = effect.second, Count = effect.secondEngravingCount });
+            return _template;
+        }
+
+        private const string MysticCategory = "MYSTIC";
+
+        private sealed class ComboEngravingTemplate
+        {
+            public string Query = "";
+            public readonly List<ComboEngravingTier> Tiers = new List<ComboEngravingTier>();
         }
 
         private static bool IsEmpty(FixedEffectCell cell) =>

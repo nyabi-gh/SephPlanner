@@ -74,6 +74,7 @@ namespace SephPlanner.Core.Runtime
                 // 배치 문제의 입력이다. 달라졌으면 지문이 달라져 평소대로 푼다.
                 ComboCounts = source.ComboCounts,
                 FixedEffects = source.FixedEffects,
+                ComboEngraving = source.ComboEngraving,
                 Engravings = source.Engravings,
 
                 // 게임이 배치를 보고 다시 계산하는 값이다.

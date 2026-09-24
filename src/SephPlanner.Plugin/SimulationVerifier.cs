@@ -29,12 +29,12 @@ namespace SephPlanner.Plugin
             var layer = FixedEffectLayer.Get(inv);
             var view = layer.View;
             LastCheckedTablets = view.Placements.Count;
-            LastFixedCells = layer.Cells.Count;
+            LastFixedCells = layer.All.Count;
 
             if (layer.Pending.Length > 0) return Result(PlanVerificationStatus.Unavailable, layer.Pending);
             if (layer.Blocker.Length > 0) return Result(PlanVerificationStatus.Failed, layer.Blocker);
 
-            var result = TabletSimulator.Run(view.Placements, view.Occupancy, view.Grid, layer.Cells);
+            var result = TabletSimulator.Run(view.Placements, view.Occupancy, view.Grid, layer.All);
 
             for (var i = 0; i < view.Tablets.Count; i++)
             {

@@ -265,6 +265,7 @@ namespace SephPlanner.Core.Planning
             }
 
             problem.FixedEffects.AddRange(inventory.FixedEffects);
+            problem.ComboEngraving = inventory.ComboEngraving;
             problem.ComboCounts = inventory.ComboCounts;
             problem.Combos = catalog.Combo;
             problem.PriorityCategories = new System.Collections.Generic.HashSet<string>(preferences.PriorityCategories);

@@ -112,6 +112,59 @@ namespace SephPlanner.Core.Solver
             return count;
         }
 
+        /// <summary>게임이 세어 둔 지금 수. 조언 갈래에서는 갈래가 고쳐 둔 수다.</summary>
+        internal static int Reported(PlacementProblem problem, string category) =>
+            problem.ComboCounts is not null && problem.ComboCounts.TryGetValue(category, out var count) ? count : 0;
+
+        /// <summary>
+        /// 이 배치에서 게임이 셀 수. 게임 수에서 <b>지금 자리를 우리 방식으로 센 것</b>을 빼고 이
+        /// 배치를 같은 방식으로 센 것을 더한다. 지금 배치에서는 정확히 게임 수가 되고, 우리가
+        /// 재현하지 않는 규칙(유니크 페어 등)은 양쪽에서 지워진다. 판에 없던 아티팩트를 더한
+        /// 후보 갈래는 그 몫이 더해지고, 뺀 갈래는 빠진다.
+        /// </summary>
+        internal static int CountOf(
+            PlacementProblem problem, string category, IReadOnlyDictionary<GridPos, CharmSlot> byCell)
+        {
+            if (problem.CurrentComboCount is not { } current || problem.CurrentComboCategory != category)
+            {
+                var now = new Dictionary<GridPos, CharmSlot>();
+                foreach (var charm in problem.Charms)
+                {
+                    if (problem.CurrentCharms.TryGetValue(charm.InstanceId, out var cell)) now[cell] = charm;
+                }
+                current = Count(now, category);
+                problem.CurrentComboCount = current;
+                problem.CurrentComboCategory = category;
+            }
+            return Reported(problem, category) - current + Count(byCell, category);
+        }
+
+        private static int Count(IReadOnlyDictionary<GridPos, CharmSlot> byCell, string category)
+        {
+            var count = 0;
+            List<string>? positional = null;
+            foreach (var pair in byCell)
+            {
+                var charm = pair.Value;
+                if (charm.IsFiller) continue;
+
+                if (!IsPositional(charm.Definition))
+                {
+                    if (charm.Definition.Categories.Contains(category)) count++;
+                    continue;
+                }
+
+                positional ??= new List<string>();
+                positional.Clear();
+                PositionalCategories(charm, pair.Key, byCell, positional);
+                foreach (var contributed in positional)
+                {
+                    if (contributed == category) count++;
+                }
+            }
+            return count;
+        }
+
         /// <summary>
         /// 게임 개수에서 자리 의존 아티팩트들이 지금 자리에서 보태고 있는 몫을 뺀 것. 문제마다 한 번만
         /// 짓는다 - 배정 비용 행렬의 최내곽에서 읽히는 값이다.

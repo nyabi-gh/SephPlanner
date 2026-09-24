@@ -164,6 +164,33 @@ namespace SephPlanner.Core.Solver
         public List<FixedEffectCell> FixedEffects { get; set; } = new List<FixedEffectCell>();
 
         /// <summary>
+        /// 콤보 수를 따라 생기고 사라지는 각인. 배치가 콤보 수를 바꾸므로 <see cref="FixedEffects"/>
+        /// 처럼 한 벌로 둘 수 없다 - 신비 4개에서 ×2 세 칸을 믿고 짠 배치가 하얀 종이를 옮겨 신비를
+        /// 3개로 떨어뜨리자 두 칸이 사라졌다(제보 <c>ca26eeb4</c>).
+        /// </summary>
+        public ComboEngravingRule? ComboEngraving { get; set; }
+
+        private List<FixedEffectCell>?[]? _effectsByStage;
+
+        /// <summary>
+        /// 이 배치에서 칸에 걸려 있을 고정 효과 전부. <paramref name="byCell"/> 이 null 이면 아직
+        /// 배치를 모르는 것이라 게임이 세어 둔 지금 수로 푼다. 단계마다 한 번만 짓는다.
+        /// </summary>
+        internal IReadOnlyList<FixedEffectCell> EffectsFor(IReadOnlyDictionary<GridPos, CharmSlot>? byCell)
+        {
+            var rule = ComboEngraving;
+            if (rule is null) return FixedEffects;
+
+            var count = byCell is null
+                ? ComboCounting.Reported(this, rule.Category)
+                : ComboCounting.CountOf(this, rule.Category, byCell);
+            var stage = ComboEngravings.StageAt(rule, count);
+            _effectsByStage ??= new List<FixedEffectCell>?[rule.Tiers.Count + 1];
+            return _effectsByStage[stage] ??=
+                ComboEngravings.Combine(FixedEffects, ComboEngravings.Cells(rule, stage, Grid));
+        }
+
+        /// <summary>
         /// 하얀 종이(양옆이 공유하는 카테고리를 물려받아 콤보에 +1)의 자리 가치를 매기는 데 쓴다.
         /// 없으면 하얀 종이는 평범한 아티팩트로만 평가된다.
         /// </summary>
@@ -182,6 +209,10 @@ namespace SephPlanner.Core.Solver
         /// 처음 읽을 때 짓는다. 개수나 지금 자리를 바꾼 뒤에는 null 로 되돌려야 다시 짓는다.
         /// </summary>
         public Dictionary<string, int>? BaseComboCounts { get; set; }
+
+        /// <summary><see cref="ComboCounting.CountOf"/>가 지금 자리를 센 값. 처음 읽을 때 짓는다.</summary>
+        internal int? CurrentComboCount { get; set; }
+        internal string? CurrentComboCategory { get; set; }
 
         private List<CharmSlot>? _designatedTargets;
 

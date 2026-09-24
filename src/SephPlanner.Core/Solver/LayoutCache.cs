@@ -314,6 +314,18 @@ namespace SephPlanner.Core.Solver
                 builder.Append("fixed:").Append(effect.Position.X).Append(',').Append(effect.Position.Y).Append(':')
                     .Append(effect.Level).Append(':').Append(effect.Multiply).Append(':')
                     .Append(effect.Disable).Append(':').Append(effect.IgnoreCriteria).Append(';');
+
+            // 빔은 콤보 각인을 지금 수의 단계로 본다. 규칙이 같아도 수가 단계를 넘으면 빔이 달라진다.
+            if (problem.ComboEngraving is { } rule)
+            {
+                builder.Append("comboEngraving:").Append(rule.Category).Append(':')
+                    .Append(ComboCounting.Reported(problem, rule.Category)).Append(':')
+                    .Append(rule.Query.Length).Append(':').Append(rule.Query).Append(':');
+                foreach (var tier in rule.Tiers) builder.Append(tier.Threshold).Append('x').Append(tier.Count).Append(',');
+                builder.Append(':');
+                foreach (var position in rule.Positions) builder.Append(position.X).Append(',').Append(position.Y).Append(' ');
+                builder.Append(';');
+            }
             foreach (var charm in problem.Charms.Where(charm => ScalesPosition.Required(problem, charm)).OrderBy(charm => charm.InstanceId))
                 builder.Append("scales:").Append(charm.InstanceId).Append(':')
                     .Append(ScalesPosition.IsLeft(problem.CurrentCharms[charm.InstanceId]) ? 'L' : 'R').Append(';');

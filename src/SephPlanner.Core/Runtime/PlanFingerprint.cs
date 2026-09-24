@@ -146,6 +146,24 @@ namespace SephPlanner.Core.Runtime
                 Add(builder, "fixedMultiply", effect.Multiply);
             }
 
+            // 이 항목이 없던 자료가 재현에서 거부되지 않게 있을 때만 더한다. 좌표는 순서가 곧
+            // 뜻이라(문턱마다 다음 칸) 정렬하지 않는다.
+            if (inventory.ComboEngraving is { } rule)
+            {
+                Add(builder, "comboEngraving", rule.Category);
+                Add(builder, "comboEngravingQuery", rule.Query);
+                foreach (var tier in rule.Tiers)
+                {
+                    Add(builder, "comboEngravingThreshold", tier.Threshold);
+                    Add(builder, "comboEngravingCount", tier.Count);
+                }
+                foreach (var position in rule.Positions)
+                {
+                    Add(builder, "comboEngravingX", position.X);
+                    Add(builder, "comboEngravingY", position.Y);
+                }
+            }
+
             foreach (var pair in inventory.LevelMatrix.OrderBy(value => value.Key, StringComparer.Ordinal))
             {
                 Add(builder, "levelCell", pair.Key);

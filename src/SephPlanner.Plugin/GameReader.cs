@@ -308,7 +308,9 @@ namespace SephPlanner.Plugin
             foreach (var pair in inv.currentSetEffectCount)
                 state.ComboCounts[pair.Key] = pair.Value;
 
-            state.FixedEffects.AddRange(FixedEffectLayer.Get(inv).Cells);
+            var layer = FixedEffectLayer.Get(inv);
+            state.FixedEffects.AddRange(layer.Cells);
+            state.ComboEngraving = layer.ComboEngraving;
 
             return state;
         }
