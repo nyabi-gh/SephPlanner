@@ -610,6 +610,17 @@ namespace SephPlanner.Core.Planning
                 };
             }
 
+            // 낡은 행렬과 견주면 우리 쪽 어긋남처럼 보인다. 판정은 게임이 다시 계산한 뒤로 미룬다.
+            if (inventory.Tablets.Any(tablet => tablet.AppliedRangeStale) ||
+                inventory.Engravings.Any(engraving => engraving.AppliedRangeStale))
+            {
+                return new PlanVerification
+                {
+                    Status = PlanVerificationStatus.Unavailable,
+                    Reason = PlanVerification.GameNotRecalculated,
+                };
+            }
+
             var levelMismatches = 0;
             foreach (var pair in current.CellLevels)
             {

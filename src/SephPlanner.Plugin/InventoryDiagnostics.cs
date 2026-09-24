@@ -236,6 +236,17 @@ namespace SephPlanner.Plugin
                     text.AppendLine($"  콤보 각인 {rule.Category} {count}개: " +
                                     FixedEffectResidual.Describe(layer.Engraved, limit: 64) + $" (좌표{positions})");
                 }
+                text.AppendLine(layer.Residual == null
+                    ? "  게임 행렬에서 되뺀 값: 게임이 다시 계산하기 전이라 되빼지 않음"
+                    : $"  게임 행렬에서 되뺀 값({layer.Residual.Status}): " +
+                      FixedEffectResidual.Describe(layer.Residual.Cells, limit: 64) +
+                      (layer.Residual.Reason.Length > 0 ? " - " + layer.Residual.Reason : ""));
+                foreach (var tablet in layer.View.Stale)
+                {
+                    text.AppendLine(
+                        $"  옛 격자로 적용된 채인 석판: ({tablet.xIdx},{tablet.yIdx}) entity={tablet.entityID} " +
+                        $"적용 범위 {tablet.EffectRange.Count}칸");
+                }
                 if (layer.Blocker.Length > 0) text.AppendLine("  막힘: " + layer.Blocker);
                 if (layer.Pending.Length > 0) text.AppendLine("  보류: " + layer.Pending);
             });

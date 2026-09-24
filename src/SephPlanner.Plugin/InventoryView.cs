@@ -19,6 +19,12 @@ namespace SephPlanner.Plugin
         /// <summary>참조가 끊겨 읽지 못한 석판·각인 수.</summary>
         public int Severed { get; private set; }
 
+        /// <summary>
+        /// 게임이 적용해 둔 범위가 지금 격자에 맞지 않는 석판·각인. 게임이 아직 다시 계산하지 않아
+        /// 행렬이 낡았다는 뜻이라 행렬과 견줄 수 없다(<see cref="Core.Runtime.PlacedTablet.AppliedRangeStale"/>).
+        /// </summary>
+        public HashSet<StoneTablet> Stale { get; } = new HashSet<StoneTablet>();
+
         public string Sources { get; private set; } = "";
         public string Arrangement { get; private set; } = "";
 
@@ -47,8 +53,8 @@ namespace SephPlanner.Plugin
 
             var seen = new HashSet<int>();
             var sources = new List<string>();
-            foreach (var pair in inv.stoneTablets) view.Add(pair.Value, seen, sources);
-            foreach (var engraving in inv.engravings) view.Add(engraving, seen, sources);
+            foreach (var pair in inv.stoneTablets) view.Add(inv, pair.Value, seen, sources);
+            foreach (var engraving in inv.engravings) view.Add(inv, engraving, seen, sources);
 
             occupied.Sort(System.StringComparer.Ordinal);
             sources.Sort(System.StringComparer.Ordinal);
@@ -70,7 +76,7 @@ namespace SephPlanner.Plugin
             return value;
         }
 
-        private void Add(StoneTablet tablet, HashSet<int> seen, List<string> sources)
+        private void Add(GridInventory inv, StoneTablet tablet, HashSet<int> seen, List<string> sources)
         {
             if (tablet == null)
             {
@@ -80,6 +86,7 @@ namespace SephPlanner.Plugin
             if (!seen.Add(tablet.instanceID)) return;
 
             Tablets.Add(tablet);
+            if (!AppliedRangeIsCurrent(inv, tablet)) Stale.Add(tablet);
             Placements.Add(new TabletPlacement
             {
                 Definition = new TabletDefinition(),
@@ -89,6 +96,28 @@ namespace SephPlanner.Plugin
                 InstanceConditionQuery = tablet.GetConditionQuery(tablet.instanceID) ?? "",
             });
             sources.Add($"{tablet.instanceID}@{tablet.xIdx},{tablet.yIdx},{tablet.rotation}");
+        }
+
+        /// <summary>
+        /// 게임이 <c>ApplyEffect</c> 에서 쓰는 해석을 그대로 지금 격자로 돌려 적용해 둔 범위와 견준다.
+        /// 우리 파서가 아니라 게임의 것을 쓰므로, 다르면 우리 해석이 틀린 것이 아니라 게임이 옛
+        /// 격자로 적용한 채 다시 계산하지 않은 것이다.
+        /// </summary>
+        private static bool AppliedRangeIsCurrent(GridInventory inv, StoneTablet tablet)
+        {
+            if (!tablet.IsApplied) return true;
+
+            var expected = StoneTablet.ParseQuery(
+                tablet.GetQuery(tablet.instanceID), inv.Width, inv.Height, inv.CurrentInventoryStorage,
+                new ItemPosition(tablet.xIdx, tablet.yIdx), tablet.rotation, out _);
+            if (expected.Count != tablet.EffectRange.Count) return false;
+
+            for (var i = 0; i < expected.Count; i++)
+            {
+                var applied = tablet.EffectRange[i].position;
+                if (expected[i].position.x != applied.x || expected[i].position.y != applied.y) return false;
+            }
+            return true;
         }
     }
 }

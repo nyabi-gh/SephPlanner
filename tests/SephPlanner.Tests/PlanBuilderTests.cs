@@ -326,6 +326,33 @@ public class PlanBuilderTests
     }
 
     [Fact]
+    public void AMatrixTheGameHasNotRecalculatedWaitsInsteadOfFailing()
+    {
+        var snapshot = Snapshot();
+        snapshot.Inventory!.LevelMatrix.Clear();
+        snapshot.Inventory.Tablets[0].AppliedRangeStale = true;
+
+        var plan = PlanBuilder.Build(snapshot, Catalog());
+
+        Assert.Equal(PlanVerificationStatus.Unavailable, plan!.Verification.Status);
+        Assert.Equal(PlanVerification.GameNotRecalculated, plan.Verification.Reason);
+        Assert.Empty(plan.Targets);
+    }
+
+    [Fact]
+    public void AStaleTabletChangesThePlacementFingerprintOnlyWhenPresent()
+    {
+        var snapshot = Snapshot();
+        var fresh = PlanFingerprint.Placement(snapshot, "test");
+
+        snapshot.Inventory!.Tablets[0].AppliedRangeStale = true;
+        Assert.NotEqual(fresh, PlanFingerprint.Placement(snapshot, "test"));
+
+        snapshot.Inventory.Tablets[0].AppliedRangeStale = false;
+        Assert.Equal(fresh, PlanFingerprint.Placement(snapshot, "test"));
+    }
+
+    [Fact]
     public void AWeaponMismatchFromTheSnapshotTurnsTheCharmOff()
     {
         var charm = new CharmDefinition

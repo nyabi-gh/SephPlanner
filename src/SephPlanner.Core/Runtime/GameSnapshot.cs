@@ -194,6 +194,13 @@ namespace SephPlanner.Core.Runtime
         public bool IsApplied { get; set; }
 
         /// <summary>
+        /// 게임이 적용해 둔 효과 범위(<c>EffectRange</c>)가 게임 자신의 질의 해석으로 지금 격자에서
+        /// 나오는 범위와 다르다. 게임이 아직 다시 계산하지 않은 것이라 레벨 행렬도 낡았다 - 가방이
+        /// 34칸에서 48칸으로 넓어진 뒤 새 칸에 석판 효과가 없던 제보 40f5874c 가 그랬다.
+        /// </summary>
+        public bool AppliedRangeStale { get; set; }
+
+        /// <summary>
         /// 이 인스턴스를 지금 돌릴 수 있는지. 저주는 돌릴 수 있던 석판을 잠그고, 석판 합성은
         /// 반대로 정의상 돌릴 수 없는 합성 석판을 돌릴 수 있게 풀기 때문에 정의값과 별개다
         /// (<c>DungeonManager.IsTabletRotatable</c>). 비어 있으면 정의값을 쓴다 — 참을 기본값으로

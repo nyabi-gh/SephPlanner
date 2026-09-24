@@ -244,6 +244,8 @@ namespace SephPlanner.Core.Runtime
             Add(builder, prefix + "Y", tablet.Position.Y);
             Add(builder, prefix + "Rotation", tablet.Rotation);
             Add(builder, prefix + "Applied", tablet.IsApplied);
+            // 이 항목이 없던 자료가 재현에서 거부되지 않게 켜졌을 때만 더한다.
+            if (tablet.AppliedRangeStale) Add(builder, prefix + "Stale", true);
             Add(builder, prefix + "Rotatable", tablet.IsRotatable?.ToString() ?? "unknown");
             Add(builder, prefix + "Query", tablet.Query ?? "");
             Add(builder, prefix + "Condition", tablet.ConditionQuery ?? "");

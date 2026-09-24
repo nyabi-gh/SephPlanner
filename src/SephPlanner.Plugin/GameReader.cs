@@ -282,19 +282,20 @@ namespace SephPlanner.Plugin
                 });
             }
 
+            var layer = FixedEffectLayer.Get(inv);
             var seenTablets = new HashSet<int>();
             foreach (var pair in inv.stoneTablets)
             {
                 var tablet = pair.Value;
                 if (tablet == null || !seenTablets.Add(tablet.instanceID)) continue;
 
-                state.Tablets.Add(Describe(tablet));
+                state.Tablets.Add(Describe(tablet, layer.View));
             }
 
             foreach (var engraving in inv.engravings)
             {
                 if (engraving == null) continue;
-                state.Engravings.Add(Describe(engraving));
+                state.Engravings.Add(Describe(engraving, layer.View));
             }
 
             // 게임이 계산해 둔 값. 우리 시뮬레이터를 대조하는 정답지로 쓴다.
@@ -308,7 +309,6 @@ namespace SephPlanner.Plugin
             foreach (var pair in inv.currentSetEffectCount)
                 state.ComboCounts[pair.Key] = pair.Value;
 
-            var layer = FixedEffectLayer.Get(inv);
             state.FixedEffects.AddRange(layer.Cells);
             state.ComboEngraving = layer.ComboEngraving;
 
@@ -355,13 +355,14 @@ namespace SephPlanner.Plugin
             return GrowthCounter.GetValue(growth) is int counter ? counter : (int?)null;
         }
 
-        private static PlacedTablet Describe(StoneTablet tablet) => new PlacedTablet
+        private static PlacedTablet Describe(StoneTablet tablet, InventoryView view) => new PlacedTablet
         {
             DefinitionId = tablet.entityID,
             InstanceId = tablet.instanceID,
             Position = new GridPos(tablet.xIdx, tablet.yIdx),
             Rotation = tablet.rotation,
             IsApplied = tablet.IsApplied,
+            AppliedRangeStale = view.Stale.Contains(tablet),
             IsRotatable = DungeonManager.IsTabletRotatable(tablet.instanceID, tablet.isRotatable),
             Query = tablet.isCustomTablet ? tablet.GetQuery(tablet.instanceID) : null,
             ConditionQuery = tablet.isCustomTablet ? tablet.GetConditionQuery(tablet.instanceID) : null,

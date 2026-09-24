@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Mirror;
 using SephPlanner.Core.Model;
+using SephPlanner.Core.Planning;
 using SephPlanner.Core.Tablets;
 using UnityEngine;
 
@@ -28,6 +29,9 @@ namespace SephPlanner.Plugin
 
         /// <summary>아직 판단할 수 없는 이유. 잠시 뒤 풀리므로 알리지 않는다.</summary>
         public string Pending { get; set; } = "";
+
+        /// <summary>게임 행렬에서 되뺀 값. 게임이 아직 다시 계산하지 않아 되빼지 않았으면 null 이다.</summary>
+        public FixedEffectResidualResult Residual { get; set; }
     }
 
     /// <summary>
@@ -105,18 +109,28 @@ namespace SephPlanner.Plugin
                 state.Engraved = ComboEngravings.Cells(rule, ComboEngravings.StageAt(rule, count), view.Grid);
             }
 
-            var observed = TabletSimulator.Run(view.Placements, view.Occupancy, view.Grid);
-            var residual = ComboEngravings.Without(
-                FixedEffectResidual.Extract(view.Grid, observed, view.Matrices(inv)), state.Engraved);
-            Tracker.Observe(residual, view.Sources, view.Arrangement);
-            if (Tracker.Note.Length > 0) Log?.Invoke(Tracker.Note);
+            // 게임이 옛 격자로 적용한 채인 행렬에서 되빼면 그 차이가 고정 효과처럼 남는다. 추적기에도
+            // 먹이지 않는다 - 튄 값으로 셀 것이 아니라 게임이 다시 계산하기를 기다릴 것이다.
+            var stale = view.Stale.Count > 0;
+            if (!stale)
+            {
+                var observed = TabletSimulator.Run(view.Placements, view.Occupancy, view.Grid);
+                state.Residual = ComboEngravings.Without(
+                    FixedEffectResidual.Extract(view.Grid, observed, view.Matrices(inv)), state.Engraved);
+                Tracker.Observe(state.Residual, view.Sources, view.Arrangement);
+                if (Tracker.Note.Length > 0) Log?.Invoke(Tracker.Note);
+            }
 
             if (NetworkServer.active)
             {
                 state.Cells = HostFixedEffects(inv, rule != null);
                 state.All = ComboEngravings.Combine(state.Cells, state.Engraved);
-                if (residual.Status == FixedEffectResidualStatus.Extracted &&
-                    !FixedEffectResidual.Same(state.Cells, residual.Cells))
+                if (stale)
+                {
+                    state.Pending = PlanVerification.GameNotRecalculated;
+                }
+                else if (state.Residual.Status == FixedEffectResidualStatus.Extracted &&
+                         !FixedEffectResidual.Same(state.Cells, state.Residual.Cells))
                 {
                     state.Blocker = "고정 효과 원본과 게임 행렬에서 되뺀 값이 다릅니다.";
                 }
@@ -128,6 +142,11 @@ namespace SephPlanner.Plugin
             if (view.Severed > 0)
             {
                 state.Pending = $"석판·각인 참조 {view.Severed}개를 읽지 못했습니다. 방에 재접속하면 다시 읽습니다.";
+                return state;
+            }
+            if (stale)
+            {
+                state.Pending = PlanVerification.GameNotRecalculated;
                 return state;
             }
             if (Tracker.Contradicted) state.Blocker = Tracker.Reason;
