@@ -186,8 +186,10 @@ namespace SephPlanner.Plugin
                 "무엇을 집을지에 대한 후보 추천을 계산할지. 끄면 가리는 것이 아니라 계산 자체를 " +
                 "건너뛴다. 점수와 배치 제안은 그대로 남는다.");
 
+            // 옛 키(ForgetDesignationsOnNewRun, 기본 켜짐)는 설정 파일에 true 로 적혀 있어 기본값만 바꾸면
+            // 기존 사용자에게 닿지 않는다. 새 판 첫 가방에는 시작 아이템뿐이라 사실상 ★/▽ 전부가 지워졌다.
             ForgetOnNewRun = config.Bind(
-                "NativePanel", "ForgetDesignationsOnNewRun", true,
+                "NativePanel", "ClearDesignationsOnNewRun", false,
                 "새 판이 시작되면 가방에 없는 아이템의 강화칸 우선·양보·사용 유지 같은 지정을 지운다. " +
                 "빌드 코드와 콤보 우선은 남는다. 끄면 지정이 판을 넘어 이어진다.");
 
