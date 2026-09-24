@@ -137,6 +137,7 @@ namespace SephPlanner.Core.Runtime
         private GameSnapshot? _replaySnapshot;
         private PlanPreferences? _replayPreferences;
         private System.Collections.Generic.List<PlanTarget>? _replayPreviousTargets;
+        private bool _replaySettled;
         private PlanFailure? _failure;
 
         public PlanFailure? TakeFailure()
@@ -433,6 +434,7 @@ namespace SephPlanner.Core.Runtime
                     Catalog = catalog.Export(),
                     PreviousTargets = new System.Collections.Generic.List<PlanTarget>(
                         _replayPreviousTargets ?? new System.Collections.Generic.List<PlanTarget>()),
+                    Settled = _replaySettled,
                     Expected = ReplayResult.From(_latest),
                 };
             }
@@ -453,6 +455,7 @@ namespace SephPlanner.Core.Runtime
                 _replaySnapshot = null;
                 _replayPreferences = null;
                 _replayPreviousTargets = null;
+                _replaySettled = false;
                 _layouts = new LayoutCache();
                 _layoutsContext = "";
                 _placementPublished = 0;
@@ -601,6 +604,7 @@ namespace SephPlanner.Core.Runtime
             _replayPreferences = request.Preferences;
             _replayPreviousTargets = new System.Collections.Generic.List<PlanTarget>(
                 request.Previous?.Targets ?? new System.Collections.Generic.List<PlanTarget>());
+            _replaySettled = request.Settled;
             _blocker = blocker;
             _error = null;
 

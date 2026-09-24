@@ -84,6 +84,57 @@ public sealed class PlanReplayTests : IDisposable
         Assert.Equal(0, PlanReproduce.Run(path));
     }
 
+    /// <summary>
+    /// 자동 배치 직후의 계획은 탐색 없이 지금 배치를 채점한 것이다. 재현 자료가 그것을 싣지 않으면
+    /// 재생이 탐색해 다른 답을 내고, 그 차이가 모델 탓처럼 보인다(제보 4ed5b25c).
+    /// </summary>
+    [Fact]
+    public void ASettledPlanReplaysWithoutSearching()
+    {
+        var (catalog, snapshot, preferences) = Inputs();
+        using var runner = new PlanRunner(catalog);
+        runner.Submit(snapshot, preferences, "saved-catalog");
+        Await(runner);
+        var first = runner.State.Latest!;
+        Assert.NotEmpty(first.Targets);
+        runner.MarkApplied(first);
+
+        var applied = RoundTrip(snapshot);
+        foreach (var target in first.Targets)
+        {
+            if (target.IsTablet)
+            {
+                var tablet = applied.Inventory!.Tablets.Single(t => t.InstanceId == target.InstanceId);
+                tablet.Position = target.To;
+                tablet.Rotation = target.Rotation;
+            }
+            else
+            {
+                applied.Inventory!.Items.Single(i => i.InstanceId == target.InstanceId).Position = target.To;
+            }
+        }
+        runner.Submit(applied, preferences, "saved-catalog");
+        Assert.True(SpinWait.SpinUntil(
+            () => runner.State.RequestedGeneration == 2 && runner.State.IsCurrent && runner.State.AdviceIsCurrent,
+            TimeSpan.FromSeconds(10)));
+
+        var capture = runner.CaptureReplay()!;
+        Assert.True(capture.Settled);
+        var path = PathOf("settled.replay");
+        PlanReplayFile.Write(path, JsonConvert.SerializeObject(capture, Formatting.Indented));
+        var restored = System.Text.Json.JsonSerializer.Deserialize<PlanReplay>(PlanReplayFile.Read(path))!;
+        Assert.True(restored.Settled);
+        var replayed = restored.Rebuild();
+        Assert.False(replayed.HasPlacementChanges);
+        Assert.Empty(restored.Expected!.Differences(ReplayResult.From(replayed)));
+        Assert.Equal(0, PlanReproduce.Run(path));
+
+        // 이 항목이 없는 옛 자료는 전처럼 탐색한다.
+        var legacy = System.Text.Json.Nodes.JsonNode.Parse(JsonConvert.SerializeObject(capture))!.AsObject();
+        Assert.True(legacy.Remove("Settled"));
+        Assert.False(System.Text.Json.JsonSerializer.Deserialize<PlanReplay>(legacy.ToJsonString())!.Settled);
+    }
+
     [Fact]
     public void CaptureWhileAnotherRequestRunsKeepsThePublishedSnapshotAndPreferences()
     {

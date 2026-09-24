@@ -49,6 +49,15 @@ namespace SephPlanner.Core.Runtime
         /// 계산됐으므로 그것이 사실과 같다.
         /// </summary>
         public bool AdviceComplete { get; set; } = true;
+
+        /// <summary>
+        /// 자동 배치 직후라 탐색 없이 지금 배치를 채점만 한 계획인가(<see cref="AppliedPlacement"/>).
+        /// 재현이 이것을 모르고 탐색하면 저장 결과와 다른 답을 내고, 그 차이가 모델 탓처럼 보인다.
+        ///
+        /// 옛 자료에는 이 항목이 없어 <c>false</c> 로 읽히고 전처럼 탐색한다. 그때 잡힌 계획이
+        /// 실제로 그 길을 탔는지는 알 수 없다.
+        /// </summary>
+        public bool Settled { get; set; }
         public GameSnapshot? Snapshot { get; set; }
         public ReplayPreferences? Preferences { get; set; }
         public ReplayCatalog? Catalog { get; set; }
@@ -74,8 +83,13 @@ namespace SephPlanner.Core.Runtime
             if (!matches)
                 throw new InvalidDataException("스냅샷·설정의 지문이 게시된 계획과 다릅니다.");
             var previous = new Plan { Targets = PreviousTargets };
-            return PlanBuilder.Build(Snapshot, Catalog.Restore(), preferences, out var blocker, previous) ??
+            var catalog = Catalog.Restore();
+            var layouts = new LayoutCache();
+            var placement = PlanBuilder.BuildPlacement(
+                Snapshot, catalog, preferences, out var blocker, previous, layouts, Settled) ??
                 throw new InvalidDataException("저장된 입력으로 계획을 만들지 못했습니다: " + blocker);
+            return PlanBuilder.BuildAdvice(placement, Snapshot, catalog, preferences, layouts) ??
+                throw new InvalidDataException("저장된 입력으로 조언을 만들지 못했습니다.");
         }
     }
 

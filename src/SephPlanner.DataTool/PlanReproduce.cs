@@ -21,6 +21,8 @@ public static class PlanReproduce
             if (replay.CoreBuild != PlanReplay.CurrentCoreBuild)
                 Console.WriteLine($"계산 코드 차이: 저장={replay.CoreBuild}, 현재={PlanReplay.CurrentCoreBuild}");
             if (allowModelChange) Remeasure(replay);
+            if (replay.Settled)
+                Console.WriteLine("자동 배치 직후의 계획입니다. 그때처럼 탐색 없이 지금 배치를 채점합니다.");
             if (!replay.AdviceComplete)
                 Console.WriteLine("조언이 아직 붙지 않은 계획을 잡은 자료입니다. 배치만 견줍니다.");
             var plan = replay.Rebuild(allowModelChange);
