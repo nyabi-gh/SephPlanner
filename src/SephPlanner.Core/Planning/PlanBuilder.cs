@@ -169,7 +169,7 @@ namespace SephPlanner.Core.Planning
             var problem = placement.Work!.Problem;
             var values = preferences.CharmValues;
             layouts ??= new LayoutCache();
-            layouts.BeginPlan();
+            layouts.BeginPlan(problem);
 
             // 되돌릴 수 없는 선택 셋이 나눠 쓰는 "다음 칸이 열린 판". 하나만 두어야 늘어난 판의
             // 빔과 기준 배치도 한 번만 풀린다.
@@ -222,11 +222,6 @@ namespace SephPlanner.Core.Planning
             blocker = PlanBlocker.None;
             preferences ??= PlanPreferences.None;
 
-            // 기준 배치와 두 조언이 같은 탐색을 나눠 쓴다. 따로 풀면 같은 탐색을 두 번 돌리는
-            // 셈이고, 그 한 번이 실측에서 백 밀리초대다. 부르는 쪽이 들고 있으면 그 나눠 쓰기가
-            // 계획 사이까지 이어진다.
-            layouts ??= new LayoutCache();
-            layouts.BeginPlan();
             var values = preferences.CharmValues;
             var inventory = snapshot.Inventory;
             if (inventory is null || inventory.Storage <= 0)
@@ -348,6 +343,12 @@ namespace SephPlanner.Core.Planning
                         problem.PlannedCharms[target.InstanceId] = target.To;
                 }
             }
+
+            // 기준 배치와 두 조언이 같은 탐색을 나눠 쓴다. 따로 풀면 같은 탐색을 두 번 돌리는
+            // 셈이고, 그 한 번이 실측에서 백 밀리초대다. 부르는 쪽이 들고 있으면 그 나눠 쓰기가
+            // 계획 사이까지 이어진다. 가방 구성이 열쇠에 들어가므로 판이 다 지어진 뒤에 연다.
+            layouts ??= new LayoutCache();
+            layouts.BeginPlan(problem);
 
             var current = PlacementSolver.Score(problem, layout, positions);
             var verification = Verify(inventory, current, grid);

@@ -306,6 +306,7 @@ public class SolverCostTests
         var problem = FullBag(charmCount: 35);
         var cache = new LayoutCache();
         var advice = SolverOptions.ForAdvice(default);
+        cache.BeginPlan(problem);
 
         OfferAdvisor.Rank(problem, Candidates(charms: 2, tablets: 0), int.MaxValue, layouts: cache);
         var searched = cache.Searches;
@@ -314,8 +315,8 @@ public class SolverCostTests
         var ranked = DiscardAdvisor.Rank(problem, baseline, cache);
         Assert.Equal(searched, cache.Searches);
 
-        // 다음 계획. 빔은 계획을 넘어 살고 잣대만 버려진다.
-        cache.BeginPlan();
+        // 다음 계획. 가방이 그대로면 빔은 계획을 넘어 살고 잣대만 버려진다.
+        cache.BeginPlan(problem);
         DiscardAdvisor.Rank(problem, cache.Baseline(problem, advice), cache);
         Assert.Equal(searched, cache.Searches);
 
@@ -455,5 +456,110 @@ public class SolverCostTests
 
         Assert.Equal(searched, warm.Searches);
         Assert.Empty(ReplayResult.From(fresh).Differences(ReplayResult.From(cached)));
+    }
+
+    /// <summary>
+    /// 석판 넷, 아티팩트 다섯, ×2 칸 하나인 판. 무작위 판 3000개 가운데 옛 빔을 이어받으면 답이
+    /// 나빠지는 가장 작은 것이다. <paramref name="without"/>의 아티팩트를 빼면 그것을 줍기 전이다.
+    /// </summary>
+    private static (GameSnapshot Snapshot, Catalog Catalog) DoubledCellBoard(int without = -1)
+    {
+        var grid = new GridSpec(6, 7, 10);
+        var queries = new[] { "UP 1", "HORIZONTAL 2", "O 2", "O 2" };
+        var slopes = new[] { 4, 4, 2, 2, 5 };
+        var tablets = new List<TabletDefinition>();
+        var charms = new List<CharmDefinition>();
+        var inventory = new InventoryState { Width = grid.Width, Height = grid.Height, Storage = grid.Storage };
+        inventory.FixedEffects.Add(new FixedEffectCell { Position = new GridPos(0, 1), Multiply = 2 });
+
+        for (var i = 0; i < queries.Length; i++)
+        {
+            tablets.Add(new TabletDefinition { Id = "t" + i, EntityId = 700 + i, Query = queries[i] });
+            inventory.Tablets.Add(new PlacedTablet { DefinitionId = 700 + i, InstanceId = 900 + i, Position = grid.ToPosition(i) });
+        }
+        for (var i = 0; i < slopes.Length; i++)
+        {
+            var slope = slopes[i];
+            charms.Add(new CharmDefinition
+            {
+                Id = "c" + i,
+                EntityId = 200 + i,
+                MaxLevel = 5,
+                StatWorthByLevel = Enumerable.Range(0, 6).Select(level => 1d + slope * level).ToList(),
+            });
+            if (i == without) continue;
+            inventory.Items.Add(new PlacedItem { DefinitionId = 200 + i, InstanceId = i, Position = grid.ToPosition(queries.Length + i) });
+        }
+        return (new GameSnapshot { Inventory = inventory }, new Catalog(tablets, charms));
+    }
+
+    /// <summary>
+    /// 아티팩트를 주운 뒤의 계획은 새 캐시로 푼 계획과 같아야 한다.
+    ///
+    /// 빔은 아티팩트의 값어치 표로 줄 세운 결과인데 열쇠는 석판 구성만 보고 있었다. 그래서 석판이
+    /// 그대로면 줍기 전 가방에 맞춘 빔을 이어받아, 새 캐시가 찾는 더 나은 배치를 두고 지금 배치에
+    /// 머물렀다 - ×2 칸에 석판이 앉은 채 "변경 없음"이라던 제보가 그것이다.
+    /// </summary>
+    [Fact]
+    public void AfterPickingUpAnArtifactTheCachedPlanIsTheFreshOne()
+    {
+        var preferences = new PlanPreferences { Recommendations = false };
+        var (before, catalog) = DoubledCellBoard(without: 1);
+        var (after, _) = DoubledCellBoard();
+
+        var warm = new LayoutCache();
+        PlanBuilder.BuildPlacement(before, catalog, preferences, out _, null, warm);
+        var searched = warm.Searches;
+        var cached = PlanBuilder.BuildPlacement(after, catalog, preferences, out _, null, warm)!;
+        var fresh = PlanBuilder.BuildPlacement(after, catalog, preferences, out _, null, new LayoutCache())!;
+
+        Assert.True(warm.Searches > searched, "가방 구성이 바뀌었는데 빔을 다시 찾지 않았다.");
+        Assert.Equal(fresh.Best.Score, cached.Best.Score, 8);
+        Assert.Empty(ReplayResult.From(fresh).Differences(ReplayResult.From(cached), includeAdvice: false));
+    }
+
+    /// <summary>
+    /// 가방 구성은 그대로 두고 아티팩트를 옮기기만 하면 빔은 다시 돌지 않는다. 자리는 어림에서
+    /// 동률을 가를 때만 읽히므로 열쇠에 없다 - 있으면 손으로 하나 옮길 때마다 cold 로 돌아간다.
+    /// </summary>
+    [Fact]
+    public void MovingAnArtifactStillReusesTheBeam()
+    {
+        var preferences = new PlanPreferences { Recommendations = false };
+        var (snapshot, catalog) = DoubledCellBoard();
+
+        var warm = new LayoutCache();
+        PlanBuilder.BuildPlacement(snapshot, catalog, preferences, out _, null, warm);
+        var searched = warm.Searches;
+
+        var inventory = snapshot.Inventory!;
+        (inventory.Items[0].Position, inventory.Items[1].Position) = (inventory.Items[1].Position, inventory.Items[0].Position);
+        PlanBuilder.BuildPlacement(snapshot, catalog, preferences, out _, null, warm);
+
+        Assert.Equal(searched, warm.Searches);
+    }
+
+    /// <summary>
+    /// 같은 석판 구성의 후보 판(아티팩트 하나를 뺀 제거 조언 같은)이 빔을 먼저 찾아 두어도, 실제
+    /// 가방의 판은 그 빔을 받지 않고 제 빔을 찾는다. 받으면 다음 계획이 후보 가방에 맞춘 빔을
+    /// 이어받는다. 지금은 조언마다 실제 판을 먼저 묻지만, 그 순서에 기대지 않게 한다.
+    /// </summary>
+    [Fact]
+    public void TheBasisDoesNotTakeABeamACandidateSearched()
+    {
+        var basis = FullBag(charmCount: 8);
+        var candidate = FullBag(charmCount: 8);
+        candidate.Charms.RemoveAt(candidate.Charms.Count - 1);
+        var options = SolverOptions.ForAdvice(default);
+        var cache = new LayoutCache();
+        cache.BeginPlan(basis);
+
+        cache.Of(candidate, options);
+        cache.Of(basis, options);
+        Assert.Equal(2, cache.Searches);
+
+        cache.Of(candidate, options);
+        cache.Of(basis, options);
+        Assert.Equal(2, cache.Searches);
     }
 }

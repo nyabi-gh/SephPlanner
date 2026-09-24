@@ -15,16 +15,20 @@ namespace SephPlanner.Core.Solver
     /// 실측에서 42칸 가방이 꽉 찬 채 후보 8개를 보면 탐색이 288번 돌아 41초, 할당 48GB였다.
     /// 같은 석판 구성이면 탐색 결과도 같으므로, 여기서 한 번만 짓고 나눠 준다.
     ///
-    /// <b>같음의 기준은 석판 구성이다.</b> 아티팩트가 달라지면 빔을 좁히는 어림값
-    /// (<c>scoring</c>·<c>levelCap</c>)이 조금 달라질 수 있지만, 그것은 후보를 줄 세우는 값일
-    /// 뿐 점수가 아니다. 채점은 언제나 그 배치로 다시 정확히 하므로 보고되는 점수는 실제 배치의
-    /// 점수 그대로이고, 기준과 후보가 같은 배치 후보들 위에서 겨루게 되어 증가분의 공정함은
-    /// 오히려 좋아진다.
+    /// <b>한 계획 안에서는 석판 구성이 같으면 나눠 쓴다.</b> 후보가 아티팩트를 더하거나 빼면
+    /// 빔을 줄 세우는 어림값이 조금 달라지지만, 채점은 언제나 그 배치로 다시 정확히 하므로
+    /// 보고되는 점수는 실제 배치의 점수 그대로이고, 기준과 후보가 같은 배치 후보들 위에서
+    /// 겨루게 되어 증가분의 공정함은 오히려 좋아진다.
     ///
     /// <b>계획 하나보다 오래 산다.</b> 지문이 아이템 자리까지 보므로 아티팩트를 하나 옮기기만
-    /// 해도 판이 다시 풀리는데, 석판이 그대로면 빔은 같은 것을 다시 찾을 뿐이다. 그래서
-    /// <c>PlanRunner</c>가 이것을 들고 계획마다 넘긴다. 계획 맥락(카탈로그 세대와 설정)이 바뀌면
-    /// 들고 있는 쪽이 캐시를 통째로 새로 짓는다 - 그래서 그 둘은 열쇠에 없다.
+    /// 해도 판이 다시 풀리는데, 석판과 가방 구성이 그대로면 빔은 같은 것을 다시 찾을 뿐이다.
+    /// 그래서 <c>PlanRunner</c>가 이것을 들고 계획마다 넘긴다. 계획 맥락(카탈로그 세대와 설정)이
+    /// 바뀌면 들고 있는 쪽이 캐시를 통째로 새로 짓는다 - 그래서 그 둘은 열쇠에 없다.
+    ///
+    /// <b>계획을 넘을 때는 가방 구성도 열쇠다</b>(<see cref="BeginPlan"/>). 빔은 아티팩트의
+    /// 값어치 표로 줄 세운 결과라, 아티팩트를 줍거나 버린 뒤에도 석판만 보고 돌려주면 옛 가방에
+    /// 맞춘 배치 후보들 사이에서만 고르게 된다. 새로 생긴 ×2 칸을 석판이 깔고 앉은 채 "지금이
+    /// 최선"이라고 답한 제보(2026-09-23)가 그것이었다.
     ///
     /// <b>계획을 넘어가는 것은 탐색뿐이고 채점은 아니다.</b> 지금 배치와 직전 계획은 폴링마다
     /// 달라지므로, 빔에 붙이는 그 둘은 <see cref="PlacementSolver.WithCurrentAndPlanned"/>가
@@ -35,9 +39,9 @@ namespace SephPlanner.Core.Solver
     /// <see cref="DiscardAdvisor"/>가 <c>ForAdvice</c>의 예산 둘을 덮어쓰기 때문에 실제로 그랬다.
     /// 그래서 빔은 빔 열쇠로, 기준 배치와 잣대는 그것을 품은 채점 열쇠로 찾는다.
     ///
-    /// <b>"쓸 수 있다"이지 "같다"가 아니다.</b> 빔도 석판 구성만의 함수는 아니다 -
-    /// <c>Estimate</c>가 현재·직전 자리를 동률 가르기에 읽는다. 보장하는 것은 모든 후보가 그
-    /// 판으로 정확히 채점되고 지금 배치와 직전 계획이 매번 다시 붙는다는 것까지다.
+    /// <b>"쓸 수 있다"이지 "같다"가 아니다.</b> <c>Estimate</c>가 현재·직전 자리를 동률
+    /// 가르기에 읽으므로 빔은 그 둘에도 조금 기댄다. 보장하는 것은 모든 후보가 그 판으로 정확히
+    /// 채점되고 지금 배치와 직전 계획이 매번 다시 붙는다는 것까지다.
     /// </summary>
     public sealed class LayoutCache
     {
@@ -52,6 +56,9 @@ namespace SephPlanner.Core.Solver
         {
             public List<List<TabletPlacement>>? Value;
             public long Used;
+
+            /// <summary>빔을 실제 가방의 판으로 찾았는가. 후보 판이 먼저 찾은 빔은 거짓이다.</summary>
+            public bool OfBasis;
         }
 
         /// <summary>빔 열쇠로 찾는 탐색 결과. 계획을 넘어 산다.</summary>
@@ -90,14 +97,24 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         public int BaselineSolves { get; private set; }
 
+        private PlacementProblem? _basis;
+        private string _composition = "";
+
         /// <summary>
         /// 새 계획을 시작한다. 빔은 두고 채점한 것만 버린다 - 기준 배치와 잣대는 지금 배치와
         /// 직전 계획을 보고 고른 배치라, 넘겨 쓰면 그때의 앵커로 이번 답을 고르게 된다.
+        ///
+        /// <paramref name="basis"/>는 실제 가방의 판이다. 그 가방 구성이 이 계획의 모든 빔 열쇠에
+        /// 붙으므로 한 계획 안의 후보들은 지금처럼 빔을 나눠 쓰고, 구성이 달라진 다음 계획은 옛
+        /// 빔을 받지 않는다. 후보마다의 구성을 열쇠에 넣으면 후보마다 탐색이 다시 돈다.
         /// </summary>
-        public void BeginPlan()
+        public void BeginPlan(PlacementProblem basis)
         {
             _baselines.Clear();
             _yardsticks.Clear();
+            if (ReferenceEquals(basis, _basis)) return;
+            _basis = basis;
+            _composition = PlacementSolver.EstimateSignature(basis);
         }
 
         /// <summary>
@@ -154,13 +171,20 @@ namespace SephPlanner.Core.Solver
         public List<List<TabletPlacement>> Of(PlacementProblem problem, SolverOptions options)
         {
             var key = BeamKey(problem, options);
-            var beam = Find(_beams, key)?.Value;
+            var ofBasis = ReferenceEquals(problem, _basis);
+            var found = Find(_beams, key);
+
+            // 실제 가방의 빔은 그 가방으로 찾은 것만 받는다. 같은 석판 구성의 후보 판(아티팩트를
+            // 뺀 제거 조언 등)이 먼저 찾아 둔 빔을 받으면, 다음 계획이 그 빔을 이어받는다.
+            var beam = found is not null && (found.OfBasis || !ofBasis) ? found.Value : null;
             if (beam is not null) Reuses++;
             else
             {
                 Searches++;
                 beam = PlacementSolver.SearchBeam(problem, options);
-                Reserve(_beams, key).Value = beam;
+                var entry = Reserve(_beams, key);
+                entry.Value = beam;
+                entry.OfBasis = ofBasis;
             }
             return PlacementSolver.WithCurrentAndPlanned(problem, beam);
         }
@@ -243,14 +267,14 @@ namespace SephPlanner.Core.Solver
         /// 조언들이 같은 빔을 두 번 찾는다 - <see cref="DiscardAdvisor"/> 가 <c>ForAdvice</c> 의
         /// 예산 둘을 덮어쓰기 때문에 실제로 그랬다.
         /// </summary>
-        private static string BeamKey(PlacementProblem problem, SolverOptions options) =>
+        private string BeamKey(PlacementProblem problem, SolverOptions options) =>
             Key(problem, options, new StringBuilder());
 
         /// <summary>
         /// 빔 열쇠에 채점을 가르는 것을 더한 열쇠. 기준 배치와 잣대가 이것으로 찾는다.
         /// 빔 열쇠를 통째로 품으므로 채점 열쇠가 같으면 빔 열쇠도 반드시 같다.
         /// </summary>
-        private static string ScoringKey(PlacementProblem problem, SolverOptions options)
+        private string ScoringKey(PlacementProblem problem, SolverOptions options)
         {
             var builder = new StringBuilder();
             builder.Append(options.FixpointIterations)
@@ -262,8 +286,9 @@ namespace SephPlanner.Core.Solver
             return Key(problem, options, builder);
         }
 
-        private static string Key(PlacementProblem problem, SolverOptions options, StringBuilder builder)
+        private string Key(PlacementProblem problem, SolverOptions options, StringBuilder builder)
         {
+            builder.Append("basis:").Append(_composition).Append(';');
             builder.Append(problem.Grid.Width).Append('x').Append(problem.Grid.Height)
                    .Append('/').Append(problem.Grid.Storage)
                    .Append('/').Append(options.BeamWidth)
