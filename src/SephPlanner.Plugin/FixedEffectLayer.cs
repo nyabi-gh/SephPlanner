@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Mirror;
 using SephPlanner.Core.Model;
@@ -31,6 +32,11 @@ namespace SephPlanner.Plugin
         private static GridInventory _inventory;
         private static GridSpec _grid;
         private static int _frame = -1;
+
+        /// <summary>
+        /// 추적기의 셈이 바뀐 까닭을 남길 곳. 진단 묶음에 들어가는 것은 플러그인 로그뿐이다.
+        /// </summary>
+        internal static Action<object> Log { get; set; }
 
         internal static void Forget()
         {
@@ -75,6 +81,7 @@ namespace SephPlanner.Plugin
             var observed = TabletSimulator.Run(view.Placements, view.Occupancy, view.Grid);
             var residual = FixedEffectResidual.Extract(view.Grid, observed, view.Matrices(inv));
             Tracker.Observe(residual, view.Sources, view.Arrangement);
+            if (Tracker.Note.Length > 0) Log?.Invoke(Tracker.Note);
 
             if (NetworkServer.active)
             {

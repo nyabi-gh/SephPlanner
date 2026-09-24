@@ -117,6 +117,7 @@ namespace SephPlanner.Plugin
             };
             Logger.LogEvent += CaptureOwnLog;
             GameBinding.LogTo(Logger.LogWarning);
+            FixedEffectLayer.Log = Logger.LogInfo;
             HorayModAPI.OnStartSessionClientside += StartSession;
             HorayModAPI.OnAllDatabasesReady += ArmCatalogRefresh;
 

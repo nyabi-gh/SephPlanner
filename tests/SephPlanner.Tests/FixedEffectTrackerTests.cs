@@ -57,6 +57,68 @@ public class FixedEffectTrackerTests
         Assert.Contains("배치", tracker.Reason);
     }
 
+    /// <summary>
+    /// 한 번 튄 뒤 확정된 층으로 돌아오는 것은 두 번째 어긋남이 아니다. 예전에는 튄 값을 기준으로
+    /// 삼아 돌아오는 것까지 세었다(제보 5642c7be).
+    /// </summary>
+    [Fact]
+    public void OneGlitchThatComesBackIsNotAContradiction()
+    {
+        var tracker = new FixedEffectTracker();
+
+        tracker.Observe(Extracted((1, 4, 2)), "t@0,0", "a");
+        tracker.Observe(Extracted((1, 4, 1)), "t@0,0", "b");
+        Assert.Contains("1/2", tracker.Note);
+        tracker.Observe(Extracted((1, 4, 2)), "t@0,0", "c");
+
+        Assert.False(tracker.Contradicted);
+        Assert.True(tracker.Trustworthy);
+        Assert.Contains("돌아왔", tracker.Note);
+        Assert.Equal(2, Assert.Single(tracker.Layer).Level);
+
+        // 돌아온 뒤에는 셈이 처음부터다.
+        tracker.Observe(Extracted((1, 4, 1)), "t@0,0", "d");
+        Assert.False(tracker.Contradicted);
+    }
+
+    /// <summary>
+    /// 벗어난 값이 아이템을 옮긴 뒤에도 그대로면 새 고정 효과다. 보상 석판을 바로 각인한 것이
+    /// 아이템 이동과 겹치면 이렇게 보인다.
+    /// </summary>
+    [Fact]
+    public void ANewLayerThatHoldsAcrossAMoveIsConfirmed()
+    {
+        var tracker = new FixedEffectTracker();
+
+        tracker.Observe(Extracted((0, 0, 1)), "t@0,0", "a");
+        tracker.Observe(Extracted((0, 0, 1), (1, 4, 2)), "t@0,0", "b");
+        tracker.Observe(Extracted((0, 0, 1), (1, 4, 2)), "t@0,0", "c");
+
+        Assert.False(tracker.Contradicted);
+        Assert.True(tracker.ConfirmedAcrossArrangements);
+        Assert.Contains("확정", tracker.Note);
+
+        // 확정된 새 층에서 한 번 벗어나는 것은 다시 첫 번째다.
+        tracker.Observe(Extracted((0, 0, 1)), "t@0,0", "d");
+        Assert.False(tracker.Contradicted);
+    }
+
+    [Fact]
+    public void AContradictionIsNotClearedByComingBack()
+    {
+        var tracker = new FixedEffectTracker();
+
+        tracker.Observe(Extracted((0, 0, 1)), "t@0,0", "a");
+        tracker.Observe(Extracted((0, 0, 2)), "t@0,0", "b");
+        tracker.Observe(Extracted((0, 0, 3)), "t@0,0", "c");
+        Assert.True(tracker.Contradicted);
+
+        tracker.Observe(Extracted((0, 0, 1)), "t@0,0", "d");
+
+        Assert.True(tracker.Contradicted);
+        Assert.False(tracker.Trustworthy);
+    }
+
     [Fact]
     public void AnEngravedTabletChangesTheLayerWithoutBlame()
     {
