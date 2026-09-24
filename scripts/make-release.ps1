@@ -196,7 +196,13 @@ try {
 
     Write-Host "완성: $zip"
     Write-Host "릴리스 본문: $notesPath"
-    Write-Host "  gh release create v$version `"$zip`" -R nyabi-gh/SephPlanner --title `"SephPlanner $version`" --notes-file `"$notesPath`""
+    # 공개는 두 ZIP 이 한 드래프트에 모인 뒤에만 한다. macOS ZIP 이 빠진 채 Latest 가 되면 Mac 업데이트가 404 다.
+    Write-Host "드래프트가 아직 없으면 먼저 만든다:"
+    Write-Host "  gh release create v$version `"$zip`" -R nyabi-gh/SephPlanner --draft --title `"SephPlanner $version`" --notes-file `"$notesPath`""
+    Write-Host "다른 운영체제에서 드래프트를 이미 만들었으면 ZIP 만 더한다:"
+    Write-Host "  gh release upload v$version `"$zip`" -R nyabi-gh/SephPlanner"
+    Write-Host "두 ZIP 이 모두 올라간 뒤 공개한다(없으면 거절한다):"
+    Write-Host "  scripts/publish-release.ps1"
 }
 finally {
     if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }

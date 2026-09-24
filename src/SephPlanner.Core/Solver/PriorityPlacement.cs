@@ -143,7 +143,7 @@ namespace SephPlanner.Core.Solver
             var designated = problem.DesignatedTargets.Count > 0;
             if (problem.PriorityCategories.Count == 0 && !designated) return best;
             cancellation.ThrowIfCancellationRequested();
-            var flexible = problem.Charms.Where(charm => !charm.IsFiller &&
+            var flexible = problem.Charms.Where(charm => !charm.IsFiller && !charm.Immovable &&
                     (problem.PriorityCategories.Count > 0 && Applies(charm.Definition) ||
                      designated && DirectedCharmSupport.WantsDesignatedTarget(problem, charm)))
                 .OrderBy(charm => charm.InstanceId).ToList();
@@ -168,7 +168,9 @@ namespace SephPlanner.Core.Solver
                 }
             }
 
-            var cells = Enumerable.Range(0, problem.Grid.Storage).Select(problem.Grid.ToPosition).ToList();
+            var pinned = PlacementSolver.Pinned(problem);
+            var cells = Enumerable.Range(0, problem.Grid.Storage).Select(problem.Grid.ToPosition)
+                .Where(cell => !pinned.Contains(cell)).ToList();
             if (options.PriorityComboTrials <= 0) return best;
             var remaining = options.PriorityComboTrials;
             var perItem = Math.Max(1, remaining / (Passes * flexible.Count));
@@ -188,7 +190,7 @@ namespace SephPlanner.Core.Solver
                         if (trials++ >= perItem) break;
                         if (remaining-- <= 0) return best;
                         var trial = Place(problem, seed, targets);
-                        if (Compare(trial, best) <= 0) continue;
+                        if (trial is null || Compare(trial, best) <= 0) continue;
                         best = trial;
                         changed = true;
                     }
@@ -277,19 +279,26 @@ namespace SephPlanner.Core.Solver
             }
         }
 
-        private static Arrangement Place(
+        /// <summary>
+        /// 목표대로 옮긴 배치. 못 옮기는 아이템을 움직이는 조합이면 null 이다 - 그 배치가 이기면
+        /// 자동 배치가 그 칸에서 멈춘다.
+        /// </summary>
+        private static Arrangement? Place(
             PlacementProblem problem, Arrangement seed, (int Id, GridPos Cell)[] targets)
         {
             var positions = new Dictionary<int, GridPos>(seed.CharmPositions);
+            var immovable = new HashSet<int>(problem.Charms.Where(charm => charm.Immovable).Select(charm => charm.InstanceId));
             var layout = seed.Tablets.Select((tablet, index) =>
                 problem.Tablets[index].At(tablet.Position, tablet.Rotation)).ToList();
             foreach (var target in targets)
             {
                 var from = positions[target.Id];
                 if (from == target.Cell) continue;
+                if (immovable.Contains(target.Id)) return null;
                 foreach (var pair in positions)
                 {
                     if (pair.Value != target.Cell) continue;
+                    if (immovable.Contains(pair.Key)) return null;
                     positions[pair.Key] = from;
                     break;
                 }

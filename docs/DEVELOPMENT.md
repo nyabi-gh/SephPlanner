@@ -131,7 +131,9 @@ macOS 배포물은 `build-macos-loader.sh`가 고정한 BepInEx·Doorstop·pltho
 커밋과 파일 해시가 적힌 `manifest.json`을 만든다. 게임 파일은 넣지 않는다.
 
 **한 릴리스에 두 ZIP을 모두 올린 뒤 공개한다.** Windows와 Mac에서 각각 `make-release.ps1`을 돌려
-같은 드래프트에 올린다. 업데이트 확인은 `releases/latest`의 태그만 보고 창을 띄우므로, macOS ZIP이
+같은 드래프트에 올린다 - 먼저 도는 쪽이 `gh release create --draft`, 나중 쪽이 `gh release upload`
+(스크립트가 끝에 두 명령을 출력한다). 공개는 `scripts/publish-release.ps1`로 한다. 드래프트에 두 ZIP이
+다 있을 때만 `--draft=false`로 바꾸고, 하나라도 빠지면 거절한다. 업데이트 확인은 `releases/latest`의 태그만 보고 창을 띄우므로, macOS ZIP이
 빠진 채 공개하면 Mac 사용자의 `업데이트`가 404로 실패한다.
 
 zip은 이 저장소의 Releases 에 올린다. 변경 기록은 CHANGELOG.md 가 정본이고, 릴리스 본문은

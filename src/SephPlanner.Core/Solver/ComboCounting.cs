@@ -112,6 +112,40 @@ namespace SephPlanner.Core.Solver
             return count;
         }
 
+        /// <summary>그 자리들에 놓인 아티팩트를 게임 방식으로 센 것.</summary>
+        internal static Dictionary<string, int> CountAt(PlacementProblem problem, IReadOnlyDictionary<int, GridPos> positions)
+        {
+            var byCell = new Dictionary<GridPos, CharmSlot>();
+            foreach (var charm in problem.Charms)
+            {
+                if (positions.TryGetValue(charm.InstanceId, out var cell)) byCell[cell] = charm;
+            }
+            return CountAll(byCell);
+        }
+
+        /// <summary>
+        /// 게임 수를 우리 셈의 차이만큼 옮긴다. 우리가 재현하지 않는 규칙(유니크 페어 등)은 게임 수에
+        /// 남고 양쪽 셈에서 지워진다. 게임 수를 모르면 우리 셈을 그대로 쓴다.
+        /// </summary>
+        internal static Dictionary<string, int> Adjust(IReadOnlyDictionary<string, int>? reported,
+            IReadOnlyDictionary<string, int> current, IReadOnlyDictionary<string, int> next)
+        {
+            var keys = new HashSet<string>(current.Keys);
+            keys.UnionWith(next.Keys);
+            if (reported is not null) keys.UnionWith(reported.Keys);
+
+            var result = new Dictionary<string, int>();
+            foreach (var key in keys)
+            {
+                current.TryGetValue(key, out var now);
+                next.TryGetValue(key, out var then);
+                var game = now;
+                if (reported is not null) reported.TryGetValue(key, out game);
+                result[key] = game - now + then;
+            }
+            return result;
+        }
+
         /// <summary>게임이 세어 둔 지금 수. 조언 갈래에서는 갈래가 고쳐 둔 수다.</summary>
         internal static int Reported(PlacementProblem problem, string category) =>
             problem.ComboCounts is not null && problem.ComboCounts.TryGetValue(category, out var count) ? count : 0;

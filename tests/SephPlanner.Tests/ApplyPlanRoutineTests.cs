@@ -494,6 +494,30 @@ public class ApplyPlanRoutineTests
         AssertContains("원래 배치로 되돌렸습니다.", routine.Result);
     }
 
+    /// <summary>
+    /// 번호 없는 아이템은 게임이 번호 0 을 돌려주어 우리 음수 번호와 견줄 수 없다. 되돌리기 확인이
+    /// 그것을 번호로 보면 다 되돌리고도 "원래 배치와 다른 항목이 남았다" 고 한다.
+    /// </summary>
+    [Fact]
+    public void AnImmovableItemDoesNotSpoilAFullRollback()
+    {
+        var (inventory, clock) = Host();
+        inventory.Cells[At(0, 0)] = 10;
+        inventory.Cells[At(1, 0)] = 11;
+        inventory.Unnumbered.Add(At(2, 1));
+        inventory.FailingSwaps.Add(1);
+        var command = Command(
+            new PlanTarget { InstanceId = -9, From = At(2, 1), To = At(2, 1), Immovable = true },
+            Charm(10, At(0, 0), At(2, 0)), Charm(11, At(1, 0), At(3, 0)));
+
+        var routine = Routine(command, inventory, clock);
+        Drive(routine, inventory, clock);
+
+        Assert.Equal(10, inventory.Cells[At(0, 0)]);
+        Assert.Equal(11, inventory.Cells[At(1, 0)]);
+        AssertContains("원래 배치로 되돌렸습니다.", routine.Result);
+    }
+
     [Theory]
     [InlineData(-1)]
     [InlineData(2)]

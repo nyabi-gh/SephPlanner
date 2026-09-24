@@ -127,7 +127,7 @@ namespace SephPlanner.Core.Solver
     /// </summary>
     public static class OfferAdvisor
     {
-        private sealed class TrialOutcome
+        internal sealed class TrialOutcome
         {
             public PlacementProblem Trial = new PlacementProblem();
             public Arrangement Solved = new Arrangement();
@@ -398,7 +398,7 @@ namespace SephPlanner.Core.Solver
             return best.Solved.UnretainedCharms.Count == 0 && ActivationPolicy.AllowsTransition(baseline, best.Solved) ? best : null;
         }
 
-        private static IEnumerable<TrialOutcome> Trials(
+        internal static IEnumerable<TrialOutcome> Trials(
             PlacementProblem problem, OfferCandidate candidate, int candidateId, CharmValueBook? values)
         {
             var occupied = problem.Charms.Count + problem.Tablets.Count;
@@ -410,6 +410,7 @@ namespace SephPlanner.Core.Solver
                 yield break;
             }
 
+            var currentCounts = ComboCounting.CountAt(problem, problem.CurrentCharms);
             foreach (var charm in problem.Charms.OrderBy(value => value.InstanceId))
             {
                 if (charm.Retained || charm.Definition.CannotDiscard) continue;
@@ -417,6 +418,11 @@ namespace SephPlanner.Core.Solver
                 trial.Charms.RemoveAll(value => value.InstanceId == charm.InstanceId);
                 trial.CurrentCharms.Remove(charm.InstanceId);
                 trial.PlannedCharms.Remove(charm.InstanceId);
+
+                // 게임 수는 밀려난 아티팩트까지 센 값이다. 덜어 내지 않으면 그 몫이 콤보 가치와
+                // 신비 각인 단계에 계속 남는다.
+                trial.ComboCounts = ComboCounting.Adjust(
+                    problem.ComboCounts, currentCounts, ComboCounting.CountAt(trial, trial.CurrentCharms));
                 if (trial.Charms.Count + trial.Tablets.Count >= problem.Grid.Storage ||
                     !AddCandidate(trial, candidate, candidateId, values))
                     continue;

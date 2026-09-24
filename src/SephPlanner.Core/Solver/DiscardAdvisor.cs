@@ -162,19 +162,13 @@ namespace SephPlanner.Core.Solver
                    .ToList();
 
         private static Dictionary<string, int> Counts(PlacementProblem problem, IReadOnlyDictionary<int, GridPos> positions) =>
-            ComboCounting.CountAll(problem.Charms.Where(c => positions.ContainsKey(c.InstanceId))
-                .ToDictionary(c => positions[c.InstanceId], c => c));
+            ComboCounting.CountAt(problem, positions);
 
         private static int Count(IReadOnlyDictionary<string, int> counts, string key) =>
             counts.TryGetValue(key, out var value) ? value : 0;
 
         private static Dictionary<string, int> Adjust(IReadOnlyDictionary<string, int>? reported,
-            IReadOnlyDictionary<string, int> current, IReadOnlyDictionary<string, int> next)
-        {
-            var result = new Dictionary<string, int>();
-            foreach (var key in current.Keys.Union(next.Keys).Union(reported?.Keys ?? Enumerable.Empty<string>()))
-                result[key] = (reported is null ? Count(current, key) : Count(reported, key)) - Count(current, key) + Count(next, key);
-            return result;
-        }
+            IReadOnlyDictionary<string, int> current, IReadOnlyDictionary<string, int> next) =>
+            ComboCounting.Adjust(reported, current, next);
     }
 }

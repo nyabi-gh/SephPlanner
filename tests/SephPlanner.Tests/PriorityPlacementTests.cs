@@ -357,4 +357,26 @@ public class PriorityPlacementTests
         Assert.True(plan.HasPlacementChanges);
         Assert.Equal(new GridPos(0, 2), plan.Targets.Single().To);
     }
+
+    /// <summary>
+    /// 콤보 우선은 점수보다 앞서므로, 번호 없는 아이템을 옮겨 종이를 끼운 배치가 이기면 자동 배치가
+    /// 그 칸에서 멈춘다. 못 옮기는 아이템은 제자리여야 한다.
+    /// </summary>
+    [Fact]
+    public void ThePriorityComboNeverMovesAnImmovableItem()
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(4, 1, 4), PriorityCategories = { "X" } };
+        problem.Charms.Add(new CharmSlot { InstanceId = 1, Definition = new CharmDefinition { Id = "a", EntityId = 1, MaxLevel = 5, Categories = { "X" } } });
+        problem.Charms.Add(new CharmSlot { InstanceId = -2, IsFiller = true, Immovable = true, Definition = new CharmDefinition { Id = "f", EntityId = 2 } });
+        problem.Charms.Add(new CharmSlot { InstanceId = 3, Definition = new CharmDefinition { Id = "p", EntityId = 3, MaxLevel = 5, Behavior = "Charm_WhitePaper" } });
+        problem.Charms.Add(new CharmSlot { InstanceId = 4, Definition = new CharmDefinition { Id = "b", EntityId = 4, MaxLevel = 5, Categories = { "X" } } });
+        problem.CurrentCharms[1] = new GridPos(0, 0);
+        problem.CurrentCharms[-2] = new GridPos(1, 0);
+        problem.CurrentCharms[3] = new GridPos(2, 0);
+        problem.CurrentCharms[4] = new GridPos(3, 0);
+
+        var best = PlacementSolver.Solve(problem);
+
+        Assert.Equal(new GridPos(1, 0), best.CharmPositions[-2]);
+    }
 }

@@ -591,6 +591,18 @@ namespace SephPlanner.Core.Runtime
             }
             foreach (var target in _command.Targets)
             {
+                // 번호 없는 아이템은 게임이 0 을 돌려주어 우리 음수 번호와 견줄 수 없다. TargetDrift 처럼
+                // 칸이 차 있는지만 본다.
+                if (target.Immovable)
+                {
+                    if (!_port.Occupied(target.From))
+                    {
+                        outcome.Note = "확인된 이동은 되돌렸지만 원래 배치와 다른 항목이 남았습니다. 현재 배치를 확인하세요.";
+                        yield break;
+                    }
+                    continue;
+                }
+
                 if (_port.InstanceAt(target.From) != target.InstanceId ||
                     target.IsTablet && RotationOf(target.InstanceId) != target.FromRotation)
                 {

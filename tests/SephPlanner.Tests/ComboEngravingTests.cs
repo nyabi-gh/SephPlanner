@@ -182,6 +182,71 @@ public class ComboEngravingTests
         }
     }
 
+    /// <summary>
+    /// 가방이 차서 후보를 넣으려고 신비 하나를 밀어내는 갈래. 게임 수는 밀려난 것까지 센 값이라
+    /// 갈래가 덜어 내지 않으면 신비 4개로 남아 사라질 ×2 칸을 믿는다.
+    /// </summary>
+    [Fact]
+    public void DisplacingAMysticForAnOfferLowersTheEngravingStage()
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(4, 1, 4) };
+        for (var id = 1; id <= 4; id++)
+        {
+            problem.Charms.Add(new CharmSlot
+            {
+                InstanceId = id,
+                Definition = new CharmDefinition { Id = "m" + id, EntityId = 100 + id, MaxLevel = 5, Categories = { "MYSTIC" } },
+            });
+            problem.CurrentCharms[id] = new GridPos(id - 1, 0);
+        }
+        problem.ComboCounts = new Dictionary<string, int> { ["MYSTIC"] = 4 };
+        problem.ComboEngraving = Mystic(new GridPos(0, 0), new GridPos(1, 0), new GridPos(2, 0));
+
+        var offer = new OfferCandidate { DefinitionId = 900, Kind = "charm", Charm = new CharmDefinition { Id = "y", EntityId = 900, MaxLevel = 5 } };
+        var displaced = OfferAdvisor.Trials(problem, offer, -1000, null)
+            .Single(outcome => outcome.DisplacedCharm?.InstanceId == 1).Trial;
+
+        Assert.Equal(3, ComboCounting.Reported(displaced, "MYSTIC"));
+        var after = displaced.Charms.Where(charm => displaced.CurrentCharms.ContainsKey(charm.InstanceId))
+            .ToDictionary(charm => displaced.CurrentCharms[charm.InstanceId], charm => charm);
+        after[new GridPos(0, 0)] = displaced.Charms.Single(charm => charm.InstanceId == -1000);
+        Assert.Single(displaced.EffectsFor(after));
+    }
+
+    /// <summary>
+    /// 빔은 콤보 각인을 단계로만 본다. 같은 단계 안에서 수만 바뀌었는데 빔을 다시 찾으면 종이를
+    /// 옮길 때마다 cold 가 된다.
+    /// </summary>
+    [Fact]
+    public void TheBeamIsKeptWhileTheCountStaysInOneStage()
+    {
+        var cache = new LayoutCache();
+        var options = SolverOptions.ForAdvice(default);
+
+        cache.Of(BeamBoard(4), options);
+        cache.Of(BeamBoard(5), options);
+        Assert.Equal(1, cache.Searches);
+
+        cache.Of(BeamBoard(3), options);
+        Assert.Equal(2, cache.Searches);
+    }
+
+    private static PlacementProblem BeamBoard(int mystic)
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(3, 2, 6) };
+        problem.Tablets.Add(new TabletSlot
+        {
+            InstanceId = 900,
+            Definition = new TabletDefinition { Id = "t", EntityId = 700, Query = "RIGHT 1" },
+        });
+        problem.CurrentTablets[900] = new TabletSpot(new GridPos(0, 0), 0);
+        problem.Charms.Add(new CharmSlot { InstanceId = 1, Definition = new CharmDefinition { Id = "a", EntityId = 1, MaxLevel = 5 } });
+        problem.CurrentCharms[1] = new GridPos(1, 0);
+        problem.ComboCounts = new Dictionary<string, int> { ["MYSTIC"] = mystic };
+        problem.ComboEngraving = Mystic(new GridPos(2, 1), new GridPos(0, 1), new GridPos(1, 1));
+        return problem;
+    }
+
     private static int CountAt(PlacementProblem problem, IReadOnlyDictionary<int, GridPos> positions) =>
         ComboCounting.CountAll(problem.Charms.Where(charm => positions.ContainsKey(charm.InstanceId))
             .ToDictionary(charm => positions[charm.InstanceId], charm => charm)).GetValueOrDefault("MYSTIC");

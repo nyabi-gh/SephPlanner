@@ -315,11 +315,12 @@ namespace SephPlanner.Core.Solver
                     .Append(effect.Level).Append(':').Append(effect.Multiply).Append(':')
                     .Append(effect.Disable).Append(':').Append(effect.IgnoreCriteria).Append(';');
 
-            // 빔은 콤보 각인을 지금 수의 단계로 본다. 규칙이 같아도 수가 단계를 넘으면 빔이 달라진다.
+            // 빔은 콤보 각인을 지금 수의 단계로만 본다. 수를 그대로 넣으면 단계 안에서 종이를 옮길
+            // 때마다 빔을 다시 찾는다.
             if (problem.ComboEngraving is { } rule)
             {
                 builder.Append("comboEngraving:").Append(rule.Category).Append(':')
-                    .Append(ComboCounting.Reported(problem, rule.Category)).Append(':')
+                    .Append(ComboEngravings.StageAt(rule, ComboCounting.Reported(problem, rule.Category))).Append(':')
                     .Append(rule.Query.Length).Append(':').Append(rule.Query).Append(':');
                 foreach (var tier in rule.Tiers) builder.Append(tier.Threshold).Append('x').Append(tier.Count).Append(',');
                 builder.Append(':');
