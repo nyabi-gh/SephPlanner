@@ -626,6 +626,12 @@ fixedMultiplyLevel)를 들고 있고, 배수는 석판과 같은 `multiplyLevelM
   을 빼고, 참가자는 되뺀 층에서 지금 수의 몫을 뺀 뒤 추적기에 넘긴다. 0.4.17 제보 `ca26eeb4` 는 신비
   4개일 때의 ×2 세 칸을 고정 효과로 받은 계획이 하얀 종이를 옮겨 신비를 3개로 떨어뜨렸고, 사라진 두
   칸에 둔 아티팩트가 정확히 어긋난 두 칸이었다.
+
+  신비가 문턱에서 하는 일은 이 칸을 심는 것뿐이라, 칸이 점수에 들어간 뒤로는 일반 콤보 가치
+  (`OfComboStep`, 문턱 2.18레벨)가 같은 이득의 어림값이 되어 두 번 세어졌다. 그래서 규칙이 있으면
+  신비에는 일반 콤보 가치를 주지 않는다(`PlacementProblem.ScoresComboItself`) - 종이·침·열쇠의 자리
+  가치, 후보의 콤보 보너스, 그리고 버리기 조언이 콤보 단계 변화를 막는 판단에서. 다가가기 가치(0.27)도
+  함께 빠진다. F2 콤보 우선은 사용자의 선택이라 그대로다. 규칙이 없는 옛 자료는 예전처럼 푼다.
 - **가방의 석판 각인.** `tabletEngravingCount > 0`이면 `UI_CharacterStatusPanel.OnItemLongClicked`가
   석판을 길게 눌렀을 때 `CmdCreateFixedEngravingFromInventory(tablet)`을 보낸다. 서버는 효과를
   구운 뒤 **`ForceRemoveItem`으로 석판을 가방에서 지운다.**
@@ -1218,8 +1224,13 @@ selectionSeedOffset)`으로 내용을 정한다. **고르기 전에 무엇이 �
 - 카테고리 정의는 `Resources.LoadAll<ItemCategoryEntity>("ItemCategory")`. `id`, 로컬라이즈된
   `categoryName`, 그리고 발동 효과가 있다. 효과는 두 세대가 공존한다: 신형은 `comboEffectPrefab`의
   `ComboEffectBase.addStatByCombo[]`(원소마다 `comboCount` 임계값), 구형은 `setStatus[]`
-  (`itemCount` 임계값). 게임의 `SearchSetEffectInInventory`가 양쪽을 다 쓰므로 임계값은 둘을
-  합쳐 모은다. `CatalogDump`가 `combos.json`으로 덤프한다.
+  (`itemCount` 임계값). 임계값은 둘을 합쳐 모은다. `CatalogDump`가 `combos.json`으로 덤프한다.
+  **그런데 1.0.33 에서 `setStatus` 는 아무도 읽지 않는다**(2026-09-24 디컴파일). 선언 말고는
+  참조가 없고, 구형 효과를 담는 `setEffectInstancesServer` 에는 추가하는 코드가 없으며
+  `GetSetTargetByItemCount` 를 부르는 곳도 없다. 예전에 "게임이 양쪽을 다 쓴다" 고 적었던 것은
+  틀렸다. 그래서 효과 설명이 없는 단계(신비의 3·5·6, 여러 콤보의 3·5)는 아무 효과 없는 단계일 수
+  있고, 그 단계에도 콤보 가치가 붙고 있다. 어느 출처에서 온 단계인지는 카탈로그가 합쳐 저장해
+  아직 가르지 못했다 - 출처를 따로 적어 다시 수집해야 확정된다.
 - 개수 판정은 `GridInventory.SearchSetEffectInInventory`(서버). **배치 위치·레벨·활성 여부와
   무관하게 격자에 있는 아티팩트 전체로 카테고리를 센다.** 그래서 콤보는 배치 최적화가 아니라
   **후보 추천**에만 영향을 준다.

@@ -173,6 +173,14 @@ namespace SephPlanner.Core.Solver
         private List<FixedEffectCell>?[]? _effectsByStage;
 
         /// <summary>
+        /// 배치 점수가 효과를 직접 세는 콤보인가. 신비는 문턱에서 ×2 칸을 심을 뿐이고 그 칸은
+        /// <see cref="EffectsFor"/>로 이미 점수에 들어가므로, 일반 콤보 가치(<c>OfComboStep</c>)를
+        /// 더 얹으면 같은 이득을 두 번 센다. F2 콤보 우선은 사용자의 선택이라 여기와 무관하다.
+        /// </summary>
+        internal bool ScoresComboItself(string category) =>
+            ComboEngraving is { } rule && rule.Category == category;
+
+        /// <summary>
         /// 이 배치에서 칸에 걸려 있을 고정 효과 전부. <paramref name="byCell"/> 이 null 이면 아직
         /// 배치를 모르는 것이라 게임이 세어 둔 지금 수로 푼다. 단계마다 한 번만 짓는다.
         /// </summary>

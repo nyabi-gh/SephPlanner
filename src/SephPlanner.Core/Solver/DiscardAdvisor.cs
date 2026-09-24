@@ -112,8 +112,10 @@ namespace SephPlanner.Core.Solver
                 var before = Adjust(problem.ComboCounts, currentCounts, baselineCounts);
                 var after = Adjust(problem.ComboCounts, currentCounts, finalCounts);
                 // 고정 콤보의 전투 효과는 배치 점수에 없으므로, 단계가 달라지는 경우를 이득으로 단정하지 않는다.
+                // 신비는 예외다 - 단계가 바뀌면 사라지는 ×2 칸까지 점수가 이미 셌다.
                 if (before.Keys.Union(after.Keys).Any(key =>
                     {
+                        if (problem.ScoresComboItself(key)) return false;
                         var combo = problem.Combos?.Invoke(key);
                         return combo is null ? Count(before, key) != Count(after, key) : combo.Thresholds.Any(t =>
                             (Count(before, key) >= t) != (Count(after, key) >= t));

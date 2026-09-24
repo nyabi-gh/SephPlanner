@@ -209,7 +209,7 @@ namespace SephPlanner.Core.Solver
                     entry.Solved = outcome.Solved;
                 }
                 EvaluateCombo(
-                    entry, problem.Scale, comboCounts, combos, priorityCategories, presetCharms,
+                    entry, problem, comboCounts, combos, priorityCategories, presetCharms,
                     outcome?.DisplacedCharm);
                 advice.Add(entry);
             }
@@ -237,7 +237,7 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         private static void EvaluateCombo(
             OfferAdvice advice,
-            WorthScale scale,
+            PlacementProblem problem,
             IReadOnlyDictionary<string, int>? comboCounts,
             Func<string, ComboDefinition?>? combos,
             IReadOnlyCollection<string>? priorityCategories,
@@ -286,12 +286,12 @@ namespace SephPlanner.Core.Solver
 
                 comboCounts.TryGetValue(category, out var current);
                 var next = Math.Max(0, current + pair.Value);
-                var change = ComboValue(combo, next, scale) - ComboValue(combo, current, scale);
+                var change = ComboValue(combo, next, problem.Scale) - ComboValue(combo, current, problem.Scale);
                 if (Math.Abs(change) < 0.000001) continue;
 
                 if (CrossesUp(combo, current, next)) advice.ComboCompletes = true;
                 if (CrossesDown(combo, current, next)) advice.ComboLoses = true;
-                advice.ComboBonus += change * worth;
+                if (priority || !problem.ScoresComboItself(category)) advice.ComboBonus += change * worth;
 
                 var name = Naming.Of(combo.Names, combo.Id, "?");
                 parts.Add($"{name} {next}/{Goal(combo, next, pair.Value)}");

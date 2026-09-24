@@ -247,6 +247,103 @@ public class ComboEngravingTests
         return problem;
     }
 
+    private static ComboDefinition? MysticCombo(string id) =>
+        id == "MYSTIC" ? new ComboDefinition { Id = "MYSTIC", Thresholds = { 2, 3, 4, 5, 6 } } : null;
+
+    /// <summary>
+    /// 신비 후보의 ×2 칸은 갈래의 배치 점수가 이미 센다. 일반 콤보 보너스까지 얹으면 같은 이득을
+    /// 두 번 받는다. 문구와 완성 표시는 그대로 두고, F2 로 고른 콤보는 사용자 선택이라 남긴다.
+    /// </summary>
+    [Theory]
+    [InlineData(true, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(true, true, true)]
+    public void AMysticOfferEarnsNoGenericComboBonusWhenItsCellsAreScored(bool rule, bool priority, bool bonus)
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(6, 1, 6) };
+        if (rule) problem.ComboEngraving = Mystic(new GridPos(0, 0), new GridPos(1, 0), new GridPos(2, 0));
+        var offer = new OfferCandidate
+        {
+            DefinitionId = 900,
+            Kind = "charm",
+            Name = "m",
+            Charm = new CharmDefinition { Id = "m", EntityId = 900, MaxLevel = 5, Categories = { "MYSTIC" } },
+        };
+        var counts = new Dictionary<string, int> { ["MYSTIC"] = 1 };
+
+        var advice = OfferAdvisor.Rank(problem, new List<OfferCandidate> { offer }, int.MaxValue, counts, MysticCombo,
+            priority ? new[] { "MYSTIC" } : null).Single();
+
+        Assert.True(advice.ComboCompletes);
+        Assert.Equal(bonus, advice.ComboBonus > 0);
+    }
+
+    [Theory]
+    [InlineData(true, 0)]
+    [InlineData(false, 1)]
+    public void APaperCompletingMysticIsValuedByItsCellsOnly(bool rule, int steps)
+    {
+        var problem = new PlacementProblem
+        {
+            Grid = new GridSpec(3, 1, 3),
+            ComboCounts = new Dictionary<string, int> { ["MYSTIC"] = 3 },
+            Combos = MysticCombo,
+        };
+        if (rule) problem.ComboEngraving = Mystic(new GridPos(0, 0));
+        var paper = new CharmSlot { InstanceId = 2, Definition = new CharmDefinition { MaxLevel = 5, Behavior = "Charm_WhitePaper" } };
+        var neighbors = new Dictionary<GridPos, CharmSlot>
+        {
+            [new GridPos(0, 0)] = new CharmSlot { InstanceId = 1, Definition = new CharmDefinition { MaxLevel = 5, Categories = { "MYSTIC" } } },
+            [new GridPos(1, 0)] = paper,
+            [new GridPos(2, 0)] = new CharmSlot { InstanceId = 3, Definition = new CharmDefinition { MaxLevel = 5, Categories = { "MYSTIC" } } },
+        };
+        foreach (var pair in neighbors)
+        {
+            problem.Charms.Add(pair.Value);
+            problem.CurrentCharms[pair.Value.InstanceId] = pair.Key;
+        }
+
+        Assert.Equal(steps * problem.Scale.ComboThreshold,
+            PositionalWorth.ComboWorth(problem, paper, new GridPos(1, 0), neighbors), 9);
+    }
+
+    /// <summary>
+    /// 버리기 조언은 "콤보 효과는 점수에 없다" 며 단계가 바뀌는 제거를 막는다. 신비는 사라지는 ×2
+    /// 칸까지 점수가 셌으므로 막을 이유가 없다 - 여기서는 그 칸에 레벨이 없어 잃는 것이 없다.
+    /// </summary>
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public void DroppingAHarmfulMysticIsAdvisedWhenTheStageIsScored(bool rule, bool advised)
+    {
+        var problem = new PlacementProblem
+        {
+            Grid = new GridSpec(3, 1, 3),
+            ComboCounts = new Dictionary<string, int> { ["MYSTIC"] = 3 },
+            Combos = id => id == "MYSTIC" ? new ComboDefinition { Id = "MYSTIC", Thresholds = { 3 } } : null,
+        };
+        for (var id = 1; id <= 3; id++)
+        {
+            problem.Charms.Add(new CharmSlot
+            {
+                InstanceId = id,
+                Definition = new CharmDefinition { Id = "m" + id, EntityId = id, MaxLevel = 0, Categories = { "MYSTIC" } },
+                Worth = new CharmWorth { Base = id == 3 ? -5 : 1, PerLevel = 0 },
+            });
+            problem.CurrentCharms[id] = new GridPos(id - 1, 0);
+        }
+        if (rule)
+        {
+            var mystic = new ComboEngravingRule { Category = "MYSTIC", Query = "O MUL/2", Positions = { new GridPos(0, 0) } };
+            mystic.Tiers.Add(new ComboEngravingTier { Threshold = 3, Count = 1 });
+            problem.ComboEngraving = mystic;
+        }
+
+        var advice = DiscardAdvisor.Rank(problem, PlacementSolver.Solve(problem));
+
+        Assert.Equal(advised, advice.Any(entry => entry.InstanceId == 3));
+    }
+
     private static int CountAt(PlacementProblem problem, IReadOnlyDictionary<int, GridPos> positions) =>
         ComboCounting.CountAll(problem.Charms.Where(charm => positions.ContainsKey(charm.InstanceId))
             .ToDictionary(charm => positions[charm.InstanceId], charm => charm)).GetValueOrDefault("MYSTIC");

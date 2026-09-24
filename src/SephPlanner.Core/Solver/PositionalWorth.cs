@@ -120,7 +120,7 @@ namespace SephPlanner.Core.Solver
             var worth = 0.0;
             foreach (var category in categories)
             {
-                if (string.IsNullOrEmpty(category)) continue;
+                if (string.IsNullOrEmpty(category) || problem.ScoresComboItself(category)) continue;
 
                 var combo = problem.Combos(category);
                 if (combo is null) continue;
