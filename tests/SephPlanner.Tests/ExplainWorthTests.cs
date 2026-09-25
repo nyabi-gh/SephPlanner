@@ -78,6 +78,7 @@ public class ExplainWorthTests
 
             Assert.True(ScalesPosition.IsSideBound(definition), behavior);
             Assert.Contains("지금 놓인 쪽을 유지합니다", Text(definition));
+            Assert.Equal(behavior == "Charm_FireIce", Text(definition).Contains("우선 콤보"));
         }
     }
 }

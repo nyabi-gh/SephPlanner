@@ -84,7 +84,7 @@ namespace SephPlanner.Core.Runtime
                 return AutoPlaceDecision.Deny(
                     $"석판 {plan.Best.UnplacedTablets}개를 놓을 자리가 없어 자동 배치를 실행하지 않습니다.");
             if (plan.Best.WrongSideCharms.Count > 0)
-                return AutoPlaceDecision.Deny("대립의 천칭이 현재 놓인 쪽을 유지하지 못해 자동 배치를 실행하지 않습니다.");
+                return AutoPlaceDecision.Deny("대립의 천칭을 있어야 할 쪽에 두지 못해 자동 배치를 실행하지 않습니다.");
             if (plan.Best.UnretainedCharms.Count > 0)
                 return AutoPlaceDecision.Deny("사용 유지 조건을 만족하는 배치를 찾지 못해 자동 배치를 실행하지 않습니다.");
             if (plan.HasUnapprovedDeactivation || !ActivationPolicy.AllowsTransition(plan.Current, plan.Best))

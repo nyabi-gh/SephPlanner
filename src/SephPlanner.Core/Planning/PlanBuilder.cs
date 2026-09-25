@@ -315,6 +315,9 @@ namespace SephPlanner.Core.Planning
                     IsSupportTarget = definition is not null && preferences.SupportTargets.Contains(item.DefinitionId),
                     Retained = definition is not null && preferences.RetainedCharms.Contains(item.DefinitionId),
                     AllowDeactivation = definition is not null && preferences.DeactivationAllowed.Contains(item.DefinitionId),
+                    PreferredLeft = definition is not null && item.Arrived
+                        ? ScalesPosition.PreferredLeft(definition, preferences.PriorityCategories)
+                        : null,
                 };
                 if (definition is not null)
                 {
@@ -396,7 +399,7 @@ namespace SephPlanner.Core.Planning
                         (best.CharmPositions.TryGetValue(charm.InstanceId, out var cell) && best.InactiveCells.TryGetValue(cell, out var reason)
                             ? Explain.InactiveReason(reason) : "놓을 자리가 부족합니다.") +
                         (unapprovedDeactivation ? " 끄기 허용 없이 새로 비활성화하는 배치는 적용하지 않습니다." : ""))
-                    .Concat(best.WrongSideCharms.Select(_ => "대립의 천칭: 현재 놓인 쪽을 유지하는 배치를 찾지 못했습니다. 직접 원하는 쪽으로 옮긴 뒤 다시 계산하세요."))
+                    .Concat(best.WrongSideCharms.Select(_ => "대립의 천칭: 있어야 할 쪽에 두는 배치를 찾지 못했습니다. 직접 원하는 쪽으로 옮긴 뒤 다시 계산하세요."))
                     .Concat(DormantPreferences(problem)).ToList(),
                 ManualMoveInstructionsAvailable = manualMovesAvailable,
                 HasPlacementChanges = hasPlacementChanges,

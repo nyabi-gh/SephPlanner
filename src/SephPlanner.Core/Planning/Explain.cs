@@ -40,6 +40,9 @@ namespace SephPlanner.Core.Planning
                 lines.Add("가방의 어느 편에 있느냐로 주는 것이 달라집니다. 왼쪽은 1~3열, 오른쪽은 4열 "
                           + "이후이며 지금 놓인 쪽을 유지합니다. 바꾸려면 직접 반대쪽으로 옮기세요. "
                           + "좌우 중 어느 쪽이 나은지는 비교하지 않습니다.");
+            if (ScalesPosition.FollowsPriority(definition))
+                lines.Add("새로 얻어 아직 옮기지 않은 천칭은 우선 콤보에 잉걸불만 있으면 왼쪽, 빙하만 있으면 "
+                          + "오른쪽으로 보냅니다.");
 
             if (definition.GrowthQuestGoal > 0)
                 lines.Add("다 키우면 다른 아티팩트가 됩니다. 얼마나 키웠는지에 따라 값어치를 그쪽으로 끌어올려 평가합니다.");

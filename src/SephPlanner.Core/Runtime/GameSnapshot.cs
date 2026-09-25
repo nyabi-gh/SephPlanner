@@ -166,6 +166,12 @@ namespace SephPlanner.Core.Runtime
         public bool Immovable { get; set; }
 
         /// <summary>
+        /// 세션 도중 가방에 들어와 아직 한 번도 옮겨지지 않았다(<see cref="ItemArrivals"/>). 게임이 넣어 준
+        /// 자리 그대로라 사용자가 고른 자리로 보지 않는다. 이 항목이 없던 자료에서는 거짓으로 읽힌다.
+        /// </summary>
+        public bool Arrived { get; set; }
+
+        /// <summary>
         /// 성장 아티팩트가 목표까지 얼마나 왔는지. <c>null</c> 은 읽지 못했다는 뜻이며 0 과 다르다.
         ///
         /// 게임은 이 값을 서버에만 두고 소유자 화면에는 문자열로만 보낸다(<c>SetEffectHUDValue</c>).

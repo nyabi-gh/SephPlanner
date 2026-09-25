@@ -81,6 +81,12 @@ namespace SephPlanner.Core.Solver
         public bool Retained { get; set; }
         public bool AllowDeactivation { get; set; }
 
+        /// <summary>
+        /// 새로 들어온 대립의 천칭이 가야 할 편(<see cref="ScalesPosition.PreferredLeft"/>). 참이면 왼편이다.
+        /// 없으면 지금 놓인 편을 지킨다.
+        /// </summary>
+        public bool? PreferredLeft { get; set; }
+
         private CharmCriteriaKind? _criteria;
 
         /// <summary>
@@ -114,6 +120,7 @@ namespace SephPlanner.Core.Solver
             IsSupportTarget = IsSupportTarget,
             Retained = Retained,
             AllowDeactivation = AllowDeactivation,
+            PreferredLeft = PreferredLeft,
         };
     }
 
