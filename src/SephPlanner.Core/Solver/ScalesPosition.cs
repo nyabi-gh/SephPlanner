@@ -25,7 +25,9 @@ namespace SephPlanner.Core.Solver
         /// 새로 들어오면 우선 콤보로 편을 고르는 아티팩트. 대립의 천칭뿐이다 - 영원의 식은 편에 따라
         /// 바뀌는 것이 속성 피해가 아니라 무기 연동이라 콤보로 고를 수 없다.
         /// </summary>
-        public static bool FollowsPriority(CharmDefinition definition) => definition.Behavior == "Charm_FireIce";
+        public static bool FollowsPriority(CharmDefinition definition) => FollowsPriority(definition.Behavior);
+
+        public static bool FollowsPriority(string behavior) => behavior == "Charm_FireIce";
 
         /// <summary>
         /// 새로 들어온 대립의 천칭이 갈 편. 게임은 왼편에서 화염, 오른편에서 얼음 피해를 크게 준다. 우선

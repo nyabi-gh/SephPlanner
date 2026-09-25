@@ -40,7 +40,6 @@ namespace SephPlanner.Plugin
         private BuildWindow _build;
         private PluginPreferences _prefs;
         private bool _newRunPending;
-        private readonly ItemArrivals _arrivals = new ItemArrivals();
         private PlanRunner _runner;
         private GameSnapshot _lastSnapshot;
         private DiagnosticConsentWindow _diagnosticWindow;
@@ -404,7 +403,7 @@ namespace SephPlanner.Plugin
                     avatar.Inventory, avatar, _settings.OfferRadius.Value, capture.DirectoryPath, DumpSectionFailed);
             }, legacy: true);
             capture.Collect("inventory-snapshot.json", () => GameReader.FindLocalPlayer()?.Inventory == null ? null :
-                InventoryDiagnostics.WriteSnapshot(ReadSnapshot(), capture.DirectoryPath), legacy: true);
+                InventoryDiagnostics.WriteSnapshot(GameReader.Read(_settings.OfferRadius.Value), capture.DirectoryPath), legacy: true);
             capture.Collect("plan.replay", () =>
             {
                 var replay = _runner?.CaptureReplay();
@@ -807,7 +806,7 @@ namespace SephPlanner.Plugin
             try
             {
                 var step = FrameCost.Now;
-                var snapshot = ReadSnapshot(_settings.Recommendations.Value);
+                var snapshot = GameReader.Read(_settings.OfferRadius.Value, _settings.Recommendations.Value);
                 FrameCost.Read.Add(step);
 
                 step = FrameCost.Now;
@@ -840,18 +839,7 @@ namespace SephPlanner.Plugin
         private void StartSession(bool isSaved)
         {
             if (!isSaved) _newRunPending = true;
-            _arrivals.Reset();
-        }
-
-        /// <summary>
-        /// 게임 상태를 읽고 새로 들어온 아이템을 표시한다. 계획 지문이 그 표시를 보므로 폴링과 자동 배치가
-        /// 같은 길로 읽어야 한다.
-        /// </summary>
-        private GameSnapshot ReadSnapshot(bool includeRecommendations = true)
-        {
-            var snapshot = GameReader.Read(_settings.OfferRadius.Value, includeRecommendations);
-            _arrivals.Mark(snapshot.Inventory);
-            return snapshot;
+            GameReader.ForgetArrivals();
         }
 
         /// <summary>
@@ -1451,7 +1439,7 @@ namespace SephPlanner.Plugin
                     return;
                 }
 
-                var snapshot = ReadSnapshot(_settings.Recommendations.Value);
+                var snapshot = GameReader.Read(_settings.OfferRadius.Value, _settings.Recommendations.Value);
                 VerifySimulation(GameReader.CheckSimulation());
                 FeedNativePanel(snapshot);
 

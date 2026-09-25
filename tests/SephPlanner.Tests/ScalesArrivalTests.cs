@@ -87,63 +87,123 @@ public class ScalesArrivalTests
         Assert.Equal(Dropped, Planned(snapshot, Priority("EMBER")));
     }
 
+    private static bool Sided(PlacedItem item) => item.DefinitionId == 1144;
+
     [Fact]
     public void OnceMovedTheScalesKeepsWhereverItWasMovedTo()
     {
         var arrivals = new ItemArrivals();
         var snapshot = Snapshot();
-        arrivals.Mark(snapshot.Inventory);
+        arrivals.Mark(snapshot.Inventory, Sided);
         var scales = Scales();
         snapshot.Inventory!.Items.Add(scales);
-        arrivals.Mark(snapshot.Inventory);
+        arrivals.Mark(snapshot.Inventory, Sided);
         var ember = Priority("EMBER");
 
         var target = Planned(snapshot, ember);
         Assert.True(ScalesPosition.IsLeft(target));
 
         scales.Position = target;
-        arrivals.Mark(snapshot.Inventory);
+        arrivals.Mark(snapshot.Inventory, Sided);
         Assert.False(scales.Arrived);
 
         // 사용자가 도로 오른편에 두면 그것이 사용자의 편이다.
         scales.Position = new GridPos(5, 0);
-        arrivals.Mark(snapshot.Inventory);
+        arrivals.Mark(snapshot.Inventory, Sided);
         Assert.False(scales.Arrived);
         Assert.False(ScalesPosition.IsLeft(Planned(snapshot, ember)));
     }
 
     [Fact]
-    public void OnlyItemsThatCameInDuringTheSessionAndStayPutAreArrivals()
+    public void OnlyTrackedItemsThatCameInDuringTheSessionAndStayPutAreArrivals()
     {
         var arrivals = new ItemArrivals();
-        arrivals.Mark(null);
+        arrivals.Mark(null, Sided);
         var snapshot = Snapshot();
         var existing = snapshot.Inventory!.Items[0];
-        arrivals.Mark(snapshot.Inventory);
-        Assert.False(existing.Arrived);
+        arrivals.Mark(snapshot.Inventory, Sided);
 
         var scales = Scales();
-        var companion = new PlacedItem { DefinitionId = 1, InstanceId = -3, Position = new GridPos(2, 0), Immovable = true };
-        snapshot.Inventory.Items.Add(scales);
-        snapshot.Inventory.Items.Add(companion);
-        arrivals.Mark(snapshot.Inventory);
-        arrivals.Mark(snapshot.Inventory);
+        var picked = new PlacedItem { DefinitionId = 1, InstanceId = 11, Position = new GridPos(2, 0) };
+        var companion = new PlacedItem { DefinitionId = 1144, InstanceId = -3, Position = new GridPos(3, 0), Immovable = true };
+        snapshot.Inventory.Items.AddRange(new[] { scales, picked, companion });
+        arrivals.Mark(snapshot.Inventory, Sided);
+        arrivals.Mark(snapshot.Inventory, Sided);
         Assert.True(scales.Arrived);
+        Assert.False(picked.Arrived);
         Assert.False(companion.Arrived);
         Assert.False(existing.Arrived);
 
         scales.Position = new GridPos(5, 0);
-        arrivals.Mark(snapshot.Inventory);
+        arrivals.Mark(snapshot.Inventory, Sided);
         scales.Position = Dropped;
-        arrivals.Mark(snapshot.Inventory);
+        arrivals.Mark(snapshot.Inventory, Sided);
         Assert.False(scales.Arrived);
+    }
 
-        var other = Scales();
-        other.InstanceId = 8;
-        snapshot.Inventory.Items.Add(other);
+    /// <summary>
+    /// 저장된 판은 아바타가 빈 가방으로 생긴 뒤에 채워진다. 그 빈 가방을 기준으로 삼으면 사용자가 전 판에
+    /// 둔 천칭까지 새로 들어온 것이 된다.
+    /// </summary>
+    [Fact]
+    public void AnEmptyBagBeforeTheSaveIsRestoredIsNotTheBaseline()
+    {
+        var arrivals = new ItemArrivals();
+        arrivals.Mark(new InventoryState { Width = 6, Height = 1, Storage = 6 }, Sided);
+
+        var restored = Snapshot();
+        var scales = Scales();
+        restored.Inventory!.Items.Add(scales);
+        arrivals.Mark(restored.Inventory, Sided);
+
+        Assert.False(scales.Arrived);
+        Assert.Equal(Dropped, Planned(restored, Priority("EMBER")));
+
+        var picked = Scales();
+        picked.InstanceId = 8;
+        picked.Position = new GridPos(5, 0);
+        restored.Inventory.Items.Add(picked);
+        arrivals.Mark(restored.Inventory, Sided);
+        Assert.True(picked.Arrived);
+
         arrivals.Reset();
-        arrivals.Mark(snapshot.Inventory);
-        Assert.False(other.Arrived);
+        arrivals.Mark(restored.Inventory, Sided);
+        Assert.False(picked.Arrived);
+    }
+
+    /// <summary>
+    /// 자동 배치가 새 천칭을 옮기지 않았으면 적용 뒤에도 새로 들어온 채다. 예상 판이 그것을 빠뜨리면
+    /// "계획 그대로"를 알아보지 못해 처음부터 다시 푼다.
+    /// </summary>
+    [Fact]
+    public void AnArrivalTheApplyDidNotMoveStillCountsAsThePlannedLayout()
+    {
+        var before = Snapshot();
+        var scales = Scales();
+        scales.Position = new GridPos(0, 0);
+        scales.EffectiveLevel = 1;
+        scales.Arrived = true;
+        before.Inventory!.Items.Add(scales);
+        var preferences = Priority("EMBER");
+        var plan = PlanBuilder.Build(before, Catalog(), preferences)!;
+        var context = PlanFingerprint.PlanningContext(preferences, "generation");
+        plan.PlanningContextFingerprint = context;
+        Assert.Equal(scales.Position, plan.Best.CharmPositions[ScalesId]);
+
+        var after = Snapshot();
+        after.Inventory!.Items.Clear();
+        foreach (var item in before.Inventory.Items)
+            after.Inventory.Items.Add(new PlacedItem
+            {
+                DefinitionId = item.DefinitionId,
+                InstanceId = item.InstanceId,
+                Position = plan.Best.CharmPositions[item.InstanceId],
+                IsActive = true,
+                Arrived = item.Arrived && plan.Best.CharmPositions[item.InstanceId] == item.Position,
+            });
+
+        Assert.True(AppliedPlacement.Settled(
+            plan, before, after, PlanFingerprint.Placement(after, context), context));
     }
 
     [Fact]

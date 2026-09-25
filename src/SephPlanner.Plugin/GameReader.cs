@@ -4,6 +4,7 @@ using Mirror;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
+using SephPlanner.Core.Solver;
 using SephPlanner.Core.Tablets;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -13,6 +14,19 @@ namespace SephPlanner.Plugin
     /// <summary>살아 있는 게임 상태를 스냅샷으로 옮긴다. 읽기만 한다.</summary>
     internal static class GameReader
     {
+        private static readonly ItemArrivals Arrivals = new ItemArrivals();
+        private static GridInventory _arrivalsOf;
+
+        /// <summary>
+        /// 새로 들어온 아이템의 기준을 다시 잡는다. 세션 신호가 오지 않아도 가방이 바뀌면
+        /// <see cref="ReadInventory"/> 가 같은 일을 한다 - 층을 내려가도 가방은 그대로다.
+        /// </summary>
+        internal static void ForgetArrivals()
+        {
+            Arrivals.Reset();
+            _arrivalsOf = null;
+        }
+
         /// <summary>
         /// 항상 스냅샷을 돌려준다. 런이 끝났거나 플레이어가 죽었으면 인벤토리가 비어 있는 스냅샷이다.
         /// 이 상태를 넘겨야 HUD에서 직전 런의 배치를 지울 수 있다.
@@ -248,6 +262,7 @@ namespace SephPlanner.Plugin
 
             var grid = GridOf(inv);
             var seenItems = new HashSet<int>();
+            var sided = new HashSet<int>();
             foreach (var pair in inv.inventoryMatrix)
             {
                 var instance = pair.Value;
@@ -261,6 +276,8 @@ namespace SephPlanner.Plugin
 
                 var identity = ItemIdentity.Of(instance.InstanceID, grid, instance.XIdx, instance.YIdx);
                 if (!seenItems.Add(identity)) continue;
+                if (instance.Charm != null && ScalesPosition.FollowsPriority(instance.Charm.GetType().Name))
+                    sided.Add(identity);
 
                 state.Items.Add(new PlacedItem
                 {
@@ -311,6 +328,14 @@ namespace SephPlanner.Plugin
 
             state.FixedEffects.AddRange(layer.Cells);
             state.ComboEngraving = layer.ComboEngraving;
+
+            // 모든 읽기가 여기를 지나야 계획과 자동 배치 직전의 지문이 같다.
+            if (!ReferenceEquals(_arrivalsOf, inv))
+            {
+                Arrivals.Reset();
+                _arrivalsOf = inv;
+            }
+            Arrivals.Mark(state, item => sided.Contains(item.InstanceId));
 
             return state;
         }
