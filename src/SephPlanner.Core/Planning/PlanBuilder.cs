@@ -305,7 +305,7 @@ namespace SephPlanner.Core.Planning
                     IsFiller = definition is null,
                     Immovable = item.Immovable,
                     LevelCap = definition is not null &&
-                               preferences.LevelCaps.TryGetValue(item.DefinitionId, out var cap) ? cap : 0,
+                               preferences.LevelCaps.TryGetValue(item.DefinitionId, out var cap) ? cap : null,
                     IsDormant = definition is not null && WeaponMatch.IsDormant(definition, weapon),
                     Weight = definition is not null &&
                              preferences.PinnedCharms.TryGetValue(item.DefinitionId, out var pin)

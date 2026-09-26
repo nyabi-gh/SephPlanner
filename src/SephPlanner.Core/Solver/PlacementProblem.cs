@@ -42,9 +42,9 @@ namespace SephPlanner.Core.Solver
         public bool IsFiller { get; set; }
 
         /// <summary>
-        /// 사용자가 건 레벨 제한(<see cref="Planning.PlanPreferences.LevelCaps"/>). 0 이면 없다.
+        /// 사용자가 건 레벨 제한(<see cref="Planning.PlanPreferences.LevelCaps"/>). 없으면 null 이다.
         /// </summary>
-        public int LevelCap { get; set; }
+        public int? LevelCap { get; set; }
 
         /// <summary>
         /// 이 아티팩트의 값을 세는 레벨 상한. 게임의 상한과 사용자 제한 중 낮은 쪽이다.
@@ -52,7 +52,7 @@ namespace SephPlanner.Core.Solver
         /// 그쪽은 게임 사실이고 이것은 우리 선호다.
         /// </summary>
         public int WorthLevelCap =>
-            LevelCap > 0 ? System.Math.Min(Definition.MaxLevel, LevelCap) : Definition.MaxLevel;
+            LevelCap is int cap && cap >= 0 ? System.Math.Min(Definition.MaxLevel, cap) : Definition.MaxLevel;
 
         /// <summary>
         /// 지금 칸에서 옮길 수 없다(<see cref="Runtime.PlacedItem.Immovable"/>). 배정에서 빼고

@@ -721,8 +721,10 @@ namespace SephPlanner.Plugin.Ui
                     lines.Add("침·모래시계·별조각 우선: 이 아이템을 우선 강화합니다. 콤보 지정과 강화칸 우선·양보보다 먼저 적용됩니다.");
                 if (frame.Prefs != null && frame.Prefs.IsDeactivationAllowed(charmId))
                     lines.Add("끄기 허용: 배치 이득이 있으면 효과를 꺼도 됩니다. 항상 끄지는 않으며 사용 유지가 함께 켜져 있으면 효과를 유지합니다.");
-                if (frame.Prefs != null && frame.Prefs.LevelCap(charmId) > 0)
-                    lines.Add($"목표 레벨: {frame.Prefs.LevelCap(charmId)}레벨까지만 이득으로 평가합니다. 실제 배치 레벨은 더 높을 수 있습니다.");
+                if (frame.Prefs?.LevelCap(charmId) is int cap)
+                    lines.Add(cap == 0
+                        ? "목표 레벨: 0레벨로 평가해 효과만 켜 두고 레벨 이득은 세지 않습니다. 실제 배치 레벨은 더 높을 수 있습니다."
+                        : $"목표 레벨: {cap}레벨까지만 이득으로 평가합니다. 실제 배치 레벨은 더 높을 수 있습니다.");
                 return Explain.Join(lines);
             });
         }

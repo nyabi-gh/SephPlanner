@@ -425,7 +425,7 @@ namespace SephPlanner.Plugin.Ui
                 + "민트색 버튼은 켜진 설정입니다. 설정은 같은 종류의 아이템 모두에 적용됩니다.\n"
                 + "사용 유지: 효과와 지원 연결을 지키고 제거·교체 추천에서 보호합니다. 끄기 허용: 이득이 있으면 효과를 꺼도 됩니다. 둘 다 켜면 사용 유지가 우선합니다.\n"
                 + "침·모래시계·별조각 우선: 이 아이템을 우선 강화합니다. 콤보 지정과 강화칸 우선·양보보다 먼저 적용하며, 연결을 찾지 못하면 이유를 알립니다.\n"
-                + "목표 레벨: 그 레벨까지만 이득으로 평가합니다. 실제 레벨을 제한하지는 않습니다. 좌클릭으로 올리고 우클릭으로 내립니다.\n"
+                + "목표 레벨: 그 레벨까지만 이득으로 평가합니다. 0레벨은 효과만 켜 두고 레벨 이득은 세지 않습니다. 실제 레벨을 제한하지는 않습니다. 좌클릭으로 올리고 우클릭으로 내립니다.\n"
                 + "조건 무시 칸: 배치 조건을 무시하는 칸을 요구합니다. 좌표 고정은 아닙니다. 양보도 효과 끄기나 침 연결 금지는 아닙니다.").ToString();
         }
 
@@ -653,7 +653,7 @@ namespace SephPlanner.Plugin.Ui
 
             /// <summary>이 가방에서 침·모래시계의 대상이 될 수 있는가. 아니면 버튼을 걸지 않는다.</summary>
             public bool CanSupport;
-            public int LevelCap;
+            public int? LevelCap;
             public bool Retained;
             public bool AllowDeactivation;
         }
@@ -738,8 +738,8 @@ namespace SephPlanner.Plugin.Ui
                 Widgets.SetActive(_deactivation, entry.EntityId != 0);
                 _support.color = entry.SupportTarget ? NativeSkin.Mint : NativeSkin.TextDim;
                 Widgets.SetActive(_support, entry.EntityId != 0 && (entry.CanSupport || entry.SupportTarget));
-                _cap.text = entry.LevelCap > 0 ? "목표 " + entry.LevelCap + "레벨" : "목표 레벨";
-                _cap.color = entry.LevelCap > 0 ? NativeSkin.Mint : NativeSkin.TextDim;
+                _cap.text = entry.LevelCap is int cap ? "목표 " + cap + "레벨" : "목표 레벨";
+                _cap.color = entry.LevelCap.HasValue ? NativeSkin.Mint : NativeSkin.TextDim;
                 Widgets.SetActive(_cap, entry.EntityId != 0);
                 _hold.color = entry.Held ? NativeSkin.Mint : NativeSkin.TextDim;
                 Widgets.SetActive(_hold, entry.EntityId != 0);

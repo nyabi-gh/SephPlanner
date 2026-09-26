@@ -156,21 +156,21 @@ namespace SephPlanner.Plugin
             Changed();
         }
 
-        public int LevelCap(int entityId) =>
-            entityId != 0 && LevelCaps.TryGetValue(entityId, out var level) ? level : 0;
+        public int? LevelCap(int entityId) =>
+            entityId != 0 && LevelCaps.TryGetValue(entityId, out var level) && level >= 0 ? level : (int?)null;
 
         /// <summary>
-        /// 레벨 제한을 한 단계 옮긴다. 없음 → 1 → 2 → … → <paramref name="maxLevel"/> 직전까지
+        /// 레벨 제한을 한 단계 옮긴다. 없음 → 0 → 1 → … → <paramref name="maxLevel"/> 직전까지
         /// 돌고 다시 없음이다. 상한과 같은 제한은 제한이 아니므로 목록에 두지 않는다.
         /// </summary>
         public void StepLevelCap(int entityId, int direction, int maxLevel)
         {
             if (entityId == 0 || direction == 0) return;
 
-            var highest = Math.Max(1, maxLevel - 1);
-            var next = LevelCap(entityId) + Math.Sign(direction);
-            if (next < 0) next = highest;
-            if (next <= 0 || next > highest) LevelCaps.Remove(entityId);
+            var highest = maxLevel - 1;
+            var current = LevelCap(entityId);
+            var next = current is int level ? level + Math.Sign(direction) : direction > 0 ? 0 : highest;
+            if (next < 0 || next > highest) LevelCaps.Remove(entityId);
             else LevelCaps[entityId] = next;
             Changed();
         }

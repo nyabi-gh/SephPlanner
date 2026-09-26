@@ -203,6 +203,35 @@ public class PlanBuilderTests
         Assert.NotEqual(new GridPos(1, 0), capped.Best.CharmPositions[10]);
     }
 
+    [Fact]
+    public void ALevelCapOfZeroGivesAwayEveryLevel()
+    {
+        var catalog = new Catalog(
+            new[] { new TabletDefinition { Id = "T", EntityId = TabletEntity, Query = "RIGHT 2" } },
+            new[]
+            {
+                new CharmDefinition { Id = "A", EntityId = CharmEntity, MaxLevel = 5 },
+                new CharmDefinition { Id = "B", EntityId = CharmEntity + 1, MaxLevel = 5 },
+            });
+
+        var snapshot = Snapshot();
+        snapshot.Inventory!.Items.Clear();
+        snapshot.Inventory.LevelMatrix.Clear();
+        snapshot.Inventory.Items.Add(new PlacedItem
+        { DefinitionId = CharmEntity, InstanceId = 10, Position = new GridPos(1, 0), EffectiveLevel = 2, IsActive = true });
+        snapshot.Inventory.Items.Add(new PlacedItem
+        { DefinitionId = CharmEntity + 1, InstanceId = 11, Position = new GridPos(2, 0), IsActive = true });
+        snapshot.Inventory.LevelMatrix["1,0"] = 2;
+
+        var capped = PlanBuilder.Build(snapshot, catalog, new PlanPreferences
+        {
+            LevelCaps = { [CharmEntity] = 0 },
+        })!;
+
+        Assert.Equal(new GridPos(1, 0), capped.Best.CharmPositions[11]);
+        Assert.NotEqual(new GridPos(1, 0), capped.Best.CharmPositions[10]);
+    }
+
     /// <summary>제한을 걸지 않으면 지문이 그대로여야 한다. 옛 재현 자료가 거부되면 안 된다.</summary>
     [Fact]
     public void ALevelCapOnlyEntersTheFingerprintWhenItIsSet()
