@@ -1200,7 +1200,7 @@ namespace SephPlanner.Plugin.Ui
                     return;
                 }
 
-                _level.text = star + (effective > 0 ? "+" + effective : effective.ToString());
+                _level.text = star + Explain.Level(effective);
 
                 // 상한을 넘겨 흘리는 레벨은 값어치가 없다. 색으로만 알린다.
                 _level.color = level > effective ? NativeSkin.Orange : NativeSkin.TextBright;

@@ -68,6 +68,17 @@ public class ExplainWorthTests
         Assert.Contains("무기를 바꾸면", warnings[0]);
     }
 
+    [Theory]
+    [InlineData(3, 3, "+3")]
+    [InlineData(2, 3, "+2~+3")]
+    [InlineData(0, 0, "0")]
+    [InlineData(-1, 2, "-1~+2")]
+    public void GroupedLevelsShowTheirWholeRange(int lowest, int highest, string expected)
+    {
+        // 제보 ae100e4c: 중화제 흑 셋이 3·3·2 인데 빌드 창은 가장 높은 +3 만 적었다.
+        Assert.Equal(expected, Explain.LevelRange(lowest, highest));
+    }
+
     [Fact]
     public void BothSideBoundCharmsSayTheyKeepTheirSide()
     {

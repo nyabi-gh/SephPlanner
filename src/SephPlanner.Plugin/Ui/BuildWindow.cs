@@ -483,6 +483,7 @@ namespace SephPlanner.Plugin.Ui
                     {
                         existing.Count++;
                         existing.Level = Mathf.Max(existing.Level, level);
+                        existing.LowestLevel = Mathf.Min(existing.LowestLevel, level);
                         continue;
                     }
 
@@ -493,6 +494,7 @@ namespace SephPlanner.Plugin.Ui
                         Name = string.IsNullOrEmpty(name) ? "아티팩트" : name,
                         Count = 1,
                         Level = level,
+                        LowestLevel = level,
                         Selected = _prefs.IsPinned(entityId),
                         Mark = PinMark(_prefs.PinLevel(entityId)),
                         Held = _prefs.IsHeld(entityId),
@@ -550,7 +552,7 @@ namespace SephPlanner.Plugin.Ui
                 if (entry.Detail.Length == 0)
                 {
                     entry.Detail = (favorites.Contains(entityId) ? "빌드  " : "") +
-                                   (entry.Level > 0 ? "+" + entry.Level : entry.Level.ToString()) +
+                                   Explain.LevelRange(entry.LowestLevel, entry.Level) +
                                    (entry.Count > 1 ? "  x" + entry.Count : "");
                 }
                 _entries.Add(entry);
@@ -641,6 +643,7 @@ namespace SephPlanner.Plugin.Ui
             public string Mark;
             public int Count;
             public int Level;
+            public int LowestLevel;
 
             /// <summary>제한 해제 칸에 고정돼 있는가. 아티팩트 줄에만 뜻이 있다.</summary>
             public bool Held;

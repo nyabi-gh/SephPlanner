@@ -196,6 +196,15 @@ namespace SephPlanner.Core.Planning
                   + "정해져 있습니다. 배치와 점수는 지금 열린 칸으로만 계산합니다."
                 : "";
 
+        public static string Level(int level) => level > 0 ? "+" + level : level.ToString();
+
+        /// <summary>
+        /// 같은 종류 여럿을 한 줄로 묶었을 때의 레벨. 가장 높은 것 하나만 적으면 나머지도 그
+        /// 레벨인 줄 안다 - 제보 ae100e4c 는 +3 을 보고 레벨 2 인 셋째를 배치 탓으로 여겼다.
+        /// </summary>
+        public static string LevelRange(int lowest, int highest) =>
+            lowest == highest ? Level(lowest) : Level(lowest) + "~" + Level(highest);
+
         /// <summary>지금 집을 수 있는 후보 하나. 왜 그 자리에 있는지를 순위 대신 설명한다.</summary>
         public static List<string> Offer(OfferAdvice advice, int gold, CharmValueBook? values)
         {
