@@ -206,8 +206,9 @@ namespace SephPlanner.Plugin.Ui
         }
 
         /// <summary>
-        /// 휠과 이전·다음 키. 게임의 창들처럼 <c>UIInputModule</c> 의 탭 동작을 읽으므로 키를 바꾼
-        /// 사람에게도 그 키로 듣고, 이 동작에는 패드 LB/RB 도 묶여 있다.
+        /// 휠과 이전·다음 키. 게임의 창들(<c>UI_HardModePanel</c>)처럼 키보드는 <c>UIInputModule</c> 의
+        /// 탭 동작을 읽어 키를 바꾼 사람에게도 그 키로 듣고, 패드는 LB/RB 를 직접 읽는다. 게임에는
+        /// Player 맵(Q 만)과 UI 맵(Q·LB) 의 PrevTab 이 둘 다 있고 이 동작이 어느 쪽인지는 확인하지 못했다.
         /// </summary>
         public void PollPaging()
         {
@@ -215,12 +216,15 @@ namespace SephPlanner.Plugin.Ui
 
             var module = UIInputModule.current;
             var keyboard = Keyboard.current;
-            var previous = module != null
-                ? module.prevTabAction.action.WasPressedThisFrame()
-                : keyboard != null && keyboard.qKey.wasPressedThisFrame;
-            var next = module != null
-                ? module.nextTabAction.action.WasPressedThisFrame()
-                : keyboard != null && keyboard.eKey.wasPressedThisFrame;
+            var pad = Gamepad.current;
+            var previous = (module != null
+                    ? module.prevTabAction.action.WasPressedThisFrame()
+                    : keyboard != null && keyboard.qKey.wasPressedThisFrame)
+                || (pad != null && pad.leftShoulder.wasPressedThisFrame);
+            var next = (module != null
+                    ? module.nextTabAction.action.WasPressedThisFrame()
+                    : keyboard != null && keyboard.eKey.wasPressedThisFrame)
+                || (pad != null && pad.rightShoulder.wasPressedThisFrame);
 
             var mouse = Mouse.current;
             var wheel = mouse != null ? mouse.scroll.ReadValue().y : 0f;
