@@ -230,7 +230,11 @@ namespace SephPlanner.Plugin
             // 화면 스위치 밖이어야 한다. 화면을 끈 뒤 이 키까지 죽으면 되켤 길이 없다.
             if (_settings.SettingsKey.Value.IsDown()) ToggleWindow(_window, _settings.SettingsKey, "설정 창");
             if (_settings.BuildKey.Value.IsDown()) ToggleWindow(_build, _settings.BuildKey, "빌드 창");
-            if (_build.IsOpen && !_window.IsOpen && RightClicked()) _build.RightClick(Cursor());
+            if (_build.IsOpen && !_window.IsOpen)
+            {
+                if (RightClicked()) _build.RightClick(Cursor());
+                _build.PollPaging();
+            }
             HandlePadInput();
             if (_settings.Panel.Value)
             {

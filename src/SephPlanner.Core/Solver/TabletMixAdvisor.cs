@@ -31,24 +31,16 @@ namespace SephPlanner.Core.Solver
         public int TurnsA { get; set; }
         public int TurnsB { get; set; }
 
-        /// <summary>같은 석판이 여럿이라 어느 것을 넣어도 결과가 같다.</summary>
-        public bool AnyOfSameKind { get; set; }
-
         /// <summary>
-        /// 재료 둘이 같은 석판이다. 합성 창에서 어느 쪽이 A 인지 짚을 수 없고, 한쪽을 돌리느냐
-        /// 다른 쪽을 돌리느냐에 따라 결과가 달라질 수 있어 횟수 대신 두 석판의 사이 각도로 말한다.
+        /// 먼저 넣어 돌릴 쪽이 B 다. 한쪽만 돌리므로 돌릴 것을 ① 로 부른다 - 창에 그것만 들어 있을
+        /// 때 돌리면 같은 석판 둘이어도 어느 쪽인지 헷갈릴 일이 없다.
         /// </summary>
-        public bool SameKind { get; set; }
+        public bool TurnBFirst => TurnsB > 0;
 
-        /// <summary>
-        /// 같은 석판이 가방에서 서로 다른 방향으로 놓여 있어, 돌릴 횟수가 어느 것을 넣느냐에 따라
-        /// 다르다. 화면에 어느 것인지 짚을 수 없으므로 이때는 횟수 대신 모양으로 말한다.
-        /// </summary>
-        public bool TurnsDependOnPick { get; set; }
+        public int Turns => TurnsA + TurnsB;
 
-        /// <summary>같은 석판 둘로 만든 같은 합성인지 가르는 열쇠와, 그 순서로 적은 돌릴 횟수.</summary>
+        /// <summary>같은 석판 둘로 만든 같은 합성인지 가르는 열쇠.</summary>
         internal string Kind { get; set; } = "";
-        internal (int, int) KindTurns { get; set; }
 
         /// <summary>합성했을 때의 점수 증가분. 재료 둘이 사라지고 결과 하나가 생기는 것까지 반영된다.</summary>
         public double Gain { get; set; }
@@ -163,27 +155,18 @@ namespace SephPlanner.Core.Solver
         }
 
         /// <summary>
-        /// 같은 석판 둘로 만든 같은 합성은 한 줄로 합친다. 화면은 이름만 보여 주므로 둘은 사람
-        /// 눈에 같은 줄이고, 세 줄뿐인 자리에서 다른 조합을 밀어낸다.
+        /// 같은 석판 둘로 만든 같은 합성은 한 줄로 합친다. 줄마다 실제 재료 둘을 격자에서 짚으므로
+        /// 덜 돌려도 되는 쌍을 남긴다.
         /// </summary>
-        private static List<MixAdvice> OnePerKind(List<MixAdvice> advice)
-        {
-            var kept = new List<MixAdvice>();
-            foreach (var group in advice.GroupBy(entry => entry.Kind))
-            {
-                var members = group
+        private static List<MixAdvice> OnePerKind(List<MixAdvice> advice) =>
+            advice.GroupBy(entry => entry.Kind)
+                .Select(group => group
                     .OrderByDescending(entry => entry.RankedGain)
-                    .ThenBy(entry => entry.TurnsA + entry.TurnsB)
+                    .ThenBy(entry => entry.Turns)
                     .ThenBy(entry => entry.InstanceA)
                     .ThenBy(entry => entry.InstanceB)
-                    .ToList();
-                var first = members[0];
-                first.AnyOfSameKind = members.Count > 1;
-                first.TurnsDependOnPick = members.Any(entry => entry.KindTurns != first.KindTurns);
-                kept.Add(first);
-            }
-            return kept;
-        }
+                    .First())
+                .ToList();
 
         /// <summary>
         /// 사람이 따라 할 몫을 적는다. 합성 창은 돌릴 수 있는 석판을 가방에 놓인 방향으로 받고
@@ -211,22 +194,14 @@ namespace SephPlanner.Core.Solver
 
             var kindA = KindOf(a);
             var kindB = KindOf(b);
-            var turns = (advice.TurnsA, advice.TurnsB);
             if (string.CompareOrdinal(kindA, kindB) > 0)
             {
                 (kindA, kindB) = (kindB, kindA);
-                turns = (turns.Item2, turns.Item1);
                 if (a.Rotatable && b.Rotatable) shapeB = Mod(-shapeB);
                 else (shapeA, shapeB) = (shapeB, shapeA);
             }
-            advice.SameKind = kindA == kindB;
-            if (kindA == kindB)
-            {
-                if (a.Rotatable) shapeB = System.Math.Min(shapeB, Mod(-shapeB));
-                if (turns.Item1 > turns.Item2) turns = (turns.Item2, turns.Item1);
-            }
+            if (kindA == kindB && a.Rotatable) shapeB = System.Math.Min(shapeB, Mod(-shapeB));
             advice.Kind = kindA + "|" + kindB + "|" + shapeA + "," + shapeB;
-            advice.KindTurns = turns;
         }
 
         private static string KindOf(MixMaterial material) =>

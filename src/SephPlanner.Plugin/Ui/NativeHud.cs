@@ -58,6 +58,9 @@ namespace SephPlanner.Plugin.Ui
             public RectTransform Rect;
             public string Title;
             public Func<string> Body;
+
+            /// <summary>커서가 있는 동안 격자에 붙일 표. 합성 재료를 짚는다.</summary>
+            public List<KeyValuePair<GridPos, string>> Badges;
         }
 
         private NativeSkin _skin;
@@ -106,6 +109,9 @@ namespace SephPlanner.Plugin.Ui
         private readonly Tooltip _tooltip = new Tooltip();
         private readonly List<HoverTarget> _hover = new List<HoverTarget>();
         private bool _hoverable;
+
+        /// <summary>지금 격자에 붙어 있는 표. 커서가 그대로면 다시 칠하지 않는다.</summary>
+        private List<KeyValuePair<GridPos, string>> _badged;
 
         /// <summary>마지막으로 그린 근거와, 그린 것이 있는지.</summary>
         private HudFrameKey _drawn;
@@ -420,6 +426,8 @@ namespace SephPlanner.Plugin.Ui
 
             _hover.Clear();
             _hoverable = expanded;
+            _badged = null;
+            foreach (var cell in _cells) cell.SetBadge("");
 
             var previewed = Previewed(plan, frame.PreviewKey);
             var score = previewed?.Preview.Score ?? plan.Best.Score;
@@ -499,7 +507,7 @@ namespace SephPlanner.Plugin.Ui
                 _moves.End();
             }
             RenderOffers(plan, frame, previewed);
-            RenderMixes(plan, snapshot.Mixer, frame.MixerOpen, frame.AdviceBusy);
+            RenderMixes(plan, snapshot.Mixer, frame.MixerOpen, frame.AdviceBusy, previewed == null);
             RenderEnchants(plan, snapshot.EnchantChance, frame.EnchantOpen, frame.AdviceBusy);
             RenderDiscards(plan, previewed == null);
             RenderChips(snapshot, frame);
@@ -526,6 +534,7 @@ namespace SephPlanner.Plugin.Ui
             if (!enabled || !_hoverable || !_root.activeSelf || _group.alpha <= 0.01f)
             {
                 _tooltip.Hide();
+                Badge(null);
                 return;
             }
 
@@ -534,6 +543,8 @@ namespace SephPlanner.Plugin.Ui
             {
                 if (target.Rect == null || !target.Rect.gameObject.activeInHierarchy) continue;
                 if (!RectTransformUtility.RectangleContainsScreenPoint(target.Rect, cursor, camera)) continue;
+
+                Badge(target.Badges);
 
                 var body = target.Body != null ? target.Body() : "";
 
@@ -545,6 +556,23 @@ namespace SephPlanner.Plugin.Ui
                 return;
             }
             _tooltip.Hide();
+            Badge(null);
+        }
+
+        private void Badge(List<KeyValuePair<GridPos, string>> badges)
+        {
+            if (ReferenceEquals(badges, _badged)) return;
+
+            _badged = badges;
+            foreach (var cell in _cells) cell.SetBadge("");
+            if (badges == null) return;
+
+            var width = _gridLayout.constraintCount;
+            foreach (var badge in badges)
+            {
+                var index = badge.Key.Y * width + badge.Key.X;
+                if (index >= 0 && index < _cells.Count) _cells[index].SetBadge(badge.Value);
+            }
         }
 
         /// <summary>
@@ -552,7 +580,9 @@ namespace SephPlanner.Plugin.Ui
         /// 전부 미리 지어 두면, 읽히지도 않을 마흔 몇 개의 문장을 갱신마다 만들게 된다.
         /// 할 말이 없는 자리는 <see cref="UpdateHover"/>가 걸러낸다.
         /// </summary>
-        private void Hover(RectTransform rect, string title, Func<string> body)
+        private void Hover(
+            RectTransform rect, string title, Func<string> body,
+            List<KeyValuePair<GridPos, string>> badges = null)
         {
             if (rect == null) return;
 
@@ -561,6 +591,7 @@ namespace SephPlanner.Plugin.Ui
                 Rect = rect,
                 Title = title,
                 Body = body,
+                Badges = badges,
             });
         }
 
@@ -909,13 +940,14 @@ namespace SephPlanner.Plugin.Ui
             Widgets.SetActive(_enchants.Root, enchantOpen);
         }
 
-        private void RenderMixes(Plan plan, MixerState mixer, bool mixerOpen, bool adviceBusy)
+        private void RenderMixes(Plan plan, MixerState mixer, bool mixerOpen, bool adviceBusy, bool planDrawn)
         {
             _mixes.Begin();
             for (var i = 0; i < plan.Mixes.Count && i < MixRows; i++)
             {
                 var advice = plan.Mixes[i];
-                var name = advice.NameA + " + " + advice.NameB;
+                var (one, two) = Explain.MixNames(advice);
+                var name = $"{_skin.FirstMark}{one} + {_skin.SecondMark}{two}";
                 var soonTag = Explain.SoonTag(advice.Gain, advice.SoonGain);
                 var row = _mixes.Add(
                     name,
@@ -924,7 +956,10 @@ namespace SephPlanner.Plugin.Ui
                     Tint($"{advice.Gain:+0.#;-0.#;0}",
                         advice.Gain > 0.001 ? NativeSkin.Good : NativeSkin.TextDim),
                     advice.Affordable ? NativeSkin.Text : NativeSkin.TextDim);
-                Hover(row, name, () => Explain.Join(Explain.Mix(advice)));
+                Hover(
+                    row, name,
+                    () => Explain.Join(Explain.Mix(advice, _skin.FirstMark, _skin.SecondMark)),
+                    planDrawn ? MixBadges(plan, advice) : null);
             }
             if (mixerOpen && plan.Mixes.Count == 0)
             {
@@ -949,14 +984,31 @@ namespace SephPlanner.Plugin.Ui
             Widgets.SetActive(_mixes.Root, mixerOpen);
         }
 
-        /// <summary>
-        /// 합성 창에서 손으로 돌려야 하는 횟수. 빠뜨리면 답이 반쪽이 된다. 어느 석판을 돌리는지는
-        /// <see cref="Explain.Turn"/>가 쪽지에서 말한다.
-        /// </summary>
-        private static string RotationTag(MixAdvice advice)
+        /// <summary>합성 창에서 손으로 돌려야 하는 횟수. 빠뜨리면 답이 반쪽이 된다.</summary>
+        private string RotationTag(MixAdvice advice)
         {
-            var tag = Explain.TurnTag(advice);
+            var tag = Explain.TurnTag(advice, _skin.FirstMark);
             return tag.Length == 0 ? "" : Tint(tag, NativeSkin.Amber) + "  ";
+        }
+
+        /// <summary>
+        /// 재료 둘이 격자에 그려진 자리. 격자는 계획의 목표 배치를 그리므로 목표 자리로 짚는다 -
+        /// 옮길 것이 없으면 그것이 가방의 지금 자리다.
+        /// </summary>
+        private List<KeyValuePair<GridPos, string>> MixBadges(Plan plan, MixAdvice advice)
+        {
+            var first = advice.TurnBFirst ? advice.InstanceB : advice.InstanceA;
+            var second = advice.TurnBFirst ? advice.InstanceA : advice.InstanceB;
+            var badges = new List<KeyValuePair<GridPos, string>>(2);
+            foreach (var target in plan.Targets)
+            {
+                if (!target.IsTablet) continue;
+                if (target.InstanceId == first)
+                    badges.Add(new KeyValuePair<GridPos, string>(target.To, _skin.FirstMark));
+                else if (target.InstanceId == second)
+                    badges.Add(new KeyValuePair<GridPos, string>(target.To, _skin.SecondMark));
+            }
+            return badges;
         }
 
         /// <summary>
@@ -1116,7 +1168,10 @@ namespace SephPlanner.Plugin.Ui
             private readonly Image _icon;
             private readonly TextMeshProUGUI _name;
             private readonly TextMeshProUGUI _level;
+            private readonly TextMeshProUGUI _badge;
             private readonly string _yieldMark;
+            private Color _edgeColor;
+            private bool _thick;
 
             public Cell(RectTransform parent, NativeSkin skin, float b)
             {
@@ -1124,6 +1179,7 @@ namespace SephPlanner.Plugin.Ui
                 _yieldMark = skin.YieldMark;
 
                 _border = Widgets.Fill("Cell", parent, NativeSkin.SlotEdge);
+                _edgeColor = NativeSkin.SlotEdge;
                 _fill = Widgets.Fill("Fill", _border.rectTransform, NativeSkin.EmptyFill);
                 Stretch(_fill.rectTransform, _edge);
 
@@ -1143,6 +1199,11 @@ namespace SephPlanner.Plugin.Ui
                     "Level", _fill.rectTransform, skin, b * 0.8f, NativeSkin.TextBright,
                     TextAlignmentOptions.Bottom);
                 Stretch(_level.rectTransform, _edge);
+
+                _badge = Widgets.Label(
+                    "Badge", _fill.rectTransform, skin, b * 0.9f, NativeSkin.Mint, TextAlignmentOptions.TopLeft);
+                Stretch(_badge.rectTransform, _edge);
+                Widgets.SetActive(_badge, false);
             }
 
             private static void Stretch(RectTransform rect, float margin)
@@ -1221,8 +1282,20 @@ namespace SephPlanner.Plugin.Ui
                 Widgets.SetActive(_icon, icon != null);
             }
 
+            /// <summary>합성 재료 표. 비우면 칠해 둔 테두리로 돌아간다.</summary>
+            public void SetBadge(string mark)
+            {
+                var shown = mark.Length > 0;
+                _badge.text = mark;
+                Widgets.SetActive(_badge, shown);
+                _border.color = shown ? NativeSkin.Mint : _edgeColor;
+                Stretch(_fill.rectTransform, shown || _thick ? _edge * 2f : _edge);
+            }
+
             private void Paint(Color border, Color fill, bool thick)
             {
+                _edgeColor = border;
+                _thick = thick;
                 _border.color = border;
                 _fill.color = fill;
                 Stretch(_fill.rectTransform, thick ? _edge * 2f : _edge);

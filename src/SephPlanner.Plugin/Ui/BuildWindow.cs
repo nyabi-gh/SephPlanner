@@ -8,6 +8,7 @@ using SephPlanner.Core.Runtime;
 using SephPlanner.Core.Solver;
 using TMPro;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace SephPlanner.Plugin.Ui
@@ -28,11 +29,19 @@ namespace SephPlanner.Plugin.Ui
     /// 일이라 창을 따로 열 만큼 자주 쓰지 않기 때문이다. 창을 나누면 단축키도 그만큼 는다.
     ///
     /// <b>목록은 쪽으로 넘긴다.</b> 아티팩트가 서른 개 가까이 될 수 있어 다 펼치면 창이 화면을
-    /// 넘어간다. 스크롤 대신 쪽 넘김을 쓰는 것은 설정 창의 화살표와 같은 몸짓이라서다.
+    /// 넘어간다. 스크롤 대신 쪽 넘김을 쓰는 것은 설정 창의 화살표와 같은 몸짓이라서다. 화살표 말고도
+    /// 휠과 게임의 이전·다음 키(Q/E, 패드 LB/RB)로 넘긴다 - 게임의 튜토리얼 창(<c>UI_TutorialViewer</c>)이
+    /// 같은 키로 쪽을 넘긴다.
     /// </summary>
     internal sealed class BuildWindow : PlannerWindow
     {
         private const int RowsPerPage = 6;
+
+        /// <summary>
+        /// 휠 한 번에 한 쪽만 넘기기 위한 간격. 터치패드는 한 번 쓸어도 여러 프레임에 걸쳐 값을
+        /// 보낸다. 재지 않은 어림값이다.
+        /// </summary>
+        private const float WheelInterval = 0.15f;
 
         private enum Tab
         {
@@ -60,7 +69,9 @@ namespace SephPlanner.Plugin.Ui
         private LayoutElement _noteSize;
         private float _noteWidth;
         private TextMeshProUGUI _pageLabel;
+        private TextMeshProUGUI _pageKeys;
         private RectTransform _pager;
+        private float _lastWheel = float.NegativeInfinity;
 
         public BuildWindow(PluginPreferences prefs, Func<BuildContext> source)
         {
@@ -168,23 +179,60 @@ namespace SephPlanner.Plugin.Ui
             Widgets.Fixed(_pageLabel.rectTransform, S(1.4f), S(6f));
 
             Step(_pager, ">", 1);
+
+            _pageKeys = Widgets.Label("PageKeys", _pager, Skin, S(0.75f), NativeSkin.TextDim);
+            Widgets.Fixed(_pageKeys.rectTransform, S(1.4f), S(6f));
         }
 
         private void Step(RectTransform row, string glyph, int delta)
         {
             var arrow = Widgets.Clickable(
                 "Page" + glyph, row, Skin, S(1.1f), NativeSkin.TextBright,
-                () =>
-                {
-                    _page = Mathf.Clamp(_page + delta, 0, LastPage);
-                    Refresh();
-                });
+                () => TurnPage(delta));
             arrow.text = glyph;
             arrow.alignment = TextAlignmentOptions.Center;
             Widgets.Fixed(arrow.rectTransform, S(1.4f), S(1.6f));
         }
 
         private int LastPage => Mathf.Max(0, (_entries.Count - 1) / RowsPerPage);
+
+        private void TurnPage(int delta)
+        {
+            var page = Mathf.Clamp(_page + delta, 0, LastPage);
+            if (page == _page) return;
+
+            _page = page;
+            Refresh();
+        }
+
+        /// <summary>
+        /// 휠과 이전·다음 키. 게임의 창들처럼 <c>UIInputModule</c> 의 탭 동작을 읽으므로 키를 바꾼
+        /// 사람에게도 그 키로 듣고, 이 동작에는 패드 LB/RB 도 묶여 있다.
+        /// </summary>
+        public void PollPaging()
+        {
+            if (!HasControl || _entries.Count <= RowsPerPage) return;
+
+            var module = UIInputModule.current;
+            var keyboard = Keyboard.current;
+            var previous = module != null
+                ? module.prevTabAction.action.WasPressedThisFrame()
+                : keyboard != null && keyboard.qKey.wasPressedThisFrame;
+            var next = module != null
+                ? module.nextTabAction.action.WasPressedThisFrame()
+                : keyboard != null && keyboard.eKey.wasPressedThisFrame;
+
+            var mouse = Mouse.current;
+            var wheel = mouse != null ? mouse.scroll.ReadValue().y : 0f;
+            if (wheel != 0f && Time.unscaledTime - _lastWheel >= WheelInterval)
+            {
+                _lastWheel = Time.unscaledTime;
+                if (wheel > 0f) previous = true;
+                else next = true;
+            }
+
+            if (previous != next) TurnPage(previous ? -1 : 1);
+        }
 
         public override void Refresh()
         {
@@ -271,6 +319,7 @@ namespace SephPlanner.Plugin.Ui
             }
 
             _pageLabel.text = $"{_page + 1} / {LastPage + 1}";
+            _pageKeys.text = PadInput.InUse() ? "LB/RB" : "Q/E · 휠";
             Widgets.SetActive(_pager, _entries.Count > RowsPerPage);
 
             if (_entries.Count > 0) return;

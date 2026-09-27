@@ -116,66 +116,77 @@ public class TabletMixAdvisorTests
         Assert.Equal(0, advice.RotationB - advice.RotationA);
         Assert.Equal(turnsA, advice.TurnsA);
         Assert.Equal(turnsB, advice.TurnsB);
-        Assert.False(advice.AnyOfSameKind);
     }
 
     [Fact]
-    public void TwoOfTheSameTabletGiveOneRowNotTwo()
+    public void TheTabletToTurnIsNumberedFirst()
     {
-        var advice = TabletMixAdvisor.Rank(Bag(("A", 0), ("B", 0), ("B", 0)), new Catalog([], []), 0, 100);
+        var advice = Assert.Single(TabletMixAdvisor.Rank(Bag(("A", 1), ("B", 0)), new Catalog([], []), 0, 100));
 
-        var mix = Assert.Single(advice, entry => entry.NameA == "A" && entry.NameB == "B");
-        Assert.True(mix.AnyOfSameKind);
-        Assert.False(mix.TurnsDependOnPick);
-        Assert.Contains("어느 것을 넣어도", Explain.Join(Explain.Mix(mix)));
-    }
-
-    [Fact]
-    public void SameTabletsFacingDifferentWaysAreDescribedByShapeNotClicks()
-    {
-        var advice = TabletMixAdvisor.Rank(Bag(("A", 0), ("B", 0), ("B", 1)), new Catalog([], []), 0, 100);
-
-        var mix = Assert.Single(advice, entry => entry.NameA == "A" && entry.NameB == "B");
-        Assert.True(mix.TurnsDependOnPick);
-        Assert.Equal("회전 확인", Explain.TurnTag(mix));
-        Assert.Contains("A과(와) B이(가) 같은 방향이 되게 맞추세요", Explain.Turn(mix));
-        Assert.DoesNotContain("0번", Explain.Turn(mix));
+        Assert.True(advice.TurnBFirst);
+        Assert.Equal(("B", "A"), Explain.MixNames(advice));
+        Assert.Equal("① 회전 1번", Explain.TurnTag(advice));
+        Assert.Equal(
+            "합성 창에 ① B을(를) 먼저 넣고 우클릭 1번 돌린 뒤 ② A을(를) 넣으세요(한 번에 90°).",
+            Explain.Turn(advice));
     }
 
     /// <summary>
-    /// 같은 석판 둘은 합성 창에서 어느 쪽이 어느 것인지 짚을 수 없다. 한쪽을 한 번 돌리면 같은
-    /// 방향이 되고 다른 쪽을 한 번 돌리면 반대 방향이 되므로, "B 를 1번" 은 반쯤 틀린 안내였다
-    /// (제보 dcd4ef12 의 쌍성 + 쌍성).
+    /// 줄은 격자에서 실제 재료 둘을 짚는다. 같은 석판이 여럿이면 덜 돌려도 되는 것을 고른다 -
+    /// 예전에는 어느 것을 넣을지 짚을 수 없어 "모양이 되게" 라고 에둘러 말했다.
     /// </summary>
     [Fact]
-    public void TwoOfTheSameTabletAreToldByTheirAngleNotClicks()
+    public void SameTabletsGiveOneRowNamingTheOneThatNeedsFewestTurns()
+    {
+        var advice = TabletMixAdvisor.Rank(Bag(("A", 0), ("B", 1), ("B", 0)), new Catalog([], []), 0, 100);
+
+        var mix = Assert.Single(advice, entry => entry.NameA == "A" && entry.NameB == "B");
+        Assert.Equal(102, mix.InstanceB);
+        Assert.Equal(0, mix.Turns);
+        Assert.Equal("", Explain.TurnTag(mix));
+        Assert.Equal("합성 창에 넣은 방향 그대로 합치면 됩니다.", Explain.Turn(mix));
+    }
+
+    /// <summary>
+    /// 같은 석판 둘은 합성 창에서 생김새로 가를 수 없다. 한쪽을 한 번 돌리면 같은 방향, 다른 쪽을
+    /// 한 번 돌리면 반대 방향이 된다(제보 dcd4ef12 의 쌍성 + 쌍성). 돌릴 것을 먼저 넣고 창에 그것만
+    /// 있을 때 돌리게 하면 어느 쪽인지 헷갈릴 일이 없다(<c>UI_TabletMixPanel.AddItemToMix</c> 는 빈
+    /// 첫 칸부터 채우고, 우클릭은 누른 칸만 돌린다).
+    /// </summary>
+    [Fact]
+    public void TwoOfTheSameTabletAreTurnedOneAtATime()
     {
         var turned = Assert.Single(TabletMixAdvisor.Rank(Bag(("B", 0), ("B", 1)), new Catalog([], []), 0, 100));
-        Assert.True(turned.SameKind);
-        Assert.Equal("회전 확인", Explain.TurnTag(turned));
-        Assert.Contains("두 B이(가) 같은 방향이 되게", Explain.Turn(turned));
-        Assert.DoesNotContain("번 돌린", Explain.Turn(turned));
-        Assert.StartsWith("B 둘을 합칩니다", Explain.Mix(turned)[0]);
+        Assert.Equal(1, turned.Turns);
+        Assert.Equal("① 회전 1번", Explain.TurnTag(turned));
+        Assert.Contains("① B을(를) 먼저 넣고 우클릭 1번 돌린 뒤 ② B을(를) 넣으세요", Explain.Turn(turned));
+        Assert.StartsWith("① B과(와) ② B을(를) 합칩니다", Explain.Mix(turned)[0]);
 
         var aligned = Assert.Single(TabletMixAdvisor.Rank(Bag(("B", 1), ("B", 1)), new Catalog([], []), 0, 100));
         Assert.Equal("", Explain.TurnTag(aligned));
         Assert.Contains("그대로 합치면", Explain.Turn(aligned));
     }
 
+    /// <summary>
+    /// 한쪽만 돌릴 수 있으면 게임이 합치기 전에 한 번 더 묻는다(<c>UI_TabletMixPanel.MixTablet</c>).
+    /// </summary>
     [Fact]
-    public void AShapeWithoutTurnsIsCalledTheUnturnedShape()
+    public void ALockedMaterialWarnsThatTheGameWillAsk()
     {
-        var advice = new MixAdvice
-        {
-            NameA = "쌍성",
-            NameB = "동시성",
-            RotatableA = true,
-            RotatableB = false,
-            TurnsDependOnPick = true,
-        };
+        var advice = new MixAdvice { NameA = "쌍성", NameB = "동시성", RotatableA = true, RotatableB = false };
+        Assert.Contains("합칠 때 게임이 한 번 더 묻습니다", Explain.Join(Explain.Mix(advice)));
 
-        Assert.Contains("쌍성이 돌리지 않은 처음 모양이 되게", Explain.Turn(advice));
-        Assert.DoesNotContain("0번", Explain.Turn(advice));
+        advice.RotatableA = false;
+        Assert.DoesNotContain("묻습니다", Explain.Join(Explain.Mix(advice)));
+    }
+
+    [Fact]
+    public void AnotherMarkCanStandInWhenTheFontLacksTheCircledDigits()
+    {
+        var advice = new MixAdvice { NameA = "쌍성", NameB = "전진", RotatableA = true, TurnsA = 2 };
+
+        Assert.Equal("(1) 회전 2번", Explain.TurnTag(advice, "(1)"));
+        Assert.StartsWith("합성 창에 (1) 쌍성을 먼저 넣고", Explain.Turn(advice, "(1)", "(2)"));
     }
 
     [Theory]

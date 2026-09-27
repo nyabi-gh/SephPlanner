@@ -27,6 +27,10 @@ namespace SephPlanner.Plugin.Ui
         /// </summary>
         public string YieldMark { get; private set; } = "▽";
 
+        /// <summary>합성 재료 표. 양보 표시와 같은 까닭으로 글꼴에 있는지 보고 정한다.</summary>
+        public string FirstMark { get; private set; } = Core.Planning.Explain.FirstMark;
+        public string SecondMark { get; private set; } = Core.Planning.Explain.SecondMark;
+
         /// <summary>게임 HUD 글자 크기의 중앙값. 우리 크기는 전부 여기에 대한 비율이다.</summary>
         public float BaseSize { get; private set; } = 12f;
 
@@ -91,6 +95,12 @@ namespace SephPlanner.Plugin.Ui
             }
 
             if (skin.Font != null && !skin.Font.HasCharacter('▽', searchFallbacks: true)) skin.YieldMark = "v";
+            if (skin.Font != null &&
+                (!skin.Font.HasCharacter('①', searchFallbacks: true) || !skin.Font.HasCharacter('②', searchFallbacks: true)))
+            {
+                skin.FirstMark = "(1)";
+                skin.SecondMark = "(2)";
+            }
 
             skin.Origin =
                 "글꼴=" + (skin.Font != null ? skin.Font.name : "없음(기본)") +

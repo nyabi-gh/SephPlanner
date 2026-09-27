@@ -268,22 +268,25 @@ namespace SephPlanner.Core.Planning
             return lines;
         }
 
-        public static List<string> Mix(MixAdvice advice)
+        /// <summary>합성 재료를 격자에서 짚는 표. 글꼴에 없으면 화면이 다른 표를 넘긴다.</summary>
+        public const string FirstMark = "①";
+        public const string SecondMark = "②";
+
+        /// <summary>① 과 ② 의 이름. ① 은 먼저 넣어 돌릴 쪽이다(<see cref="MixAdvice.TurnBFirst"/>).</summary>
+        public static (string First, string Second) MixNames(MixAdvice advice) =>
+            advice.TurnBFirst ? (advice.NameB, advice.NameA) : (advice.NameA, advice.NameB);
+
+        public static List<string> Mix(MixAdvice advice, string first = FirstMark, string second = SecondMark)
         {
+            var (one, two) = MixNames(advice);
             var lines = new List<string>
             {
-                advice.SameKind
-                    ? $"{advice.NameA} 둘을 합칩니다. 재료 둘은 사라집니다."
-                    : $"{With(advice.NameA, "과", "와")} {With(advice.NameB, "을", "를")} 합칩니다. 재료 둘은 사라집니다.",
+                $"{first} {With(one, "과", "와")} {second} {With(two, "을", "를")} 합칩니다. 재료 둘은 사라집니다.",
+                Turn(advice, first, second),
+                advice.Rotatable ? "결과는 돌릴 수 있습니다."
+                : advice.RotatableA != advice.RotatableB ? "한쪽이 돌아가지 않아 결과는 돌릴 수 없습니다. 합칠 때 게임이 한 번 더 묻습니다."
+                : "결과는 돌릴 수 없습니다.",
             };
-
-            lines.Add(Turn(advice));
-            if (advice.AnyOfSameKind && !advice.TurnsDependOnPick)
-                lines.Add("같은 석판이 여러 개면 어느 것을 넣어도 결과가 같습니다.");
-
-            lines.Add(advice.Rotatable
-                ? "결과는 돌릴 수 있습니다 (재료가 둘 다 돌아가므로)."
-                : "결과는 돌릴 수 없습니다 (재료 중 하나가 돌아가지 않으므로).");
 
             var reach = Reach(advice.Effect);
             if (reach.Length > 0) lines.Add($"결과가 미치는 범위: {reach}");
@@ -310,82 +313,22 @@ namespace SephPlanner.Core.Planning
         }
 
         /// <summary>
-        /// 합성 창에서 할 일. 창은 석판을 가방에 놓인 방향 그대로 받고 우클릭 한 번에 90° 돌린다.
-        /// 같은 석판이 방향을 달리해 여럿이면 어느 것을 넣을지에 따라 횟수가 달라지므로 모양으로 말한다.
+        /// 합성 창에서 할 일. 창은 칸마다 넣은 석판 하나를 가방에 놓인 방향으로 받고, 우클릭 한 번에
+        /// 그 칸만 90° 돌린다(<c>UI_TabletMixPanel</c>). 돌릴 것을 먼저 넣고 돌리게 하면 창에 석판이
+        /// 하나뿐이라 같은 석판 둘이어도 어느 쪽을 돌릴지 헷갈리지 않는다.
         /// </summary>
-        public static string Turn(MixAdvice advice)
+        public static string Turn(MixAdvice advice, string first = FirstMark, string second = SecondMark)
         {
-            if (!advice.RotatableA && !advice.RotatableB) return "두 석판 모두 돌릴 수 없어 그대로 합칩니다.";
+            if (advice.Turns == 0) return "합성 창에 넣은 방향 그대로 합치면 됩니다.";
 
-            if (SameAndTurnable(advice))
-            {
-                var wanted = Apart(advice.RotationB - advice.RotationA);
-                if (!advice.TurnsDependOnPick && wanted == Apart(BagApart(advice)))
-                    return "합성 창에 들어간 방향 그대로 합치면 됩니다.";
-                var how = wanted == 0 ? "같은 방향이 되게" : wanted == 2 ? "서로 반대 방향이 되게" : "서로 90° 어긋나게";
-                return $"합성 창에서 두 {With(advice.NameA, "이", "가")} {how} 한쪽을 우클릭해 돌린 뒤 합치세요" +
-                       "(한 번에 90°). 어느 쪽을 돌리느냐에 따라 필요한 횟수가 다릅니다.";
-            }
-
-            if (advice.TurnsDependOnPick)
-            {
-                string shape;
-                if (advice.RotatableA && advice.RotatableB)
-                {
-                    var steps = Steps(advice.RotationB - advice.RotationA);
-                    shape = steps == 0
-                        ? $"{With(advice.NameA, "과", "와")} {With(advice.NameB, "이", "가")} 같은 방향이 되게"
-                        : $"{With(advice.NameB, "이", "가")} {advice.NameA}보다 우클릭 {steps}번만큼 더 돌아간 모양이 되게";
-                }
-                else
-                {
-                    var name = advice.RotatableA ? advice.NameA : advice.NameB;
-                    var steps = Steps(advice.RotatableA ? advice.RotationA : advice.RotationB);
-                    shape = steps == 0
-                        ? $"{With(name, "이", "가")} 돌리지 않은 처음 모양이 되게"
-                        : $"{With(name, "이", "가")} 처음 모양에서 우클릭 {steps}번 돌아간 모양이 되게";
-                }
-                return "같은 석판이 가방에서 서로 다른 방향으로 놓여 있어, 몇 번 돌릴지는 어느 것을 넣느냐에 " +
-                       $"따라 다릅니다. 합성 창에서 {shape} 맞추세요(우클릭 한 번에 90°).";
-            }
-
-            if (advice.TurnsA == 0 && advice.TurnsB == 0) return "합성 창에 들어간 방향 그대로 합치면 됩니다.";
-
-            var turned = advice.TurnsA > 0 ? advice.NameA : advice.NameB;
-            var turns = advice.TurnsA > 0 ? advice.TurnsA : advice.TurnsB;
-            return $"합성 창에서 {With(turned, "을", "를")} 우클릭해 {turns}번 돌린 뒤 합치세요(한 번에 90°). " +
-                   "합성 창은 석판을 가방에 놓인 방향 그대로 받아옵니다.";
+            var (one, two) = MixNames(advice);
+            return $"합성 창에 {first} {With(one, "을", "를")} 먼저 넣고 우클릭 {advice.Turns}번 돌린 뒤 " +
+                   $"{second} {With(two, "을", "를")} 넣으세요(한 번에 90°).";
         }
 
         /// <summary>합성 추천 줄에 붙는 짧은 표. 자세한 것은 <see cref="Turn"/>이 쪽지에서 말한다.</summary>
-        public static string TurnTag(MixAdvice advice)
-        {
-            if (SameAndTurnable(advice))
-                return !advice.TurnsDependOnPick &&
-                       Apart(advice.RotationB - advice.RotationA) == Apart(BagApart(advice)) ? "" : "회전 확인";
-            return advice.TurnsDependOnPick ? "회전 확인"
-                : advice.TurnsA + advice.TurnsB > 0 ? $"회전 {advice.TurnsA + advice.TurnsB}번"
-                : "";
-        }
-
-        private static bool SameAndTurnable(MixAdvice advice) =>
-            advice.SameKind && advice.RotatableA && advice.RotatableB;
-
-        /// <summary>
-        /// 가방에서 두 석판이 어긋난 각도. 돌릴 횟수는 창이 가방 방향으로 받은 둘을 목표 사이 각도로
-        /// 맞추는 수이므로 거기서 되짚는다(<c>TabletMixAdvisor.Instruct</c>).
-        /// </summary>
-        private static int BagApart(MixAdvice advice) =>
-            advice.RotationB - advice.RotationA - advice.TurnsB + advice.TurnsA;
-
-        /// <summary>같은 석판 둘의 사이 각도. 둘은 서로 바꿔 불러도 같으므로 r 과 −r 이 같은 모양이다.</summary>
-        private static int Apart(int rotation)
-        {
-            var steps = Steps(rotation);
-            return Math.Min(steps, 4 - steps);
-        }
-
-        private static int Steps(int rotation) => ((rotation % 4) + 4) % 4;
+        public static string TurnTag(MixAdvice advice, string first = FirstMark) =>
+            advice.Turns == 0 ? "" : $"{first} 회전 {advice.Turns}번";
 
         /// <summary>
         /// 받침을 보고 조사를 붙인다. 한글로 끝나지 않는 이름은 받침을 알 수 없어 둘을 함께 적는다.
