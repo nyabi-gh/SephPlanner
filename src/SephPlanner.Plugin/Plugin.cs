@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using BepInEx;
 using BepInEx.Configuration;
+using HarmonyLib;
 using Mirror;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
@@ -25,6 +26,7 @@ namespace SephPlanner.Plugin
         public const string PluginGuid = "dev.nyabi.sephplanner.bridge";
 
         private PluginSettings _settings;
+        private Harmony _harmony;
         private float _nextPoll;
         private bool _catalogRetryArmed;
         private bool _inRun;
@@ -117,6 +119,8 @@ namespace SephPlanner.Plugin
             };
             Logger.LogEvent += CaptureOwnLog;
             GameBinding.LogTo(Logger.LogWarning);
+            _harmony = new Harmony(PluginGuid);
+            TabletRotationTooltipGuard.Install(_harmony, Logger.LogWarning);
             FixedEffectLayer.Log = Logger.LogInfo;
             HorayModAPI.OnStartSessionClientside += StartSession;
             HorayModAPI.OnAllDatabasesReady += ArmCatalogRefresh;
@@ -1609,6 +1613,7 @@ namespace SephPlanner.Plugin
             Logger.LogEvent -= CaptureOwnLog;
             HorayModAPI.OnStartSessionClientside -= StartSession;
             HorayModAPI.OnAllDatabasesReady -= ArmCatalogRefresh;
+            _harmony?.UnpatchSelf();
             if (_moving && _settings != null && _hud.IsAlive)
             {
                 var margin = _hud.Margin;

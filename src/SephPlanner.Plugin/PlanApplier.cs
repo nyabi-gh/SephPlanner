@@ -444,8 +444,8 @@ namespace SephPlanner.Plugin
             /// 툴팁을 빼앗는다.
             ///
             /// 참가자 경로는 <c>DoClickAction</c> 이 게임의 <c>Rotate</c> 를 그대로 타므로 해당
-            /// 없다. 알림도 게임이 보내므로 그쪽 툴팁은 우리가 막을 수 없다. 되돌린 뒤에도 보낸다 -
-            /// 그때는 되돌아간 각도가 화면에 맞아야 한다.
+            /// 없다. 그쪽 알림은 서버가 보내므로 받는 자리에서 <see cref="TabletRotationTooltipGuard"/>
+            /// 가 막는다. 되돌린 뒤에도 보낸다 - 그때는 되돌아간 각도가 화면에 맞아야 한다.
             /// </summary>
             private void Announce(IReadOnlyList<KeyValuePair<StoneTablet, int>> rotated)
             {

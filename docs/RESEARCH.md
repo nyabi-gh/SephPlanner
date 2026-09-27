@@ -271,8 +271,17 @@ NetworkInventory.SendMessageTabletRotated(this, rotation);
 `HandleTabletRotated` 에만 그 검사가 없다 - 게임은 우클릭으로만 그 경로에 닿으므로 필요가 없었다.
 우리가 커서 없이 알림만 보내 그 전제를 깬 것이라, `PlanApplier` 가 그 검사를 대신 한다. 테두리는
 선택된 아이템의 범위 표시라 그 석판에 커서가 올라가 있을 때만 생기므로 잃는 것이 없고, 반대로
-다른 아이템을 보고 있을 때 보내면 그쪽 테두리와 툴팁을 빼앗는다. 참가자 쪽은 게임의 `Rotate` 가
-직접 알림을 보내므로 같은 툴팁이 뜰 수 있고 우리가 막을 수 없다.
+다른 아이템을 보고 있을 때 보내면 그쪽 테두리와 툴팁을 빼앗는다.
+
+**참가자 쪽은 받는 자리에서 막는다(2026-09-27, 제보 `7ff22719`).** 참가자 회전은 서버의 `Rotate` 가
+알림을 보내므로 가방을 닫은 채 `F8` 을 누르면 같은 툴팁이 떠서 남았다. 보내는 쪽은 서버라 손댈 수
+없지만 `HandleTabletRotated` 는 받는 PC 에서 돈다. 그래서 HarmonyX prefix(`TabletRotationTooltipGuard`)가
+패널이 닫혀 있으면(`UIBase.IsOpened` = `gameObject.activeSelf`) 그 함수를 건너뛴다. 플러그인의 첫
+Harmony 패치다. 선택된 칸으로 가르지 않은 까닭은 게임이 **들어 올린 석판**을 돌릴 때도
+(`UI_NewItemPicker(_Controller).CurrentPickedUp` → `DoClickAction`) 같은 알림을 타는데, 그때 선택은
+그 석판이 아닐 수 있어서다. 게임의 회전 경로는 전부 패널의 입력 처리 안에 있으므로 패널이 닫혀 있을 때
+게임이 원하는 알림은 없다. 가방을 연 채 다른 아이템에 커서를 둔 참가자 자동 배치는 여전히 그쪽 툴팁을
+빼앗을 수 있다.
 
 **이동 뒤에도 게임은 화면을 다시 잡는다.** 드래그로 옮기는 자리는 `Swap` 다음에
 `OnItemSelected(icon, -1)` 을 부르는데, 그 첫 동작이 모든 `stoneTabletFrame` 과 `dependencyFrame`
