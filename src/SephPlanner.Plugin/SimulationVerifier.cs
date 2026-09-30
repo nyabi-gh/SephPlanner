@@ -9,6 +9,12 @@ namespace SephPlanner.Plugin
     {
         public PlanVerificationStatus Status { get; set; }
         public string Reason { get; set; } = "";
+
+        /// <summary>호스트에서 서버 원본으로 설명되지 않아 되뺀 값으로 대신 쓴 칸 수.</summary>
+        public int UnexplainedFixedCells { get; set; }
+
+        /// <summary>그때 원본과 되뺀 값을 적은 한 줄. 알릴 것이 없으면 빈 문자열이다.</summary>
+        public string FixedEffectMismatch { get; set; } = "";
     }
 
     /// <summary>
@@ -27,6 +33,14 @@ namespace SephPlanner.Plugin
         public static RuntimeSimulationCheck Check(GridInventory inv)
         {
             var layer = FixedEffectLayer.Get(inv);
+            var check = Verify(inv, layer);
+            check.UnexplainedFixedCells = layer.Unexplained.Count;
+            check.FixedEffectMismatch = layer.Mismatch;
+            return check;
+        }
+
+        private static RuntimeSimulationCheck Verify(GridInventory inv, FixedEffectLayerState layer)
+        {
             var view = layer.View;
             LastCheckedTablets = view.Placements.Count;
             LastFixedCells = layer.All.Count;

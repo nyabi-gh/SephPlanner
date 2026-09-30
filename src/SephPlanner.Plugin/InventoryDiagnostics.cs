@@ -225,7 +225,9 @@ namespace SephPlanner.Plugin
             {
                 var layer = FixedEffectLayer.Get(inv);
                 text.AppendLine();
-                text.AppendLine($"[고정 효과] {(NetworkServer.active ? "서버 원본" : "게임 행렬에서 되뺌")}");
+                var source = !NetworkServer.active ? "게임 행렬에서 되뺌"
+                    : layer.Mismatch.Length > 0 ? "서버 원본과 달라 게임 행렬에서 되뺌" : "서버 원본";
+                text.AppendLine($"[고정 효과] {source}");
                 text.AppendLine("  " + FixedEffectResidual.Describe(layer.Cells, limit: 64));
                 if (layer.ComboEngraving != null)
                 {
@@ -247,6 +249,9 @@ namespace SephPlanner.Plugin
                         $"  옛 격자로 적용된 채인 석판: ({tablet.xIdx},{tablet.yIdx}) entity={tablet.entityID} " +
                         $"적용 범위 {tablet.EffectRange.Count}칸");
                 }
+                if (layer.Mismatch.Length > 0)
+                    text.AppendLine("  " + layer.Mismatch + " / 원본에 없는 칸: " +
+                                    FixedEffectResidual.Describe(layer.Unexplained, limit: 64));
                 if (layer.Blocker.Length > 0) text.AppendLine("  막힘: " + layer.Blocker);
                 if (layer.Pending.Length > 0) text.AppendLine("  보류: " + layer.Pending);
             });

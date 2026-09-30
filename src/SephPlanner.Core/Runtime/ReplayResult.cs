@@ -82,6 +82,7 @@ namespace SephPlanner.Core.Runtime
             result.Fact("경고/유지", string.Join("\n", plan.RetentionWarnings));
             result.Fact("경고/연결", string.Join("\n", plan.SupportWarnings));
             result.Fact("경고/활성", string.Join("\n", plan.ActivationWarnings));
+            if (plan.TabletWarnings.Count > 0) result.Fact("경고/석판", string.Join("\n", plan.TabletWarnings));
             result.Fact("끄기 허용 필요", plan.HasUnapprovedDeactivation);
             return result;
         }

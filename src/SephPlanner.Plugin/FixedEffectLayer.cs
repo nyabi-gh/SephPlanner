@@ -32,6 +32,12 @@ namespace SephPlanner.Plugin
 
         /// <summary>게임 행렬에서 되뺀 값. 게임이 아직 다시 계산하지 않아 되빼지 않았으면 null 이다.</summary>
         public FixedEffectResidualResult Residual { get; set; }
+
+        /// <summary>호스트에서 서버 원본으로 설명되지 않는 칸. 비어 있으면 원본을 그대로 쓴다.</summary>
+        public IReadOnlyList<FixedEffectCell> Unexplained { get; set; } = new List<FixedEffectCell>();
+
+        /// <summary><see cref="Unexplained"/> 가 있을 때 원본과 되뺀 값을 적은 한 줄.</summary>
+        public string Mismatch { get; set; } = "";
     }
 
     /// <summary>
@@ -43,7 +49,8 @@ namespace SephPlanner.Plugin
     /// (<c>createdByExternalSystem</c>)만은 빼고 적는다. 양쪽 모두 규칙과 동기화된 좌표로 지금
     /// 몫을 풀어 고정 층에서 뺀다.
     ///
-    /// 호스트에서는 원본과 되뺀 값을 대조해 되빼기 자체를 검증한다.
+    /// 호스트에서는 원본과 되뺀 값을 대조해 되빼기 자체를 검증한다. 둘이 다르면 알리고 참가자처럼
+    /// 되뺀 값으로 물러선다.
     /// </summary>
     internal static class FixedEffectLayer
     {
@@ -123,18 +130,23 @@ namespace SephPlanner.Plugin
 
             if (NetworkServer.active)
             {
-                state.Cells = HostFixedEffects(inv, rule != null);
-                state.All = ComboEngravings.Combine(state.Cells, state.Engraved);
-                if (stale)
+                var original = HostFixedEffects(inv, rule != null);
+                if (stale || state.Residual.Status != FixedEffectResidualStatus.Extracted ||
+                    FixedEffectResidual.Same(original, state.Residual.Cells))
                 {
-                    state.Pending = PlanVerification.GameNotRecalculated;
+                    state.Cells = original;
+                    state.All = ComboEngravings.Combine(state.Cells, state.Engraved);
+                    if (stale) state.Pending = PlanVerification.GameNotRecalculated;
+                    return state;
                 }
-                else if (state.Residual.Status == FixedEffectResidualStatus.Extracted &&
-                         !FixedEffectResidual.Same(state.Cells, state.Residual.Cells))
-                {
-                    state.Blocker = "고정 효과 원본과 게임 행렬에서 되뺀 값이 다릅니다.";
-                }
-                return state;
+
+                // 원본 목록이 행렬의 전부가 아니다. 게임이 인챈트 표를 잃으면 더해 둔 인챈트를 빼지
+                // 못해 그 칸에 남긴다(제보 34a32e60). 그 층은 게임이 실제로 쓰므로 참가자처럼
+                // 되뺀 값을 추적기로 가려 쓴다.
+                state.Unexplained = FixedEffectResidual.Difference(original, state.Residual.Cells);
+                state.Mismatch = "고정 효과 원본과 게임 행렬에서 되뺀 값이 다릅니다: 원본 " +
+                                 FixedEffectResidual.Describe(original) + ", 되뺀 값 " +
+                                 FixedEffectResidual.Describe(state.Residual.Cells);
             }
 
             state.Cells = Tracker.Layer;

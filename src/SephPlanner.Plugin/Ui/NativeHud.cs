@@ -479,7 +479,7 @@ namespace SephPlanner.Plugin.Ui
             Widgets.FitHeight(_gain, _gainSize, inner);
             var warning = Warning(
                 snapshot, plan, frame.MultiplayerAutoPlace, frame.QueryVerified,
-                frame.RuntimeVerification, frame.RuntimeVerificationReason, frame.Stale);
+                frame.RuntimeVerification, frame.RuntimeVerificationReason, frame.UnexplainedFixedCells, frame.Stale);
             _notice.text = warning;
             Widgets.FitHeight(_notice, _noticeSize, inner);
             Widgets.SetActive(_notice, warning.Length > 0);
@@ -601,7 +601,8 @@ namespace SephPlanner.Plugin.Ui
         /// </summary>
         private static string Warning(
             GameSnapshot snapshot, Plan plan, bool multiplayerAutoPlace, bool queryVerified,
-            PlanVerificationStatus runtimeVerification, string runtimeVerificationReason, bool stale)
+            PlanVerificationStatus runtimeVerification, string runtimeVerificationReason,
+            int unexplainedFixedCells, bool stale)
         {
             var warnings = new List<string>();
 
@@ -623,6 +624,9 @@ namespace SephPlanner.Plugin.Ui
                 runtimeVerificationReason != plan.Verification.Reason)
                 warnings.Add(runtimeVerificationReason);
 
+            if (unexplainedFixedCells > 0)
+                warnings.Add($"가방에 이유를 알 수 없는 칸 효과 {unexplainedFixedCells}칸이 있어 게임에 보이는 값 그대로 계산했습니다.");
+
             if (!plan.ManualMoveInstructionsAvailable)
                 warnings.Add("목표 배치가 유효하지 않아 수동 이동 순서를 만들 수 없습니다.");
 
@@ -636,6 +640,7 @@ namespace SephPlanner.Plugin.Ui
             warnings.AddRange(plan.RetentionWarnings);
             warnings.AddRange(plan.SupportWarnings);
             warnings.AddRange(plan.ActivationWarnings);
+            warnings.AddRange(plan.TabletWarnings);
 
             if (snapshot.IsMultiplayer)
             {

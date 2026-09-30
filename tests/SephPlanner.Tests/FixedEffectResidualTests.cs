@@ -132,4 +132,38 @@ public class FixedEffectResidualTests
 
         Assert.Empty(residual.Cells);
     }
+
+    [Fact]
+    public void EnchantLeftBehindByTheGameIsWhatTheHostOriginalDoesNotExplain()
+    {
+        // 제보 34a32e60: 게임이 인챈트 표를 잃으면 더해 둔 인챈트를 빼지 못해 행렬에 남는다.
+        // 인챈트는 0 으로 읽히므로 그 몫이 원본에 없는 고정 층으로 드러난다.
+        var original = new List<FixedEffectCell> { new() { Position = new GridPos(3, 0), Level = 1 } };
+        var game = Game(new Dictionary<GridPos, int>
+        {
+            [new GridPos(0, 1)] = 1,
+            [new GridPos(2, 1)] = 2,
+            [new GridPos(3, 0)] = 1,
+        });
+
+        var residual = FixedEffectResidual.Extract(Grid, Observed(), game);
+        var unexplained = FixedEffectResidual.Difference(original, residual.Cells);
+
+        Assert.False(FixedEffectResidual.Same(original, residual.Cells));
+        Assert.Collection(unexplained,
+            cell => { Assert.Equal(new GridPos(0, 1), cell.Position); Assert.Equal(1, cell.Level); },
+            cell => { Assert.Equal(new GridPos(2, 1), cell.Position); Assert.Equal(2, cell.Level); });
+    }
+
+    [Fact]
+    public void TheDifferenceKeepsWhatTheOriginalHasButTheGameDoesNot()
+    {
+        var original = new List<FixedEffectCell> { new() { Position = new GridPos(1, 1), Level = 2, Multiply = 2 } };
+        var actual = new List<FixedEffectCell> { new() { Position = new GridPos(1, 1), Level = 2 } };
+
+        var cell = Assert.Single(FixedEffectResidual.Difference(original, actual));
+
+        Assert.Equal(0, cell.Level);
+        Assert.Equal(-2, cell.Multiply);
+    }
 }

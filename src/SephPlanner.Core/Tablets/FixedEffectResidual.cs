@@ -145,6 +145,36 @@ namespace SephPlanner.Core.Tablets
             return true;
         }
 
+        /// <summary><paramref name="actual"/> 에서 <paramref name="expected"/> 를 칸마다 뺀 나머지.</summary>
+        public static List<FixedEffectCell> Difference(
+            IReadOnlyList<FixedEffectCell>? expected, IReadOnlyList<FixedEffectCell>? actual)
+        {
+            var cells = new Dictionary<GridPos, FixedEffectCell>();
+            foreach (var cell in actual ?? Array.Empty<FixedEffectCell>()) Add(cells, cell, 1);
+            foreach (var cell in expected ?? Array.Empty<FixedEffectCell>()) Add(cells, cell, -1);
+
+            var result = new List<FixedEffectCell>();
+            foreach (var cell in cells.Values)
+                if (cell.Level != 0 || cell.Multiply != 0 || cell.Disable != 0 || cell.IgnoreCriteria != 0)
+                    result.Add(cell);
+            result.Sort((a, b) => a.Position.Y != b.Position.Y
+                ? a.Position.Y.CompareTo(b.Position.Y) : a.Position.X.CompareTo(b.Position.X));
+            return result;
+        }
+
+        private static void Add(Dictionary<GridPos, FixedEffectCell> cells, FixedEffectCell cell, int sign)
+        {
+            if (!cells.TryGetValue(cell.Position, out var sum))
+            {
+                sum = new FixedEffectCell { Position = cell.Position };
+                cells[cell.Position] = sum;
+            }
+            sum.Level += sign * cell.Level;
+            sum.Multiply += sign * cell.Multiply;
+            sum.Disable += sign * cell.Disable;
+            sum.IgnoreCriteria += sign * cell.IgnoreCriteria;
+        }
+
         public static string Describe(IReadOnlyList<FixedEffectCell>? cells, int limit = 12)
         {
             if (cells == null || cells.Count == 0) return "없음";

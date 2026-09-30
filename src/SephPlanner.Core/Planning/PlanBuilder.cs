@@ -401,6 +401,7 @@ namespace SephPlanner.Core.Planning
                         (unapprovedDeactivation ? " 끄기 허용 없이 새로 비활성화하는 배치는 적용하지 않습니다." : ""))
                     .Concat(best.WrongSideCharms.Select(_ => "대립의 천칭: 있어야 할 쪽에 두는 배치를 찾지 못했습니다. 직접 원하는 쪽으로 옮긴 뒤 다시 계산하세요."))
                     .Concat(DormantPreferences(problem)).ToList(),
+                TabletWarnings = EmptyMixedTablets(problem),
                 ManualMoveInstructionsAvailable = manualMovesAvailable,
                 HasPlacementChanges = hasPlacementChanges,
                 InventoryWidth = inventory.Width,
@@ -437,6 +438,27 @@ namespace SephPlanner.Core.Planning
                     "연동된 무기를 들고 있지 않아 꺼져 있습니다. 강화 우선(★) 지정대로 자리는 잡아 두었으니 " +
                     "무기를 바꾸면 그대로 켜집니다. 그때까지는 점수에 들어가지 않습니다.")
                 .ToList();
+
+        /// <summary>
+        /// 합성 석판의 질의는 게임이 인스턴스마다 따로 들고 있다(<c>DungeonManager.customTabletQuery</c>).
+        /// 그 표를 잃으면 게임도 빈 질의로 적용해 효과가 사라진다(제보 34a32e60). 계산은 그대로 따르되
+        /// 사용자는 모르고 지나가므로 알린다.
+        /// </summary>
+        internal static List<string> EmptyMixedTablets(PlacementProblem problem)
+        {
+            var names = problem.Tablets
+                .Where(slot => slot.Definition.IsCustom && slot.InstanceQuery is { Length: 0 })
+                .Select(slot => string.IsNullOrEmpty(slot.InstanceName) ? "이름 없음" : slot.InstanceName!)
+                .ToList();
+            if (names.Count == 0) return new List<string>();
+
+            var kinds = names.GroupBy(name => name).OrderBy(group => group.Key, StringComparer.Ordinal)
+                .Select(group => group.Count() > 1 ? group.Key + " " + group.Count() : group.Key);
+            return new List<string>
+            {
+                $"합성 석판 {names.Count}개({string.Join(", ", kinds)})의 효과가 게임에 남아 있지 않아 아무 칸에도 영향을 주지 않습니다.",
+            };
+        }
 
         private static List<string> ComboPlacementWarnings(PlacementProblem problem, Arrangement best)
         {

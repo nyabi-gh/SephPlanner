@@ -27,6 +27,9 @@ namespace SephPlanner.Plugin.Ui
         public bool QueryVerified;
         public PlanVerificationStatus RuntimeVerification;
         public string RuntimeVerificationReason = "";
+
+        /// <summary>게임 행렬에 있으나 출처를 알 수 없어 게임 값 그대로 계산에 넣은 칸 수.</summary>
+        public int UnexplainedFixedCells;
         public string Hint = "";
 
         /// <summary>안내 줄이 지금 미리보기를 설명하고 있는가. 그때는 색이 달라야 눈에 든다.</summary>
@@ -66,6 +69,7 @@ namespace SephPlanner.Plugin.Ui
         private readonly string _previewKey;
         private readonly PlanVerificationStatus _verification;
         private readonly int _prefs;
+        private readonly int _unexplainedFixedCells;
         private readonly bool _expanded;
         private readonly bool _mixerOpen;
         private readonly bool _enchantOpen;
@@ -86,6 +90,7 @@ namespace SephPlanner.Plugin.Ui
             _reason = frame.RuntimeVerificationReason;
             _previewKey = frame.PreviewKey;
             _verification = frame.RuntimeVerification;
+            _unexplainedFixedCells = frame.UnexplainedFixedCells;
 
             // 빌드 창에서 강화 우선이나 밀고 있는 콤보를 바꾸면, 계획이 다시 풀리기 전에도
             // 격자와 칩의 표시가 달라진다. 개정 번호가 그 순간을 잡는다.
@@ -111,6 +116,7 @@ namespace SephPlanner.Plugin.Ui
             ReferenceEquals(_catalog, other._catalog) &&
             ReferenceEquals(_values, other._values) &&
             _verification == other._verification &&
+            _unexplainedFixedCells == other._unexplainedFixedCells &&
             _prefs == other._prefs &&
             _expanded == other._expanded &&
             _mixerOpen == other._mixerOpen &&

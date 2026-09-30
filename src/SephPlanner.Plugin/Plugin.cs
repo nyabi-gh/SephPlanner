@@ -35,6 +35,8 @@ namespace SephPlanner.Plugin
         private string _lastSephiriteReport;
         private int _verifiedTablets;
         private int _verifiedFixedCells;
+        private int _unexplainedFixedCells;
+        private string _reportedFixedEffectMismatch = "";
 
         private readonly NativeHud _hud = new NativeHud();
         private readonly PadInput _pad = new PadInput();
@@ -894,6 +896,15 @@ namespace SephPlanner.Plugin
                 QueueAutomaticDiagnostic("시뮬레이션 불일치", verification.Reason);
             }
 
+            _unexplainedFixedCells = verification.UnexplainedFixedCells;
+            var mismatch = verification.FixedEffectMismatch;
+            if (mismatch.Length > 0 && mismatch != _reportedFixedEffectMismatch)
+            {
+                _reportedFixedEffectMismatch = mismatch;
+                Logger.LogWarning(mismatch);
+                QueueAutomaticDiagnostic("고정 효과 원본 불일치", mismatch);
+            }
+
             // 일치할 때 아무것도 남기지 않으면 검증이 돌았는지조차 알 수 없다.
             var checkedTablets = SimulationVerifier.LastCheckedTablets;
             var fixedCells = SimulationVerifier.LastFixedCells;
@@ -1117,6 +1128,7 @@ namespace SephPlanner.Plugin
                 QueryVerified = CatalogDump.QueryVerificationPassed(),
                 RuntimeVerification = _simulationVerification,
                 RuntimeVerificationReason = _simulationReason,
+                UnexplainedFixedCells = _unexplainedFixedCells,
                 Hint = Hint(plan, preview, state),
                 HintIsPreview = preview != null,
                 PreviewKey = _previewKey,

@@ -139,4 +139,28 @@ public sealed class HudFrameTests
         Assert.False(busy.Matches(ready));
         Assert.True(ready.Matches(new HudFrameKey(frame)));
     }
+
+    /// <summary>출처를 알 수 없는 칸 안내는 검증 상태가 그대로인 채 켜지고 꺼진다.</summary>
+    [Fact]
+    public void UnexplainedFixedCellsRedrawEvenThoughThePlanIsTheSame()
+    {
+        var frame = new HudFrame
+        {
+            Snapshot = new(),
+            Plan = new Plan(),
+            Catalog = new Catalog([], []),
+            Prefs = new(),
+            Values = CharmValueBook.Empty,
+            RuntimeVerification = PlanVerificationStatus.Passed,
+            RuntimeVerificationReason = "",
+            Hint = "",
+            PreviewKey = "",
+            UnexplainedFixedCells = 0,
+        };
+
+        var explained = new HudFrameKey(frame);
+        frame.UnexplainedFixedCells = 3;
+
+        Assert.False(explained.Matches(new HudFrameKey(frame)));
+    }
 }
