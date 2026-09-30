@@ -678,7 +678,7 @@ fixedMultiplyLevel)를 들고 있고, 배수는 석판과 같은 `multiplyLevelM
 `DungeonManager.globalItemStatTable` 에서 읽는데, 이 표가 비면 인챈트를 빼지 못해 그 칸에 영구히 남는다.
 합성 석판 질의(`customTabletQuery`)도 같은 매니저에 있어, 비면 게임도 빈 질의로 적용해 효과가 사라진다.
 바닐라에서 둘을 함께 비우는 곳은 `HorayNetworkManager.RestartGame`(`ForceRemoveAll` →
-`globalItemStatTable.Clear` → `LoadDungeon`)이다. 0.4.20 제보 `34a32e60`(호스트, QoL 모드)은 계획과 F10 사이
+`globalItemStatTable.Clear` → `LoadDungeon`)이다. 0.4.20 제보 `34a32e60`(호스트, QoL 모드, 0.4.21 에서 고침)은 계획과 F10 사이
 69초에 가방이 8×8 → 10×7 로 바뀌고 두 표가 비었다 - 인스턴스 번호는 그대로라 모드가 판을 다시 시작하며
 가방을 되살린 것으로 본다(추정, 모드 코드 미확인). 되뺀 세 칸이 계획 시점 인챈트 +1·+2·+3 과 정확히 같다.
 그래서 **원본과 다르면 알리고(자동 진단 `고정 효과 원본 불일치`) 참가자처럼 되뺀 값을 추적기로 가려 쓴다.**
