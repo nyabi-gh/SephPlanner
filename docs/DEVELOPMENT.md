@@ -146,9 +146,15 @@ zip은 이 저장소의 Releases 에 올린다. 변경 기록은 CHANGELOG.md �
 본문 형식을 확인하고, 사용자가 수정한 드래프트는 현재 내용을 읽은 뒤 필요한 부분만 갱신한다.
 
 **소스와 배포본이 한 저장소에 있다**(`nyabi-gh/SephPlanner`, 공개). 2026-09-13 에 합쳤고 옛
-소스 저장소는 `SephPlanner-archive` 로 이름을 바꿔 잠갔다. 경위와, 그때 일부러 남긴 것들은
-[현재 상태](STATUS.md)의 "저장소 공개와 합치기" 에 있다 - **옛 태그가 로컬과 원격에서 갈라져
-있으므로 `git fetch --tags` 의 clobber 경고는 정상이고 `--force` 로 맞추지 않는다.**
+소스 저장소는 `SephPlanner-archive` 로 이름을 바꿔 잠갔다(옛 주소 `SephPlanner-Release` 는 리다이렉트된다).
+
+- **옛 태그가 로컬과 원격에서 갈라져 있다.** 원격의 `v0.1.0`~`v0.3.8` 은 옛 릴리스 저장소의 커밋을, 로컬의 같은
+  이름은 소스 커밋을 가리킨다. `git fetch --tags` 의 "would clobber existing tag" 는 정상이고 **`--force` 로 맞추지
+  않는다** - 릴리스 자산이 그 태그에 붙어 있다. `v0.3.9` 부터는 갈라지지 않는다.
+- 합칠 때 커밋 메시지의 트레일러를 지우느라 히스토리를 한 번 다시 썼다. 그래서 공개된 옛 릴리스 노트와 zip
+  manifest 의 커밋 번호는 이 저장소에서 찾을 수 없다.
+- 진단 서버 배치 문서(`deploy/diagnostics`)는 공인 주소와 서버 구성을 담고 있어 저장소에 넣지 않는다. 배포 담당자
+  디스크에 있고 `.gitignore` 가 `deploy/` 를 덮는다.
 
 **zip 의 이름과 `manifest.json` 은 게임 안 업데이트가 읽는다.** 플러그인은 `releases/latest` 가
 가리키는 태그 `v{버전}` 에서 운영체제에 맞는 ZIP을 받고, 안의 `manifest.json` 으로 버전과
@@ -160,6 +166,20 @@ DLL 둘의 SHA-256 을 대조한다(`UpdateClient`·`UpdatePackage`). 자산 이
 나중에 달면 zip을 만든 커밋과 태그가 갈라져 어느 소스에서 나온 zip인지 되짚을 수 없다.
 `make-release.ps1`이 HEAD에 `v{버전}` 태그가 없으면 멈추고, `[BepInPlugin]`의 버전과
 CHANGELOG의 해당 절도 함께 확인한다.
+
+## 게임이 패치되면
+
+카탈로그는 게임 버전·어셈블리가 바뀌면 스스로 다시 짓는다. 그 밖에 다시 보는 것.
+
+1. 카탈로그의 질의 검증(`query-verification.txt`)이 불일치 0 인지, 플러그인이 새 어셈블리로 경고 없이 빌드되는지.
+2. **쓰기 경로 셋이 그대로인지.** `GridInventory.Swap` → `LocalSwap`/`CmdSwap`, `DoClickAction` →
+   `LocalDoClickAction`/`CmdDoClickAction`, `StoneTablet.Networkrotation`. 우리가 부르는 것은 이 셋뿐이다. 개발사가
+   "동기화 구현이 최적화 중이라 바뀔 수 있다" 고 했으므로(LEGAL "받은 답변") 참가자 경로는 실기로도 다시 본다.
+3. 아티팩트 번호가 밀리지 않았는지(양쪽에 있는 것의 식별자가 같은지). 1.0.31 에서는 중복 등록이던 플리트비체의
+   물방울이 1261 → 1248 로 정리된 것 하나뿐이었다.
+4. 새 아티팩트·능력치 종류가 환산율을 받는지(`DataTool --values`), 새 조건 토큰이 없는지(모르는 조건은 `None` 으로
+   읽혀 조용히 통과한다).
+5. 1.0.32·1.0.33 은 이 대조를 하지 않았다.
 
 ## 화면 설계
 
@@ -226,17 +246,6 @@ CHANGELOG의 해당 절도 함께 확인한다.
 
 ## 문서
 
-- [STATUS.md](STATUS.md) — 현재 구현·추정·실기 미검증 범위와 다음 작업. 설계·감사·제보 문서는 여기서 잇는다
-- [REPRODUCTION.md](REPRODUCTION.md) — F10 계획 재현 자료와 진단 도구 사용법
-- [DIAGNOSTIC-UPLOAD.md](DIAGNOSTIC-UPLOAD.md) — F10 비공개 진단 전송과 서버 배포 인계
-
-- [INSTALL.txt](INSTALL.txt) — 사용자용 설치 안내. 메모장에서 그대로 읽히도록 마크다운 없이 평문으로 쓰고, 배포 zip에 `설치안내.txt`로 들어간다
-- [RESEARCH.md](RESEARCH.md) — 게임 내부 구조 조사 결과
-- [LEGAL.md](LEGAL.md) — 약관·저작권 검토와 그에 따른 설계 제약
-- [ROADMAP.md](ROADMAP.md) — 백로그, 측정 기준선, 고치지 않기로 한 것
-- [PERFORMANCE.md](PERFORMANCE.md) — 성능과 응답성. 지금 값, 남은 일감, 지켜야 할 규약
-- [CHANGELOG.md](CHANGELOG.md) — 버전별 사용자 영향 변경 사항
-- [PLACEMENT-OBJECTIVE.md](PLACEMENT-OBJECTIVE.md) — 배치 평가 순서, 활성 보호, 선호도 가중치, 사용 유지
-- [HANDOVER.md](HANDOVER.md) — 직전 세션이 남긴 길잡이. 세션마다 덮어쓰며, STATUS 와 어긋나면 STATUS 가 정본이다
-- [notes/](notes) — 지난 검토·감사·제보 분석과 측정 기록. 그때의 사실이며 현재 상태가 아니다
-- [LICENSE](../LICENSE) — MIT. 우리가 비영리인 것은 운영 방침이지 라이선스 조건이 아니다
+어느 문서가 무엇을 맡는지는 [현재 상태](STATUS.md)의 "문서 지도" 에 있다. 문서를 새로 만들기 전에 거기 들어갈
+자리가 있는지 먼저 본다. 날짜가 붙은 조사 보고서는 따로 두지 않는다 - 결론은 해당 문서의 절에, 경위는 커밋
+메시지에 남긴다. [LICENSE](../LICENSE) 는 MIT 이고, 우리가 비영리인 것은 운영 방침이지 라이선스 조건이 아니다.

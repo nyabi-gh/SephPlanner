@@ -11,7 +11,7 @@ namespace SephPlanner.Tests;
 /// 배치는 폴링마다 다시 풀리고 <c>F8</c>이 옮겨 주므로 근시안이어도 되지만, 이 셋은 한 번 하면
 /// 끝이다. 아래·오른쪽으로 뻗는 석판은 잠긴 칸 몫이 버려져 지금 가방에서만 값이 낮으므로,
 /// 그것만 보고 줄을 세우면 두 층 뒤에 가장 좋았을 석판을 상점에서 흘려보낸다.
-/// 판단의 경위는 docs/notes/LOOKAHEAD-2026-09-14.md 에 있다.
+/// 판단의 경위는 docs/PLACEMENT-OBJECTIVE.md 의 "앞을 보는 자리" 에 있다.
 /// </summary>
 public class LookaheadTests
 {
