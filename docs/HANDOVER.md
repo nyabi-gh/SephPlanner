@@ -39,7 +39,12 @@
 이어서 셋을 더 했다. 폴링의 지문 비용은 Unity Mono 로 재 보니 이미 작아 ROADMAP 만 고쳤고,
 `FrameCost`·`GameBinding` 을 테스트 프로젝트로 링크하고 `ItemIdentity` 시험을 넣었고(검토 6-1·6-3), 제거·인챈트 조언의
 문턱을 점수 눈금으로 바꿨다(검토 3-3, 42건 재현 불변). 마지막 것은 0.4.22 CHANGELOG 의 Fixed 에
-넣었다. 이 셋과 CHANGELOG 커밋까지 태그로 옮겨 드래프트 ZIP 을 다시 올린다.
+넣었다. 태그를 `d2775b4` 로 옮겨 드래프트 ZIP·본문을 갱신했다.
+
+**태그 뒤(드래프트 밖).** 셋을 더 했다. 업데이트가 반쯤 걸리면 알린다 - 되돌리기 실패를 `UpdateRollbackException` 으로
+올리고, 시작할 때 플러그인과 Core 의 판을 대조해 다르면 다시 설치하라고 띄운다(`40ce8be`, 플레이어가 보는 변화라
+CHANGELOG 미기재). `CompareTo` 단계 순서와 허용 오차를 `PlacementQualityTests` 로 고정했다(검토 3-4·3-6). `check.ps1` 이 판
+대조와 경고 0 을 강제하고 `make-release.ps1` 이 그것을 부르며, `--replay` 가 실패를 종료 코드로 낸다(검토 6-4).
 
 ## 다음 세션
 
