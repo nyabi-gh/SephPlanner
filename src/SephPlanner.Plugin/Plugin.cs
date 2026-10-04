@@ -729,16 +729,17 @@ namespace SephPlanner.Plugin
         /// </summary>
         private void FinishPreviousUpdate()
         {
-            var updated = UpdateInstaller.CleanRetired(UpdateTargets().Values);
+            // 판 대조를 지우기보다 먼저 한다. 옛 DLL 이 잠겨 지우다 실패해도 알림은 남아야 한다.
             var core = typeof(UpdateClient).Assembly.GetName().Version;
-            if (UpdateClient.Normalize(CurrentVersion()) != UpdateClient.Normalize(core))
+            var split = UpdateClient.Normalize(CurrentVersion()) != UpdateClient.Normalize(core);
+            if (split)
             {
                 _startupNotice = "SephPlanner 파일의 판이 서로 다릅니다(플러그인 " + UpdateClient.Format(CurrentVersion()) +
                                  ", Core " + UpdateClient.Format(core) + "). " + UpdateRollbackException.ReinstallAdvice;
                 Logger.LogError(_startupNotice);
-                return;
             }
-            if (!updated) return;
+            var updated = UpdateInstaller.CleanRetired(UpdateTargets().Values);
+            if (split || !updated) return;
             _startupNotice = "SephPlanner " + UpdateClient.Format(CurrentVersion()) + " 으로 업데이트됐습니다.";
             Logger.LogInfo("업데이트가 적용됐습니다. 이전 버전의 DLL 을 지웠습니다.");
         }
