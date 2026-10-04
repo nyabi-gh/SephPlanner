@@ -41,9 +41,9 @@
 문턱을 점수 눈금으로 바꿨다(검토 3-3, 42건 재현 불변). 마지막 것은 0.4.22 CHANGELOG 의 Fixed 에
 넣었다. 태그를 `d2775b4` 로 옮겨 드래프트 ZIP·본문을 갱신했다.
 
-**태그 뒤(드래프트 밖).** 셋을 더 했다. 업데이트가 반쯤 걸리면 알린다 - 되돌리기 실패를 `UpdateRollbackException` 으로
-올리고, 시작할 때 플러그인과 Core 의 판을 대조해 다르면 다시 설치하라고 띄운다(`40ce8be`, 플레이어가 보는 변화라
-CHANGELOG 미기재). `CompareTo` 단계 순서와 허용 오차를 `PlacementQualityTests` 로 고정했다(검토 3-4·3-6). `check.ps1` 이 판
+**0.4.22 에 더한 것.** 셋을 더 했다. 업데이트가 반쯤 걸리면 알린다 - 되돌리기 실패를 `UpdateRollbackException` 으로
+올리고, 시작할 때 플러그인과 Core 의 판을 대조해 다르면 다시 설치하라고 띄운다(`40ce8be`, 0.4.22 CHANGELOG 에 넣고
+옛 Core 와 섞여도 돌도록 대조를 옛 API 로만 했다). `CompareTo` 단계 순서와 허용 오차를 `PlacementQualityTests` 로 고정했다(검토 3-4·3-6). `check.ps1` 이 판
 대조와 경고 0 을 강제하고 `make-release.ps1` 이 그것을 부르며, `--replay` 가 실패를 종료 코드로 낸다(검토 6-4).
 
 ## 다음 세션

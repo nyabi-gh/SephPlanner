@@ -722,12 +722,16 @@ namespace SephPlanner.Plugin
         /// <summary>
         /// 지난 실행이 밀어 둔 옛 DLL 을 지운다. 있었다면 이번이 새 버전의 첫 실행이다. 두 DLL 의 판이
         /// 다르면 업데이트가 반쯤 걸린 것이라 알리고 다시 설치하라고 한다.
+        ///
+        /// <b>여기서는 옛 Core 에도 있던 것만 부른다.</b> 판이 섞였다면 Core 가 옛것일 수 있고, 그때 새로 생긴
+        /// 멤버를 부르면 이 메서드가 통째로 못 돌아 알릴 기회를 잃는다. 문자열 상수는 컴파일할 때 박히므로 괜찮다.
+        /// 이 메서드를 부르는 <c>Awake</c> 본문도 같다 - 거기서 새 Core 멤버를 직접 부르면 여기까지 오지 못한다.
         /// </summary>
         private void FinishPreviousUpdate()
         {
             var updated = UpdateInstaller.CleanRetired(UpdateTargets().Values);
             var core = typeof(UpdateClient).Assembly.GetName().Version;
-            if (!UpdateInstaller.SameRelease(CurrentVersion(), core))
+            if (UpdateClient.Normalize(CurrentVersion()) != UpdateClient.Normalize(core))
             {
                 _startupNotice = "SephPlanner 파일의 판이 서로 다릅니다(플러그인 " + UpdateClient.Format(CurrentVersion()) +
                                  ", Core " + UpdateClient.Format(core) + "). " + UpdateRollbackException.ReinstallAdvice;

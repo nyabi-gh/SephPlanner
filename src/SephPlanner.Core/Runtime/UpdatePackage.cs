@@ -187,13 +187,6 @@ namespace SephPlanner.Core.Runtime
         }
 
         /// <summary>
-        /// 다음 실행에 올라올 플러그인과 Core 가 같은 판인가. 교체 도중에 게임이 꺼지거나 되돌리기가
-        /// 실패하면 둘이 갈라진 채 올라올 수 있다.
-        /// </summary>
-        public static bool SameRelease(Version plugin, Version core) =>
-            UpdateClient.Normalize(plugin) == UpdateClient.Normalize(core);
-
-        /// <summary>
         /// 지난 실행이 밀어 둔 <c>.old</c> 를 지운다. 하나라도 있었으면 방금 새 버전으로 올라온
         /// 것이므로 참을 돌려준다 - 그것이 "업데이트됐다" 를 알리는 유일한 표시다.
         /// </summary>

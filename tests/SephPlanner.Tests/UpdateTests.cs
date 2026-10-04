@@ -234,13 +234,6 @@ public class UpdateTests
         Assert.Equal("막힘", error.InnerException?.Message);
     }
 
-    [Fact]
-    public void SameReleaseIgnoresTheRevisionButNotTheVersion()
-    {
-        Assert.True(UpdateInstaller.SameRelease(new Version(0, 4, 22, 0), new Version(0, 4, 22)));
-        Assert.False(UpdateInstaller.SameRelease(new Version(0, 4, 22, 0), new Version(0, 4, 21, 0)));
-    }
-
     private static Dictionary<string, string> Targets(string directory) => new()
     {
         [UpdatePackage.PluginFile] = Path.Combine(directory, UpdatePackage.PluginFile),
