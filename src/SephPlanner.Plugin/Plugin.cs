@@ -73,7 +73,7 @@ namespace SephPlanner.Plugin
         /// <summary>화면에 띄워야 하는데 아직 못 띄운 단계. 창을 만들 수 있을 때까지 폴링마다 다시 시도한다.</summary>
         private UpdateWindow.Stage? _updatePrompt;
         private float _updatePromptRetryAt;
-        private bool _updatedOnThisStart;
+        private string _startupNotice = "";
         private string _lastPanelOrigin;
         private string _lastPanelBlocker;
         private readonly Dictionary<string, string> _lastErrors = new Dictionary<string, string>();
@@ -719,11 +719,23 @@ namespace SephPlanner.Plugin
             [UpdatePackage.CoreFile] = typeof(UpdateClient).Assembly.Location,
         };
 
-        /// <summary>지난 실행이 밀어 둔 옛 DLL 을 지운다. 있었다면 이번이 새 버전의 첫 실행이다.</summary>
+        /// <summary>
+        /// 지난 실행이 밀어 둔 옛 DLL 을 지운다. 있었다면 이번이 새 버전의 첫 실행이다. 두 DLL 의 판이
+        /// 다르면 업데이트가 반쯤 걸린 것이라 알리고 다시 설치하라고 한다.
+        /// </summary>
         private void FinishPreviousUpdate()
         {
-            if (!UpdateInstaller.CleanRetired(UpdateTargets().Values)) return;
-            _updatedOnThisStart = true;
+            var updated = UpdateInstaller.CleanRetired(UpdateTargets().Values);
+            var core = typeof(UpdateClient).Assembly.GetName().Version;
+            if (!UpdateInstaller.SameRelease(CurrentVersion(), core))
+            {
+                _startupNotice = "SephPlanner 파일의 판이 서로 다릅니다(플러그인 " + UpdateClient.Format(CurrentVersion()) +
+                                 ", Core " + UpdateClient.Format(core) + "). " + UpdateRollbackException.ReinstallAdvice;
+                Logger.LogError(_startupNotice);
+                return;
+            }
+            if (!updated) return;
+            _startupNotice = "SephPlanner " + UpdateClient.Format(CurrentVersion()) + " 으로 업데이트됐습니다.";
             Logger.LogInfo("업데이트가 적용됐습니다. 이전 버전의 DLL 을 지웠습니다.");
         }
 
@@ -1031,10 +1043,10 @@ namespace SephPlanner.Plugin
                 Report(Guide());
 
                 // 화면이 처음 서는 순간에 알린다. Awake 에서 걸어 두면 게임이 뜨는 사이에 시효가 지난다.
-                if (_updatedOnThisStart)
+                if (_startupNotice.Length > 0)
                 {
-                    _updatedOnThisStart = false;
-                    ReportDiagnostic("SephPlanner " + UpdateClient.Format(CurrentVersion()) + " 으로 업데이트됐습니다.");
+                    ReportDiagnostic(_startupNotice);
+                    _startupNotice = "";
                 }
                 if (_hud.Origin != _lastPanelOrigin)
                 {

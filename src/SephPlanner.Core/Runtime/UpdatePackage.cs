@@ -13,6 +13,10 @@ namespace SephPlanner.Core.Runtime
     ///
     /// 검증은 zip 안의 <c>manifest.json</c> 으로 한다. <c>make-release.ps1</c> 이 파일마다 SHA-256 을
     /// 적어 두므로 받다가 깨진 파일이나 버전이 다른 zip 을 여기서 걸러낸다.
+    ///
+    /// <b>manifest 는 같은 zip 안에 있으므로 이 검증은 자기참조다.</b> 깨짐과 판 어긋남은 거르지만, zip 을
+    /// 통째로 바꿔치기한 것은 막지 못한다. 그쪽은 받는 길을 GitHub 릴리스의 HTTPS 로만 두는
+    /// <see cref="UpdateClient"/>에 기댄다.
     /// </summary>
     public static class UpdatePackage
     {
@@ -74,6 +78,30 @@ namespace SephPlanner.Core.Runtime
     }
 
     /// <summary>
+    /// 실패한 업데이트를 되돌리지 못한 것. 플러그인과 Core 의 판이 섞였거나 파일이 빠졌을 수 있어
+    /// 사용자가 손으로 다시 설치해야 한다.
+    /// </summary>
+    public sealed class UpdateRollbackException : IOException
+    {
+        public IReadOnlyList<string> Stranded { get; }
+        /// <summary>손으로 다시 설치하는 법. README 의 "직접 업데이트" 와 같은 말이다.</summary>
+        public const string ReinstallAdvice =
+            "게임을 끄고 ZIP 의 BepInEx/plugins 안 DLL 두 개를 게임 폴더의 같은 위치에 다시 덮어쓰세요.";
+
+        public UpdateRollbackException(IReadOnlyList<string> stranded, Exception cause)
+            : base("업데이트를 되돌리지 못해 SephPlanner 파일이 섞였을 수 있습니다(" +
+                   string.Join(", ", Names(stranded)) + "). " + ReinstallAdvice, cause)
+        {
+            Stranded = stranded;
+        }
+
+        private static IEnumerable<string> Names(IEnumerable<string> paths)
+        {
+            foreach (var path in paths) yield return Path.GetFileName(path);
+        }
+    }
+
+    /// <summary>
     /// 받은 DLL 을 지금 로드된 파일의 자리에 놓는다.
     ///
     /// <b>로드된 DLL 은 덮어쓸 수도 지울 수도 없지만 이름은 바꿀 수 있다.</b> 게임을 켠 채로
@@ -124,27 +152,46 @@ namespace SephPlanner.Core.Runtime
                     File.Move(Path.ChangeExtension(target, StagedExtension), target);
                 }
             }
-            catch
+            catch (Exception error)
             {
-                foreach (var target in swapped)
-                {
-                    try
-                    {
-                        if (File.Exists(target)) File.Delete(target);
-                        File.Move(Retired(target), target);
-                    }
-                    catch (IOException) { }
-                    catch (UnauthorizedAccessException) { }
-                }
+                var stranded = RollBack(swapped);
+                // 남은 .new 는 로더가 올리지 않으므로 지우지 못해도 해가 없다.
                 foreach (var path in staged)
                 {
                     try { File.Delete(path); }
                     catch (IOException) { }
                     catch (UnauthorizedAccessException) { }
                 }
+                if (stranded.Count > 0) throw new UpdateRollbackException(stranded, error);
                 throw;
             }
         }
+
+        /// <summary>옮겨 둔 옛 파일을 제자리로 돌린다. 돌리지 못한 자리를 돌려준다.</summary>
+        internal static List<string> RollBack(IEnumerable<string> swapped)
+        {
+            var stranded = new List<string>();
+            foreach (var target in swapped)
+            {
+                try
+                {
+                    if (File.Exists(target)) File.Delete(target);
+                    File.Move(Retired(target), target);
+                }
+                catch (Exception error) when (error is IOException || error is UnauthorizedAccessException)
+                {
+                    stranded.Add(target);
+                }
+            }
+            return stranded;
+        }
+
+        /// <summary>
+        /// 다음 실행에 올라올 플러그인과 Core 가 같은 판인가. 교체 도중에 게임이 꺼지거나 되돌리기가
+        /// 실패하면 둘이 갈라진 채 올라올 수 있다.
+        /// </summary>
+        public static bool SameRelease(Version plugin, Version core) =>
+            UpdateClient.Normalize(plugin) == UpdateClient.Normalize(core);
 
         /// <summary>
         /// 지난 실행이 밀어 둔 <c>.old</c> 를 지운다. 하나라도 있었으면 방금 새 버전으로 올라온

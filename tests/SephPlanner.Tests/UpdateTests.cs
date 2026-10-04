@@ -199,6 +199,48 @@ public class UpdateTests
         Assert.Equal(2, Directory.GetFiles(directory.Path).Length);
     }
 
+    /// <summary>
+    /// 되돌리지 못한 자리는 삼키지 않고 돌려준다. 삼켰던 동안에는 플러그인과 Core 의 판이 섞여도 사용자가
+    /// 알 길이 없었고, 다음 실행은 "업데이트됐습니다" 를 띄웠다.
+    /// </summary>
+    [Fact]
+    public void RollBackReportsTheFilesItCouldNotRestore()
+    {
+        using var directory = new DiagnosticTestDirectory();
+        var targets = Targets(directory.Path);
+        var plugin = targets[UpdatePackage.PluginFile];
+        var core = targets[UpdatePackage.CoreFile];
+        File.WriteAllText(plugin, "new plugin");
+        File.WriteAllText(UpdateInstaller.Retired(plugin), "old plugin");
+        // 제자리를 폴더가 막고 있으면 옛 파일을 돌려놓지 못한다.
+        Directory.CreateDirectory(core);
+        File.WriteAllText(UpdateInstaller.Retired(core), "old core");
+
+        var stranded = UpdateInstaller.RollBack(new[] { plugin, core });
+
+        Assert.Equal(new[] { core }, stranded);
+        Assert.Equal("old plugin", File.ReadAllText(plugin));
+        Assert.Equal("old core", File.ReadAllText(UpdateInstaller.Retired(core)));
+    }
+
+    [Fact]
+    public void RollBackExceptionNamesTheFilesAndHowToReinstall()
+    {
+        var error = new UpdateRollbackException(
+            new[] { Path.Combine("plugins", UpdatePackage.CoreFile) }, new IOException("막힘"));
+
+        Assert.Contains(UpdatePackage.CoreFile, error.Message);
+        Assert.Contains(UpdateRollbackException.ReinstallAdvice, error.Message);
+        Assert.Equal("막힘", error.InnerException?.Message);
+    }
+
+    [Fact]
+    public void SameReleaseIgnoresTheRevisionButNotTheVersion()
+    {
+        Assert.True(UpdateInstaller.SameRelease(new Version(0, 4, 22, 0), new Version(0, 4, 22)));
+        Assert.False(UpdateInstaller.SameRelease(new Version(0, 4, 22, 0), new Version(0, 4, 21, 0)));
+    }
+
     private static Dictionary<string, string> Targets(string directory) => new()
     {
         [UpdatePackage.PluginFile] = Path.Combine(directory, UpdatePackage.PluginFile),

@@ -161,8 +161,6 @@ git 로그의 `docs/notes/REVIEW-2026-09-22.md` 에 있다.
 ### 런타임·업데이트
 
 - `ApplyPlanRoutine` 의 이른 `TargetDrift` 반환에만 `Collapsed()` 재접속 안내가 빠진다.
-- `UpdatePackage` 가 되돌리기 실패를 빈 catch 로 삼켜 Plugin·Core 판이 섞일 수 있다. 업데이트 무결성은 zip 안의
-  `manifest.json` 을 믿는 자기참조라는 것도 코드·문서에 적혀 있지 않다.
 - `Update` 앞머리와 `OnDestroy` 가 `Guarded` 밖이다.
 - `inventory-snapshot.json`·`plan.replay` 는 진단 텍스트의 가림을 거치지 않는다(`DiagnosticCapture`).
   `DiagnosticText` 의 정규식은 `?token=` 꼴을 놓친다.
