@@ -15,7 +15,10 @@ public static class SnapshotReplay
     /// <summary>플러그인의 PlanRunner 처럼 직전 계획을 앵커로 잇는다. 다르게 하면 진단이 실제와 어긋난다.</summary>
     private static Plan? _previous;
 
-    /// <summary>녹화해 둔 스냅샷들을 순서대로 다시 풀어 본다. 솔버를 고친 뒤 같은 세션으로 검증하는 용도다.</summary>
+    /// <summary>
+    /// 녹화해 둔 스냅샷들을 순서대로 다시 풀어 본다. 솔버를 고친 뒤 같은 세션으로 검증하는 용도다.
+    /// 하나라도 못 풀었거나 스냅샷이 없으면 1 이다 - 회귀 검사에 쓰려면 실패가 종료 코드로 보여야 한다.
+    /// </summary>
     public static int Run(string dir)
     {
         var catalog = LoadCatalog();
@@ -26,6 +29,7 @@ public static class SnapshotReplay
         var watch = new System.Diagnostics.Stopwatch();
         var total = 0L;
         var count = 0;
+        var failed = 0;
 
         foreach (var path in Directory.GetFiles(dir, "*.json").OrderBy(p => p, StringComparer.Ordinal))
         {
@@ -33,11 +37,12 @@ public static class SnapshotReplay
             watch.Restart();
             lastTargets = Describe(count, File.ReadAllText(path), catalog, lastTargets);
             watch.Stop();
+            if (lastTargets is null) failed++;
             total += watch.ElapsedMilliseconds;
         }
 
-        Console.WriteLine($"스냅샷 {count}장, 풀이 평균 {(count > 0 ? total / count : 0)}ms, 합계 {total}ms");
-        return 0;
+        Console.WriteLine($"스냅샷 {count}장, 풀이 평균 {(count > 0 ? total / count : 0)}ms, 합계 {total}ms, 실패 {failed}장");
+        return count == 0 || failed > 0 ? 1 : 0;
     }
 
     private static Catalog? LoadCatalog()

@@ -1,13 +1,13 @@
-﻿$ErrorActionPreference = "Stop"
+﻿#Requires -Version 7
+# 5.1 에서는 $IsMacOS 가 없고 manifest.json 의 BOM 이 셸에 따라 달라진다.
+$ErrorActionPreference = "Stop"
 # 콘솔이 한글을 깨뜨리지 않게 한다. 실패 이유를 읽을 수 없으면 검사가 반쪽이 된다.
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $root = Split-Path $PSScriptRoot -Parent
-$solution = Join-Path $root "SephPlanner.slnx"
 $artifacts = Join-Path $root "artifacts"
 $stage = Join-Path $artifacts "stage"
 $zipRoot = Join-Path $stage "SephPlanner"
 $pluginProject = Join-Path $root "src/SephPlanner.Plugin/SephPlanner.Plugin.csproj"
-$testProject = Join-Path $root "tests/SephPlanner.Tests/SephPlanner.Tests.csproj"
 $thirdParty = Join-Path $root "third-party"
 $overlay = Join-Path $zipRoot "게임 폴더에 복사"
 
@@ -20,11 +20,6 @@ $bepinexUrl = "https://github.com/BepInEx/BepInEx/releases/download/v$bepinexVer
 $bepinexSha256 = if ($IsMacOS) { "01c2ae782eb016dfd6c345a18dbd2dcafffb3d9d318449d6486689f426b4a323" } else { "82f9878551030f54657792c0740d9d51a09500eeae1fba21106b0c441e6732c4" }
 $version = ([xml](Get-Content (Join-Path $root "Directory.Build.props"))).Project.PropertyGroup.Version |
     Where-Object { $_ } | Select-Object -First 1
-
-function Invoke-DotNet([string[]]$Arguments, [string]$Failure) {
-    & dotnet @Arguments
-    if ($LASTEXITCODE -ne 0) { throw $Failure }
-}
 
 # 받아 둔 것이든 방금 받은 것이든 해시를 매번 확인한다. 남의 코드를 사용자 게임 폴더에 넣어
 # 주는 일이라 "예전에 맞았다"로는 부족하다.
@@ -46,22 +41,7 @@ function Get-BepInEx {
 if (-not $version) { throw "배포 버전을 읽지 못했습니다." }
 if (& git -C $root status --porcelain) { throw "작업 트리가 깨끗하지 않습니다. 커밋한 뒤 다시 실행하세요." }
 
-# 버전은 네 곳에 손으로 적힌다. 어긋나도 빌드와 테스트는 통과하므로 여기서 붙잡는다.
-# BepInEx 로그와 F10 덤프 첫 줄에 찍히는 것이 플러그인 쪽 값이라, 어긋나면 제보를 받고도
-# 어느 빌드인지 되짚을 수 없다. STATUS 는 그 자체가 정본이라고 규정된 문서인데 갱신을
-# 강제하는 것이 없어 두 판이 밀린 적이 있다.
-$pluginSource = Get-Content (Join-Path $root "src/SephPlanner.Plugin/Plugin.cs") -Raw
-if ($pluginSource -notmatch [regex]::Escape("[BepInPlugin(PluginGuid, ""SephPlanner"", ""$version"")]")) {
-    throw "[BepInPlugin] 의 버전이 $version 이 아닙니다. Plugin.cs 를 맞추세요."
-}
-$status = Get-Content (Join-Path $root "docs/STATUS.md") -Raw
-if ($status -notmatch [regex]::Escape("**이번 판: $version.**")) {
-    throw "STATUS.md 의 '배포 상태' 가 이번 판을 $version 이라고 말하지 않습니다."
-}
 $changelog = Get-Content (Join-Path $root "docs/CHANGELOG.md")
-if ($changelog -notcontains "## $version") {
-    throw "CHANGELOG.md 에 '## $version' 절이 없습니다."
-}
 
 # 릴리스 본문은 CHANGELOG 의 해당 절을 그대로 뽑는다. 손으로 옮겨 적으면 두 벌이 되고,
 # 한쪽만 고친 채 나가면 배포된 본문과 저장소가 갈라진다.
@@ -83,10 +63,8 @@ if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
 New-Item -ItemType Directory -Force $overlay | Out-Null
 
 try {
-    Invoke-DotNet @("restore", $solution, "--locked-mode") "복원 실패"
-    Invoke-DotNet @("format", $solution, "--verify-no-changes", "--no-restore") "포맷 검사 실패"
-    Invoke-DotNet @("test", $testProject, "-c", "Release", "--no-restore") "테스트 실패"
-    Invoke-DotNet @("build", $pluginProject, "-c", "Release", "--no-restore", "-p:DeployToGame=false") "플러그인 빌드 실패"
+    # 판 대조·포맷·테스트·플러그인 빌드는 커밋 전 검사와 한 벌이다.
+    & (Join-Path $PSScriptRoot "check.ps1")
 
     # 게임 폴더에 그대로 부을 한 벌을 먼저 짓는다. 받는 사람이 할 일은 한 폴더의 내용을 옮기는 것뿐이다.
     if ($IsMacOS) {

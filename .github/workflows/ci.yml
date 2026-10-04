@@ -24,6 +24,6 @@ jobs:
       - run: dotnet format src/SephPlanner.Core/SephPlanner.Core.csproj --verify-no-changes --no-restore
       - run: dotnet format src/SephPlanner.Diagnostics/SephPlanner.Diagnostics.csproj --verify-no-changes --no-restore
       - run: dotnet format tests/SephPlanner.Tests/SephPlanner.Tests.csproj --verify-no-changes --no-restore
-      - run: dotnet test tests/SephPlanner.Tests/SephPlanner.Tests.csproj -c Release --no-restore
+      - run: dotnet test tests/SephPlanner.Tests/SephPlanner.Tests.csproj -c Release --no-restore -p:TreatWarningsAsErrors=true
       - run: dotnet format src/SephPlanner.DataTool/SephPlanner.DataTool.csproj --verify-no-changes --no-restore
-      - run: dotnet build src/SephPlanner.DataTool/SephPlanner.DataTool.csproj -c Release --no-restore
+      - run: dotnet build src/SephPlanner.DataTool/SephPlanner.DataTool.csproj -c Release --no-restore -p:TreatWarningsAsErrors=true

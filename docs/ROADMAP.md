@@ -110,8 +110,8 @@ git 로그의 `docs/notes/REVIEW-2026-09-22.md` 에 있다.
 
 ### 검증·도구·빌드
 
-- 버전은 여전히 세 곳에 손으로 적힌다(`Directory.Build.props`, `[BepInPlugin]`, `CHANGELOG`).
-  `make-release.ps1` 이 셋이 어긋나면 멈추지만, 한 곳에서 나오게 만든 것은 아니다.
+- 버전은 여전히 네 곳에 손으로 적힌다(`Directory.Build.props`, `[BepInPlugin]`, `CHANGELOG`, STATUS).
+  `check.ps1` 이 넷이 어긋나면 멈추지만(`make-release.ps1` 도 그것을 부른다), 한 곳에서 나오게 만든 것은 아니다.
 - **CI는 Plugin을 빌드하지 못한다.** DataTool 빌드·포맷은 2026-09-05 추가했고 Plugin은 로컬 `check.ps1`로 검사한다.
   근본 해법은 Plugin 의 로직을 Core 로 더 옮겨 CI 가 검사할 표면을 넓히는 것이다. 적용기의
   걸음 순서·저널·되돌리기·시간 상한은 `ApplyPlanRoutine` 으로 옮겨 가짜 격자로 시험한다.
@@ -133,11 +133,7 @@ git 로그의 `docs/notes/REVIEW-2026-09-22.md` 에 있다.
   타입(`GridInventory`·`StoneTablet`·`UnitAvatar`)을 직접 읽어 링크되지 않는다. `GrowthProgressWatch` 의 판정은 이미
   Core(`GrowthProgressReading`)에 있고, 나머지 셋의 비교는 게임 행렬을 읽는 몇 줄이라 떼어 내는 값이 작다.
   **다시 열 조건:** 이 셋에서 판정이 틀린 제보가 오면 그 비교를 Core 로 옮기며 시험을 붙인다.
-- **`--replay` 가 기본 설정으로 풀고 실패해도 0 을 돌려준다**(`SnapshotReplay`). 회귀 검사에 쓰려면 실패 종료 코드가
-  필요하다. 설정까지 재현하는 것은 `--reproduce` 다.
-- 도구·CI 의 작은 것(검토 6-4). `TreatWarningsAsErrors` 가 없다. `make-release.ps1` 에 `#Requires -Version 7` 이 없다.
-  `check.ps1` 이 버전을 대조하지 않는다. CI 에 cache·concurrency·timeout 이 없고 push+PR 로 두 번 돈다.
-  `DocumentedCommandsAreAccepted` 에 `--check`·`--replay`·`--measure`·`--values`·`--charm-stats` 가 빠졌다.
+- 도구·CI 의 작은 것(검토 6-4). CI 에 cache·concurrency·timeout 이 없고 push+PR 로 두 번 돈다.
   `CharmValueSource` 가 스키마 오류를 삼킨다. 픽스처 생성 프로그램이 `artifacts/` 에만 있다.
 
 ### 화면
