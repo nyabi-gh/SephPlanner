@@ -76,6 +76,23 @@ public class SolverCostTests
         Assert.True(with < without * 1.1, $"콤보 우선 {with:N0}B, 끔 {without:N0}B");
     }
 
+    /// <summary>
+    /// 빔은 확장마다 배치를 짓지 않는다. 다음 단계로 가는 것은 빔 폭만큼이라, 확장 수만큼 지으면
+    /// 석판 11장·41칸 판에서 탐색 한 번이 83MB 를 버렸다(제보 <c>698b2f07</c>).
+    /// </summary>
+    [Fact]
+    public void BeamExpansionsAreNotMaterialized()
+    {
+        var problem = FullBag(20, spare: 10);
+        var options = new SolverOptions { BeamWidth = 100, ExactCandidates = 10 };
+        PlacementSolver.SearchBeam(problem, options);
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        PlacementSolver.SearchBeam(problem, options);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        Assert.True(allocated < 6_000_000, $"{allocated:N0}B");
+    }
+
     private static List<OfferCandidate> Candidates(int charms, int tablets)
     {
         var candidates = new List<OfferCandidate>();

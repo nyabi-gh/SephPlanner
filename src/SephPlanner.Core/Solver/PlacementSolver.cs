@@ -874,6 +874,11 @@ namespace SephPlanner.Core.Solver
             var beam = new List<List<TabletPlacement>> { new List<TabletPlacement>() };
             var twin = Twins(problem);
 
+            // 확장은 수만 개인데 다음 단계로 가는 것은 빔 폭만큼이다. 확장마다 배치를 새로 지으면
+            // 그 쓰레기가 풀이 한 번에 수십 MB 라, 채점은 작업 배치 하나로 하고 고른 것만 짓는다.
+            var expanded = new List<(TabletPlacement Placement, PlacementQuality Score, int Parent)>();
+            var trial = new List<TabletPlacement>(problem.Tablets.Count);
+
             for (var index = 0; index < problem.Tablets.Count; index++)
             {
                 var slot = problem.Tablets[index];
@@ -888,12 +893,15 @@ namespace SephPlanner.Core.Solver
                 // 같은 자리·회전의 석판은 탐색 중 읽기만 하므로 부모 후보들이 공유한다.
                 var placements = cells.Select(cell => rotations.Select(rotation => slot.At(cell, rotation)).ToArray()).ToArray();
 
-                var expanded = new List<(List<TabletPlacement> Layout, PlacementQuality Score, int Parent)>();
+                expanded.Clear();
 
                 for (var parent = 0; parent < beam.Count; parent++)
                 {
                     var layout = beam[parent];
                     var taken = new HashSet<GridPos>(layout.Select(p => p.Position));
+                    trial.Clear();
+                    trial.AddRange(layout);
+                    trial.Add(null!);
 
                     // 똑같은 석판끼리는 자리를 맞바꿔도 같은 배치다. 앞선 쌍둥이보다 뒤쪽 칸만
                     // 보게 해 그 순열들을 한 번씩만 만든다.
@@ -909,17 +917,15 @@ namespace SephPlanner.Core.Solver
 
                         foreach (var placement in placements[cellIndex])
                         {
-                            var next = new List<TabletPlacement>(layout.Count + 1);
-                            next.AddRange(layout);
-                            next.Add(placement);
-                            expanded.Add((next, Estimate(problem, cells, next, model), parent));
+                            trial[layout.Count] = placement;
+                            expanded.Add((placement, Estimate(problem, cells, trial, model), parent));
                         }
                     }
                 }
 
                 if (expanded.Count == 0) break;
 
-                beam = Select(expanded, beam.Count, options);
+                beam = Select(expanded, beam, options);
             }
             return beam;
         }
@@ -938,10 +944,11 @@ namespace SephPlanner.Core.Solver
         /// 하나뿐이다) 빔을 비워 두지 않기 위해서다.
         /// </summary>
         private static List<List<TabletPlacement>> Select(
-            List<(List<TabletPlacement> Layout, PlacementQuality Score, int Parent)> expanded,
-            int parents, SolverOptions options)
+            List<(TabletPlacement Placement, PlacementQuality Score, int Parent)> expanded,
+            List<List<TabletPlacement>> beam, SolverOptions options)
         {
             expanded.Sort((a, b) => b.Score.CompareTo(a.Score));
+            var parents = beam.Count;
 
             var quota = options.BeamWidth;
             if (parents > 1 && options.ParentQuota > 0)
@@ -949,7 +956,7 @@ namespace SephPlanner.Core.Solver
 
             var chosen = new List<List<TabletPlacement>>(Math.Min(options.BeamWidth, expanded.Count));
             var used = new Dictionary<int, int>(parents);
-            var skipped = new List<List<TabletPlacement>>();
+            var skipped = new List<(TabletPlacement Placement, PlacementQuality Score, int Parent)>();
 
             foreach (var entry in expanded)
             {
@@ -958,18 +965,26 @@ namespace SephPlanner.Core.Solver
                 used.TryGetValue(entry.Parent, out var count);
                 if (count >= quota)
                 {
-                    if (skipped.Count < options.BeamWidth) skipped.Add(entry.Layout);
+                    if (skipped.Count < options.BeamWidth) skipped.Add(entry);
                     continue;
                 }
 
                 used[entry.Parent] = count + 1;
-                chosen.Add(entry.Layout);
+                chosen.Add(Grow(beam[entry.Parent], entry.Placement));
             }
 
             for (var i = 0; i < skipped.Count && chosen.Count < options.BeamWidth; i++)
-                chosen.Add(skipped[i]);
+                chosen.Add(Grow(beam[skipped[i].Parent], skipped[i].Placement));
 
             return chosen;
+        }
+
+        private static List<TabletPlacement> Grow(List<TabletPlacement> parent, TabletPlacement placement)
+        {
+            var layout = new List<TabletPlacement>(parent.Count + 1);
+            layout.AddRange(parent);
+            layout.Add(placement);
+            return layout;
         }
 
         /// <summary>
