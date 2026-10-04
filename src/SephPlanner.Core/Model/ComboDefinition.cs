@@ -5,7 +5,7 @@ namespace SephPlanner.Core.Model
     /// <summary>
     /// 콤보(세트 효과) 정의. 게임의 <c>ItemCategoryEntity</c>에서 온다. 같은 카테고리의
     /// 아티팩트를 임계값만큼 모으면 효과가 발동하며, 개수는 배치 위치와 무관하게 격자에 있는
-    /// 아티팩트 전체로 센다. 그래서 배치 최적화가 아니라 후보 추천에 쓰인다.
+    /// 아티팩트 전체로 센다. 자리에 따라 카테고리가 바뀌는 열쇠·종이·침만 배치에 따라 개수가 달라진다.
     /// </summary>
     public sealed class ComboDefinition
     {

@@ -28,8 +28,7 @@ namespace SephPlanner.Core.Model
         public double? PerLevel { get; set; }
 
         /// <summary>
-        /// 빌드 성향 꼬리표. 지금은 저장·표시만 하고 점수에 쓰지 않는다. 빌드 프로필이 여기에
-        /// 가중치를 걸게 되면 그때 이어진다(docs/ROADMAP.md).
+        /// 빌드 성향 꼬리표. 지금은 저장·표시만 하고 점수에 쓰지 않는다.
         /// </summary>
         public List<string> Tags { get; set; } = new List<string>();
 

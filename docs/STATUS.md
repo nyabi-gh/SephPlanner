@@ -134,8 +134,8 @@ macOS 에서 카탈로그 시도가 58회 → 1회(0.4.15).
 | STATUS | 이 문서 |
 | [HANDOVER](HANDOVER.md) | 직전 세션의 길잡이. 세션마다 덮어쓴다 |
 | [ROADMAP](ROADMAP.md) | 백로그와 고치지 않기로 한 것 |
-| [RESEARCH](RESEARCH.md) | 디컴파일로 확인한 게임 규칙 |
-| [PLACEMENT-OBJECTIVE](PLACEMENT-OBJECTIVE.md) | 배치 비교 순서와 사용자 지정의 뜻 |
+| [RESEARCH](RESEARCH.md) | 디컴파일로 확인한 게임 규칙과 그것을 읽는 법. 솔버 정책은 PLACEMENT-OBJECTIVE, 성능은 PERFORMANCE 로 |
+| [PLACEMENT-OBJECTIVE](PLACEMENT-OBJECTIVE.md) | 배치 비교 순서, 탐색 구조, 제안 안정화와 사용자 지정의 뜻 |
 | [PERFORMANCE](PERFORMANCE.md) | 성능과 측정 기준선. **"지켜야 할 규약" 절은 성능 작업 전에 읽는다** |
 | [REPRODUCTION](REPRODUCTION.md) · [DIAGNOSTIC-UPLOAD](DIAGNOSTIC-UPLOAD.md) | F10 재현 자료와 진단 전송 |
 | [DEVELOPMENT](DEVELOPMENT.md) | 빌드·배포·화면 설계 |
