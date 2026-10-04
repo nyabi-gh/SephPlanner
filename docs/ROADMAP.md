@@ -99,9 +99,8 @@ git 로그의 `docs/notes/REVIEW-2026-09-22.md` 에 있다.
   다시 열 조건은 [배치 평가](PLACEMENT-OBJECTIVE.md)의 "앞을 보는 자리".
 - **이웃 의존 아티팩트 대부분이 아직 모델 밖이다.** 목록과 게임 규칙은 [게임 내부 조사](RESEARCH.md)의
   "아직 모델 밖인 효과". 종이 중첩과 능력치 전환은 갱신 순서까지 재현해야 해서 정적 수식으로는 안 된다.
-- **`PlacementQuality.CompareTo` 의 1e-9 허용오차가 비추이 비교다**(검토 3-4). 지금 안전한 것은 `PlanBonus`(2e-8)가
-  그 20배라는, 어디에도 적히지 않은 결합 덕이다. 결합을 주석으로 적고 고정 시험을 둔다(2~3시간).
-- **직접 시험이 없는 것**(검토 3-6). `CompareTo` 9단계 표 시험(반나절, 가장 값이 크다), `CharmCriteria.ReadsNeighbors`,
+- **직접 시험이 없는 것**(검토 3-6). `CompareTo` 단계 순서와 허용 오차의 관계는 `PlacementQualityTests` 가 붙잡았다
+  (2026-10-04). 남은 것은 `CharmCriteria.ReadsNeighbors`,
   `StatExchange.CrossValidate`·`IsReliable`, `DirectedCharmSupport`·`ContextStatWorth`·`BuildStatWorth`·`PreparedTablet`.
 - 솔버의 작은 것(검토 3-5). `PriorityPlacement` 의 `ToDictionary` 가 칸이 겹치면 던지는데 `PlanBuilder` 는 취소
   예외만 잡는다. `DirectedCharmSupport.Estimate` 에 메모가 없고 `ImproveTablets` 가 패스마다 할당한다. `TabletQuery`

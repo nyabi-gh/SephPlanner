@@ -10,7 +10,11 @@ namespace SephPlanner.Core.Solver
     /// <summary>석판 후보 탐색과 조건부 아티팩트 배정을 공통 우선순위로 비교한다.</summary>
     public static class PlacementSolver
     {
-        private const double PlanBonus = 2e-8;
+        /// <summary>
+        /// 직전 계획과 같은 자리에 주는 몫. 지금 자리 한 수(1)보다 한참 작아 동률일 때만 가르고,
+        /// <see cref="PlacementQuality.Tolerance"/>보다는 커야 비교가 이 몫을 지우지 않는다.
+        /// </summary>
+        internal const double PlanBonus = 2e-8;
 
         /// <param name="layouts">
         /// 빔 탐색을 받아 올 자리. <see cref="ImproveTablets"/>가 private 이라 밖에서는 이 순서를

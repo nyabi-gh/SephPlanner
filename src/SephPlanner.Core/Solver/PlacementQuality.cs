@@ -72,8 +72,16 @@ namespace SephPlanner.Core.Solver
             return order != 0 ? order : Compare(Familiarity, other.Familiarity);
         }
 
+        /// <summary>
+        /// 실수 단계를 같다고 볼 차이. 눈금을 씌우지 않는 <c>ComboProgress</c>·<c>Familiarity</c> 는 이 값으로만
+        /// 끊기므로 비교가 추이적이지 않다. 지금 안전한 것은 <c>Familiarity</c> 의 가장 작은 몫인
+        /// <see cref="PlacementSolver.PlanBonus"/>가 이보다 20배 커서 몫끼리의 차이가 이 안에 들지 않기
+        /// 때문이다. 둘 중 하나를 바꾸면 그 관계부터 본다(<c>PlacementQualityTests</c>).
+        /// </summary>
+        internal const double Tolerance = 1e-9;
+
         private static int Compare(double left, double right) =>
-            left == right ? 0 : Math.Abs(left - right) <= 1e-9 ? 0 : left.CompareTo(right);
+            left == right ? 0 : Math.Abs(left - right) <= Tolerance ? 0 : left.CompareTo(right);
     }
 
     internal readonly struct AssignmentCost : IComparable<AssignmentCost>
