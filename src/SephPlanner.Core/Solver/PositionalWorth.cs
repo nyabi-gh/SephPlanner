@@ -103,6 +103,11 @@ namespace SephPlanner.Core.Solver
         /// 콤보를 세는 <c>SearchSetEffectInInventory</c>가 그 값을 읽으므로 <b>이들에 한해서는 콤보
         /// 개수가 배치에 달려 있다</b>(docs/RESEARCH.md). 출발 개수는 자기 몫을 뺀 것이어야 한다 -
         /// <see cref="ComboCounting"/>.
+        ///
+        /// <b>단계를 채울 때만 값이 있다.</b> 못 채우는 +1 은 지금 아무 효과가 없고, 이 아티팩트는
+        /// 다음 계획에서 언제든 다른 줄로 옮길 수 있다. 그 +1 에 진행 가치를 주면 배치가 지금 받는
+        /// 능력치를 잰 적 없는 앞날의 짐작과 맞바꾼다(docs/PLACEMENT-OBJECTIVE.md 의 "앞을 보는 자리").
+        /// 진행 가치는 되돌릴 수 없는 획득을 견주는 후보 조언에만 쓴다.
         /// </summary>
         public static double ComboWorth(
             PlacementProblem problem, CharmSlot charm, GridPos cell,
@@ -125,8 +130,9 @@ namespace SephPlanner.Core.Solver
                 var combo = problem.Combos(category);
                 if (combo is null) continue;
 
-                worth += problem.Scale.OfComboStep(
-                    combo, ComboCounting.CountFor(problem, charm, category, neighbors), out _, out _);
+                var step = problem.Scale.OfComboStep(
+                    combo, ComboCounting.CountFor(problem, charm, category, neighbors), out var completes, out _);
+                if (completes) worth += step;
             }
             return worth;
         }

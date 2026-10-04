@@ -349,6 +349,32 @@ public class PositionalWorthTests
     }
 
     /// <summary>
+    /// 단계를 채우지 못하는 줄은 값이 없다. 견고가 이미 다 찬 판에서 빙하 0 → 1 을 값으로 쳤더니
+    /// 물리 빌드의 열쇠가 물리 피해를 주는 견고 행을 버리고 빙하 행으로 갔다(제보 b4826648).
+    /// </summary>
+    [Fact]
+    public void AChalcedonyKeyRowThatCompletesNoStageIsWorthNoComboValue()
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(1, 2, 2) };
+        var key = new CharmSlot
+        {
+            InstanceId = 1,
+            Definition = new CharmDefinition
+            {
+                MaxLevel = 3,
+                Behavior = "Charm_3Elemental_ByRow",
+                LineCategories = { "STURDY", "GLACIER" },
+            },
+        };
+        problem.Charms.Add(key);
+        problem.ComboCounts = new Dictionary<string, int> { ["STURDY"] = 11 };
+        problem.Combos = id => new ComboDefinition { Id = id, Thresholds = { 2, 4, 6, 8, 10 } };
+
+        Assert.Equal(0, PositionalWorth.ComboWorth(problem, key, new GridPos(0, 0), null));
+        Assert.Equal(0, PositionalWorth.ComboWorth(problem, key, new GridPos(0, 1), null));
+    }
+
+    /// <summary>
     /// 실제 카탈로그의 북향(1289·1290). 덤은 기본의 2.5배이고 조건은 레어도 언커먼 이하다.
     /// </summary>
     private static CharmDefinition ConditionalNeedle() => new()

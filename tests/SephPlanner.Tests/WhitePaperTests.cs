@@ -71,7 +71,7 @@ public class WhitePaperTests
     }
 
     /// <summary>1x3 격자. 잉걸불 둘이 양끝에 있고 하얀 종이가 남는다.</summary>
-    private static PlacementProblem Sandwich(bool withCombos)
+    private static PlacementProblem Sandwich(bool withCombos, int count = 2)
     {
         var problem = new PlacementProblem { Grid = new GridSpec(3, 1, 3) };
 
@@ -97,7 +97,7 @@ public class WhitePaperTests
 
         if (withCombos)
         {
-            problem.ComboCounts = new Dictionary<string, int> { ["EMBER"] = 2 };
+            problem.ComboCounts = new Dictionary<string, int> { ["EMBER"] = count };
             problem.Combos = id => id == "EMBER"
                 ? new ComboDefinition { Id = "EMBER", Thresholds = { 2, 5, 8 } }
                 : null;
@@ -106,14 +106,28 @@ public class WhitePaperTests
     }
 
     [Fact]
-    public void APaperBetweenASharedCategoryPairIsWorthAComboStep()
+    public void APaperBetweenASharedCategoryPairIsWorthTheStageItCompletes()
     {
-        var with = PlacementSolver.Solve(Sandwich(withCombos: true));
+        var with = PlacementSolver.Solve(Sandwich(withCombos: true, count: 4));
         var without = PlacementSolver.Solve(Sandwich(withCombos: false));
 
         // 게임의 Charm_WhitePaper 는 양옆이 공유하는 카테고리를 물려받아 콤보에 +1 을 보탠다.
-        // 잉걸불 2개에서 3개째(다음 임계값 5를 향한 진행)가 되므로 진행 가치만큼 점수가 오른다.
+        // 잉걸불 4개에서 5개째가 되어 임계값 5를 채우므로 그 단계의 가치만큼 점수가 오른다.
         Assert.Equal(new GridPos(1, 0), with.CharmPositions[3]);
-        Assert.Equal(Worth.ComboProgress, with.Score - without.Score, 3);
+        Assert.Equal(Worth.ComboThreshold, with.Score - without.Score, 3);
+    }
+
+    /// <summary>
+    /// 단계를 채우지 못하는 +1 은 지금 아무 효과가 없다. 배치는 언제든 다시 옮길 수 있으니 그 +1 에
+    /// 값을 매기면 지금 받는 능력치를 앞날의 짐작과 맞바꾸게 된다(제보 b4826648, 견고가 다 찬
+    /// 물리 빌드에서 켈세더니 열쇠를 빙하 행으로 옮겼다).
+    /// </summary>
+    [Fact]
+    public void APaperThatDoesNotCompleteAStageIsWorthNothingNow()
+    {
+        var with = PlacementSolver.Solve(Sandwich(withCombos: true, count: 2));
+        var without = PlacementSolver.Solve(Sandwich(withCombos: false));
+
+        Assert.Equal(0, with.Score - without.Score, 3);
     }
 }
