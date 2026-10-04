@@ -108,6 +108,11 @@ namespace SephPlanner.Core.Solver
         /// 다음 계획에서 언제든 다른 줄로 옮길 수 있다. 그 +1 에 진행 가치를 주면 배치가 지금 받는
         /// 능력치를 잰 적 없는 앞날의 짐작과 맞바꾼다(docs/PLACEMENT-OBJECTIVE.md 의 "앞을 보는 자리").
         /// 진행 가치는 되돌릴 수 없는 획득을 견주는 후보 조언에만 쓴다.
+        ///
+        /// <b>꺼져 있어도 같다.</b> 셋 다 꺼질 때 능력치만 거두고 카테고리는 다시 찾아 둔다 - 열쇠는
+        /// <c>Charm_3Elemental_ByRow.OnDisabledEffect</c> 가 <c>SearchCategory(idx, false)</c> 로 행의 것을, 종이와
+        /// 침은 <c>OnDisabledEffect</c> 가 활성을 묻지 않는 <c>SearchCategory()</c> 로 이웃의 것을 담는다(1.0.33).
+        /// 게임은 활성과 무관하게 콤보를 세므로 꺼진 채로도 콤보에 든다.
         /// </summary>
         public static double ComboWorth(
             PlacementProblem problem, CharmSlot charm, GridPos cell,
@@ -136,13 +141,6 @@ namespace SephPlanner.Core.Solver
             }
             return worth;
         }
-
-        /// <summary>
-        /// 꺼져도 카테고리를 내보이는가. 열쇠는 꺼질 때도 행이 정한 카테고리를 그대로 두고 능력치만 거둔다
-        /// (<c>Charm_3Elemental_ByRow.OnDisabledEffect</c> → <c>SearchCategory(idx, false)</c>). 게임은 활성과
-        /// 무관하게 콤보를 세므로 꺼진 열쇠도 콤보에 든다. 종이와 침은 꺼진 채를 확인하지 않아 넣지 않는다.
-        /// </summary>
-        internal static bool KeepsCategoryWhenOff(CharmDefinition definition) => definition.LineCategories.Count > 0;
 
         private static readonly IReadOnlyDictionary<GridPos, CharmSlot> EmptyNeighbors =
             new Dictionary<GridPos, CharmSlot>();

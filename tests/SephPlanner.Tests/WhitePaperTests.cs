@@ -118,6 +118,27 @@ public class WhitePaperTests
     }
 
     /// <summary>
+    /// 꺼진 종이도 양옆의 카테고리를 담아 둔다(게임 <c>Charm_WhitePaper.OnDisabledEffect</c> 가 활성을 묻지 않고
+    /// 다시 찾는다). 게임은 꺼진 아티팩트로도 콤보를 세므로 단계를 채우는 값은 그대로다.
+    /// </summary>
+    [Fact]
+    public void ASwitchedOffPaperStillCompletesTheStage()
+    {
+        // 게임의 수 5 에는 지금 자리의 종이 몫이 들어 있다.
+        var problem = Sandwich(withCombos: true, count: 5);
+        problem.FixedEffects.Add(new FixedEffectCell { Position = new GridPos(1, 0), Disable = 1 });
+        problem.CurrentCharms[3] = new GridPos(1, 0);
+        var off = PlacementSolver.Score(problem, new List<TabletPlacement>(), problem.CurrentCharms);
+
+        Assert.Contains(3, off.InactiveCharms);
+        var without = Sandwich(withCombos: false);
+        without.FixedEffects.Add(new FixedEffectCell { Position = new GridPos(1, 0), Disable = 1 });
+        without.CurrentCharms[3] = new GridPos(1, 0);
+        Assert.Equal(Worth.ComboThreshold,
+            off.Score - PlacementSolver.Score(without, new List<TabletPlacement>(), without.CurrentCharms).Score, 3);
+    }
+
+    /// <summary>
     /// 단계를 채우지 못하는 +1 은 지금 아무 효과가 없다. 배치는 언제든 다시 옮길 수 있으니 그 +1 에
     /// 값을 매기면 지금 받는 능력치를 앞날의 짐작과 맞바꾸게 된다(제보 b4826648, 견고가 다 찬
     /// 물리 빌드에서 켈세더니 열쇠를 빙하 행으로 옮겼다).

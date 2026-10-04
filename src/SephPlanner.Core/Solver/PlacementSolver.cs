@@ -1512,8 +1512,7 @@ namespace SephPlanner.Core.Solver
                 familiarity += part.Anchors;
                 waste += part.Waste;
                 if (categories is not null && !charm.IsFiller && PriorityPlacement.Applies(charm.Definition) &&
-                    PriorityPlacement.Contribute(problem, charm,
-                        !part.Inactive || PositionalWorth.KeepsCategoryWhenOff(charm.Definition), positions[charm.InstanceId],
+                    PriorityPlacement.Contribute(problem, charm, true, positions[charm.InstanceId],
                         neighbors!, categories, ref comboProgress))
                     comboMatches++;
                 if (designated && !part.Inactive && DirectedCharmSupport.HasConnection(charm) &&
@@ -1710,14 +1709,12 @@ namespace SephPlanner.Core.Solver
         {
             if (charm.IsFiller) return 0;
             var inactive = Reason(charm, cell, result, problem.Grid, occupancy) != CharmInactiveReason.None;
-            var offCombo = inactive && PositionalWorth.KeepsCategoryWhenOff(charm.Definition)
+            var offCombo = inactive
                 ? CharmWorth.ApplyWeight(PositionalWorth.ComboWorth(problem, charm, cell, neighbors), charm.Weight)
                 : 0;
 
             if (charm.ComboOnly)
-                return inactive
-                    ? offCombo
-                    : CharmWorth.ApplyWeight(PositionalWorth.ComboWorth(problem, charm, cell, neighbors), charm.Weight);
+                return CharmWorth.ApplyWeight(PositionalWorth.ComboWorth(problem, charm, cell, neighbors), charm.Weight);
             if (inactive && !PositionalWorth.IsNeedle(charm.Definition))
                 return DormantPreference(problem, charm, cell, result, occupancy) + offCombo;
 
@@ -1735,7 +1732,7 @@ namespace SephPlanner.Core.Solver
             if (PositionalWorth.IsNeedle(charm.Definition) && neighbors is not null &&
                 !DirectedCharmSupport.IsConnected(charm, cell, result, problem.Grid, occupancy, neighbors)) factor = 0;
             // DisableEffect는 침의 보너스 요청을 끄지 않고 limitedEffectEnabledLevel만 0으로 만든다.
-            if (inactive) return charm.Worth.WeightedAt(0, charm.Weight) * factor;
+            if (inactive) return charm.Worth.WeightedAt(0, charm.Weight) * factor + offCombo;
 
             var value = BuildStatWorth.Value(problem, charm, effective, result, occupancy, neighbors) * factor;
             if (charm.Definition.ContextStats.Count > 0)
