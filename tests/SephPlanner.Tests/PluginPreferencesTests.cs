@@ -26,25 +26,29 @@ public sealed class PluginPreferencesTests : IDisposable
         Assert.False(Load().IsDeactivationAllowed(9));
     }
     [Fact]
-    public void TheLevelCapCyclesFromZeroToJustBelowTheMaximum()
+    public void TheLevelCapCyclesFromComboOnlyToJustBelowTheMaximum()
     {
         var prefs = Load();
         var forward = new List<int?>();
-        for (var i = 0; i < 5; i++)
+        for (var i = 0; i < 6; i++)
         {
             prefs.StepLevelCap(3, 1, 4);
             forward.Add(prefs.LevelCap(3));
         }
-        Assert.Equal(new int?[] { 0, 1, 2, 3, null }, forward);
+        Assert.Equal(new int?[] { PlanPreferences.ComboOnly, 0, 1, 2, 3, null }, forward);
 
         prefs.StepLevelCap(3, -1, 4);
         Assert.Equal(3, prefs.LevelCap(3));
         for (var i = 0; i < 3; i++) prefs.StepLevelCap(3, -1, 4);
         Assert.Equal(0, Load().LevelCap(3));
-        Assert.Equal(0, Load().ToPreferences(false).LevelCaps[3]);
+        prefs.StepLevelCap(3, -1, 4);
+        Assert.Equal(PlanPreferences.ComboOnly, Load().LevelCap(3));
+        Assert.Equal(PlanPreferences.ComboOnly, Load().ToPreferences(false).LevelCaps[3]);
         prefs.StepLevelCap(3, -1, 4);
         Assert.Null(prefs.LevelCap(3));
 
+        prefs.StepLevelCap(4, 1, 1);
+        Assert.Equal(PlanPreferences.ComboOnly, prefs.LevelCap(4));
         prefs.StepLevelCap(4, 1, 1);
         Assert.Equal(0, prefs.LevelCap(4));
         prefs.StepLevelCap(4, 1, 1);

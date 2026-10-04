@@ -711,6 +711,7 @@ namespace SephPlanner.Core.Solver
         /// 잣대이되, 자리에 달린 몫(조건·이웃·안정)은 뺀 것이다 - 아직 어느 칸인지 모르기 때문이다.
         /// </summary>
         private static double RankValue(PlacementProblem problem, CharmSlot charm, int level) =>
+            charm.ComboOnly ? 0 :
             charm.Definition.ContextStats.Count > 0
                 ? ContextStatWorth.Value(problem, charm, default, Math.Min(charm.WorthLevelCap, level), null, true) :
             charm.Definition.MagicSupport is not null
@@ -1608,7 +1609,7 @@ namespace SephPlanner.Core.Solver
                 inactive: reason != CharmInactiveReason.None);
         }
 
-        internal static bool Preserve(CharmSlot charm) => !charm.IsFiller && !charm.IsDormant && !charm.Definition.HasNoActivationEffect && !charm.AllowDeactivation;
+        internal static bool Preserve(CharmSlot charm) => !charm.IsFiller && !charm.IsDormant && !charm.Definition.HasNoActivationEffect && !charm.AllowDeactivation && !charm.ComboOnly;
         private static bool RequiresUse(PlacementProblem problem, CharmSlot charm) =>
             charm.Retained || problem.ProtectedActive.Contains(charm.InstanceId);
 
@@ -1708,6 +1709,13 @@ namespace SephPlanner.Core.Solver
         {
             if (charm.IsFiller) return 0;
             var inactive = Reason(charm, cell, result, problem.Grid, occupancy) != CharmInactiveReason.None;
+
+            // 열쇠는 꺼져도 행이 정한 카테고리를 그대로 내보인다(Charm_3Elemental_ByRow.SearchCategory).
+            // 종이와 침은 꺼진 채의 카테고리를 확인하지 않았으므로 켜져 있을 때만 센다.
+            if (charm.ComboOnly)
+                return inactive && charm.Definition.LineCategories.Count == 0
+                    ? 0
+                    : CharmWorth.ApplyWeight(PositionalWorth.ComboWorth(problem, charm, cell, neighbors), charm.Weight);
             if (inactive && !PositionalWorth.IsNeedle(charm.Definition))
                 return DormantPreference(problem, charm, cell, result, occupancy);
 

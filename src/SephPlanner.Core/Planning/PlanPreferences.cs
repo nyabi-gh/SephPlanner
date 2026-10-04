@@ -85,6 +85,13 @@ namespace SephPlanner.Core.Planning
         public Dictionary<int, int> LevelCaps { get; set; } = new Dictionary<int, int>();
 
         /// <summary>
+        /// <see cref="LevelCaps"/> 의 0 아래 단계. 효과는 값으로 치지 않고 콤보 수만 채운다. 게임은 활성·레벨과
+        /// 무관하게 격자의 아티팩트로 콤보를 세므로(docs/RESEARCH.md 의 "콤보") 꺼져도 잃는 것이 없고, 끄기를
+        /// 허용한 것으로 친다. 그래서 마음의 짐처럼 감점 칸을 먼저 채우고 좋은 칸을 남에게 넘긴다.
+        /// </summary>
+        public const int ComboOnly = -1;
+
+        /// <summary>
         /// 침·모래시계가 강화할 대상으로 삼을 아티팩트(엔티티 번호).
         ///
         /// <b>왜 필요한가.</b> 게임은 자리만 보고 대상을 정하므로 여기 물어볼 것이 없다는 것이

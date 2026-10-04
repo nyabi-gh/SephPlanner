@@ -157,10 +157,12 @@ namespace SephPlanner.Plugin
         }
 
         public int? LevelCap(int entityId) =>
-            entityId != 0 && LevelCaps.TryGetValue(entityId, out var level) && level >= 0 ? level : (int?)null;
+            entityId != 0 && LevelCaps.TryGetValue(entityId, out var level) && level >= PlanPreferences.ComboOnly
+                ? level
+                : (int?)null;
 
         /// <summary>
-        /// 레벨 제한을 한 단계 옮긴다. 없음 → 0 → 1 → … → <paramref name="maxLevel"/> 직전까지
+        /// 레벨 제한을 한 단계 옮긴다. 없음 → 콤보만 → 0 → 1 → … → <paramref name="maxLevel"/> 직전까지
         /// 돌고 다시 없음이다. 상한과 같은 제한은 제한이 아니므로 목록에 두지 않는다.
         /// </summary>
         public void StepLevelCap(int entityId, int direction, int maxLevel)
@@ -169,8 +171,8 @@ namespace SephPlanner.Plugin
 
             var highest = maxLevel - 1;
             var current = LevelCap(entityId);
-            var next = current is int level ? level + Math.Sign(direction) : direction > 0 ? 0 : highest;
-            if (next < 0 || next > highest) LevelCaps.Remove(entityId);
+            var next = current is int level ? level + Math.Sign(direction) : direction > 0 ? PlanPreferences.ComboOnly : highest;
+            if (next < PlanPreferences.ComboOnly || next > highest) LevelCaps.Remove(entityId);
             else LevelCaps[entityId] = next;
             Changed();
         }

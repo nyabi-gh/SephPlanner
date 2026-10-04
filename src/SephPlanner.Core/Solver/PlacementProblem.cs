@@ -53,7 +53,10 @@ namespace SephPlanner.Core.Solver
         /// 그쪽은 게임 사실이고 이것은 우리 선호다.
         /// </summary>
         public int WorthLevelCap =>
-            LevelCap is int cap && cap >= 0 ? System.Math.Min(Definition.MaxLevel, cap) : Definition.MaxLevel;
+            LevelCap is int cap ? System.Math.Max(0, System.Math.Min(Definition.MaxLevel, cap)) : Definition.MaxLevel;
+
+        /// <summary>효과는 값으로 치지 않고 콤보 수만 채운다(<see cref="Planning.PlanPreferences.ComboOnly"/>).</summary>
+        public bool ComboOnly => LevelCap == Planning.PlanPreferences.ComboOnly;
 
         /// <summary>
         /// 지금 칸에서 옮길 수 없다(<see cref="Runtime.PlacedItem.Immovable"/>). 배정에서 빼고

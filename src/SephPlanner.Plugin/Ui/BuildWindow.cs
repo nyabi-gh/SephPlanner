@@ -791,7 +791,9 @@ namespace SephPlanner.Plugin.Ui
                 Widgets.SetActive(_deactivation, entry.EntityId != 0);
                 _support.color = entry.SupportTarget ? NativeSkin.Mint : NativeSkin.TextDim;
                 Widgets.SetActive(_support, entry.EntityId != 0 && (entry.CanSupport || entry.SupportTarget));
-                _cap.text = entry.LevelCap is int cap ? "목표 " + cap + "레벨" : "목표 레벨";
+                _cap.text = entry.LevelCap is int cap
+                    ? cap == PlanPreferences.ComboOnly ? "콤보만" : "목표 " + cap + "레벨"
+                    : "목표 레벨";
                 _cap.color = entry.LevelCap.HasValue ? NativeSkin.Mint : NativeSkin.TextDim;
                 Widgets.SetActive(_cap, entry.EntityId != 0);
                 _hold.color = entry.Held ? NativeSkin.Mint : NativeSkin.TextDim;

@@ -758,7 +758,9 @@ namespace SephPlanner.Plugin.Ui
                 if (frame.Prefs != null && frame.Prefs.IsDeactivationAllowed(charmId))
                     lines.Add("끄기 허용: 배치 이득이 있으면 효과를 꺼도 됩니다. 항상 끄지는 않으며 사용 유지가 함께 켜져 있으면 효과를 유지합니다.");
                 if (frame.Prefs?.LevelCap(charmId) is int cap)
-                    lines.Add(cap == 0
+                    lines.Add(cap == PlanPreferences.ComboOnly
+                        ? "콤보만: 효과는 값으로 치지 않고 콤보 수만 채웁니다. 꺼져도 콤보는 세므로 감점 칸을 먼저 채우고 좋은 칸은 다른 아이템에 넘깁니다."
+                        : cap == 0
                         ? "목표 레벨: 0레벨로 평가해 효과만 켜 두고 레벨 이득은 세지 않습니다. 실제 배치 레벨은 더 높을 수 있습니다."
                         : $"목표 레벨: {cap}레벨까지만 이득으로 평가합니다. 실제 배치 레벨은 더 높을 수 있습니다.");
                 return Explain.Join(lines);
