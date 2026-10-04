@@ -22,12 +22,10 @@
   편차로 10% 쯤 움직이므로 **한 자리까지 인용하지 말고 표 안에서 비율로 읽는다.**
 - **Mono 배율은 4.4~5.6배의 어림이다.** 게임 안에 올려 잰 것이 아니라 Unity 동봉
   `MonoBleedingEdge/bin/mono-bdwgc.exe` 에서 같은 코드를 돌린 값이다.
-- **개발 PC 재현.** 스크래치 콘솔 하나면 된다(약 40줄). `PlanReplayFile.Read` →
-  `JsonSerializer.Deserialize<PlanReplay>` → `Preferences.Restore()`·`Catalog.Restore()` →
-  `PlanBuilder.Build(snapshot, catalog, preferences, out _, previous, layouts, token)` 를
-  **cold 1회 + warm 3회**, `snapshot.Mixer = null` 로 한 번 더. 할당은
-  `GC.GetTotalAllocatedBytes(true)`. 판은 `reports/` 의 `4c1efa35`(가장 큼)·`74e0d686`·
-  `3fc4d9ac`·`6c41c965`·`8a7728df`.
+- **개발 PC 재현.** `DataTool --bench <파일.replay>` 가 배치와 조언을 **cold 1회 + warm 3회** 풀어
+  시간·할당·0세대 수집을 찍는다. F10 순간에 세피라이트 창이 닫혀 있던 판은 `--offers
+  charm:1083,tablet:2047` 처럼 후보를 얹어 후보 조언까지 잰다. 판은 `reports/` 의 `698b2f07`(41칸 /
+  석판 11 / 아티팩트 30, 콤보 우선 셋)·`b4826648`·`4c1efa35`·`3fc4d9ac`.
 - **결과가 안 바뀌었다** 는 `--reproduce --allow-model-change` 로 제보들이 "일치" 인 것으로
   증명한다.
 - **회귀 고정은 시간이 아니라 기계와 무관한 수로 한다.** `SolverCostTests` 가 `LayoutCache.Searches`

@@ -398,6 +398,8 @@ public sealed class PlanReplayTests : IDisposable
     [InlineData("--reproduce", "input.replay")]
     [InlineData("--reproduce", "input.replay", "--allow-model-change")]
     [InlineData("--churn", "snapshot.json", "3")]
+    [InlineData("--bench", "input.replay")]
+    [InlineData("--bench", "input.replay", "--offers", "charm:1083,tablet:2047")]
     public void DocumentedCommandsAreAccepted(params string[] args) => Assert.Null(CommandLine.Error(args));
 
     [Theory]
@@ -409,6 +411,8 @@ public sealed class PlanReplayTests : IDisposable
     [InlineData("--allow-model-change")]
     [InlineData("--churn", "snapshot.json", "0")]
     [InlineData("--churn", "snapshot.json", "bad")]
+    [InlineData("--bench")]
+    [InlineData("--bench", "input.replay", "--offers")]
     public void InvalidCommandsAreRejected(params string[] args) => Assert.NotNull(CommandLine.Error(args));
 
     [Theory]

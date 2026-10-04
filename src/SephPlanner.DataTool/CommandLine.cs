@@ -12,6 +12,9 @@ public static class CommandLine
           --reproduce <파일.replay> --allow-model-change
                                                    다른 계산 빌드로 변경 전후 비교
                                                    (값어치도 여기 덤프로 다시 잰다)
+          --bench <파일.replay> [--offers <종류:번호,...>]
+                                                   재현 자료 한 판의 cold·warm 풀이 시간과 할당
+                                                   (--offers 는 charm:1083,tablet:2047 처럼 후보를 얹는다)
           --solve                                  합성 배치 검사
           --prediction-probe                       효과 갱신 순서의 합성 반례 검사
           --measure                                능력치 환산율과 콤보 가치
@@ -36,6 +39,8 @@ public static class CommandLine
             "--churn" => args.Length is 2 or 3 && PathArgument(args[1]) &&
                          (args.Length == 2 || int.TryParse(args[2], out var rounds) && rounds > 0),
             "--charm-stats" => args.Length is 1 or 2 && (args.Length == 1 || PathArgument(args[1])),
+            "--bench" => args.Length is 2 or 4 && PathArgument(args[1]) &&
+                         (args.Length == 2 || args[2] == "--offers" && PathArgument(args[3])),
             "--reproduce" => args.Length is 2 or 3 && PathArgument(args[1]) &&
                              (args.Length == 2 || args[2] == "--allow-model-change"),
             _ => false,
