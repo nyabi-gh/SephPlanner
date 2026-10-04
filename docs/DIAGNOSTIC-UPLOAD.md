@@ -1,8 +1,8 @@
 # F10 비공개 진단 수집
 
-2026-09-10 설계 및 구현 작업 문서다. 수집처는 사용자 소유의 `sephplanner.nyabi.me`이며, HTTPS를 끝내는 리버스 프록시 뒤에서 컨테이너 하나가 받는다. 프록시 주소와 서버 배치는 저장소에 적지 않는다. 현재 배포된 0.2.7에는 전송 기능이 없다.
+수집처는 사용자 소유의 `sephplanner.nyabi.me`이며, HTTPS를 끝내는 리버스 프록시 뒤에서 컨테이너 하나가 받는다. 프록시 주소와 서버 배치는 저장소에 적지 않는다.
 
-배포 파일과 적용·검증 절차는 저장소 밖 `deploy/diagnostics`에 있다. 서버 주소와 경로가 적혀 있어 공개 저장소에 넣지 않는다. 실제 DNS·VPS·홈서버 설정은 이 구현 작업에서 변경하지 않았다.
+배포 파일과 적용·검증 절차는 저장소 밖 `deploy/diagnostics`에 있다. 서버 주소와 경로가 적혀 있어 공개 저장소에 넣지 않는다.
 
 ## 목적
 
@@ -48,7 +48,7 @@
 - 통신은 취소·시간 제한을 적용한다. 게임의 메인 스레드에서 네트워크 응답을 기다리지 않는다.
 - Docker 배포 설정과 관리자 조회 방법을 함께 제공한다. 보관 기간과 용량 제한을 명시하고 관리자가 변경할 수 있게 한다.
 
-## 검증 기준
+## 지켜야 할 것
 
 1. 미동의·전송 해제 상태에서는 HTTP 요청이 발생하지 않는다.
 2. 스냅샷·재현 저장 일부 실패와 게시 계획 부재를 구분하며 과거 파일이 섞이지 않는다.
@@ -56,24 +56,14 @@
 4. 성공·통신 실패·시간 초과·게임 종료·중복 요청에서 로컬 기록과 화면 상태가 일치한다.
 5. 관리자 인증 없이 진단 목록·원문을 읽을 수 없다.
 6. 허용하지 않은 파일·경로 이동·중복 ZIP 항목·손상 자료·용량 초과를 서버가 거부한다.
-7. 로컬 HTTP 통합 검사와 전체 `scripts/check.ps1`을 통과한다. 실제 서버와 Unity에서의 검증은 따로 기록한다.
-
-## 창 높이
-
-진단 창처럼 부모를 끈 채 글자를 만들고 `GetPreferredValues` 로 높이를 재는 창은 첫 측정이 틀린다. 게임의
-`Unity.TextMeshPro.dll` 에서 `TMP_Text.m_isOrthographic` 의 초기값은 false 이고 `TextMeshProUGUI.Awake` 에서 true 가
-되는데, 높이 계산은 이 값에 따라 글꼴 배율을 0.1 또는 1 로 쓴다. 그래서 공통 `Widgets.Label` 이
-`isOrthographic = true` 를 미리 세운다.
 
 ## 참고 문서
 
-- [Unity TextMeshPro의 isOrthographic 속성](https://docs.unity3d.com/ja/Packages/com.unity.textmeshpro%403.0/api/TMPro.TMP_Text.isOrthographic.html)
 - [Microsoft: HttpClient 사용 지침](https://learn.microsoft.com/en-us/dotnet/fundamentals/networking/http/httpclient-guidelines)
 - [Microsoft: ASP.NET Core 10 파일 업로드](https://learn.microsoft.com/en-us/aspnet/core/mvc/models/file-uploads?view=aspnetcore-10.0)
 - [Microsoft: ASP.NET Core 10 요청 빈도 제한](https://learn.microsoft.com/en-us/aspnet/core/performance/rate-limit?view=aspnetcore-10.0)
 
 플러그인은 기존 `netstandard2.1`과 게임의 Unity Mono에서 동작해야 한다. 서버의 최신 .NET API를 플러그인에서 그대로 사용할 수 있다고 가정하지 않는다. 현재 프로젝트 SDK 계열은 .NET 10이며 기존 의존성 버전은 변경하지 않는다.
-
 
 ## 오류 자동 전송
 

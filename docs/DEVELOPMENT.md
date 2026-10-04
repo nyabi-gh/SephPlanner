@@ -10,6 +10,7 @@ SephPlanner.Core      게임 상태 모델 + 솔버와 배치 계산 (netstandar
 SephPlanner.Plugin    BepInEx 플러그인. 게임 상태를 읽어 배치를 풀고 게임 HUD 안에 직접
                       그린다. 멀티 세션의 자동 배치는 설정으로 연다
 SephPlanner.DataTool  게임 없이 도는 CLI. 텍스트 추출, 스냅샷 대조, 콤보·아티팩트 값어치 측정
+SephPlanner.Diagnostics  F10 진단을 받는 수집 서버(ASP.NET Core). docs/DIAGNOSTIC-UPLOAD.md
 SephPlanner.Tests     Core 단위 테스트. 게임 없이 돈다
 ```
 

@@ -157,7 +157,7 @@ namespace SephPlanner.Core.Solver
             if (charm.Enchant >= charm.Definition.MaxLevel) return false;
 
             // 연동 무기를 안 든 아티팩트는 지금 효과가 없어 증가분을 잴 수가 없다. 무기를 바꿀
-            // 생각으로 미리 걸어 두는 것은 미래를 재는 일이라 하지 않는다(ROADMAP 5번의
+            // 생각으로 미리 걸어 두는 것은 미래를 재는 일이라 하지 않는다(ROADMAP "알려진 한계"의
             // "배치 목적함수의 미래 항").
             return !charm.IsDormant;
         }
