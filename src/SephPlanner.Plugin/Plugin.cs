@@ -29,6 +29,7 @@ namespace SephPlanner.Plugin
         private Harmony _harmony;
         private float _nextPoll;
         private bool _catalogRetryArmed;
+        private bool _databasesReady;
         private bool _inRun;
         private PlanVerificationStatus _simulationVerification;
         private string _simulationReason = "실시간 시뮬레이션 검증이 아직 완료되지 않았습니다.";
@@ -125,7 +126,7 @@ namespace SephPlanner.Plugin
             TabletRotationTooltipGuard.Install(_harmony, Logger.LogWarning);
             FixedEffectLayer.Log = Logger.LogInfo;
             HorayModAPI.OnStartSessionClientside += StartSession;
-            HorayModAPI.OnAllDatabasesReady += ArmCatalogRefresh;
+            HorayModAPI.OnAllDatabasesReady += DatabasesReady;
 
             // 실행기는 카탈로그가 준비된 뒤에 생기고 F9 뒤에는 새로 지어진다. 지금 것을 그때그때
             // 묻게 해 두면 계측 쪽이 그 수명을 몰라도 된다.
@@ -277,7 +278,11 @@ namespace SephPlanner.Plugin
             _inRun = inRun;
         }
 
-        private void ArmCatalogRefresh() => _catalogRetryArmed = true;
+        private void DatabasesReady()
+        {
+            _databasesReady = true;
+            _catalogRetryArmed = true;
+        }
 
         private bool _dumping;
 
@@ -929,12 +934,11 @@ namespace SephPlanner.Plugin
 
             if (_runner == null)
             {
-                // 카탈로그를 짓는 일은 리소스를 통째로 훑는 것이라 무겁다. 덤프가 끝나 정의가
-                // 갖춰진 뒤에 한 번만 짓는다.
-                if (_dumping || !CatalogDump.HasCatalog()) return;
+                // 카탈로그를 짓는 일은 리소스를 통째로 훑는 것이라 무겁다. 게임 데이터베이스가 서고
+                // 덤프가 끝나 정의가 갖춰진 뒤에 한 번만 짓는다. 데이터베이스는 타이틀이 아니라
+                // 세이브에 들어갈 때 서므로, 그 전에 지어 보면 폴링마다 실패한다(제보 3e262106, 527회).
+                if (!_databasesReady || _dumping || !CatalogDump.HasCatalog()) return;
 
-                // 부팅 직후에는 게임의 로컬라이제이션이 아직 준비되지 않아 지을 수 없다.
-                // 그때는 물러서서 다음 폴링에 다시 짓는다.
                 var catalog = CatalogSource.Get();
                 if (catalog == null)
                 {
@@ -1624,7 +1628,7 @@ namespace SephPlanner.Plugin
             _updateClient?.Dispose();
             Logger.LogEvent -= CaptureOwnLog;
             HorayModAPI.OnStartSessionClientside -= StartSession;
-            HorayModAPI.OnAllDatabasesReady -= ArmCatalogRefresh;
+            HorayModAPI.OnAllDatabasesReady -= DatabasesReady;
             _harmony?.UnpatchSelf();
             if (_moving && _settings != null && _hud.IsAlive)
             {
