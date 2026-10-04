@@ -1512,7 +1512,8 @@ namespace SephPlanner.Core.Solver
                 familiarity += part.Anchors;
                 waste += part.Waste;
                 if (categories is not null && !charm.IsFiller && PriorityPlacement.Applies(charm.Definition) &&
-                    PriorityPlacement.Contribute(problem, charm, !part.Inactive, positions[charm.InstanceId],
+                    PriorityPlacement.Contribute(problem, charm,
+                        !part.Inactive || PositionalWorth.KeepsCategoryWhenOff(charm.Definition), positions[charm.InstanceId],
                         neighbors!, categories, ref comboProgress))
                     comboMatches++;
                 if (designated && !part.Inactive && DirectedCharmSupport.HasConnection(charm) &&
@@ -1709,15 +1710,16 @@ namespace SephPlanner.Core.Solver
         {
             if (charm.IsFiller) return 0;
             var inactive = Reason(charm, cell, result, problem.Grid, occupancy) != CharmInactiveReason.None;
+            var offCombo = inactive && PositionalWorth.KeepsCategoryWhenOff(charm.Definition)
+                ? CharmWorth.ApplyWeight(PositionalWorth.ComboWorth(problem, charm, cell, neighbors), charm.Weight)
+                : 0;
 
-            // 열쇠는 꺼져도 행이 정한 카테고리를 그대로 내보인다(Charm_3Elemental_ByRow.SearchCategory).
-            // 종이와 침은 꺼진 채의 카테고리를 확인하지 않았으므로 켜져 있을 때만 센다.
             if (charm.ComboOnly)
-                return inactive && charm.Definition.LineCategories.Count == 0
-                    ? 0
+                return inactive
+                    ? offCombo
                     : CharmWorth.ApplyWeight(PositionalWorth.ComboWorth(problem, charm, cell, neighbors), charm.Weight);
             if (inactive && !PositionalWorth.IsNeedle(charm.Definition))
-                return DormantPreference(problem, charm, cell, result, occupancy);
+                return DormantPreference(problem, charm, cell, result, occupancy) + offCombo;
 
             var level = result.EffectiveLevel(cell, charm.Enchant);
 

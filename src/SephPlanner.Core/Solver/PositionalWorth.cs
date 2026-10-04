@@ -137,6 +137,13 @@ namespace SephPlanner.Core.Solver
             return worth;
         }
 
+        /// <summary>
+        /// 꺼져도 카테고리를 내보이는가. 열쇠는 꺼질 때도 행이 정한 카테고리를 그대로 두고 능력치만 거둔다
+        /// (<c>Charm_3Elemental_ByRow.OnDisabledEffect</c> → <c>SearchCategory(idx, false)</c>). 게임은 활성과
+        /// 무관하게 콤보를 세므로 꺼진 열쇠도 콤보에 든다. 종이와 침은 꺼진 채를 확인하지 않아 넣지 않는다.
+        /// </summary>
+        internal static bool KeepsCategoryWhenOff(CharmDefinition definition) => definition.LineCategories.Count > 0;
+
         private static readonly IReadOnlyDictionary<GridPos, CharmSlot> EmptyNeighbors =
             new Dictionary<GridPos, CharmSlot>();
 

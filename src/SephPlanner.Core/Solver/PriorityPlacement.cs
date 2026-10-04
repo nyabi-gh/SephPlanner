@@ -118,9 +118,10 @@ namespace SephPlanner.Core.Solver
             foreach (var charm in problem.Charms)
             {
                 if (charm.IsFiller || !Applies(charm.Definition)) continue;
-                var active = arrangement.CharmPositions.TryGetValue(charm.InstanceId, out var cell) &&
-                             !arrangement.InactiveCharms.Contains(charm.InstanceId);
-                if (Contribute(problem, charm, active, cell, neighbors, categories, ref progress))
+                var exposed = arrangement.CharmPositions.TryGetValue(charm.InstanceId, out var cell) &&
+                              (!arrangement.InactiveCharms.Contains(charm.InstanceId) ||
+                               PositionalWorth.KeepsCategoryWhenOff(charm.Definition));
+                if (Contribute(problem, charm, exposed, cell, neighbors, categories, ref progress))
                     arrangement.PriorityComboMatches++;
                 else arrangement.UnmatchedComboCharms.Add(charm.InstanceId);
             }
@@ -132,11 +133,11 @@ namespace SephPlanner.Core.Solver
         /// 따로 모았다 더하면 덧셈 순서가 바뀌어 점수 비교가 끝자리에서 갈릴 수 있다.
         /// </summary>
         internal static bool Contribute(
-            PlacementProblem problem, CharmSlot charm, bool active, GridPos cell,
+            PlacementProblem problem, CharmSlot charm, bool exposed, GridPos cell,
             IReadOnlyDictionary<GridPos, CharmSlot> neighbors, List<string> categories, ref double progress)
         {
             categories.Clear();
-            if (active) ComboCounting.PositionalCategories(charm, cell, neighbors, categories);
+            if (exposed) ComboCounting.PositionalCategories(charm, cell, neighbors, categories);
 
             var matched = false;
             foreach (var category in categories)

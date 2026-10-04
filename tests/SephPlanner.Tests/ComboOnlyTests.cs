@@ -43,8 +43,14 @@ public class ComboOnlyTests
         Assert.Empty(combo.UnpreservedCharms);
     }
 
-    [Fact]
-    public void AComboOnlyKeyStillScoresItsRowWhenSwitchedOff()
+    /// <summary>
+    /// 꺼진 열쇠도 행의 카테고리를 내보이고 게임은 그것으로 콤보를 센다. 예전에는 지정과 무관하게
+    /// 꺼진 열쇠의 콤보 몫을 버렸다.
+    /// </summary>
+    [Theory]
+    [InlineData(PlanPreferences.ComboOnly)]
+    [InlineData(null)]
+    public void ASwitchedOffKeyStillScoresItsRow(int? cap)
     {
         var problem = new PlacementProblem { Grid = new GridSpec(1, 1, 1) };
         problem.FixedEffects.Add(new FixedEffectCell { Position = new GridPos(0, 0), Level = -1 });
@@ -52,7 +58,7 @@ public class ComboOnlyTests
         {
             InstanceId = 1,
             Definition = new CharmDefinition { MaxLevel = 3, Behavior = "Charm_3Elemental_ByRow", LineCategories = { "GLACIER" } },
-            LevelCap = PlanPreferences.ComboOnly,
+            LevelCap = cap,
         });
         problem.CurrentCharms[1] = new GridPos(0, 0);
         problem.ComboCounts = new Dictionary<string, int> { ["GLACIER"] = 2 };

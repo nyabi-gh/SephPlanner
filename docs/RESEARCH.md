@@ -1305,6 +1305,8 @@ selectionSeedOffset)`으로 내용을 정한다. **고르기 전에 무엇이 �
 - 개수 판정은 `GridInventory.SearchSetEffectInInventory`(서버). **배치 위치·레벨·활성 여부와
   무관하게 격자에 있는 아티팩트 전체로 카테고리를 센다.** 그래서 콤보는 배치 최적화가 아니라
   **후보 추천**에만 영향을 준다.
+- 켈세더니 열쇠는 꺼질 때도(`OnDisabledEffect` → `SearchCategory(idx, false)`) 행의 카테고리를 그대로 두고
+  능력치만 거둔다. 그래서 꺼진 열쇠도 그 행의 콤보에 든다(2026-10-04, 1.0.33).
 - 센 결과는 `currentSetEffectCount`(SyncDictionary)로 클라이언트에 동기화된다. 유니크 페어 변환
   (`allowUniquePairIncreaseCombo`)이나 하드모드 중복 금지(`OVERLAPITEMCOMBO`) 같은 보정이 서버
   계산에 섞여 있어, **우리가 다시 세지 않고 이 값을 스냅샷(`ComboCounts`)에 그대로 싣는다.**
