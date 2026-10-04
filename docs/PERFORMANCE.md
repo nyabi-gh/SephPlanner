@@ -22,6 +22,9 @@
   편차로 10% 쯤 움직이므로 **한 자리까지 인용하지 말고 표 안에서 비율로 읽는다.**
 - **Mono 배율은 4.4~5.6배의 어림이다.** 게임 안에 올려 잰 것이 아니라 Unity 동봉
   `MonoBleedingEdge/bin/mono-bdwgc.exe` 에서 같은 코드를 돌린 값이다.
+  게임 폴더에는 런타임만 있고 실행 파일이 없으므로 Unity 에디터(2022.3)의 `MonoBleedingEdge` 를 쓴다 - 그 안의
+  `lib/mono/4.5/csc.exe` 로 `SephPlanner.Core.dll` 과 `Facades/netstandard.dll` 을 참조해 작은 측정 프로그램을 컴파일하고
+  `bin/mono-bdwgc.exe` 로 돌린다. Core 에는 JSON 의존이 없어 재현 자료를 못 읽으므로 같은 규모의 판을 지어서 잰다.
 - **개발 PC 재현.** `DataTool --bench <파일.replay>` 가 배치와 조언을 **cold 1회 + warm 3회** 풀어
   시간·할당·0세대 수집을 찍는다. F10 순간에 세피라이트 창이 닫혀 있던 판은 `--offers
   charm:1083,tablet:2047` 처럼 후보를 얹어 후보 조언까지 잰다. 판은 `reports/` 의 `698b2f07`(41칸 /
