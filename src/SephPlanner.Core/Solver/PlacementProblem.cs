@@ -195,7 +195,7 @@ namespace SephPlanner.Core.Solver
         /// 이 배치에서 칸에 걸려 있을 고정 효과 전부. <paramref name="byCell"/> 이 null 이면 아직
         /// 배치를 모르는 것이라 게임이 세어 둔 지금 수로 푼다. 단계마다 한 번만 짓는다.
         /// </summary>
-        internal IReadOnlyList<FixedEffectCell> EffectsFor(IReadOnlyDictionary<GridPos, CharmSlot>? byCell)
+        internal IReadOnlyList<FixedEffectCell> EffectsFor(Dictionary<GridPos, CharmSlot>? byCell)
         {
             var rule = ComboEngraving;
             if (rule is null) return FixedEffects;

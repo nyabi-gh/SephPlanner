@@ -21,7 +21,7 @@ namespace SephPlanner.Core.Solver
             for (var row = 0; row < rows; row++)
                 for (var column = 0; column < columns; column++)
                     combined[row, column] = new AssignmentCost(priority[row, column], cost[row, column]);
-            return Solve(combined);
+            return Solve(combined, rows, columns);
         }
 
         private static readonly AssignmentCost Infinity = new AssignmentCost(double.PositiveInfinity, 0);
@@ -36,30 +36,33 @@ namespace SephPlanner.Core.Solver
             for (var row = 0; row < cost.GetLength(0); row++)
                 for (var column = 0; column < cost.GetLength(1); column++)
                     combined[row, column] = new AssignmentCost(0, cost[row, column]);
-            var assignment = Solve(combined);
+            var assignment = Solve(combined, cost.GetLength(0), cost.GetLength(1));
             totalCost = 0;
             for (var row = 0; row < assignment.Length; row++)
                 if (assignment[row] >= 0) totalCost += cost[row, assignment[row]];
             return assignment;
         }
 
-        internal static int[] Solve(AssignmentCost[,] cost)
+        /// <summary>
+        /// <paramref name="cost"/> 의 왼쪽 위 <paramref name="rows"/> × <paramref name="columns"/> 만 읽는다.
+        /// 배정마다 행렬을 새로 짓지 않고 큰 것 하나를 돌려 쓰기 위해서다.
+        /// </summary>
+        internal static int[] Solve(AssignmentCost[,] cost, int rows, int columns)
         {
-            var rows = cost.GetLength(0);
-            var columns = cost.GetLength(1);
             if (rows > columns) throw new ArgumentException("행 수가 열 수보다 많습니다.", nameof(cost));
 
             var rowPotential = new AssignmentCost[rows + 1];
             var columnPotential = new AssignmentCost[columns + 1];
             var columnMatch = new int[columns + 1];
             var path = new int[columns + 1];
+            var minimum = new AssignmentCost[columns + 1];
+            var used = new bool[columns + 1];
 
             for (var row = 1; row <= rows; row++)
             {
                 columnMatch[0] = row;
                 var current = 0;
-                var minimum = new AssignmentCost[columns + 1];
-                var used = new bool[columns + 1];
+                Array.Clear(used, 0, used.Length);
                 for (var i = 0; i <= columns; i++) minimum[i] = Infinity;
 
                 do

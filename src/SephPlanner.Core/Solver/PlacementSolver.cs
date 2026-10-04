@@ -1669,7 +1669,7 @@ namespace SephPlanner.Core.Solver
             var charmsAreRows = movable.Count <= free.Count;
             var rows = charmsAreRows ? movable.Count : free.Count;
             var columns = charmsAreRows ? free.Count : movable.Count;
-            var cost = new AssignmentCost[rows, columns];
+            var cost = AssignmentScratch(rows, columns);
             var unit = rows + 1.0;
 
             for (var charmIndex = 0; charmIndex < movable.Count; charmIndex++)
@@ -1702,7 +1702,7 @@ namespace SephPlanner.Core.Solver
                 }
             }
 
-            var assignment = HungarianAssignment.Solve(cost);
+            var assignment = HungarianAssignment.Solve(cost, rows, columns);
             for (var row = 0; row < assignment.Length; row++)
             {
                 if (assignment[row] < 0) continue;
@@ -1712,6 +1712,18 @@ namespace SephPlanner.Core.Solver
                 positions[movable[charmIndex].InstanceId] = free[cellIndex];
             }
             return positions;
+        }
+
+        // 배정 한 번 안에서 채우고 다 읽는다. 돌려주지 않으므로 다음 배정이 덮어써도 된다.
+        [ThreadStatic] private static AssignmentCost[,]? _assignmentScratch;
+
+        private static AssignmentCost[,] AssignmentScratch(int rows, int columns)
+        {
+            var scratch = _assignmentScratch;
+            if (scratch is null || scratch.GetLength(0) < rows || scratch.GetLength(1) < columns)
+                _assignmentScratch = scratch = new AssignmentCost[
+                    Math.Max(rows, scratch?.GetLength(0) ?? 0), Math.Max(columns, scratch?.GetLength(1) ?? 0)];
+            return scratch;
         }
 
         /// <summary>

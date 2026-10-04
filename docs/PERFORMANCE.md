@@ -163,9 +163,15 @@
 
 #### 1b. 할당
 
-`PolishSupportPairs` 의 `OccupancyFrom` + `Run`, `OfferAdvisor.Clone`, 배정 행렬
-(`AssignmentCost[36,36]` 을 반복마다 새로)이 남아 있다. 아래 3번과 같은 자리이며, 2단계 게시
-뒤에는 조언 단계만 재면 되므로 잴 자리가 좁다.
+배정 행렬과 자리 의존 카테고리 문자열은 걷어냈다(2026-10-04 둘째). `698b2f07` 에 후보 6개
+(`--offers charm:1320,charm:3036,charm:1173,charm:1018,charm:1274,tablet:2003`)를 얹은 warm 조언이
+537 → 202MB 이고, 출처는 헝가리안이 행마다 짓던 작업 배열(3할), 배정마다 새로 짓던 비용 행렬,
+카테고리를 담을 때마다 짓던 목록·배열과 상자에 담긴 사전 열거자였다. 후보 없는 네 판의 warm 조언은
+89 → 32, 91 → 51, 275 → 108, 43 → 14MB, warm 배치는 24~28 → 8~11MB 다. 시간은 기계 편차 안이다.
+
+남은 것은 `Describe` 가 결과 객체를 짓는 것(`Score`·`Evaluate` 에서 각 1할 안팎), `OccupancyFrom`·
+`CharmsByCell` 의 집합·사전, `OfferAdvisor.Clone`, 하얀 종이의 카테고리 사전이다. 종이 판의 제보가
+없어 마지막 것은 재지 못해 손대지 않았다.
 
 ### 2. 갈래를 견줄 때는 다듬지 않는다 (조건부)
 
@@ -196,7 +202,7 @@
 - **절반은 이미 됐다.** 교환 시도가 `OccupancyFrom` 과 `TabletSimulator.Run` 으로 매번 새 객체를
   만들던 것이 없어져 한 판의 할당이 334 → 155MB, 312 → 159MB 가 됐다.
 - **남은 것.** `PolishSupportPairs` 는 아직 시도마다 `OccupancyFrom` + `Run` 을 부른다(방향 지원
-  아티팩트가 있는 판에서만 돈다). `OfferAdvisor.Clone` 과 배정 행렬도 그대로다.
+  아티팩트가 있는 판에서만 돈다). `OfferAdvisor.Clone` 도 그대로다. 배정 행렬은 1b 에서 걷어냈다.
 - **왜.** 할당이 Boehm GC 를 부르고, 그 GC 는 stop-the-world 라 백그라운드 스레드가 만든 쓰레기를
   치우는 동안 **유니티 메인 스레드도 같이 선다.** 게임은 `boot.config` 에 `gc-max-time-slice=3`
   을 켜 두어 프레임당 3ms 만 GC 에 준다.

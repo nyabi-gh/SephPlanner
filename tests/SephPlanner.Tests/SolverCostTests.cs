@@ -93,6 +93,25 @@ public class SolverCostTests
         Assert.True(allocated < 6_000_000, $"{allocated:N0}B");
     }
 
+    /// <summary>
+    /// 배정은 행마다 작업 배열을 새로 짓지 않는다. 지었던 동안에는 후보 조언 할당의 3할이 여기였다
+    /// (제보 <c>698b2f07</c>, 아티팩트 30 · 칸 36).
+    /// </summary>
+    [Fact]
+    public void AssignmentDoesNotAllocatePerRow()
+    {
+        var cost = new AssignmentCost[30, 36];
+        for (var row = 0; row < 30; row++)
+            for (var column = 0; column < 36; column++)
+                cost[row, column] = new AssignmentCost(0, (row * 7 + column * 13) % 17);
+        HungarianAssignment.Solve(cost, 30, 36);
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        HungarianAssignment.Solve(cost, 30, 36);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        Assert.True(allocated < 10_000, $"{allocated:N0}B");
+    }
+
     private static List<OfferCandidate> Candidates(int charms, int tablets)
     {
         var candidates = new List<OfferCandidate>();

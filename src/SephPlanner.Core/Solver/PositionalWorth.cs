@@ -123,7 +123,8 @@ namespace SephPlanner.Core.Solver
             // 열쇠는 이웃이 없어도 행만으로 정해진다. 침과 종이는 이웃이 있어야 한다.
             if (neighbors is null && charm.Definition.LineCategories.Count == 0) return 0;
 
-            var categories = new List<string>(2);
+            var categories = _comboWorthScratch ??= new List<string>(2);
+            categories.Clear();
             ComboCounting.PositionalCategories(
                 charm, cell, neighbors ?? EmptyNeighbors, categories);
 
@@ -141,6 +142,9 @@ namespace SephPlanner.Core.Solver
             }
             return worth;
         }
+
+        // 한 호출 안에서 채우고 다 읽는다. 이 함수는 저 자신을 부르지 않는다.
+        [ThreadStatic] private static List<string>? _comboWorthScratch;
 
         private static readonly IReadOnlyDictionary<GridPos, CharmSlot> EmptyNeighbors =
             new Dictionary<GridPos, CharmSlot>();
@@ -284,6 +288,17 @@ namespace SephPlanner.Core.Solver
             if (charm.Definition.LineCategories.Count == 0) return charm.Definition.Categories;
 
             return new[] { LineCategory(charm.Definition, cell) };
+        }
+
+        /// <summary>이웃 없는 <see cref="CategoriesOf"/>와 같은 것을 배열을 짓지 않고 목록에 담는다.</summary>
+        internal static void AddCategories(CharmSlot charm, GridPos cell, List<string> into)
+        {
+            if (charm.Definition.Behavior == "Charm_WhitePaper")
+            {
+                if (charm.ObservedCategories is not null) into.AddRange(charm.ObservedCategories);
+            }
+            else if (charm.Definition.LineCategories.Count == 0) into.AddRange(charm.Definition.Categories);
+            else into.Add(LineCategory(charm.Definition, cell));
         }
 
         public static bool IsNeedle(CharmDefinition definition) =>

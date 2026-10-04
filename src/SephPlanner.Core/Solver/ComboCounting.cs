@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using SephPlanner.Core.Model;
 
@@ -37,13 +38,13 @@ namespace SephPlanner.Core.Solver
             if (PositionalWorth.IsNeedle(definition))
             {
                 if (PositionalWorth.DependencyTarget(charm, cell, neighbors, out var target, out var targetCell))
-                    into.AddRange(PositionalWorth.CategoriesOf(target, targetCell));
+                    PositionalWorth.AddCategories(target, targetCell, into);
                 return;
             }
 
             if (definition.Behavior != "Charm_WhitePaper") return;
             var matches = new Dictionary<string, int>();
-            foreach (var offset in new[] { 1, -1 })
+            foreach (var offset in PaperSides)
             {
                 var at = cell.Offset(offset, 0);
                 if (!neighbors.TryGetValue(at, out var neighbor) || neighbor == charm || neighbor.IsFiller) continue;
@@ -52,6 +53,11 @@ namespace SephPlanner.Core.Solver
             foreach (var match in matches)
                 if (match.Value >= definition.PaperMatch) into.Add(match.Key);
         }
+
+        private static readonly int[] PaperSides = { 1, -1 };
+
+        // 한 호출 안에서 채우고 다 읽는다. 각자 저 자신을 부르지 않는다.
+        [ThreadStatic] private static List<string>? _countScratch, _countForScratch;
 
         /// <summary>자리에 따라 카테고리가 달라지는 아티팩트인가. 아니면 개수 셈에서 볼 것이 없다.</summary>
         public static bool IsPositional(CharmDefinition definition) =>
@@ -101,7 +107,7 @@ namespace SephPlanner.Core.Solver
                 var other = pair.Value;
                 if (other == charm || other.IsFiller || !IsPositional(other.Definition)) continue;
 
-                positional ??= new List<string>();
+                positional ??= _countForScratch ??= new List<string>();
                 positional.Clear();
                 PositionalCategories(other, pair.Key, neighbors, positional);
                 foreach (var contributed in positional)
@@ -157,7 +163,7 @@ namespace SephPlanner.Core.Solver
         /// 후보 갈래는 그 몫이 더해지고, 뺀 갈래는 빠진다.
         /// </summary>
         internal static int CountOf(
-            PlacementProblem problem, string category, IReadOnlyDictionary<GridPos, CharmSlot> byCell)
+            PlacementProblem problem, string category, Dictionary<GridPos, CharmSlot> byCell)
         {
             if (problem.CurrentComboCount is not { } current || problem.CurrentComboCategory != category)
             {
@@ -173,7 +179,8 @@ namespace SephPlanner.Core.Solver
             return Reported(problem, category) - current + Count(byCell, category);
         }
 
-        private static int Count(IReadOnlyDictionary<GridPos, CharmSlot> byCell, string category)
+        // 구체 형으로 받는다 - 인터페이스로 돌면 배치마다 열거자를 상자에 담는다.
+        private static int Count(Dictionary<GridPos, CharmSlot> byCell, string category)
         {
             var count = 0;
             List<string>? positional = null;
@@ -188,7 +195,7 @@ namespace SephPlanner.Core.Solver
                     continue;
                 }
 
-                positional ??= new List<string>();
+                positional ??= _countScratch ??= new List<string>();
                 positional.Clear();
                 PositionalCategories(charm, pair.Key, byCell, positional);
                 foreach (var contributed in positional)
