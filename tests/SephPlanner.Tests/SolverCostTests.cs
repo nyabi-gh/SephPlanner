@@ -49,6 +49,33 @@ public class SolverCostTests
         return problem;
     }
 
+    /// <summary>
+    /// 콤보 우선을 켜도 채점 한 번이 결과 객체를 새로 짓지 않는다. 지었던 동안에는 후보 조언의 할당이
+    /// 네 배가 됐고(제보 <c>698b2f07</c>, 2.2GB), 그 쓰레기를 치우는 GC 가 게임 프레임을 세웠다.
+    /// </summary>
+    [Fact]
+    public void PriorityCombosDoNotMultiplyScoringAllocation()
+    {
+        static long Allocated(bool priority)
+        {
+            var problem = FullBag(14, spare: 4);
+            for (var i = 0; i < problem.Charms.Count; i++)
+                problem.Charms[i].Definition.Categories.Add(i % 2 == 0 ? "PLANET" : "OTHER");
+            problem.ComboCounts = new Dictionary<string, int> { ["PLANET"] = 7, ["OTHER"] = 7 };
+            problem.Combos = id => new ComboDefinition { Id = id, Thresholds = { 2, 4 } };
+            if (priority) problem.PriorityCategories.Add("PLANET");
+
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            PlacementSolver.Solve(problem, new SolverOptions { BeamWidth = 20, ExactCandidates = 4 });
+            return GC.GetAllocatedBytesForCurrentThread() - before;
+        }
+
+        Allocated(true);
+        var without = Allocated(false);
+        var with = Allocated(true);
+        Assert.True(with < without * 1.1, $"콤보 우선 {with:N0}B, 끔 {without:N0}B");
+    }
+
     private static List<OfferCandidate> Candidates(int charms, int tablets)
     {
         var candidates = new List<OfferCandidate>();

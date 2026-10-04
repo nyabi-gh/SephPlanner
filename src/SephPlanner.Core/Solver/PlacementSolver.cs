@@ -1475,9 +1475,9 @@ namespace SephPlanner.Core.Solver
             double score = 0;
             int missing = 0, unpreserved = 0, unheld = 0, waste = 0, unsafeEmpty = 0, supportMatches = 0;
             var designated = problem.DesignatedTargets.Count > 0;
-            var combo = problem.PriorityCategories.Count == 0
-                ? null
-                : new Arrangement { ScoreStep = problem.Scale.ScoreStep };
+            var categories = problem.PriorityCategories.Count == 0 || neighbors is null ? null : new List<string>();
+            var comboMatches = 0;
+            double comboProgress = 0;
             for (var index = 0; index < problem.Charms.Count; index++)
             {
                 var charm = problem.Charms[index];
@@ -1495,12 +1495,10 @@ namespace SephPlanner.Core.Solver
                 score += part.Value;
                 familiarity += part.Anchors;
                 waste += part.Waste;
-                if (combo is not null)
-                {
-                    var position = positions[charm.InstanceId];
-                    combo.CharmPositions[charm.InstanceId] = position;
-                    if (part.Inactive) combo.InactiveCharms.Add(charm.InstanceId);
-                }
+                if (categories is not null && !charm.IsFiller && PriorityPlacement.Applies(charm.Definition) &&
+                    PriorityPlacement.Contribute(problem, charm, !part.Inactive, positions[charm.InstanceId],
+                        neighbors!, categories, ref comboProgress))
+                    comboMatches++;
                 if (designated && !part.Inactive && DirectedCharmSupport.HasConnection(charm) &&
                     DirectedCharmSupport.ConnectedTarget(charm, positions[charm.InstanceId], result, problem.Grid,
                         occupancy, neighbors, out var linked) && linked.IsSupportTarget) supportMatches++;
@@ -1510,9 +1508,8 @@ namespace SephPlanner.Core.Solver
                 var cell = problem.Grid.ToPosition(index);
                 if (!occupancy.HasItem(cell) && Unsafe(cell, result)) unsafeEmpty++;
             }
-            if (combo is not null && neighbors is not null) PriorityPlacement.Describe(problem, combo, neighbors);
-            return new PlacementQuality(missing, unpreserved, unheld, combo?.PriorityComboMatches ?? 0,
-                combo?.PriorityComboProgress ?? 0, supportMatches, score, unsafeEmpty, waste, familiarity,
+            return new PlacementQuality(missing, unpreserved, unheld, comboMatches,
+                comboProgress, supportMatches, score, unsafeEmpty, waste, familiarity,
                 problem.Scale.ScoreStep);
         }
 

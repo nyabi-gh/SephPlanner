@@ -114,27 +114,41 @@ namespace SephPlanner.Core.Solver
         {
             if (problem.PriorityCategories.Count == 0) return;
             var categories = new List<string>();
+            var progress = arrangement.PriorityComboProgress;
             foreach (var charm in problem.Charms)
             {
                 if (charm.IsFiller || !Applies(charm.Definition)) continue;
-                categories.Clear();
-                if (arrangement.CharmPositions.TryGetValue(charm.InstanceId, out var cell) &&
-                    !arrangement.InactiveCharms.Contains(charm.InstanceId))
-                    ComboCounting.PositionalCategories(charm, cell, neighbors, categories);
-
-                var matched = false;
-                foreach (var category in categories)
-                {
-                    if (!problem.PriorityCategories.Contains(category)) continue;
-                    matched = true;
-                    var combo = problem.Combos?.Invoke(category);
-                    if (combo != null)
-                        arrangement.PriorityComboProgress += problem.Scale.OfComboStep(combo,
-                            ComboCounting.CountFor(problem, charm, category, neighbors), out _, out _);
-                }
-                if (matched) arrangement.PriorityComboMatches++;
+                var active = arrangement.CharmPositions.TryGetValue(charm.InstanceId, out var cell) &&
+                             !arrangement.InactiveCharms.Contains(charm.InstanceId);
+                if (Contribute(problem, charm, active, cell, neighbors, categories, ref progress))
+                    arrangement.PriorityComboMatches++;
                 else arrangement.UnmatchedComboCharms.Add(charm.InstanceId);
             }
+            arrangement.PriorityComboProgress = progress;
+        }
+
+        /// <summary>
+        /// 아티팩트 하나가 지정 콤보에 보태는 몫. <paramref name="progress"/> 에 곧바로 더한다 - 합을
+        /// 따로 모았다 더하면 덧셈 순서가 바뀌어 점수 비교가 끝자리에서 갈릴 수 있다.
+        /// </summary>
+        internal static bool Contribute(
+            PlacementProblem problem, CharmSlot charm, bool active, GridPos cell,
+            IReadOnlyDictionary<GridPos, CharmSlot> neighbors, List<string> categories, ref double progress)
+        {
+            categories.Clear();
+            if (active) ComboCounting.PositionalCategories(charm, cell, neighbors, categories);
+
+            var matched = false;
+            foreach (var category in categories)
+            {
+                if (!problem.PriorityCategories.Contains(category)) continue;
+                matched = true;
+                var combo = problem.Combos?.Invoke(category);
+                if (combo != null)
+                    progress += problem.Scale.OfComboStep(combo,
+                        ComboCounting.CountFor(problem, charm, category, neighbors), out _, out _);
+            }
+            return matched;
         }
 
         internal static Arrangement Improve(PlacementProblem problem, Arrangement best, SolverOptions options)
