@@ -689,12 +689,17 @@ namespace SephPlanner.Core.Solver
 
             /// <summary>값어치 순위별, 레벨별 값어치. <c>[순위][레벨]</c>. 풀이마다 한 번만 짓는다.</summary>
             public double[][] ValueByRank = Array.Empty<double[]>();
+            /// <summary><see cref="ValueByRank"/>에 점수 눈금을 씌운 것. 추정이 칸마다 나누지 않게 한다.</summary>
+            public double[][] ScaledValueByRank = Array.Empty<double[]>();
+            public ScalesSide[] Side = Array.Empty<ScalesSide>();
             public CharmSlot[] Items = Array.Empty<CharmSlot>();
             public bool[] Required = Array.Empty<bool>(), Preserved = Array.Empty<bool>();
             public bool HasScales;
             public int[] Current = Array.Empty<int>(), Planned = Array.Empty<int>();
             public EstimateGroup[] Groups = Array.Empty<EstimateGroup>();
-            public int[,] Members = new int[0, 0];
+            /// <summary>묶음별 칸 번호. 묶음 <c>g</c> 의 <c>k</c> 번째는 <c>[g * Stride + k]</c> 다.</summary>
+            public int[] Members = Array.Empty<int>();
+            public int Stride;
             public int[] GroupByCell = Array.Empty<int>();
             public bool[] Used = Array.Empty<bool>();
         }
@@ -703,8 +708,10 @@ namespace SephPlanner.Core.Solver
         {
             public GridPos Cell;
             public int Level, Multiplier, Count, Head;
-            public bool Disabled, Ignore, Unsafe;
+            public bool Disabled, Ignore, Left, Unsafe;
         }
+
+        private enum ScalesSide : byte { Any, Left, Right }
 
         /// <summary>
         /// 한 아티팩트가 그 레벨의 칸에서 갖는 값어치. <see cref="Value"/>가 매기는 것과 같은
@@ -749,12 +756,18 @@ namespace SephPlanner.Core.Solver
                 HasScales = problem.Charms.Any(charm => ScalesPosition.Required(problem, charm)),
                 Items = ordered.Select(row => row.Charm).ToArray(),
                 ValueByRank = ordered.Select(row => row.Values).ToArray(),
+                ScaledValueByRank = ordered
+                    .Select(row => row.Values.Select(value => PlacementQuality.OnScale(value, problem.Scale.ScoreStep)).ToArray())
+                    .ToArray(),
+                Side = ordered.Select(row => !ScalesPosition.Required(problem, row.Charm) ? ScalesSide.Any :
+                    ScalesPosition.Left(problem, row.Charm) ? ScalesSide.Left : ScalesSide.Right).ToArray(),
                 Required = ordered.Select(row => RequiresUse(problem, row.Charm)).ToArray(),
                 Preserved = ordered.Select(row => Preserve(row.Charm)).ToArray(),
                 Current = ordered.Select(row => AnchorIndex(problem, row.Charm, problem.CurrentCharms)).ToArray(),
                 Planned = ordered.Select(row => AnchorIndex(problem, row.Charm, problem.PlannedCharms)).ToArray(),
                 Groups = new EstimateGroup[problem.Grid.Storage],
-                Members = new int[problem.Grid.Storage, problem.Grid.Storage],
+                Members = new int[problem.Grid.Storage * problem.Grid.Storage],
+                Stride = problem.Grid.Storage,
                 GroupByCell = new int[problem.Grid.Storage],
                 Used = new bool[problem.Grid.Storage],
             };
@@ -1087,14 +1100,11 @@ namespace SephPlanner.Core.Solver
                 used[index] = !occupancy.HasCharm(cell);
                 model.GroupByCell[index] = -1;
                 if (used[index]) continue;
-                var level = result.LevelAt(cell);
-                var multiplier = result.MultiplierAt(cell);
-                var disabled = result.IsDisabled(cell);
-                var ignore = result.IgnoreCriteriaAt(cell) > 0;
+                result.Read(cell, out var level, out var multiplier, out var disabled, out var ignore);
+                var left = model.HasScales && ScalesPosition.IsLeft(cell);
                 var group = 0;
                 while (group < groupCount && (groups[group].Level != level || groups[group].Multiplier != multiplier ||
-                    groups[group].Disabled != disabled || groups[group].Ignore != ignore ||
-                    model.HasScales && ScalesPosition.IsLeft(groups[group].Cell) != ScalesPosition.IsLeft(cell))) group++;
+                    groups[group].Disabled != disabled || groups[group].Ignore != ignore || groups[group].Left != left)) group++;
                 if (group == groupCount)
                 {
                     groups[groupCount++] = new EstimateGroup
@@ -1104,10 +1114,11 @@ namespace SephPlanner.Core.Solver
                         Multiplier = multiplier,
                         Disabled = disabled,
                         Ignore = ignore,
-                        Unsafe = Unsafe(cell, result)
+                        Left = left,
+                        Unsafe = disabled || SimulationResult.Scaled(level, multiplier) < 0
                     };
                 }
-                model.Members[group, groups[group].Count++] = index;
+                model.Members[group * model.Stride + groups[group].Count++] = index;
                 model.GroupByCell[index] = group;
             }
             double total = 0, familiarity = Familiarity(problem, layout);
@@ -1116,36 +1127,40 @@ namespace SephPlanner.Core.Solver
             {
                 var charm = model.Items[rank];
                 var selected = -1;
-                PlacementQuality? best = null;
+                var best = default(PlacementQuality);
                 var current = model.Current[rank];
                 var planned = model.Planned[rank];
+                var values = model.ScaledValueByRank[rank];
+                var side = model.Side[rank];
+                bool required = model.Required[rank], preserved = model.Preserved[rank];
+                bool dormant = charm.IsDormant, held = charm.Held, wastes = !charm.IsFiller && !charm.IsDormant;
+                int enchant = charm.Enchant, worthCap = charm.WorthLevelCap;
                 for (var group = 0; group < groupCount; group++)
                 {
                     ref var entry = ref groups[group];
-                    while (entry.Head < entry.Count && used[model.Members[group, entry.Head]]) entry.Head++;
+                    while (entry.Head < entry.Count && used[model.Members[group * model.Stride + entry.Head]]) entry.Head++;
                     if (entry.Head == entry.Count) continue;
                     var index = current >= 0 && !used[current] && model.GroupByCell[current] == group ? current :
                         planned >= 0 && !used[planned] && model.GroupByCell[planned] == group ? planned :
-                        model.Members[group, entry.Head];
-                    var cell = entry.Cell;
-                    var level = result.EffectiveLevel(cell, charm.Enchant);
-                    var active = !entry.Disabled && level >= 0 && !charm.IsDormant;
-                    var held = !charm.Held || entry.Ignore;
-                    var value = active ? model.ValueByRank[rank][Math.Min(level, model.LevelCap)] : 0;
-                    var quality = new PlacementQuality((model.Required[rank] && !active ? 1 : 0) +
-                        (ScalesPosition.Accepts(problem, charm, cell) ? 0 : 1),
-                        model.Preserved[rank] && !active ? 1 : 0, held ? 0 : 1, 0, 0, 0, value,
-                        entry.Unsafe ? -1 : 0, charm.IsFiller || charm.IsDormant ? 0 : Math.Max(0, level - charm.WorthLevelCap),
-                        (index == current ? 1 : 0) + (index == planned ? PlanBonus : 0), problem.Scale.ScoreStep);
-                    if (best.HasValue)
+                        model.Members[group * model.Stride + entry.Head];
+                    var level = SimulationResult.Scaled(entry.Level + enchant, entry.Multiplier);
+                    var active = !entry.Disabled && level >= 0 && !dormant;
+                    // 값은 표에 이미 눈금을 씌웠으므로 눈금 0 으로 넘긴다.
+                    var quality = new PlacementQuality((required && !active ? 1 : 0) +
+                        (side == ScalesSide.Any || side == ScalesSide.Left == entry.Left ? 0 : 1),
+                        preserved && !active ? 1 : 0, held && !entry.Ignore ? 1 : 0, 0, 0, 0,
+                        active ? values[Math.Min(level, model.LevelCap)] : 0,
+                        entry.Unsafe ? -1 : 0, wastes ? Math.Max(0, level - worthCap) : 0,
+                        (index == current ? 1 : 0) + (index == planned ? PlanBonus : 0), 0);
+                    if (selected >= 0)
                     {
-                        var order = quality.CompareTo(best.Value);
+                        var order = quality.CompareTo(best);
                         if (order < 0 || order == 0 && index >= selected) continue;
                     }
                     best = quality;
                     selected = index;
                 }
-                if (!best.HasValue)
+                if (selected < 0)
                 {
                     if (RequiresUse(problem, charm)) missing++;
                     if (ScalesPosition.Required(problem, charm)) missing++;
@@ -1154,12 +1169,12 @@ namespace SephPlanner.Core.Solver
                     continue;
                 }
                 used[selected] = true;
-                total += best.Value.Value;
-                missing += best.Value.RetentionFailures;
-                unheld += best.Value.HoldFailures;
-                unpreserved += best.Value.ActivationFailures;
-                waste += best.Value.Waste;
-                familiarity += best.Value.Familiarity;
+                total += best.Value;
+                missing += best.RetentionFailures;
+                unheld += best.HoldFailures;
+                unpreserved += best.ActivationFailures;
+                waste += best.Waste;
+                familiarity += best.Familiarity;
             }
             for (var index = 0; index < cells.Count; index++)
                 if (!used[index] && groups[model.GroupByCell[index]].Unsafe) unsafeEmpty++;

@@ -12,7 +12,7 @@ namespace SephPlanner.Core.Solver
             double familiarity, double scoreStep)
         {
             // 눈금은 견줄 때가 아니라 만들 때 씌운다 - 견주는 쪽은 CompareTo 라 눈금을 받을 자리가 없다.
-            value = scoreStep > 0 ? Math.Floor(value / scoreStep) * scoreStep : value;
+            value = OnScale(value, scoreStep);
             RetentionFailures = retentionFailures;
             ActivationFailures = activationFailures;
             HoldFailures = holdFailures;
@@ -24,6 +24,9 @@ namespace SephPlanner.Core.Solver
             Waste = waste;
             Familiarity = familiarity;
         }
+
+        internal static double OnScale(double value, double scoreStep) =>
+            scoreStep > 0 ? Math.Floor(value / scoreStep) * scoreStep : value;
 
         internal static PlacementQuality From(Arrangement value) => new PlacementQuality(
             value.UnretainedCharms.Count + value.UnapprovedDeactivations.Count + value.WrongSideCharms.Count, value.UnpreservedCharms.Count, value.UnheldCharms.Count,

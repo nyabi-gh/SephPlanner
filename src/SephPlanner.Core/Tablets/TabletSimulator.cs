@@ -67,16 +67,29 @@ namespace SephPlanner.Core.Tablets
         /// </summary>
         public int EffectiveLevel(GridPos position, int enchant)
         {
-            var level = LevelAt(position) + enchant;
+            if (!Contains(position)) return enchant;
+            var index = _grid.ToIndex(position.X, position.Y);
+            return Scaled(_level[index] + enchant, _multiply[index]);
+        }
 
-            // 배수는 게임과 같이 덧셈으로 쌓인다(MUL/2 + MUL/3 = x5). 합이 0이면 게임의
-            // ReleasePermission 도 곱셈을 건너뛰므로(x0 이 아니라 x1) 같은 가드를 둔다.
-            if (Contains(position))
+        // 배수는 게임과 같이 덧셈으로 쌓인다(MUL/2 + MUL/3 = x5). 합이 0이면 게임의
+        // ReleasePermission 도 곱셈을 건너뛰므로(x0 이 아니라 x1) 같은 가드를 둔다.
+        internal static int Scaled(int level, int multiplier) => multiplier != 0 ? level * multiplier : level;
+
+        /// <summary>칸 하나의 행렬 값을 한 번에 읽는다. 격자 밖은 하나씩 읽을 때와 같이 0 이다.</summary>
+        internal void Read(GridPos position, out int level, out int multiplier, out bool disabled, out bool ignore)
+        {
+            if (!Contains(position))
             {
-                var multiplier = _multiply[_grid.ToIndex(position.X, position.Y)];
-                if (multiplier != 0) level *= multiplier;
+                level = multiplier = 0;
+                disabled = ignore = false;
+                return;
             }
-            return level;
+            var index = _grid.ToIndex(position.X, position.Y);
+            level = _level[index];
+            multiplier = _multiply[index];
+            disabled = _disable[index] > 0;
+            ignore = _ignore[index] > 0;
         }
 
         internal void AddLevel(GridPos position, int amount) => Add(_level, position, amount);
