@@ -18,21 +18,18 @@ namespace SephPlanner.Plugin
         /// <summary>마지막으로 짓지 못한 이유. 지어졌으면 빈 문자열이다.</summary>
         public static string LastError { get; private set; } = "";
 
-        /// <summary>
-        /// 아직 지을 수 없으면 <c>null</c> 을 돌려준다. 부르는 쪽은 다음 기회에 다시 물어보면 된다.
-        /// </summary>
-        /// <summary>짓기를 시도한 횟수. 부팅 직후 지역화를 기다리며 여러 번 시도한다.</summary>
-        public static int Attempts { get; private set; }
-
         /// <summary>이미 지은 카탈로그. 없으면 짓지 않고 <c>null</c> 을 돌려준다.</summary>
         public static ICatalog Current => _catalog;
 
+        /// <summary>
+        /// 아직 지을 수 없으면 <c>null</c> 을 돌려준다. 부르는 쪽은 다음 기회에 다시 물어보면 된다.
+        /// </summary>
         public static ICatalog Get()
         {
             if (_catalog != null) return _catalog;
 
             var started = FrameCost.Now;
-            Attempts++;
+            FrameCost.CatalogAttempts++;
             try
             {
                 var tablets = ItemCatalog.LoadTablets();

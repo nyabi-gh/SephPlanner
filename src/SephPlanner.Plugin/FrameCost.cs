@@ -1,3 +1,4 @@
+#nullable disable
 using System;
 using System.Diagnostics;
 using System.Globalization;
@@ -111,6 +112,9 @@ namespace SephPlanner.Plugin
         /// </summary>
         public static readonly Step Catalog = new Step("카탈로그 짓기(시작 시)");
 
+        /// <summary>카탈로그 짓기를 시도한 횟수. 부팅 직후 지역화를 기다리며 여러 번 시도한다.</summary>
+        public static int CatalogAttempts { get; set; }
+
         /// <summary>플러그인이 붙은 시점의 0세대 수집 횟수. 세션 합계를 여기서부터 센다.</summary>
         private static readonly int CollectionsAtStart = GC.CollectionCount(0);
 
@@ -142,7 +146,7 @@ namespace SephPlanner.Plugin
         /// 백그라운드 풀이의 계측을 가져오는 자리. 실행기는 카탈로그가 준비된 뒤에야 생기고 F9
         /// 뒤에는 새로 지어지므로, 들고 있지 않고 그때그때 묻는다. 없으면 그 줄을 아예 안 적는다.
         /// </summary>
-        public static Func<PlanRunnerStats> PlanStats;
+        public static Func<PlanRunnerStats> PlanStats { get; set; }
 
         public static void CountFrame() => Frames++;
         public static void CountDraw() => Draws++;
@@ -183,7 +187,7 @@ namespace SephPlanner.Plugin
                 Inventory.AverageMs, Mixer.AverageMs, Sephirites.AverageMs, Chests.AverageMs,
                 Simulation.AverageMs, Feed.AverageMs,
                 Panel.AverageMs, Frames, Draws,
-                Catalog.Count, Catalog.TotalMs, CatalogSource.Attempts,
+                Catalog.Count, Catalog.TotalMs, CatalogAttempts,
                 Poll.WorstPoll, Collections, WorstPollCollections,
                 ChestAlive.AverageMs, ChestFilter.AverageMs, ChestCollect.AverageMs,
                 InventoriesHeld) + PlanSummary();
@@ -284,7 +288,7 @@ namespace SephPlanner.Plugin
             text.AppendLine("  " + Feed.Describe());
             text.AppendLine("  " + Panel.Describe());
             text.AppendLine("  " + Catalog.Describe() +
-                            "  시도 " + CatalogSource.Attempts + "회");
+                            "  시도 " + CatalogAttempts + "회");
             text.AppendLine(
                 string.Format(
                     CultureInfo.InvariantCulture,

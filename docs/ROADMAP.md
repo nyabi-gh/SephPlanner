@@ -131,9 +131,11 @@ git 로그의 `docs/notes/REVIEW-2026-09-22.md` 에 있다.
   세션 상한 10 은 그대로다.
 - **`QueryVerifier` 가 카탈로그 정의만 돈다.** 합성 석판의 여러 줄 질의는 게임 원본과 대조된 적이
   없다. RESEARCH.md 의 "석판 합성" 절 참고.
-- **유니티 무의존 플러그인 파일이 컴파일조차 검사받지 않는다**(검토 6-1, 1~2시간). 테스트 프로젝트가 플러그인
-  파일 여덟만 링크한다. `FrameCost`·`GrowthProgressWatch`·`GameBinding` 은 그대로 링크되고, `SimulationVerifier`·
-  `QueryVerifier`·`EffectStateDiagnostics` 는 비교 로직을 떼어 내야 한다. 같이 `ItemIdentity` 시험(검토 6-3, 15분).
+- **플러그인 파일 넷이 여전히 컴파일 검사 밖이다**(검토 6-1). `FrameCost`·`GameBinding` 은 2026-10-04 에 테스트
+  프로젝트로 링크했다. `SimulationVerifier`·`QueryVerifier`·`EffectStateDiagnostics`·`GrowthProgressWatch` 는 게임
+  타입(`GridInventory`·`StoneTablet`·`UnitAvatar`)을 직접 읽어 링크되지 않는다. `GrowthProgressWatch` 의 판정은 이미
+  Core(`GrowthProgressReading`)에 있고, 나머지 셋의 비교는 게임 행렬을 읽는 몇 줄이라 떼어 내는 값이 작다.
+  **다시 열 조건:** 이 셋에서 판정이 틀린 제보가 오면 그 비교를 Core 로 옮기며 시험을 붙인다.
 - **`--replay` 가 기본 설정으로 풀고 실패해도 0 을 돌려준다**(`SnapshotReplay`). 회귀 검사에 쓰려면 실패 종료 코드가
   필요하다. 설정까지 재현하는 것은 `--reproduce` 다.
 - 도구·CI 의 작은 것(검토 6-4). `TreatWarningsAsErrors` 가 없다. `make-release.ps1` 에 `#Requires -Version 7` 이 없다.
