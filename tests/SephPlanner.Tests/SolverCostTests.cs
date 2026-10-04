@@ -584,6 +584,55 @@ public class SolverCostTests
     }
 
     /// <summary>
+    /// 가방의 빔을 다시 찾은 까닭을 가른다. 인게임에서 cold 가 석판을 돌려서인지 아티팩트를 주워서인지
+    /// 모르면 빔 열쇠에서 각도를 뺄지 정할 수 없다.
+    /// </summary>
+    [Fact]
+    public void BasisMissesNameWhatChanged()
+    {
+        var preferences = new PlanPreferences { Recommendations = false };
+        var (before, catalog) = DoubledCellBoard(without: 1);
+        var (after, _) = DoubledCellBoard();
+        var layouts = new LayoutCache();
+
+        PlanBuilder.BuildPlacement(before, catalog, preferences, out _, null, layouts);
+        Assert.Equal(1, layouts.BasisMisses.First);
+
+        PlanBuilder.BuildPlacement(after, catalog, preferences, out _, null, layouts);
+        Assert.Equal(1, layouts.BasisMisses.Composition);
+        Assert.Equal(0, layouts.BasisMisses.Rotations);
+
+        after.Inventory!.Tablets[0].Rotation = 1;
+        PlanBuilder.BuildPlacement(after, catalog, preferences, out _, null, layouts);
+        Assert.Equal(1, layouts.BasisMisses.Rotations);
+        Assert.Equal(1, layouts.BasisMisses.Composition);
+        Assert.Equal(3, layouts.BasisMisses.Searches);
+    }
+
+    /// <summary>실행기는 배치 풀이를 빔을 새로 찾은 것과 돌려 쓴 것으로 갈라 센다.</summary>
+    [Fact]
+    public void TheRunnerSplitsColdFromWarmPlacements()
+    {
+        var preferences = new PlanPreferences { Recommendations = false };
+        var (snapshot, catalog) = DoubledCellBoard();
+        using var runner = new PlanRunner(catalog);
+
+        runner.Submit(snapshot, preferences, "catalog");
+        Assert.True(SpinWait.SpinUntil(() => runner.Stats.Published == 1, TimeSpan.FromSeconds(30)));
+
+        var inventory = snapshot.Inventory!;
+        (inventory.Items[0].Position, inventory.Items[1].Position) = (inventory.Items[1].Position, inventory.Items[0].Position);
+        runner.Submit(snapshot, preferences, "catalog");
+        Assert.True(SpinWait.SpinUntil(() => runner.Stats.Published == 2, TimeSpan.FromSeconds(30)));
+
+        var stats = runner.Stats;
+        Assert.Equal(2, stats.Placement.Count);
+        Assert.Equal(1, stats.ColdPlacement.Count);
+        Assert.Equal(0, stats.SettledPlacement.Count);
+        Assert.Equal(1, stats.ColdReasons.First);
+    }
+
+    /// <summary>
     /// 같은 석판 구성의 후보 판(아티팩트 하나를 뺀 제거 조언 같은)이 빔을 먼저 찾아 두어도, 실제
     /// 가방의 판은 그 빔을 받지 않고 제 빔을 찾는다. 받으면 다음 계획이 후보 가방에 맞춘 빔을
     /// 이어받는다. 지금은 조언마다 실제 판을 먼저 묻지만, 그 순서에 기대지 않게 한다.

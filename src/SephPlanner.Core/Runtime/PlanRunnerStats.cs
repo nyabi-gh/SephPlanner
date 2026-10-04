@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using SephPlanner.Core.Solver;
 
 namespace SephPlanner.Core.Runtime
 {
@@ -78,6 +79,21 @@ namespace SephPlanner.Core.Runtime
         /// 두 단계 게시가 들어가면 여기가 찬다.
         /// </summary>
         public PlanSolveStat Advice { get; internal set; } = new PlanSolveStat();
+
+        /// <summary>
+        /// 배치 풀이 가운데 빔을 새로 찾은 것(cold). <see cref="Placement"/> 에 포함된다. 나머지에서
+        /// <see cref="SettledPlacement"/> 를 빼면 빔을 돌려 쓴 것(warm)이다.
+        /// </summary>
+        public PlanSolveStat ColdPlacement { get; internal set; } = new PlanSolveStat();
+
+        /// <summary>자동 배치 직후라 탐색 없이 채점만 한 배치 풀이. <see cref="Placement"/> 에 포함된다.</summary>
+        public PlanSolveStat SettledPlacement { get; internal set; } = new PlanSolveStat();
+
+        /// <summary>조언이 돌린 빔 탐색의 수. 석판 후보와 한 칸 늘어난 판이 여기 든다.</summary>
+        public int AdviceSearches { get; internal set; }
+
+        /// <summary>실제 가방의 빔을 다시 찾은 까닭. 배치와 조언을 함께 센다.</summary>
+        public BeamMisses ColdReasons { get; internal set; } = new BeamMisses();
 
         /// <summary>마지막으로 게시된 계획이 요청된 때로부터 게시까지 걸린 시간. 대기 시간을 포함한다.</summary>
         public double PublishDelayMs { get; internal set; }

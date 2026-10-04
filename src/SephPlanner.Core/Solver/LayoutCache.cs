@@ -92,6 +92,13 @@ namespace SephPlanner.Core.Solver
         public int Reuses { get; private set; }
 
         /// <summary>
+        /// 실제 가방의 빔을 다시 찾은 까닭. 같은 탐색 폭으로 직전에 찾은 가방의 빔과 열쇠의 어느 몫이
+        /// 달라졌는지 센다 - 석판을 돌린 것인지, 아티팩트를 줍거나 버린 것인지를 인게임에서 가르는 계측이다.
+        /// </summary>
+        public BeamMisses BasisMisses { get; } = new BeamMisses();
+        private readonly Dictionary<string, string[]> _lastBasisParts = new Dictionary<string, string[]>(StringComparer.Ordinal);
+
+        /// <summary>
         /// 기준 배치를 실제로 푼 횟수. 빔을 돌려 쓰면 <see cref="Searches"/>가 안 오르므로,
         /// 기준 배치가 몇 번 풀렸는지는 여기서만 보인다.
         /// </summary>
@@ -170,7 +177,8 @@ namespace SephPlanner.Core.Solver
 
         public List<List<TabletPlacement>> Of(PlacementProblem problem, SolverOptions options)
         {
-            var key = BeamKey(problem, options);
+            var parts = Parts(problem, options);
+            var key = string.Join(Separator, parts);
             var ofBasis = ReferenceEquals(problem, _basis);
             var found = Find(_beams, key);
 
@@ -181,6 +189,7 @@ namespace SephPlanner.Core.Solver
             else
             {
                 Searches++;
+                if (ofBasis) CountMiss(parts);
                 beam = PlacementSolver.SearchBeam(problem, options);
                 var entry = Reserve(_beams, key);
                 entry.Value = beam;
@@ -267,8 +276,6 @@ namespace SephPlanner.Core.Solver
         /// 조언들이 같은 빔을 두 번 찾는다 - <see cref="DiscardAdvisor"/> 가 <c>ForAdvice</c> 의
         /// 예산 둘을 덮어쓰기 때문에 실제로 그랬다.
         /// </summary>
-        private string BeamKey(PlacementProblem problem, SolverOptions options) =>
-            Key(problem, options, new StringBuilder());
 
         /// <summary>
         /// 빔 열쇠에 채점을 가르는 것을 더한 열쇠. 기준 배치와 잣대가 이것으로 찾는다.
@@ -283,27 +290,51 @@ namespace SephPlanner.Core.Solver
                    .Append('/').Append(options.EmptySideTrials).Append(';');
             foreach (var category in problem.PriorityCategories.OrderBy(value => value, StringComparer.Ordinal))
                 builder.Append("priority:").Append(category.Length).Append(':').Append(category).Append(';');
-            return Key(problem, options, builder);
+            return builder.Append(string.Join(Separator, Parts(problem, options))).ToString();
         }
 
-        private string Key(PlacementProblem problem, SolverOptions options, StringBuilder builder)
+        private void CountMiss(string[] parts)
         {
-            builder.Append("basis:").Append(_composition).Append(';');
-            builder.Append(problem.Grid.Width).Append('x').Append(problem.Grid.Height)
-                   .Append('/').Append(problem.Grid.Storage)
-                   .Append('/').Append(options.BeamWidth)
-                   .Append('/').Append(options.ExactCandidates)
-                   .Append('/').Append(options.ParentQuota).Append(';');
+            var width = parts[Width];
+            BasisMisses.Searches++;
+            if (!_lastBasisParts.TryGetValue(width, out var last)) BasisMisses.First++;
+            else
+            {
+                if (last[Composition] != parts[Composition]) BasisMisses.Composition++;
+                if (last[Grid] != parts[Grid]) BasisMisses.Grid++;
+                if (last[Tablets] != parts[Tablets]) BasisMisses.Tablets++;
+                if (last[Rotations] != parts[Rotations]) BasisMisses.Rotations++;
+                if (last[Fixed] != parts[Fixed]) BasisMisses.Fixed++;
+            }
+            _lastBasisParts[width] = parts;
+        }
 
+        private const string Separator = "\u0001";
+        private const int Composition = 0, Width = 1, Grid = 2, Tablets = 3, Rotations = 4, Fixed = 5;
+
+        /// <summary>빔 열쇠를 까닭별 몫으로 나눈 것. 이어 붙이면 열쇠다.</summary>
+        private string[] Parts(PlacementProblem problem, SolverOptions options)
+        {
+            var parts = new string[Fixed + 1];
+            parts[Composition] = _composition;
+            parts[Width] = options.BeamWidth + "/" + options.ExactCandidates + "/" + options.ParentQuota;
+            parts[Grid] = problem.Grid.Width + "x" + problem.Grid.Height + "/" + problem.Grid.Storage;
+
+            var tablets = new StringBuilder();
+            var rotations = new StringBuilder();
             foreach (var slot in problem.Tablets)
             {
-                builder.Append(slot.InstanceId).Append(':')
+                tablets.Append(slot.InstanceId).Append(':')
                        .Append(slot.Definition.EntityId).Append(':')
                        .Append(slot.Rotatable ? '1' : '0').Append(':')
-                       .Append(PlacementSolver.CurrentRotation(problem, slot)).Append(':')
                        .Append(slot.InstanceQuery ?? "").Append(':')
                        .Append(slot.InstanceConditionQuery ?? "").Append(';');
+                rotations.Append(PlacementSolver.CurrentRotation(problem, slot)).Append(';');
             }
+            parts[Tablets] = tablets.ToString();
+            parts[Rotations] = rotations.ToString();
+
+            var builder = new StringBuilder();
             foreach (var engraving in problem.FixedTablets)
                 builder.Append("engraving:").Append(engraving.Definition.EntityId).Append(':')
                     .Append(engraving.Position.X).Append(',').Append(engraving.Position.Y).Append(':')
@@ -340,7 +371,53 @@ namespace SephPlanner.Core.Solver
                     builder.Append(at.X).Append(',').Append(at.Y);
                 builder.Append(';');
             }
-            return builder.ToString();
+            parts[Fixed] = builder.ToString();
+            return parts;
         }
+    }
+
+    /// <summary>실제 가방의 빔을 다시 찾은 횟수와 그 까닭. 한 번에 여러 까닭이 함께 셀 수 있다.</summary>
+    public sealed class BeamMisses
+    {
+        public int Searches { get; internal set; }
+
+        /// <summary>그 탐색 폭으로는 처음 찾았다. 캐시를 새로 지은 직후다.</summary>
+        public int First { get; internal set; }
+
+        /// <summary>아티팩트를 줍거나 버렸거나 값어치·지정이 바뀌었다.</summary>
+        public int Composition { get; internal set; }
+
+        public int Grid { get; internal set; }
+
+        /// <summary>석판을 얻거나 잃었다.</summary>
+        public int Tablets { get; internal set; }
+
+        /// <summary>석판의 지금 각도가 바뀌었다.</summary>
+        public int Rotations { get; internal set; }
+
+        /// <summary>각인·고정 칸 효과·콤보 각인 단계·천칭 편·못 박힌 칸이 바뀌었다.</summary>
+        public int Fixed { get; internal set; }
+
+        internal void Add(BeamMisses later, BeamMisses earlier)
+        {
+            Searches += later.Searches - earlier.Searches;
+            First += later.First - earlier.First;
+            Composition += later.Composition - earlier.Composition;
+            Grid += later.Grid - earlier.Grid;
+            Tablets += later.Tablets - earlier.Tablets;
+            Rotations += later.Rotations - earlier.Rotations;
+            Fixed += later.Fixed - earlier.Fixed;
+        }
+
+        internal BeamMisses Copy() => new BeamMisses
+        {
+            Searches = Searches,
+            First = First,
+            Composition = Composition,
+            Grid = Grid,
+            Tablets = Tablets,
+            Rotations = Rotations,
+            Fixed = Fixed,
+        };
     }
 }

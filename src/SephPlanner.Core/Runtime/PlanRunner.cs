@@ -201,6 +201,10 @@ namespace SephPlanner.Core.Runtime
 
         private readonly PlanSolveStat _placementStat = new PlanSolveStat();
         private readonly PlanSolveStat _adviceStat = new PlanSolveStat();
+        private readonly PlanSolveStat _coldPlacementStat = new PlanSolveStat();
+        private readonly PlanSolveStat _settledPlacementStat = new PlanSolveStat();
+        private readonly BeamMisses _coldReasons = new BeamMisses();
+        private int _adviceSearches;
         private double _publishDelayMs;
         private double _worstPublishDelayMs;
         private int _worstPublishRun;
@@ -275,6 +279,10 @@ namespace SephPlanner.Core.Runtime
                     {
                         Placement = _placementStat.Copy(),
                         Advice = _adviceStat.Copy(),
+                        ColdPlacement = _coldPlacementStat.Copy(),
+                        SettledPlacement = _settledPlacementStat.Copy(),
+                        AdviceSearches = _adviceSearches,
+                        ColdReasons = _coldReasons.Copy(),
                         PublishDelayMs = _publishDelayMs,
                         WorstPublishDelayMs = _worstPublishDelayMs,
                         WorstPublishRun = _worstPublishRun,
@@ -530,6 +538,10 @@ namespace SephPlanner.Core.Runtime
                 layouts = _layouts;
             }
 
+            // 캐시는 이 작업만 만지므로 자물쇠 없이 읽어도 된다.
+            var searchesBefore = layouts.Searches;
+            var missesBefore = layouts.BasisMisses.Copy();
+
             Plan? plan = null;
             var blocker = PlanBlocker.None;
             Exception? failure = null;
@@ -564,9 +576,16 @@ namespace SephPlanner.Core.Runtime
 
             // 잠금을 기다린 시간은 풀이에 든 시간이 아니다. 자물쇠 밖에서 끊는다.
             var elapsedMs = SolveClock.MsSince(startedAt);
+            var searched = layouts.Searches - searchesBefore;
 
             lock (_gate)
             {
+                _coldReasons.Add(layouts.BasisMisses, missesBefore);
+                var stale = request.Cancellation.IsCancellationRequested || request.Generation != _placementGeneration;
+                if (request.Advice) _adviceSearches += searched;
+                else if (request.Settled) _settledPlacementStat.Add(elapsedMs, stale);
+                else if (searched > 0) _coldPlacementStat.Add(elapsedMs, stale);
+
                 if (request.Advice) FinishAdviceLocked(request, plan, failure, elapsedMs);
                 else FinishPlacementLocked(request, plan, blocker, failure, elapsedMs);
 

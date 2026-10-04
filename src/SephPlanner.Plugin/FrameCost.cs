@@ -201,12 +201,33 @@ namespace SephPlanner.Plugin
                 CultureInfo.InvariantCulture,
                 ", 계획 풀이 - 배치 {0}회 평균 {1:0}ms/최악 {2:0}ms(풀이 {3}) 버린 것 {4}회, " +
                 "조언 {5}회 평균 {6:0}ms, 게시 {7}회 지연 최근 {8:0}ms/최악 {9:0}ms, " +
-                "밀린 세대 {10}(최악 {11})",
+                "밀린 세대 {10}(최악 {11}), {12}",
                 stats.Placement.Count, stats.Placement.AverageMs, stats.Placement.WorstMs,
                 stats.Placement.WorstRun, stats.Placement.Discarded,
                 stats.Advice.Count, stats.Advice.AverageMs,
                 stats.Published, stats.PublishDelayMs, stats.WorstPublishDelayMs,
-                stats.Backlog, stats.WorstBacklog);
+                stats.Backlog, stats.WorstBacklog, Coldness(stats));
+        }
+
+        /// <summary>
+        /// 배치 풀이를 빔을 새로 찾은 것(cold)·돌려 쓴 것(warm)·자동 배치 직후(채점만)로 가르고, 가방의
+        /// 빔을 다시 찾은 까닭을 붙인다. cold 가 warm 의 10~20배라 이 비율 없이는 평균을 읽을 수 없다.
+        /// </summary>
+        private static string Coldness(PlanRunnerStats stats)
+        {
+            var cold = stats.ColdPlacement;
+            var settled = stats.SettledPlacement;
+            var warmCount = stats.Placement.Count - cold.Count - settled.Count;
+            var warmMs = stats.Placement.TotalMs - cold.TotalMs - settled.TotalMs;
+            var reasons = stats.ColdReasons;
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "배치 cold {0}회 평균 {1:0}ms / warm {2}회 평균 {3:0}ms / 채점만 {4}회 평균 {5:0}ms, " +
+                "조언 탐색 {6}회, 가방 빔 재탐색 {7}회(처음 {8} 구성 {9} 석판 {10} 각도 {11} 칸 {12} 고정 {13})",
+                cold.Count, cold.AverageMs, warmCount, warmCount == 0 ? 0 : warmMs / warmCount,
+                settled.Count, settled.AverageMs, stats.AdviceSearches,
+                reasons.Searches, reasons.First, reasons.Composition, reasons.Tablets, reasons.Rotations,
+                reasons.Grid, reasons.Fixed);
         }
 
         private static string Describe(string name, PlanSolveStat stat) =>
@@ -223,6 +244,9 @@ namespace SephPlanner.Plugin
             text.AppendLine();
             text.AppendLine("[perf] 계획 풀이 (백그라운드 스레드)");
             text.AppendLine("  " + Describe("배치 풀이", stats.Placement));
+            text.AppendLine("  " + Describe("  그중 빔을 새로 찾은 것", stats.ColdPlacement));
+            text.AppendLine("  " + Describe("  그중 자동 배치 직후", stats.SettledPlacement));
+            text.AppendLine("  " + Coldness(stats));
             text.AppendLine("  " + Describe("조언 풀이", stats.Advice) +
                             (stats.Advice.Count == 0 ? "  (아직 배치와 함께 푼다)" : ""));
             text.AppendLine(
