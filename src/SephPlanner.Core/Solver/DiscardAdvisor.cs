@@ -105,7 +105,7 @@ namespace SephPlanner.Core.Solver
                 var solved = PlacementSolver.EvaluateLayouts(trial, yardstick, options);
                 cancellation.ThrowIfCancellationRequested();
                 if (!ActivationPolicy.AllowsTransition(baseline, solved) || solved.UnretainedCharms.Count > 0 || solved.UnplacedTablets > 0 || solved.CharmPositions.Count != trial.Charms.Count ||
-                    solved.Score <= baseline.Score + 0.001 || PriorityPlacement.Compare(solved, baseline) <= 0)
+                    solved.Score - baseline.Score < problem.Scale.ScoreStep || PriorityPlacement.Compare(solved, baseline) <= 0)
                     continue;
 
                 var finalCounts = Counts(trial, solved.CharmPositions);
@@ -129,7 +129,7 @@ namespace SephPlanner.Core.Solver
                     var soon = lookahead.Solve(trial, layouts, options, soonYardstick);
                     if (soon is null || soon.UnplacedTablets > 0 ||
                         soon.CharmPositions.Count != trial.Charms.Count ||
-                        soon.Score <= soonBaseline.Score + 0.001 ||
+                        soon.Score - soonBaseline.Score < problem.Scale.ScoreStep ||
                         PriorityPlacement.Compare(soon, soonBaseline) <= 0)
                         continue;
                     soonGain = soon.Score - soonBaseline.Score;

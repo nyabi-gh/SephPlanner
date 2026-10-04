@@ -163,7 +163,8 @@ namespace SephPlanner.Core.Solver
         }
 
         /// <summary>
-        /// 버리기 조언과 같은 잣대다. <see cref="PriorityPlacement.Compare"/> 를 함께 보는 것이
+        /// 버리기 조언과 같은 잣대다. 이득은 점수 눈금 하나 이상이어야 한다 - 되돌릴 수 없는 조언이라
+        /// 환산 잡음만큼의 차이로 권하면 손해가 한쪽으로만 난다. <see cref="PriorityPlacement.Compare"/> 를 함께 보는 것이
         /// 이 조언에서는 특히 중요하다 - 그쪽이 점수를 카탈로그의 눈금으로 끊고 초과 강화를 세므로,
         /// <b>상한 위로 넘쳐 낭비만 되는 인챈트</b>가 여기서 걸러진다.
         /// </summary>
@@ -172,7 +173,7 @@ namespace SephPlanner.Core.Solver
             solved.UnplacedTablets == 0 &&
             solved.CharmPositions.Count == trial.Charms.Count &&
             ActivationPolicy.AllowsTransition(baseline, solved) &&
-            solved.Score > baseline.Score + 0.001 &&
+            solved.Score - baseline.Score >= trial.Scale.ScoreStep &&
             PriorityPlacement.Compare(solved, baseline) > 0;
     }
 }
