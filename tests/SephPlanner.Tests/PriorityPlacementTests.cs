@@ -1,4 +1,4 @@
-using SephPlanner.Core.Model;
+﻿using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
 using SephPlanner.Core.Solver;
@@ -71,6 +71,36 @@ public class PriorityPlacementTests
         problem.ComboCounts = new Dictionary<string, int> { ["PLANET"] = 10, ["OTHER"] = 2 };
         problem.Combos = id => new ComboDefinition { Id = id, Thresholds = { 2 } };
         return problem;
+    }
+
+    /// <summary>
+    /// 콤보 우선 탐색은 칸 → 아티팩트 표를 짓는데(<c>TargetsAt</c>), 두 아티팩트가 한 칸에 놓인 배치에서는 그
+    /// 표가 지어지지 않고 계획이 통째로 실패한다. 못 옮기는 아이템이 침이 노리는 칸을 막고 있어도 맞바꿈이
+    /// 그 칸을 건드리지 않고, 결과의 칸이 서로 겹치지 않아야 한다.
+    /// </summary>
+    [Theory]
+    [InlineData(1289)]
+    [InlineData(1290)]
+    public void APinnedItemOnTheNeedlesTargetCellNeverSharesACell(int definitionId)
+    {
+        var problem = NeedleProblem(definitionId);
+        problem.Grid = new GridSpec(2, 3, 6);
+        problem.Charms.Add(new CharmSlot
+        {
+            InstanceId = -5,
+            Immovable = true,
+            Definition = new CharmDefinition { EntityId = 5, MaxLevel = 5, Categories = { "OTHER" } },
+        });
+        problem.CurrentCharms[1] = new GridPos(1, 1);
+        problem.CurrentCharms[2] = new GridPos(0, 2);
+        problem.CurrentCharms[-5] = new GridPos(1, 0);
+        // 콤보 우선이 하나면 이미 맞춘 침은 다시 옮겨 보지 않는다. 둘이면 막힌 칸까지 시도한다.
+        problem.PriorityCategories.Add("OTHER");
+
+        var result = PlacementSolver.Solve(problem);
+
+        Assert.Equal(new GridPos(1, 0), result.CharmPositions[-5]);
+        Assert.Equal(result.CharmPositions.Count, result.CharmPositions.Values.Distinct().Count());
     }
 
     [Theory]

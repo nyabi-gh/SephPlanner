@@ -250,6 +250,9 @@ namespace SephPlanner.Core.Solver
             {
                 var targetCell = cell.Offset(charm.Definition.DependencyOffsetX, charm.Definition.DependencyOffsetY);
                 if (targetCell == cell || !problem.Grid.Contains(targetCell)) yield break;
+                // 시드는 아티팩트마다 서로 다른 칸을 쓴다. 솔버 배정은 못 박힌 칸을 뺀 칸에 일대일로 놓고
+                // (PlacementSolver.Cells·Assign), 현재 배치는 칸이 겹치지 않을 때만 시드가 되며, Place 는 맞바꾸기만
+                // 한다. 겹치면 여기서 던지는 것이 맞다 - 한 칸에 둘을 두는 계획은 게임에 옮길 수 없다.
                 var neighbors = problem.Charms.ToDictionary(other => seed.CharmPositions[other.InstanceId]);
                 foreach (var target in problem.Charms.OrderBy(other => seed.CharmPositions[other.InstanceId] == targetCell ? 0 : 1))
                 {

@@ -102,8 +102,7 @@ git 로그의 `docs/notes/REVIEW-2026-09-22.md` 에 있다.
 - **직접 시험이 없는 것**(검토 3-6). `CompareTo` 단계 순서와 허용 오차의 관계는 `PlacementQualityTests` 가 붙잡았다
   (2026-10-04). 남은 것은 `CharmCriteria.ReadsNeighbors`,
   `StatExchange.CrossValidate`·`IsReliable`, `DirectedCharmSupport`·`ContextStatWorth`·`BuildStatWorth`·`PreparedTablet`.
-- 솔버의 작은 것(검토 3-5). `PriorityPlacement` 의 `ToDictionary` 가 칸이 겹치면 던지는데 `PlanBuilder` 는 취소
-  예외만 잡는다. `DirectedCharmSupport.Estimate` 에 메모가 없고 `ImproveTablets` 가 패스마다 할당한다. `TabletQuery`
+- 솔버의 작은 것(검토 3-5). `DirectedCharmSupport.Estimate` 에 메모가 없고 `ImproveTablets` 가 패스마다 할당한다. `TabletQuery`
   캐시가 호출마다 전역 lock 을 잡고 10만 개에서 통째로 비운다. `PlacementSolver.cs` 는 2,000줄이고 XML 주석이 깨진
   자리가 있다. 추정이라고 적지 않은 상수(`PriorityMultiplier`·`PriorityWorth`·`PlanBonus`, `OfferAdvisor` 의
   `0.000001`).
