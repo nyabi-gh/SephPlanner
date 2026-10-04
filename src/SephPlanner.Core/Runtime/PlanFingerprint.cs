@@ -78,6 +78,14 @@ namespace SephPlanner.Core.Runtime
             Add(builder, "gameVersion", snapshot.GameVersion);
             Add(builder, "weapon", snapshot.Run?.WeaponId ?? "");
 
+            // 이 값이 없던 재현 자료의 지문과 같도록 읽었을 때만 더한다.
+            if (snapshot.Run?.Critical is { } critical)
+            {
+                Add(builder, "criticalDirect", critical.Direct);
+                Add(builder, "criticalMagic", critical.Magic);
+                Add(builder, "criticalExecution", critical.Execution);
+            }
+
             var inventory = snapshot.Inventory;
             Add(builder, "inventory", inventory is not null);
             if (inventory is null) return Hash(builder);

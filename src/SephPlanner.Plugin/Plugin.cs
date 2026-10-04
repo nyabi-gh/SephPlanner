@@ -855,6 +855,7 @@ namespace SephPlanner.Plugin
         {
             if (!isSaved) _newRunPending = true;
             GameReader.ForgetArrivals();
+            GameReader.ForgetCritical();
         }
 
         /// <summary>

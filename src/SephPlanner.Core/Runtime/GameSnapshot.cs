@@ -100,6 +100,25 @@ namespace SephPlanner.Core.Runtime
 
         /// <summary>소지금. 살 수 없는 후보를 가려내는 데 쓴다.</summary>
         public int Gold { get; set; }
+
+        /// <summary>
+        /// 아티팩트 밖에서 오는 치명타. 아직 깨끗하게 읽지 못했거나 이 값이 없던 시절의 재현 자료면
+        /// <c>null</c> 이고, 그때는 상한을 보지 않는다(<see cref="Solver.CriticalCap"/>).
+        /// </summary>
+        public CriticalBase? Critical { get; set; }
+    }
+
+    /// <summary>게임 단위(100 = 1%)의 치명타 바탕. <see cref="Solver.CriticalCap.Base"/> 가 짓는다.</summary>
+    public sealed class CriticalBase
+    {
+        /// <summary>일반 공격의 바탕(<c>CRITICAL + WEAPONCRITICAL</c>).</summary>
+        public int Direct { get; set; }
+
+        /// <summary>마법의 바탕(<c>CRITICAL + MAGICCRITICAL</c>).</summary>
+        public int Magic { get; set; }
+
+        /// <summary>베루트의 낫 말고도 처형이 있는가.</summary>
+        public bool Execution { get; set; }
     }
 
     public sealed class InventoryState

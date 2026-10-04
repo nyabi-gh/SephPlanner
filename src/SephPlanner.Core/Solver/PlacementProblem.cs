@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using SephPlanner.Core.Charms;
 using SephPlanner.Core.Model;
+using SephPlanner.Core.Runtime;
 using SephPlanner.Core.Tablets;
 
 namespace SephPlanner.Core.Solver
@@ -215,6 +216,11 @@ namespace SephPlanner.Core.Solver
         public HashSet<int> DeactivationAllowed { get; set; } = new HashSet<int>();
         public Dictionary<int, int> PinnedCharms { get; set; } = new Dictionary<int, int>();
         public HashSet<int> RetainedCharms { get; set; } = new HashSet<int>();
+
+        /// <summary>아티팩트 밖에서 오는 치명타. 모르면 <c>null</c> 이고 상한을 보지 않는다.</summary>
+        public CriticalBase? Critical { get; set; }
+
+        internal CriticalCap.CriticalModel? CriticalModel { get; set; }
         internal HashSet<int> ProtectedActive { get; set; } = new HashSet<int>();
         // 획득·제거·합성 가상 배치는 바뀐 가방이 아니라 원래 가방의 활성 보호를 따른다.
         internal bool InheritsActivationBaseline { get; set; }

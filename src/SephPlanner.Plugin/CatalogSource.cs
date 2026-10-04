@@ -24,6 +24,9 @@ namespace SephPlanner.Plugin
         /// <summary>짓기를 시도한 횟수. 부팅 직후 지역화를 기다리며 여러 번 시도한다.</summary>
         public static int Attempts { get; private set; }
 
+        /// <summary>이미 지은 카탈로그. 없으면 짓지 않고 <c>null</c> 을 돌려준다.</summary>
+        public static ICatalog Current => _catalog;
+
         public static ICatalog Get()
         {
             if (_catalog != null) return _catalog;

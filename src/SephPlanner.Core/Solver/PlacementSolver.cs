@@ -1523,6 +1523,7 @@ namespace SephPlanner.Core.Solver
                 var cell = problem.Grid.ToPosition(index);
                 if (!occupancy.HasItem(cell) && Unsafe(cell, result)) unsafeEmpty++;
             }
+            score -= CriticalCap.Penalty(problem, positions, result, occupancy);
             return new PlacementQuality(missing, unpreserved, unheld, comboMatches,
                 comboProgress, supportMatches, score, unsafeEmpty, waste, familiarity,
                 problem.Scale.ScoreStep);
@@ -2021,6 +2022,7 @@ namespace SephPlanner.Core.Solver
                 if (!charm.Retained && problem.ProtectedActive.Contains(charm.InstanceId) && (inactive || unlinked))
                     arrangement.UnapprovedDeactivations.Add(charm.InstanceId);
             }
+            arrangement.Score -= CriticalCap.Penalty(problem, positions, result, occupancy);
             PriorityPlacement.Describe(problem, arrangement, neighbors);
             var quality = ScoreOf(problem, layout, positions, occupancy, result, neighbors);
             arrangement.UnsafeEmptyCells = quality.UnsafeEmpty;

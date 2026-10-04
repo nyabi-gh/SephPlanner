@@ -541,6 +541,7 @@ namespace SephPlanner.Core.Solver
                 DeactivationAllowed = problem.DeactivationAllowed,
                 PinnedCharms = problem.PinnedCharms,
                 RetainedCharms = problem.RetainedCharms,
+                Critical = problem.Critical,
                 ProtectedActive = new HashSet<int>(problem.ProtectedActive),
                 InheritsActivationBaseline = true,
             };

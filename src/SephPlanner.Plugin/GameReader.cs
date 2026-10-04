@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Mirror;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
@@ -16,6 +17,7 @@ namespace SephPlanner.Plugin
     {
         private static readonly ItemArrivals Arrivals = new ItemArrivals();
         private static GridInventory _arrivalsOf;
+        private static CriticalBase _critical;
 
         /// <summary>
         /// 새로 들어온 아이템의 기준을 다시 잡는다. 세션 신호가 오지 않아도 가방이 바뀌면
@@ -26,6 +28,9 @@ namespace SephPlanner.Plugin
             Arrivals.Reset();
             _arrivalsOf = null;
         }
+
+        /// <summary>새 판에서는 무기가 바뀌므로 치명타 바탕을 다시 읽을 때까지 상한을 보지 않는다.</summary>
+        internal static void ForgetCritical() => _critical = null;
 
         /// <summary>
         /// 항상 스냅샷을 돌려준다. 런이 끝났거나 플레이어가 죽었으면 인벤토리가 비어 있는 스냅샷이다.
@@ -57,6 +62,7 @@ namespace SephPlanner.Plugin
             var step = FrameCost.Now;
             snapshot.Inventory = ReadInventory(avatar.Inventory);
             FrameCost.Inventory.Add(step);
+            snapshot.Run.Critical = ReadCritical(avatar, snapshot.Inventory);
 
             if (includeRecommendations)
             {
@@ -249,6 +255,23 @@ namespace SephPlanner.Plugin
                     : "",
                 Gold = avatar.Money,
             };
+        }
+
+        /// <summary>
+        /// 아티팩트 밖에서 오는 치명타. 버프·디버프가 걸려 있거나 전투 중이면 그 몫이 섞이므로 그때는
+        /// 다시 읽지 않고 마지막으로 깨끗하게 읽은 바탕을 쓴다. 바탕은 가방이 바뀌어도 그대로라 같은
+        /// 폴링의 가방으로 빼기만 하면 된다.
+        /// </summary>
+        private static CriticalBase ReadCritical(PlayerAvatar avatar, InventoryState inventory)
+        {
+            var catalog = CatalogSource.Current;
+            if (catalog == null || avatar.IsInBattle || avatar.Buffs.Any() || avatar.Debuffs.Any()) return _critical;
+            _critical = CriticalCap.Base(inventory, catalog,
+                avatar.GetCustomStat(ECustomStat.Critical),
+                avatar.GetCustomStatUnsafe("WEAPONCRITICAL"),
+                avatar.GetCustomStat(ECustomStat.MagicCritical),
+                avatar.GetCustomStat(ECustomStat.EXECUTION));
+            return _critical;
         }
 
         private static InventoryState ReadInventory(GridInventory inv)
