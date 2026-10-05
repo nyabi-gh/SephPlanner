@@ -27,7 +27,7 @@ public class ExplainWorthTests
     public void AStatOnlyThisCharmGivesIsCalledOut()
     {
         // 환산율이 자기 자신에서 나온 값은 다른 아티팩트와 견주는 근거가 못 된다.
-        Assert.Contains("효과를 비교할 자료가 부족합니다", Text(Measured(0)));
+        Assert.Contains("다른 아이템과 효과를 비교할 자료가 부족합니다", Text(Measured(0)));
     }
 
     [Fact]
@@ -42,7 +42,29 @@ public class ExplainWorthTests
         var text = Text(Measured(0.2));
 
         Assert.Contains("일부 효과를 비교할 자료가 부족합니다", text);
-        Assert.DoesNotContain("자기 자신에서", text);
+        Assert.DoesNotContain("다른 아이템과", text);
+    }
+
+    [Fact]
+    public void APartlyMeasuredThinConversionSaysItOnce()
+    {
+        var definition = Measured(0.2);
+        definition.StatWorthUnconverted.Add("CONVERSION");
+        Assert.Equal(CharmWorthSource.MeasuredFloor, CharmWorth.Resolve(definition).Source);
+
+        Assert.Single(Explain.Charm(definition, CharmValueBook.Empty), line => line.Contains("비교할 자료가 부족"));
+    }
+
+    [Fact]
+    public void ARarityGuessDoesNotAlsoClaimThinMeasurement()
+    {
+        var definition = Measured(0);
+        definition.StatWorthByLevel.Clear();
+        Assert.Equal(CharmWorthSource.Rarity, CharmWorth.Resolve(definition).Source);
+
+        var text = Text(definition);
+        Assert.Contains("레어도를 기준으로", text);
+        Assert.DoesNotContain("비교할 자료가 부족", text);
     }
 
     [Fact]

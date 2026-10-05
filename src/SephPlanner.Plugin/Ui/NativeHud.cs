@@ -449,7 +449,7 @@ namespace SephPlanner.Plugin.Ui
                 }
                 else if (Math.Abs(gain) <= 0.001 && plan.Best.UnsafeEmptyCells < plan.Current.UnsafeEmptyCells)
                 {
-                    _gain.text = "빈칸의 불리한 효과 줄이기";
+                    _gain.text = "불리한 칸 먼저 채우기";
                     _gain.color = NativeSkin.Mint;
                 }
             }
@@ -739,7 +739,7 @@ namespace SephPlanner.Plugin.Ui
                     lines.Add(
                         $"강화칸 우선 {new string('★', pinned)}: 좋은 강화칸을 먼저 받도록 배치합니다." +
                         (reason == CharmInactiveReason.Weapon
-                            ? " 지금은 무기가 맞지 않아 꺼져 있습니다."
+                            ? " 꺼져 있어도 자리는 이 지정대로 잡습니다."
                             : ""));
                 }
                 else if (pinned < 0)
@@ -851,7 +851,7 @@ namespace SephPlanner.Plugin.Ui
         {
             var parts = new StringBuilder();
 
-            if (!advice.Available) return Tint("배치할 수 없음", NativeSkin.Bad);
+            if (!advice.Available) return Tint("배치 못 찾음", NativeSkin.Bad);
 
             if (advice.MatchesPreset) parts.Append(Tint("빌드", NativeSkin.Mint)).Append("  ");
 

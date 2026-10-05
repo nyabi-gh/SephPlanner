@@ -37,7 +37,8 @@ namespace SephPlanner.Core.Planning
             // 점수는 진행한 만큼 올라가는데 쪽지에 이유가 없으면, 같은 아티팩트가 왜 다르게
             // 매겨지는지 알 길이 없다. 진행도는 인스턴스마다 달라 여기서 숫자를 적지는 못한다.
             if (ScalesPosition.IsSideBound(definition))
-                lines.Add("지금 놓인 쪽을 유지합니다. 반대쪽 효과를 원하면 직접 옮기세요. 왼쪽은 1~3열, 오른쪽은 4열부터입니다.");
+                lines.Add("지금 놓인 쪽을 유지합니다. 어느 쪽이 나은지는 비교하지 않으니, 반대쪽 효과를 원하면 직접 옮기세요. "
+                          + "왼쪽은 1~3열, 오른쪽은 4열부터입니다.");
             if (ScalesPosition.FollowsPriority(definition))
                 lines.Add("새로 얻어 아직 옮기지 않은 천칭은 우선 콤보에 잉걸불만 있으면 왼쪽, 빙하만 있으면 "
                           + "오른쪽으로 보냅니다.");
@@ -63,34 +64,31 @@ namespace SephPlanner.Core.Planning
                 return lines;
             }
 
-            if (worth.Source == CharmWorthSource.Rarity)
-                lines.Add("이 아이템은 희귀도를 기준으로 추천합니다. 실제 효과가 더 좋은지는 직접 확인하세요.");
-
-            if (worth.Source == CharmWorthSource.MeasuredFloor)
-                lines.Add("일부 효과만 비교할 수 있어 추천이 실제 체감과 다를 수 있습니다.");
-            lines.AddRange(Circular(definition, worth));
+            if (Doubt(definition, worth) is { } doubt) lines.Add(doubt);
 
             return lines;
         }
 
         /// <summary>
-        /// 환산율이 이 아티팩트 자신에게서 나온 경우. 그 능력치를 주는 아티팩트가 이것뿐이면
-        /// "레벨 하나 = 이 아티팩트의 한 걸음"이라는 동어반복이라, 다른 아티팩트와 견줄 때 쓸
-        /// 수 있는 값이 아니다. 1.0.31 에서 잰 값 173종 중 43종이 여기 해당한다.
+        /// 값어치의 근거가 약하다는 한 줄. 근거마다 따로 말하면 같은 뜻의 문장이 겹쳐 나오므로
+        /// 가장 약한 근거 하나만 고른다.
         ///
-        /// 잰 값이라는 것만 말하고 근거의 두께를 안 말하면, 짐작에 가까운 숫자가 실측과 같은
-        /// 무게로 보인다.
+        /// 신뢰도는 잰 값에만 뜻이 있다. 환산율이 이 아티팩트 자신에게서 나오면(그 능력치를 주는
+        /// 아티팩트가 이것뿐이면) "레벨 하나 = 이 아티팩트의 한 걸음"이라는 동어반복이라 다른
+        /// 아티팩트와 견줄 수 없다. 1.0.31 에서 잰 값 173종 중 43종이 여기 해당한다.
         /// </summary>
-        private static List<string> Circular(CharmDefinition definition, CharmWorth worth)
+        private static string? Doubt(CharmDefinition definition, CharmWorth worth)
         {
-            var lines = new List<string>();
-            if (definition.StatEffects.Count == 0 || worth.Source == CharmWorthSource.Curated) return lines;
-            if (worth.Confidence >= 0.5) return lines;
+            if (worth.Source == CharmWorthSource.Rarity)
+                return "이 아이템은 레어도를 기준으로 추천합니다. 실제 효과가 더 좋은지는 직접 확인하세요.";
+            if (worth.Source is not (CharmWorthSource.Measured or CharmWorthSource.MeasuredFloor)) return null;
 
-            lines.Add(worth.Confidence <= 0
-                ? "다른 아이템과 효과를 비교할 자료가 부족합니다. 추천보다 실제 체감을 우선하세요."
-                : "일부 효과를 비교할 자료가 부족합니다. 추천보다 실제 체감을 우선하세요.");
-            return lines;
+            var thin = definition.StatEffects.Count > 0 && worth.Confidence < 0.5;
+            if (thin && worth.Confidence <= 0)
+                return "다른 아이템과 효과를 비교할 자료가 부족합니다. 추천보다 실제 체감을 우선하세요.";
+            return thin || worth.Source == CharmWorthSource.MeasuredFloor
+                ? "일부 효과를 비교할 자료가 부족합니다. 추천보다 실제 체감을 우선하세요."
+                : null;
         }
 
         /// <summary>

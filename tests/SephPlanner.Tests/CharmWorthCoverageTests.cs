@@ -28,7 +28,7 @@ public class CharmWorthCoverageTests
         Assert.Equal(new[] { "CONVERSION" }, charm.StatWorthUnconverted);
         Assert.Equal(new[] { -3.0, -2, -1, 0, 1 }, charm.StatWorthByLevel);
         Assert.Equal(CharmWorthSource.MeasuredFloor, CharmWorth.Resolve(charm).Source);
-        Assert.Contains(Explain.Charm(charm, null), line => line.Contains("일부 효과만 비교"));
+        Assert.Contains(Explain.Charm(charm, null), line => line.Contains("비교할 자료가 부족"));
 
         var off = new GridPos(0, 0);
         var on = new GridPos(1, 0);
