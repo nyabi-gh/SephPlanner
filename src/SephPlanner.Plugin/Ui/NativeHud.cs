@@ -433,10 +433,10 @@ namespace SephPlanner.Plugin.Ui
             var score = previewed?.Preview.Score ?? plan.Best.Score;
             var gain = score - plan.Current.Score;
             _score.text = previewed != null
-                ? $"점수: 현재 {plan.Current.Score:0.#} → 획득 후 {score:0.#}"
-                : $"점수: 현재 {plan.Current.Score:0.#} → 제안 {score:0.#}";
+                ? $"추정 점수: 현재 {plan.Current.Score:0.#} → 획득 후 {score:0.#}"
+                : $"추정 점수: 현재 {plan.Current.Score:0.#} → 제안 {score:0.#}";
             Hover(_score.rectTransform, "배치 평가 점수", () =>
-                "게임 효과를 환산한 추정 점수이며 실제 피해량이 아닙니다. 사용 유지·침·모래시계·별조각 우선·콤보 지정 등은 점수보다 먼저 적용됩니다.");
+                "배치를 비교하기 위한 점수이며 실제 피해량은 아닙니다. 빌드 설정에 따라 달라지며, 점수가 낮아져도 지정한 효과나 콤보를 먼저 지킬 수 있습니다.");
             _gain.text = gain > 0.001 ? $"+{gain:0.#}" : gain < -0.001 ? $"{gain:0.#}" :
                 previewed == null && plan.HasPlacementChanges ? "배치 정리" : "변경 없음";
             _gain.color = gain > 0.001 ? NativeSkin.Good : gain < -0.001 ? NativeSkin.Bad : NativeSkin.TextDim;
@@ -444,12 +444,12 @@ namespace SephPlanner.Plugin.Ui
             {
                 if (plan.Best.UnpreservedCharms.Count < plan.Current.UnpreservedCharms.Count)
                 {
-                    _gain.text = $"활성 보존 우선 ({gain:+0.#;-0.#;0})";
+                    _gain.text = $"효과 유지 ({gain:+0.#;-0.#;0})";
                     _gain.color = NativeSkin.Mint;
                 }
                 else if (Math.Abs(gain) <= 0.001 && plan.Best.UnsafeEmptyCells < plan.Current.UnsafeEmptyCells)
                 {
-                    _gain.text = "감점 칸 정리";
+                    _gain.text = "빈칸의 불리한 효과 줄이기";
                     _gain.color = NativeSkin.Mint;
                 }
             }
@@ -733,36 +733,34 @@ namespace SephPlanner.Plugin.Ui
                 // 첫 줄은 쪽지의 제목으로 올라간다.
                 lines.RemoveAt(0);
                 if (definition?.HasNoActivationEffect == true)
-                    lines.Add("자체 활성 효과가 없어 감점 칸을 활용할 수 있습니다. 사용 유지·조건 무시 칸 지정과 주변 효과는 계속 고려합니다.");
+                    lines.Add("불리한 칸을 다른 아이템 대신 채울 수 있습니다.");
                 if (pinned > 0)
                 {
                     lines.Add(
-                        $"강화칸 우선 {new string('★', pinned)} - 배치 평가에서 이득을 " +
-                        $"{PlanPreferences.WeightOf(pinned):0.##}배로 칩니다. 게임 효과의 배수가 아니며 패널티는 그대로 반영합니다." +
+                        $"강화칸 우선 {new string('★', pinned)}: 좋은 강화칸을 먼저 받도록 배치합니다." +
                         (reason == CharmInactiveReason.Weapon
-                            ? " 지금은 꺼져 있어 점수에는 들어가지 않지만, 자리는 이 지정대로 잡습니다."
+                            ? " 지금은 무기가 맞지 않아 꺼져 있습니다."
                             : ""));
                 }
                 else if (pinned < 0)
                 {
                     lines.Add(
-                        $"강화칸 양보 {string.Concat(System.Linq.Enumerable.Repeat(_skin.YieldMark, -pinned))} - 배치 평가에서 이득을 " +
-                        $"{PlanPreferences.WeightOf(pinned):0.##}배로 칩니다. 패널티는 그대로 반영합니다. 효과를 끄거나 침 연결을 금지하지는 않습니다.");
+                        $"강화칸 양보 {string.Concat(System.Linq.Enumerable.Repeat(_skin.YieldMark, -pinned))}: 좋은 강화칸을 다른 아이템에 양보합니다. 효과를 끄거나 침 연결을 막지는 않습니다.");
                 }
                 if (frame.Prefs != null && frame.Prefs.IsRetained(charmId))
-                    lines.Add("사용 유지: 활성 상태와 지원 연결을 지키고 빼기·교체 추천에서 보호합니다.");
+                    lines.Add("사용 유지: 효과와 연결을 지키며, 빼거나 교체하라는 추천을 하지 않습니다.");
                 if (frame.Prefs != null && frame.Prefs.IsHeld(charmId))
-                    lines.Add("조건 무시 칸: 배치 조건을 무시하는 칸을 우선합니다. 좌표나 회전을 고정하지는 않습니다.");
+                    lines.Add("조건 무시 칸: 배치 조건을 무시해 주는 칸에 놓습니다.");
                 if (frame.Prefs != null && frame.Prefs.IsSupportTarget(charmId))
-                    lines.Add("침·모래시계·별조각 우선: 이 아이템을 우선 강화합니다. 콤보 지정과 강화칸 우선·양보보다 먼저 적용됩니다.");
+                    lines.Add("침·모래시계·별조각 우선: 이 아이템에 먼저 붙입니다.");
                 if (frame.Prefs != null && frame.Prefs.IsDeactivationAllowed(charmId))
                     lines.Add("끄기 허용: 배치 이득이 있으면 효과를 꺼도 됩니다. 항상 끄지는 않으며 사용 유지가 함께 켜져 있으면 효과를 유지합니다.");
                 if (frame.Prefs?.LevelCap(charmId) is int cap)
                     lines.Add(cap == PlanPreferences.ComboOnly
-                        ? "콤보만: 효과는 값으로 치지 않고 콤보 수만 채웁니다. 꺼져도 콤보는 세므로 감점 칸을 먼저 채우고 좋은 칸은 다른 아이템에 넘깁니다."
+                        ? "콤보만: 효과가 꺼져도 콤보 수만 채우고, 좋은 강화칸은 다른 아이템에 양보합니다."
                         : cap == 0
-                        ? "목표 레벨: 0레벨로 평가해 효과만 켜 두고 레벨 이득은 세지 않습니다. 실제 배치 레벨은 더 높을 수 있습니다."
-                        : $"목표 레벨: {cap}레벨까지만 이득으로 평가합니다. 실제 배치 레벨은 더 높을 수 있습니다.");
+                        ? "강화 양보 기준: 효과만 켜 두고 강화칸은 다른 아이템에 양보합니다. 남는 칸이면 더 높은 레벨에도 놓일 수 있습니다."
+                        : $"강화 양보 기준: {cap}레벨을 넘는 강화칸은 다른 아이템에 양보합니다. 남는 칸이면 더 높은 레벨에도 놓일 수 있습니다.");
                 return Explain.Join(lines);
             });
         }
@@ -835,7 +833,7 @@ namespace SephPlanner.Plugin.Ui
             _offerNotice.text = pending
                 ? "후보를 계산하고 있습니다."
                 : guessed > 0
-                    ? $"순위는 참고용입니다 — 이 중 {guessed}개는 값어치를 레어도로 어림잡았습니다."
+                    ? "효과를 충분히 비교하지 못한 아이템이 있습니다. 실제 체감도 함께 고려하세요."
                     : "순위는 참고용입니다.";
             Widgets.SetActive(_offerNotice, plan.Offers.Count > 0 || pending);
         }
@@ -853,7 +851,7 @@ namespace SephPlanner.Plugin.Ui
         {
             var parts = new StringBuilder();
 
-            if (!advice.Available) return Tint("배치 미확보", NativeSkin.Bad);
+            if (!advice.Available) return Tint("배치할 수 없음", NativeSkin.Bad);
 
             if (advice.MatchesPreset) parts.Append(Tint("빌드", NativeSkin.Mint)).Append("  ");
 
@@ -895,8 +893,8 @@ namespace SephPlanner.Plugin.Ui
                 var row = _discards.Add(advice.Name, $"제외 후 재배치 +{advice.Gain:0.#}", NativeSkin.Text);
                 Hover(row, advice.Name, () =>
                     $"현재 위치: {advice.Position.X + 1}열 {advice.Position.Y + 1}행\n" +
-                    "이 항목 하나를 가방에서 빼고 다시 배치했을 때의 추정 이득입니다. F8은 아이템을 제거하지 않습니다.\n" +
-                    "콤보 단계가 유지되는 후보만 표시합니다. 실제 전투 효과와 다를 수 있습니다." +
+                    "직접 뺀 뒤 자동 배치를 실행하세요. 자동 배치가 아이템을 제거하지는 않습니다.\n" +
+                    "콤보 단계가 유지되는 후보입니다. 실제 체감과 다를 수 있습니다." +
                     (advice.SoonGain.HasValue
                         ? $"\n가방이 한 칸 더 열려도 여전히 이득입니다({advice.SoonGain.Value:+0.#;-0.#;0}). "
                           + "그렇지 않은 것은 목록에서 뺐습니다."

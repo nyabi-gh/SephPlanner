@@ -283,10 +283,10 @@ namespace SephPlanner.Plugin.Ui
 
             if (_tab == Tab.Combos)
             {
-                _note.text = "누르면 콤보 우선을 켜거나 끕니다. ●는 선택한 콤보입니다.\n"
-                    + "열쇠·종이·침은 선택한 콤보를 만드는 자리를 강화칸 우선·양보보다 먼저 고릅니다. "
-                    + "침은 연결한 대상의 콤보를 복사하므로, 양보한 아티팩트에도 붙을 수 있습니다.\n"
-                    + "특정 아이템에 침을 붙이려면 아티팩트 설정에서 그 아이템의 ‘침·모래시계·별조각 우선’을 켜세요. 콤보 지정보다 먼저 적용됩니다."
+                _note.text = "원하는 콤보를 누르면 우선해서 맞춥니다. ●는 선택한 콤보입니다.\n"
+                    + "열쇠·종이·침은 강화칸보다 선택한 콤보를 먼저 맞춥니다. "
+                    + "양보한 아이템에도 콤보를 맞추려고 침이 붙을 수 있습니다.\n"
+                    + "특정 아이템에 먼저 침을 붙이려면 ‘아티팩트 설정’에서 ‘침·모래시계·별조각 우선’을 켜세요."
                     + (_context.Recommendations ? "" : "\n획득·합성·인챈트·제거 추천은 꺼져 있지만 배치 지정은 적용됩니다.");
                 _note.color = _context.Recommendations ? NativeSkin.TextDim : NativeSkin.Amber;
                 return;
@@ -474,12 +474,12 @@ namespace SephPlanner.Plugin.Ui
                 note.Append(Marks(level)).Append(' ')
                     .Append(PlanPreferences.WeightOf(level).ToString("0.##")).Append("배 → ");
             }
-            return note.Append("해제. 반대 방향은 한 단계씩 되돌립니다. 배수는 게임 효과가 아닌 배치 평가에 적용됩니다.\n"
-                + "민트색 버튼은 켜진 설정입니다. 설정은 같은 종류의 아이템 모두에 적용됩니다.\n"
-                + "사용 유지: 효과와 지원 연결을 지키고 제거·교체 추천에서 보호합니다. 끄기 허용: 이득이 있으면 효과를 꺼도 됩니다. 둘 다 켜면 사용 유지가 우선합니다.\n"
-                + "침·모래시계·별조각 우선: 이 아이템을 우선 강화합니다. 콤보 지정과 강화칸 우선·양보보다 먼저 적용하며, 연결을 찾지 못하면 이유를 알립니다.\n"
-                + "목표 레벨: 그 레벨까지만 이득으로 평가합니다. 0레벨은 효과만 켜 두고 레벨 이득은 세지 않습니다. 실제 레벨을 제한하지는 않습니다. 좌클릭으로 올리고 우클릭으로 내립니다.\n"
-                + "조건 무시 칸: 배치 조건을 무시하는 칸을 요구합니다. 좌표 고정은 아닙니다. 양보도 효과 끄기나 침 연결 금지는 아닙니다.").ToString();
+            return note.Append("해제. 반대로 누르면 한 단계 되돌립니다. 게임 효과가 배로 커지는 것은 아닙니다.\n"
+                + "민트색 버튼은 켜진 설정입니다. 같은 종류의 아이템에 함께 적용됩니다.\n"
+                + "사용 유지: 효과와 연결을 지키며 빼거나 교체하라는 추천을 하지 않습니다. 끄기 허용: 다른 아이템에 이득이면 꺼져도 됩니다. 함께 켜면 사용 유지가 우선합니다.\n"
+                + "침·모래시계·별조각 우선: 콤보와 강화칸보다 먼저 이 아이템에 붙입니다.\n"
+                + "강화 양보 기준: 정한 레벨을 넘는 강화칸을 양보합니다. 남는 칸이면 더 높은 레벨에도 놓일 수 있습니다. 0은 효과만 사용하고, 콤보만은 효과가 꺼져도 콤보 수를 채웁니다. 좌클릭으로 올리고 우클릭으로 내립니다.\n"
+                + "조건 무시 칸: 배치 조건을 무시해 주는 칸에 놓습니다. 자리를 고정하지는 않습니다. 양보해도 효과를 끄거나 침 연결을 막지는 않습니다.").ToString();
         }
 
         /// <summary>단계를 기호로. 양수는 ★, 음수는 양보 표시를 단계 수만큼.</summary>
@@ -792,8 +792,8 @@ namespace SephPlanner.Plugin.Ui
                 _support.color = entry.SupportTarget ? NativeSkin.Mint : NativeSkin.TextDim;
                 Widgets.SetActive(_support, entry.EntityId != 0 && (entry.CanSupport || entry.SupportTarget));
                 _cap.text = entry.LevelCap is int cap
-                    ? cap == PlanPreferences.ComboOnly ? "콤보만" : "목표 " + cap + "레벨"
-                    : "목표 레벨";
+                    ? cap == PlanPreferences.ComboOnly ? "콤보만" : "기준 " + cap + "레벨"
+                    : "강화 양보 기준";
                 _cap.color = entry.LevelCap.HasValue ? NativeSkin.Mint : NativeSkin.TextDim;
                 Widgets.SetActive(_cap, entry.EntityId != 0);
                 _hold.color = entry.Held ? NativeSkin.Mint : NativeSkin.TextDim;

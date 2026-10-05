@@ -30,28 +30,25 @@ namespace SephPlanner.Core.Planning
             var lines = new List<string>(definition.EffectLines);
             var worth = CharmWorth.Resolve(definition, entry);
             if (definition.Behavior == "Charm_WhitePaper")
-                lines.Add("종이끼리 연결되면 최근 관측한 카테고리로 추정합니다. 갱신 순서에 따라 이동 후 결과가 달라질 수 있습니다.");
+                lines.Add("종이끼리 연결하면 옮긴 뒤의 콤보가 예상과 다를 수 있습니다.");
 
             if (worth.Source == CharmWorthSource.Curated && entry is { Note.Length: > 0 }) lines.Add(entry.Note);
 
             // 점수는 진행한 만큼 올라가는데 쪽지에 이유가 없으면, 같은 아티팩트가 왜 다르게
             // 매겨지는지 알 길이 없다. 진행도는 인스턴스마다 달라 여기서 숫자를 적지는 못한다.
             if (ScalesPosition.IsSideBound(definition))
-                lines.Add("가방의 어느 편에 있느냐로 주는 것이 달라집니다. 왼쪽은 1~3열, 오른쪽은 4열 "
-                          + "이후이며 지금 놓인 쪽을 유지합니다. 바꾸려면 직접 반대쪽으로 옮기세요. "
-                          + "좌우 중 어느 쪽이 나은지는 비교하지 않습니다.");
+                lines.Add("지금 놓인 쪽을 유지합니다. 반대쪽 효과를 원하면 직접 옮기세요. 왼쪽은 1~3열, 오른쪽은 4열부터입니다.");
             if (ScalesPosition.FollowsPriority(definition))
                 lines.Add("새로 얻어 아직 옮기지 않은 천칭은 우선 콤보에 잉걸불만 있으면 왼쪽, 빙하만 있으면 "
                           + "오른쪽으로 보냅니다.");
 
             if (definition.GrowthQuestGoal > 0)
-                lines.Add("다 키우면 다른 아티팩트가 됩니다. 얼마나 키웠는지에 따라 값어치를 그쪽으로 끌어올려 평가합니다.");
+                lines.Add("성장이 끝나면 바뀌는 아티팩트와 현재 성장 정도를 고려해 추천합니다.");
 
             if (definition.ContextStats.Count > 0 && worth.Source != CharmWorthSource.Curated)
             {
-                lines.Add("배치의 아이템 수량·행에 따른 능력치를 함께 평가합니다. 점수는 능력치 환산값이며 실제 DPS가 아닙니다.");
                 if (definition.ContextStats.Exists(bonus => !bonus.WorthPerUnit.HasValue))
-                    lines.Add("환산하지 못한 능력치가 있어 기존 어림값을 함께 사용합니다.");
+                    lines.Add("일부 효과는 정확히 비교하기 어려워 추천이 실제 체감과 다를 수 있습니다.");
                 return lines;
             }
 
@@ -59,20 +56,18 @@ namespace SephPlanner.Core.Planning
             {
                 lines.Add(SupportDirection(definition.MagicSupport) + "의 사용 가능한 마법과 연결돼야 효과를 냅니다.");
                 lines.Add(worth.Source == CharmWorthSource.Curated
-                    ? "연결된 상태에서 직접 지정한 값어치를 사용합니다."
+                    ? "연결된 마법을 강화하도록 배치합니다."
                     : definition.MagicSupport.Effect == MagicSupportEffect.ManaCostReduction
-                        ? "보너스의 가치는 대상 마법의 기본 마나 비용 절약률로 추정합니다. 다른 비용 변경·버프·실제 시전 빈도는 반영하지 않습니다."
-                        : "보너스의 가치는 대상 마법과 회복 속도로 추정합니다. 추가 버프·마나·실제 시전 빈도는 반영하지 않습니다.");
+                        ? "마나를 아끼는 효과를 고려해 추천합니다. 주로 쓰는 마법에 맞춰 선택하세요."
+                        : "마법을 더 자주 쓰는 효과를 고려해 추천합니다. 주로 쓰는 마법에 맞춰 선택하세요.");
                 return lines;
             }
 
             if (worth.Source == CharmWorthSource.Rarity)
-                lines.Add("값어치는 레어도로 어림잡은 것입니다. 효과의 세기는 아직 점수에 없습니다.");
+                lines.Add("이 아이템은 희귀도를 기준으로 추천합니다. 실제 효과가 더 좋은지는 직접 확인하세요.");
 
             if (worth.Source == CharmWorthSource.MeasuredFloor)
-                lines.Add("효과의 일부만 측정되어 레어도 어림값을 함께 사용합니다. 실제 전투 효과와 다를 수 있습니다.");
-            if (definition.StatEffects.Count > 0 && worth.Source != CharmWorthSource.Curated)
-                lines.Add("능력치 표의 환산값입니다. 확인된 마법 지원 능력치는 주력 선호를 반영하지만 실제 사용률·전투 피해량은 추정하지 않습니다.");
+                lines.Add("일부 효과만 비교할 수 있어 추천이 실제 체감과 다를 수 있습니다.");
             lines.AddRange(Circular(definition, worth));
 
             return lines;
@@ -93,10 +88,8 @@ namespace SephPlanner.Core.Planning
             if (worth.Confidence >= 0.5) return lines;
 
             lines.Add(worth.Confidence <= 0
-                ? "다만 이 능력치를 주는 아티팩트가 이것뿐이라 환산율이 자기 자신에서 나왔습니다. "
-                  + "다른 아티팩트와 견주는 근거로는 약합니다."
-                : "다만 환산율의 근거가 얇은 능력치가 섞여 있습니다. 다른 아티팩트와 견줄 때 "
-                  + "그만큼 덜 믿을 값입니다.");
+                ? "다른 아이템과 효과를 비교할 자료가 부족합니다. 추천보다 실제 체감을 우선하세요."
+                : "일부 효과를 비교할 자료가 부족합니다. 추천보다 실제 체감을 우선하세요.");
             return lines;
         }
 
@@ -115,7 +108,7 @@ namespace SephPlanner.Core.Planning
             {
                 lines.Add(InactiveReason(reason));
                 if (definition is not null && PositionalWorth.IsNeedle(definition))
-                    lines.Add("침은 비활성 상태에서도 공격 대상과 연결되면 0레벨 피해 보너스가 남습니다. 사용 유지는 활성 상태까지 요구합니다.");
+                    lines.Add("침은 꺼져 있어도 공격 대상과 연결되면 일부 피해 보너스가 남습니다.");
                 return lines;
             }
 
@@ -191,9 +184,7 @@ namespace SephPlanner.Core.Planning
         /// <summary>쪽지에 들어가는 한 줄. 왜 순위가 지금 증가분과 어긋나 보이는지를 답한다.</summary>
         public static string SoonLine(double gain, double? soon) =>
             HasSoon(gain, soon)
-                ? $"가방이 한 칸 더 열리면 {soon!.Value:+0.#;-0.#;0} 입니다. 한 번 하면 되돌릴 수 없는 "
-                  + "선택이라 순위는 이 값으로 세웁니다. 칸은 번호 순서로 열리므로 다음 칸이 어디인지는 "
-                  + "정해져 있습니다. 배치와 점수는 지금 열린 칸으로만 계산합니다."
+                ? $"가방이 한 칸 더 열렸을 때의 예상 점수 변화는 {soon!.Value:+0.#;-0.#;0}입니다. 추천 순위는 이때의 이득을 기준으로 합니다."
                 : "";
 
         public static string Level(int level) => level > 0 ? "+" + level : level.ToString();

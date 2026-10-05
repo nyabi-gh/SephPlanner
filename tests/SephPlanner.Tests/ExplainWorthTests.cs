@@ -27,14 +27,13 @@ public class ExplainWorthTests
     public void AStatOnlyThisCharmGivesIsCalledOut()
     {
         // 환산율이 자기 자신에서 나온 값은 다른 아티팩트와 견주는 근거가 못 된다.
-        Assert.Contains("자기 자신에서 나왔습니다", Text(Measured(0)));
+        Assert.Contains("효과를 비교할 자료가 부족합니다", Text(Measured(0)));
     }
 
     [Fact]
     public void AWellSampledConversionSaysNothingExtra()
     {
-        Assert.DoesNotContain("자기 자신에서", Text(Measured(1)));
-        Assert.DoesNotContain("근거가 얇은", Text(Measured(1)));
+        Assert.DoesNotContain("효과를 비교할 자료가 부족합니다", Text(Measured(1)));
     }
 
     [Fact]
@@ -42,7 +41,7 @@ public class ExplainWorthTests
     {
         var text = Text(Measured(0.2));
 
-        Assert.Contains("근거가 얇은", text);
+        Assert.Contains("일부 효과를 비교할 자료가 부족합니다", text);
         Assert.DoesNotContain("자기 자신에서", text);
     }
 
