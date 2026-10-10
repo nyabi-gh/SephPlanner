@@ -10,8 +10,11 @@ using UnityEngine;
 namespace SephPlanner.Plugin
 {
     /// <summary>
-    /// 게임 리소스에서 아이템 정의를 읽어 Core 모델로 옮긴다.
-    /// ItemDatabase 내부 상태에 기대지 않고 Resources 를 직접 훑는다.
+    /// 게임 아이템 데이터베이스에서 아이템 정의를 읽어 Core 모델로 옮긴다.
+    ///
+    /// 리소스 폴더가 아니라 <c>ItemDatabase</c> 를 읽는다. 모드 아이템은 <c>ItemDatabase.Register</c>
+    /// 로 런타임에 들어와 리소스에 없다. 그래서 데이터베이스가 선 뒤(<see cref="CatalogSource.DatabasesReady"/>)
+    /// 에만 부를 수 있다.
     /// </summary>
     internal static class ItemCatalog
     {
@@ -19,25 +22,26 @@ namespace SephPlanner.Plugin
         private static ItemCategoryEntity[] _categories;
 
         /// <summary>
-        /// 리소스 목록. <b>한 번만 훑고 들고 있는다.</b>
-        ///
-        /// 카탈로그를 짓는 일은 게임 부팅 직후에는 실패한다 - 지역화 표가 아직 없어서 이름을
-        /// 읽는 순간 터진다. 그런데 부르는 쪽은 준비될 때까지 되풀이해 물어보므로(폴링마다,
-        /// 초당 네 번), 실패할 때마다 리소스를 통째로 다시 훑으면 그 몇 초 동안 메인 스레드가
-        /// 같은 일을 수십 번 한다. 시작 화면에서 인게임 진입이 느리다는 제보가 여기와 맞물린다.
-        ///
-        /// 목록 자체는 한 번 읽으면 바뀌지 않으므로, 준비를 기다리는 동안 들고 있다가
-        /// <see cref="Release"/> 로 놓아준다.
+        /// 아이템 목록. 지역화 표가 서기 전에는 이름을 읽다 실패해 몇 번 다시 짓게 되므로, 그동안은
+        /// 들고 있다가 <see cref="Release"/> 로 놓아준다.
         /// </summary>
-        private static ItemEntity[] Items() =>
-            _items ?? (_items = Resources.LoadAll<ItemEntity>("Item"));
+        private static ItemEntity[] Items()
+        {
+            if (_items != null) return _items;
+
+            var ids = ItemDatabase.GetAllItemID();
+            var items = new List<ItemEntity>(ids.Length);
+            foreach (var id in ids)
+            {
+                var entity = ItemDatabase.FindItemById(id);
+                if (entity != null) items.Add(entity);
+            }
+            return _items = items.ToArray();
+        }
 
         private static ItemCategoryEntity[] Categories() =>
-            _categories ?? (_categories = Resources.LoadAll<ItemCategoryEntity>("ItemCategory"));
+            _categories ?? (_categories = ItemDatabase.GetAllItemCategory());
 
-        /// <summary>
-        /// 다 짓고 나면 놓아준다. 계속 들고 있으면 게임이 쓰지 않는 에셋을 정리하지 못한다.
-        /// </summary>
         public static void Release()
         {
             _items = null;

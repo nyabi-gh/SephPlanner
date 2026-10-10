@@ -29,7 +29,6 @@ namespace SephPlanner.Plugin
         private Harmony _harmony;
         private float _nextPoll;
         private bool _catalogRetryArmed;
-        private bool _databasesReady;
         private bool _inRun;
         private PlanVerificationStatus _simulationVerification;
         private string _simulationReason = "실시간 시뮬레이션 검증이 아직 완료되지 않았습니다.";
@@ -124,6 +123,7 @@ namespace SephPlanner.Plugin
             GameBinding.LogTo(Logger.LogWarning);
             _harmony = new Harmony(PluginGuid);
             TabletRotationTooltipGuard.Install(_harmony, Logger.LogWarning);
+            CatalogSource.Install(_harmony, Logger.LogWarning);
             FixedEffectLayer.Log = Logger.LogInfo;
             HorayModAPI.OnStartSessionClientside += StartSession;
             HorayModAPI.OnAllDatabasesReady += DatabasesReady;
@@ -280,7 +280,7 @@ namespace SephPlanner.Plugin
 
         private void DatabasesReady()
         {
-            _databasesReady = true;
+            CatalogSource.MarkDatabasesReady();
             _catalogRetryArmed = true;
         }
 
@@ -303,6 +303,14 @@ namespace SephPlanner.Plugin
         private System.Collections.IEnumerator DumpRoutine()
         {
             _dumping = true;
+
+            // 모드 아이템이 데이터베이스에 등록된 뒤에 읽어야 한다. 타이틀에서 누르면 세이브에 들어갈 때까지 미룬다.
+            if (!CatalogSource.DatabasesReady)
+            {
+                Logger.LogInfo("데이터 덤프 대기 - 세이브에 들어가 게임 데이터가 준비되면 진행합니다.");
+                while (!CatalogSource.DatabasesReady) yield return new WaitForSecondsRealtime(0.5f);
+            }
+
             string generation;
             try
             {
@@ -952,10 +960,10 @@ namespace SephPlanner.Plugin
 
             if (_runner == null)
             {
-                // 카탈로그를 짓는 일은 리소스를 통째로 훑는 것이라 무겁다. 게임 데이터베이스가 서고
+                // 카탈로그를 짓는 일은 아이템을 통째로 훑는 것이라 무겁다. 게임 데이터베이스가 서고
                 // 덤프가 끝나 정의가 갖춰진 뒤에 한 번만 짓는다. 데이터베이스는 타이틀이 아니라
                 // 세이브에 들어갈 때 서므로, 그 전에 지어 보면 폴링마다 실패한다(제보 3e262106, 527회).
-                if (!_databasesReady || _dumping || !CatalogDump.HasCatalog()) return;
+                if (!CatalogSource.DatabasesReady || _dumping || !CatalogDump.HasCatalog()) return;
 
                 var catalog = CatalogSource.Get();
                 if (catalog == null)

@@ -1,14 +1,15 @@
 using System;
+using HarmonyLib;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Solver;
 
 namespace SephPlanner.Plugin
 {
     /// <summary>
-    /// 게임 리소스에서 읽은 정의를 메모리에 한 번 만들어 둔다.
+    /// 게임 아이템 데이터베이스에서 읽은 정의를 메모리에 한 번 만들어 둔다.
     ///
     /// <see cref="CatalogDump"/>는 같은 데이터를 진단 파일로 저장하고, 이쪽은 게임 안에서 직접
-    /// 배치를 풀 때 쓴다. 리소스 접근은 유니티 스레드에서만 되므로 만드는
+    /// 배치를 풀 때 쓴다. 게임 객체 접근은 유니티 스레드에서만 되므로 만드는
     /// 시점이 메인 스레드여야 하고, 그래서 백그라운드 솔버에 넘기기 전에 미리 지어 둔다.
     /// </summary>
     internal static class CatalogSource
@@ -22,11 +23,53 @@ namespace SephPlanner.Plugin
         public static ICatalog Current => _catalog;
 
         /// <summary>
+        /// 게임이 <c>HorayModAPI.OnAllDatabasesReady</c> 를 알린 뒤 <c>ItemDatabase.Destroy</c> 를 부르기 전이다.
+        /// 데이터베이스는 타이틀이 아니라 세이브에 들어갈 때 서고, 모드 아이템도 그 안에서 등록된다.
+        /// <c>GameDataLoader</c> 가 사라지면 게임이 비우므로 그때 다시 내린다.
+        /// </summary>
+        public static bool DatabasesReady { get; private set; }
+
+        public static void MarkDatabasesReady() => DatabasesReady = true;
+
+        /// <summary>
+        /// 지은 카탈로그는 버리지 않는다. 같은 실행 안에서 다시 세우는 데이터베이스는 같은 정의다.
+        /// </summary>
+        public static void Install(Harmony harmony, Action<object> warn)
+        {
+            var target = AccessTools.Method(typeof(ItemDatabase), nameof(ItemDatabase.Destroy));
+            if (target == null)
+            {
+                warn("게임의 ItemDatabase.Destroy 를 찾지 못했습니다. 타이틀로 나간 뒤 F9 가 실패할 수 있습니다.");
+                return;
+            }
+
+            try
+            {
+                harmony.Patch(target, postfix: new HarmonyMethod(typeof(CatalogSource), nameof(DatabaseDestroyed)));
+            }
+            catch (Exception ex)
+            {
+                warn("아이템 데이터베이스 해제 감시를 걸지 못했습니다: " + ex);
+            }
+        }
+
+        private static void DatabaseDestroyed()
+        {
+            DatabasesReady = false;
+            ItemCatalog.Release();
+        }
+
+        /// <summary>
         /// 아직 지을 수 없으면 <c>null</c> 을 돌려준다. 부르는 쪽은 다음 기회에 다시 물어보면 된다.
         /// </summary>
         public static ICatalog Get()
         {
             if (_catalog != null) return _catalog;
+            if (!DatabasesReady)
+            {
+                LastError = "게임 데이터베이스가 아직 서지 않았습니다";
+                return null;
+            }
 
             var started = FrameCost.Now;
             FrameCost.CatalogAttempts++;
@@ -43,7 +86,6 @@ namespace SephPlanner.Plugin
                 LastError = "";
                 _catalog = new Catalog(tablets, charms, combos, WorthScale.Measure(measurement, charms));
 
-                // 다 지었으니 리소스 목록을 놓아준다. 기다리는 동안만 들고 있으면 된다.
                 ItemCatalog.Release();
                 FrameCost.Catalog.Add(started);
                 return _catalog;
@@ -66,7 +108,6 @@ namespace SephPlanner.Plugin
             _catalog = null;
             LastError = "";
 
-            // 정의가 바뀌었을 수 있으므로 리소스도 다시 훑어야 한다.
             ItemCatalog.Release();
         }
     }
