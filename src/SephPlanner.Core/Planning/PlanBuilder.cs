@@ -471,6 +471,11 @@ namespace SephPlanner.Core.Planning
                     warnings.Add(name + ": " + PriorityPlacement.FailureReason(problem, charm));
                 if (best.UnmatchedSupportCharms.Contains(charm.InstanceId))
                     warnings.Add(name + ": " + PriorityPlacement.SupportFailureReason(problem, charm));
+                if (!charm.IsFiller && !charm.PreferredLeft.HasValue &&
+                    problem.CurrentCharms.TryGetValue(charm.InstanceId, out var cell) &&
+                    ScalesPosition.PriorityLeft(charm.Definition, problem.PriorityCategories) is { } left &&
+                    left != ScalesPosition.IsLeft(cell))
+                    warnings.Add(name + ": " + Explain.OppositeSide(charm.Definition, left));
             }
             warnings.AddRange(PriorityPlacement.UnusableDesignations(problem));
             return warnings;

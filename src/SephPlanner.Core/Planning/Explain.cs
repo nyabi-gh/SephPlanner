@@ -37,7 +37,7 @@ namespace SephPlanner.Core.Planning
             // 점수는 진행한 만큼 올라가는데 쪽지에 이유가 없으면, 같은 아티팩트가 왜 다르게
             // 매겨지는지 알 길이 없다. 진행도는 인스턴스마다 달라 여기서 숫자를 적지는 못한다.
             if (ScalesPosition.IsSideBound(definition))
-                lines.Add("지금 놓인 쪽을 유지합니다. 어느 쪽이 나은지는 비교하지 않으니, 반대쪽 효과를 원하면 직접 옮기세요. "
+                lines.Add("지금 놓인 쪽을 유지합니다. 우선 콤보와 반대쪽에 있으면 알려 드리니, 원하는 쪽으로 한 번 옮겨 주세요. "
                           + "왼쪽은 1~3열, 오른쪽은 4열부터입니다.");
             if (ScalesPosition.FollowsPriority(definition))
                 lines.Add("새로 얻어 아직 옮기지 않은 천칭은 우선 콤보에 잉걸불만 있으면 왼쪽, 빙하만 있으면 "
@@ -67,6 +67,16 @@ namespace SephPlanner.Core.Planning
             if (Doubt(definition, worth) is { } doubt) lines.Add(doubt);
 
             return lines;
+        }
+
+        /// <summary>좌우에 따라 효과가 바뀌는 아티팩트가 우선 콤보와 반대쪽에 있을 때(<see cref="ScalesPosition.PriorityLeft"/>).</summary>
+        public static string OppositeSide(CharmDefinition definition, bool priorityLeft)
+        {
+            var here = definition.Behavior == "Charm_FireIceWeapon"
+                ? priorityLeft ? "오른쪽에서는 화염검이 얼음 속성이 됩니다" : "왼쪽에서는 서리 유물이 화염 피해를 줍니다"
+                : priorityLeft ? "오른쪽에서는 얼음 피해를 더 키웁니다" : "왼쪽에서는 화염 피해를 더 키웁니다";
+            var there = priorityLeft ? "왼쪽(1~3열)" : "오른쪽(4열부터)";
+            return $"{here}. 우선 콤보에 맞추려면 {there}으로 직접 옮기세요. 한 번 옮기면 그다음부터 그쪽을 유지합니다.";
         }
 
         /// <summary>

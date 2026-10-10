@@ -87,6 +87,51 @@ public class ScalesArrivalTests
         Assert.Equal(Dropped, Planned(snapshot, Priority("EMBER")));
     }
 
+    private static List<string> Warnings(GameSnapshot snapshot, PlanPreferences preferences) =>
+        PlanBuilder.Build(snapshot, Catalog(), preferences)!.ComboPlacementWarnings;
+
+    /// <summary>
+    /// 제보 46fe8f23·1047183d: 빙하·서리 빌드인데 천칭과 영원의 식이 왼편(불 쪽)에 묶여 있었다. 옮기지는 않고
+    /// 알린다 - 사용자가 한 번 옮기면 그 편을 지킨다.
+    /// </summary>
+    [Theory]
+    [InlineData(1144, 4, true, "EMBER")]
+    [InlineData(1144, 1, true, "GLACIER", "PRECISION")]
+    [InlineData(1144, 4, false, "GLACIER")]
+    [InlineData(1144, 1, false, "FROST")]
+    [InlineData(1144, 1, false, "EMBER", "GLACIER")]
+    [InlineData(1144, 1, false)]
+    [InlineData(1259, 1, true, "FROST")]
+    [InlineData(1259, 1, true, "GLACIER")]
+    [InlineData(1259, 1, false, "FROST", "EMBER")]
+    [InlineData(1259, 4, true, "FLAMESWORD")]
+    [InlineData(1259, 4, false, "FROST")]
+    [InlineData(1259, 1, false, "FROST", "FLAMESWORD")]
+    public void ASidedCharmOnTheOppositeSideOfThePriorityIsReportedButNotMoved(
+        int definition, int column, bool warned, params string[] priority)
+    {
+        var snapshot = Snapshot();
+        var item = Scales(definition);
+        item.Position = new GridPos(column, 0);
+        snapshot.Inventory!.Items[0].Position = new GridPos(column == 1 ? 2 : 1, 0);
+        snapshot.Inventory.Items.Add(item);
+        var preferences = Priority(priority);
+
+        Assert.Equal(warned, Warnings(snapshot, preferences).Any(line => line.Contains("직접 옮기세요")));
+        Assert.Equal(ScalesPosition.IsLeft(item.Position), ScalesPosition.IsLeft(Planned(snapshot, preferences)));
+    }
+
+    [Fact]
+    public void ANewScalesTheSolverMovesIsNotReported()
+    {
+        var snapshot = Snapshot();
+        var scales = Scales();
+        scales.Arrived = true;
+        snapshot.Inventory!.Items.Add(scales);
+
+        Assert.Empty(Warnings(snapshot, Priority("EMBER")));
+    }
+
     private static bool Sided(PlacedItem item) => item.DefinitionId == 1144;
 
     [Fact]
