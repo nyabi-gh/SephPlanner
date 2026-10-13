@@ -306,6 +306,21 @@ namespace SephPlanner.Core.Solver
         /// <summary>석판 배치 탐색에서 단계마다 남길 후보 수.</summary>
         public int BeamWidth { get; set; } = 400;
 
+        /// <summary>빔 확장을 나눠 맡을 스레드 수. 몇이든 답은 1 일 때와 같다.</summary>
+        public int Parallelism { get; set; } = DefaultParallelism;
+
+        /// <summary>
+        /// 새 풀이가 쓸 스레드 수(설정의 고사양 모드). 답을 바꾸지 않으므로 계획 설정·지문·재현 자료에
+        /// 넣지 않고 프로세스 전체 값으로 둔다 - 풀이를 부르는 자리마다 넘기지 않아도 된다.
+        /// </summary>
+        public static int DefaultParallelism
+        {
+            get => System.Threading.Volatile.Read(ref _defaultParallelism);
+            set => System.Threading.Volatile.Write(ref _defaultParallelism, Math.Max(1, value));
+        }
+
+        private static int _defaultParallelism = 1;
+
         /// <summary>정확한 배정까지 돌려볼 최종 후보 수.</summary>
         public int ExactCandidates { get; set; } = 100;
 

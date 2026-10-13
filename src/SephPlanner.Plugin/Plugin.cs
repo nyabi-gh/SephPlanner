@@ -9,6 +9,7 @@ using HarmonyLib;
 using Mirror;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
+using SephPlanner.Core.Solver;
 using SephPlanner.Plugin.Ui;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -96,9 +97,19 @@ namespace SephPlanner.Plugin
         private string _autoPlaceResult = "";
         private float _autoPlaceShownUntil;
 
+        /// <summary>
+        /// 코어의 절반, 많아야 여덟. 측정에서 여덟을 넘기면 더 빨라지지 않았고, 나머지는 게임 몫으로 남긴다.
+        /// </summary>
+        private void ApplyHighPerformance() =>
+            SolverOptions.DefaultParallelism = _settings.HighPerformance.Value
+                ? Math.Min(8, Math.Max(1, Environment.ProcessorCount / 2))
+                : 1;
+
         private void Awake()
         {
             _settings = new PluginSettings(Config, Logger.LogInfo, () => OpenDiagnosticConsent(null), OpenAutomaticDiagnosticConsent);
+            ApplyHighPerformance();
+            _settings.HighPerformance.SettingChanged += (_, _) => ApplyHighPerformance();
             _prefs = PluginPreferences.Load(Logger.LogWarning);
             _window = new SettingsWindow(_settings.Rows, WindowActions);
             _build = new BuildWindow(_prefs, CurrentBuild);

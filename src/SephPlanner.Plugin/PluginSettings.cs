@@ -70,6 +70,7 @@ namespace SephPlanner.Plugin
         public ConfigEntry<float> Scale { get; }
         public ConfigEntry<float> Opacity { get; }
         public ConfigEntry<bool> Recommendations { get; }
+        public ConfigEntry<bool> HighPerformance { get; }
         public ConfigEntry<bool> MultiplayerAutoPlace { get; }
         public ConfigEntry<bool> ForgetOnNewRun { get; }
         public ConfigEntry<bool> PadWindow { get; }
@@ -185,6 +186,11 @@ namespace SephPlanner.Plugin
                 "NativePanel", "Recommendations", true,
                 "무엇을 집을지에 대한 후보 추천을 계산할지. 끄면 가리는 것이 아니라 계산 자체를 " +
                 "건너뛴다. 점수와 배치 제안은 그대로 남는다.");
+
+            HighPerformance = config.Bind(
+                "NativePanel", "HighPerformance", false,
+                "고사양 모드. 켜면 배치 계산을 여러 CPU 코어로 나눠 더 빨리 끝낸다. 결과는 같고, 계산하는 " +
+                "동안 CPU 를 더 쓴다. 게임이 끊기면 끈다.");
 
             // 옛 키(ForgetDesignationsOnNewRun, 기본 켜짐)는 설정 파일에 true 로 적혀 있어 기본값만 바꾸면
             // 기존 사용자에게 닿지 않는다. 새 판 첫 가방에는 시작 아이템뿐이라 사실상 ★/▽ 전부가 지워졌다.
@@ -324,6 +330,7 @@ namespace SephPlanner.Plugin
                     new[] { "아주 좁게", "좁게", "보통", "넓게", "아주 넓게" }),
                 Steps("불투명도", Opacity, OpacitySteps, new[] { "55%", "70%", "85%", "100%" }),
                 Switch("획득·합성·인챈트·제거 추천", Recommendations),
+                Switch("고사양 모드(여러 코어로 계산)", HighPerformance),
                 Switch("새 판에서 지난 판 지정 정리", ForgetOnNewRun),
                 Steps("주변 아이템 탐색 범위", OfferRadius, RadiusSteps,
                     new[] { "좁게", "보통", "넓게", "아주 넓게" }),

@@ -685,11 +685,36 @@ namespace SephPlanner.Core.Solver
             public readonly EstimateOccupancy Occupancy;
             public readonly SimulationResult Simulation;
 
+            private readonly GridSpec _grid;
+            private readonly bool _anyMagic;
+
             public EstimateModel(GridSpec grid, bool anyMagic)
             {
+                _grid = grid;
+                _anyMagic = anyMagic;
                 Occupancy = new EstimateOccupancy(grid, anyMagic);
                 Simulation = new SimulationResult(grid, 0);
             }
+
+            /// <summary>표는 함께 쓰고 작업 공간만 따로 가진 사본. 빔 확장을 나눠 맡는 스레드마다 하나다.</summary>
+            public EstimateModel Worker() => new EstimateModel(_grid, _anyMagic)
+            {
+                LevelCap = LevelCap,
+                HasScales = HasScales,
+                Items = Items,
+                ValueByRank = ValueByRank,
+                ScaledValueByRank = ScaledValueByRank,
+                Side = Side,
+                Required = Required,
+                Preserved = Preserved,
+                Current = Current,
+                Planned = Planned,
+                Groups = new EstimateGroup[Groups.Length],
+                Members = new int[Members.Length],
+                Stride = Stride,
+                GroupByCell = new int[GroupByCell.Length],
+                Used = new bool[Used.Length],
+            };
 
             /// <summary>값어치 순위별, 레벨별 값어치. <c>[순위][레벨]</c>. 풀이마다 한 번만 짓는다.</summary>
             public double[][] ValueByRank = Array.Empty<double[]>();
@@ -896,6 +921,17 @@ namespace SephPlanner.Core.Solver
             // 그 쓰레기가 풀이 한 번에 수십 MB 라, 채점은 작업 배치 하나로 하고 고른 것만 짓는다.
             var expanded = new List<(TabletPlacement Placement, PlacementQuality Score, int Parent)>();
             var trial = new List<TabletPlacement>(problem.Tablets.Count);
+            var workers = new EstimateModel[Math.Max(1, options.Parallelism)];
+            var parts = new List<(TabletPlacement Placement, PlacementQuality Score, int Parent)>[workers.Length];
+            var scratches = new List<TabletPlacement>[workers.Length];
+            for (var worker = 0; worker < workers.Length; worker++)
+            {
+                workers[worker] = worker == 0 ? model : model.Worker();
+                parts[worker] = new List<(TabletPlacement Placement, PlacementQuality Score, int Parent)>();
+                scratches[worker] = new List<TabletPlacement>(problem.Tablets.Count);
+            }
+            // 콤보 각인의 단계별 효과 목록은 처음 부를 때 지어 둔다. 스레드가 나눠 맡기 전에 지어 둔다.
+            problem.EffectsFor(null);
 
             for (var index = 0; index < problem.Tablets.Count; index++)
             {
@@ -913,32 +949,29 @@ namespace SephPlanner.Core.Solver
 
                 expanded.Clear();
 
-                for (var parent = 0; parent < beam.Count; parent++)
+                var threads = Math.Min(workers.Length, beam.Count);
+                if (threads <= 1)
                 {
-                    var layout = beam[parent];
-                    var taken = new HashSet<GridPos>(layout.Select(p => p.Position));
-                    trial.Clear();
-                    trial.AddRange(layout);
-                    trial.Add(null!);
-
-                    // 똑같은 석판끼리는 자리를 맞바꿔도 같은 배치다. 앞선 쌍둥이보다 뒤쪽 칸만
-                    // 보게 해 그 순열들을 한 번씩만 만든다.
-                    var floor = twin[index] >= 0 && twin[index] < layout.Count
-                        ? problem.Grid.ToIndex(layout[twin[index]].Position.X, layout[twin[index]].Position.Y)
-                        : -1;
-
-                    for (var cellIndex = 0; cellIndex < cells.Count; cellIndex++)
+                    for (var parent = 0; parent < beam.Count; parent++)
+                        Expand(problem, cells, beam, parent, index, twin, placements, trial, model, expanded);
+                }
+                else
+                {
+                    // 부모를 연속 구간으로 나눠 맡기고 구간 순서대로 이어 붙인다. 한 스레드가 부모 순서대로
+                    // 펼친 것과 같은 순서라야 한다 - 고르기의 정렬이 안정 정렬이 아니다.
+                    var currentBeam = beam;
+                    var tablet = index;
+                    System.Threading.Tasks.Parallel.For(0, threads, new System.Threading.Tasks.ParallelOptions
+                    { MaxDegreeOfParallelism = threads, CancellationToken = options.Cancellation }, part =>
                     {
-                        var cell = cells[cellIndex];
-                        if (taken.Contains(cell)) continue;
-                        if (floor >= 0 && problem.Grid.ToIndex(cell.X, cell.Y) <= floor) continue;
-
-                        foreach (var placement in placements[cellIndex])
-                        {
-                            trial[layout.Count] = placement;
-                            expanded.Add((placement, Estimate(problem, cells, trial, model), parent));
-                        }
-                    }
+                        var own = parts[part];
+                        own.Clear();
+                        var from = currentBeam.Count * part / threads;
+                        var to = currentBeam.Count * (part + 1) / threads;
+                        for (var parent = from; parent < to; parent++)
+                            Expand(problem, cells, currentBeam, parent, tablet, twin, placements, scratches[part], workers[part], own);
+                    });
+                    for (var part = 0; part < threads; part++) expanded.AddRange(parts[part]);
                 }
 
                 if (expanded.Count == 0) break;
@@ -946,6 +979,37 @@ namespace SephPlanner.Core.Solver
                 beam = Select(expanded, beam, options);
             }
             return beam;
+        }
+
+        private static void Expand(
+            PlacementProblem problem, List<GridPos> cells, List<List<TabletPlacement>> beam, int parent, int index,
+            int[] twin, TabletPlacement[][] placements, List<TabletPlacement> trial, EstimateModel model,
+            List<(TabletPlacement Placement, PlacementQuality Score, int Parent)> expanded)
+        {
+            var layout = beam[parent];
+            var taken = new HashSet<GridPos>(layout.Select(p => p.Position));
+            trial.Clear();
+            trial.AddRange(layout);
+            trial.Add(null!);
+
+            // 똑같은 석판끼리는 자리를 맞바꿔도 같은 배치다. 앞선 쌍둥이보다 뒤쪽 칸만
+            // 보게 해 그 순열들을 한 번씩만 만든다.
+            var floor = twin[index] >= 0 && twin[index] < layout.Count
+                ? problem.Grid.ToIndex(layout[twin[index]].Position.X, layout[twin[index]].Position.Y)
+                : -1;
+
+            for (var cellIndex = 0; cellIndex < cells.Count; cellIndex++)
+            {
+                var cell = cells[cellIndex];
+                if (taken.Contains(cell)) continue;
+                if (floor >= 0 && problem.Grid.ToIndex(cell.X, cell.Y) <= floor) continue;
+
+                foreach (var placement in placements[cellIndex])
+                {
+                    trial[layout.Count] = placement;
+                    expanded.Add((placement, Estimate(problem, cells, trial, model), parent));
+                }
+            }
         }
 
         /// <summary>

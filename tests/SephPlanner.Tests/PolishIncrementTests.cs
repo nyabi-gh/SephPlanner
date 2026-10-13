@@ -82,6 +82,28 @@ public class PolishIncrementTests
     }
 
     /// <summary>
+    /// 고사양 모드는 빔 확장을 여러 스레드로 나눌 뿐 답을 바꾸지 않는다. 고르기의 정렬이 안정 정렬이
+    /// 아니라, 나눠 펼친 것을 한 스레드의 순서대로 이어 붙이지 못하면 동점 후보가 뒤바뀐다.
+    /// </summary>
+    [Fact]
+    public void SplittingTheBeamAcrossThreadsGivesTheSameAnswer()
+    {
+        for (var seed = 0; seed < 40; seed++)
+        {
+            var single = PlacementSolver.Solve(RandomBoard(seed), new SolverOptions { Parallelism = 1 });
+            var split = PlacementSolver.Solve(RandomBoard(seed), new SolverOptions { Parallelism = 4 });
+
+            Assert.Equal(single.Score, split.Score, 12);
+            Assert.Equal(
+                single.CharmPositions.OrderBy(pair => pair.Key).ToList(),
+                split.CharmPositions.OrderBy(pair => pair.Key).ToList());
+            Assert.Equal(
+                single.TabletPositions.OrderBy(pair => pair.Key).Select(pair => (pair.Key, pair.Value.Position, pair.Value.Rotation)).ToList(),
+                split.TabletPositions.OrderBy(pair => pair.Key).Select(pair => (pair.Key, pair.Value.Position, pair.Value.Rotation)).ToList());
+        }
+    }
+
+    /// <summary>
     /// 이웃을 읽는 배치 조건들. 하나라도 "제 칸만 읽는다"로 잘못 분류되면 대조가 잡는다.
     /// </summary>
     private static readonly string[] Criteria =
