@@ -409,4 +409,56 @@ public class PriorityPlacementTests
 
         Assert.Equal(new GridPos(1, 0), best.CharmPositions[-2]);
     }
+
+    /// <summary>
+    /// 제보 <c>008cffa4</c> 의 모양. 열쇠가 지정 콤보 줄에 있고, 조건 무시 칸은 꼭대기에서만 켜지는 아티팩트가
+    /// 차지했으며, ★★★ 자물쇠는 꺼져 있다. 자물쇠를 조건 무시 칸으로, 그 자리 아티팩트를 빈 꼭대기 칸으로
+    /// 함께 옮겨야 좋아진다. 배정이 콤보 단계를 모르면 열쇠를 값어치 높은 칸으로 빼 콤보를 잃고 지고,
+    /// 맞바꾸기 하나로는 옮겨진 쪽이 꺼져 활성 보호에 걸린다.
+    /// </summary>
+    [Fact]
+    public void AssignmentKeepsTheSelectedComboWhileMovingTwoItemsTogether()
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(3, 3, 9), PriorityCategories = { "GLACIER" } };
+        problem.Charms.Add(new CharmSlot
+        {
+            InstanceId = 1,
+            Definition = new CharmDefinition { EntityId = 1, MaxLevel = 20, LineCategories = { "STURDY", "EMBER", "GLACIER" } },
+            Worth = new CharmWorth { Base = 1, PerLevel = 1 },
+        });
+        problem.Charms.Add(new CharmSlot
+        {
+            InstanceId = 2,
+            Weight = 10,
+            Definition = new CharmDefinition { EntityId = 2, MaxLevel = 5, CriteriaType = "CharmActivateCriteria_BothSidesAreEmpty" },
+        });
+        problem.Charms.Add(new CharmSlot
+        {
+            InstanceId = 3,
+            Definition = new CharmDefinition { EntityId = 3, MaxLevel = 5, CriteriaType = "CharmActivateCriteria_TopInInventory" },
+            Worth = new CharmWorth { Base = 1, PerLevel = 0.1 },
+        });
+        var fillers = new[] { new GridPos(0, 0), new GridPos(1, 0), new GridPos(0, 1), new GridPos(2, 1), new GridPos(1, 2) };
+        for (var index = 0; index < fillers.Length; index++)
+        {
+            problem.Charms.Add(new CharmSlot { InstanceId = 10 + index, IsFiller = true });
+            problem.CurrentCharms[10 + index] = fillers[index];
+        }
+        problem.CurrentCharms[1] = new GridPos(0, 2);
+        problem.CurrentCharms[2] = new GridPos(2, 2);
+        problem.CurrentCharms[3] = new GridPos(1, 1);
+        problem.FixedEffects.Add(new FixedEffectCell { Position = new GridPos(0, 1), Level = 10 });
+        problem.FixedEffects.Add(new FixedEffectCell { Position = new GridPos(1, 1), Level = 3, IgnoreCriteria = 1 });
+        problem.FixedEffects.Add(new FixedEffectCell { Position = new GridPos(2, 2), Level = -1 });
+        problem.ComboCounts = new Dictionary<string, int> { ["GLACIER"] = 1 };
+        problem.Combos = id => new ComboDefinition { Id = id, Thresholds = { 2 } };
+
+        var result = PlacementSolver.Solve(problem);
+
+        Assert.Equal(1, result.PriorityComboMatches);
+        Assert.Equal(new GridPos(1, 1), result.CharmPositions[2]);
+        Assert.Equal(0, result.CharmPositions[3].Y);
+        Assert.DoesNotContain(2, result.InactiveCharms);
+        Assert.DoesNotContain(3, result.InactiveCharms);
+    }
 }

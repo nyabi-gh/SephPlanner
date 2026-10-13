@@ -1675,6 +1675,8 @@ namespace SephPlanner.Core.Solver
             var columns = charmsAreRows ? free.Count : movable.Count;
             var cost = AssignmentScratch(rows, columns);
             var unit = rows + 1.0;
+            var comboNeighbors = (IReadOnlyDictionary<GridPos, CharmSlot>?)neighbors ?? new Dictionary<GridPos, CharmSlot>();
+            var comboCategories = new List<string>();
 
             for (var charmIndex = 0; charmIndex < movable.Count; charmIndex++)
             {
@@ -1687,16 +1689,24 @@ namespace SephPlanner.Core.Solver
                     var cell = free[cellIndex];
                     var usable = CanUse(problem, charm, cell, result, occupancy, neighbors);
                     var priority = 0.0;
-                    // 하위 조건의 전체 위반 수보다 큰 기수로 강제 배치·사용 유지·고정·활성을 순서대로 비교한다.
-                    if (RequiresUse(problem, charm) && !charm.IsFiller && usable) priority -= unit * unit;
-                    if (charm.Held && !charm.IsFiller && result.IgnoreCriteriaAt(cell) > 0) priority -= unit;
+                    // 하위 조건의 전체 위반 수보다 큰 기수로 강제 배치·사용 유지·고정·지정 콤보·활성을
+                    // 순서대로 비교한다. PlacementQuality 의 단계 순서와 같아야 한다 - 빠진 단계가 있으면
+                    // 배정이 그 단계를 버리고 값어치를 좇아, 그 배치가 비교에서 통째로 진다.
+                    if (RequiresUse(problem, charm) && !charm.IsFiller && usable) priority -= unit * unit * unit;
+                    if (charm.Held && !charm.IsFiller && result.IgnoreCriteriaAt(cell) > 0) priority -= unit * unit;
+                    if (problem.PriorityCategories.Count > 0 && !charm.IsFiller && PriorityPlacement.Applies(charm.Definition))
+                    {
+                        comboCategories.Clear();
+                        ComboCounting.PositionalCategories(charm, cell, comboNeighbors, comboCategories);
+                        if (comboCategories.Exists(problem.PriorityCategories.Contains)) priority -= unit;
+                    }
                     if (Preserve(charm) && usable) priority--;
-                    if (!ScalesPosition.Accepts(problem, charm, cell)) priority += unit * unit;
+                    if (!ScalesPosition.Accepts(problem, charm, cell)) priority += unit * unit * unit;
                     var row = charmsAreRows ? charmIndex : cellIndex;
                     var column = charmsAreRows ? cellIndex : charmIndex;
                     if (forcedCharm.HasValue &&
                         ((charm.InstanceId == forcedCharm.Value) != (free[cellIndex] == forcedCell)))
-                        priority += 2 * unit * unit * unit;
+                        priority += 2 * unit * unit * unit * unit;
                     var value = Value(problem, charm, cell, result, occupancy, neighbors);
                     if (usable) value += PositionalWorth.ReceivedEnhanceWorth(
                         charm, cell, neighbors, result, problem.Grid, occupancy);

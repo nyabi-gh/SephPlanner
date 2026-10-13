@@ -111,6 +111,33 @@ public class PreferenceRegressionTests
                 $"레벨 {level} 이 {level - 1} 보다 낮게 평가됐다");
     }
 
+    /// <summary>
+    /// 혈석 귀걸이의 모양 - 이득은 레벨마다 같고 패널티만 줄어든다(제보 <c>2b88c3a6</c>). 레벨이 주는 몫이
+    /// 줄어든 패널티뿐이라, 그 몫에 배수가 걸리지 않으면 ★★★ 이 좋은 칸을 다투는 데 아무 힘이 없다.
+    /// 레벨이 오르며 늘어나는 패널티는 배수 없이 그대로 남는다.
+    /// </summary>
+    [Fact]
+    public void PreferenceScalesPenaltiesThatShrinkWithLevel()
+    {
+        var shrinking = new CharmWorth
+        {
+            ByLevel = new[] { -0.52, 0.79, 2.10, 4.73 },
+            BenefitByLevel = new[] { 7.35, 7.35, 7.35, 7.35 },
+            PenaltyByLevel = new[] { -7.87, -6.56, -5.25, -2.62 }
+        };
+        Assert.Equal(-0.52, shrinking.WeightedAt(0, 1), 8);
+        Assert.Equal(4.73, shrinking.WeightedAt(3, 1), 8);
+        Assert.Equal(10 * (4.73 + 0.52), shrinking.WeightedAt(3, 10) - shrinking.WeightedAt(0, 10), 8);
+
+        var growing = new CharmWorth
+        {
+            ByLevel = new[] { 2d, 1d },
+            BenefitByLevel = new[] { 4d, 5d },
+            PenaltyByLevel = new[] { -2d, -4d }
+        };
+        Assert.Equal(10 * 5 - 4, growing.WeightedAt(1, 10), 8);
+    }
+
     private static PlacementProblem RetentionBoard(int storage = 2)
     {
         var problem = new PlacementProblem { Grid = new GridSpec(6, 1, storage) };

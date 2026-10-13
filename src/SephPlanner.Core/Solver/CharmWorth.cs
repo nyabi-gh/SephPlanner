@@ -73,7 +73,17 @@ namespace SephPlanner.Core.Solver
             Math.Max(0, value) * weight + Math.Min(0, value);
 
         /// <summary>
-        /// 선호도 배수를 걸었을 때의 값어치. 배수는 이득에만 걸리고 측정한 패널티는 그대로 남는다.
+        /// 이득과 패널티를 나눠 가중한다. 레벨 0 의 패널티는 배수 밖에 두고, 레벨이 오르며
+        /// <b>줄어든 패널티는 그 레벨의 이득으로 친다</b>. 혈석 귀걸이처럼 레벨이 오를 때 바뀌는 것이
+        /// 패널티뿐인 아티팩트는 이 몫에 배수가 걸리지 않으면 ★★★ 을 줘도 좋은 칸을 차지하지 못한다
+        /// (제보 <c>2b88c3a6</c>). 레벨이 오르며 늘어나는 패널티는 배수 없이 그대로 뺀다.
+        /// 배수가 1 이면 <c>benefit + penalty</c> 와 비트까지 같아야 한다 - 끝자리 반올림이 탐색의 동점을 뒤집는다.
+        /// </summary>
+        internal static double Weigh(double benefit, double penalty, double basePenalty, double weight) =>
+            benefit * weight + penalty + Math.Max(0, penalty - basePenalty) * (weight - 1);
+
+        /// <summary>
+        /// 선호도 배수를 걸었을 때의 값어치. 배수는 이득에만 걸린다(<see cref="Weigh"/>).
         ///
         /// <b>하한과 측정값은 각자의 규칙으로 가중한 뒤 큰 쪽을 쓴다.</b> 하한(레어도 어림값)은
         /// 환산하지 못한 효과를 대신하는 이득 추정이라 <see cref="ApplyWeight"/>로 가중하고, 측정한
@@ -93,7 +103,7 @@ namespace SephPlanner.Core.Solver
                 return ApplyWeight(At(level), weight);
 
             var index = Math.Min(level, ByLevel.Count - 1);
-            var measured = BenefitByLevel[index] * weight + PenaltyByLevel[index];
+            var measured = Weigh(BenefitByLevel[index], PenaltyByLevel[index], PenaltyByLevel[0], weight);
             if (!ByLevelIsFloor) return measured;
 
             return Math.Max(measured, ApplyWeight(Base + PerLevel * level, weight));

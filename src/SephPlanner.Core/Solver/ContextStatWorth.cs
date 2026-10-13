@@ -22,7 +22,9 @@ namespace SephPlanner.Core.Solver
                 return double.IsNegativeInfinity(best) ? 0 : best;
             }
             double benefit = At(charm.Definition.StatBenefitByLevel, level);
+            double basePenalty = At(charm.Definition.StatPenaltyByLevel, 0);
             double penalty = At(charm.Definition.StatPenaltyByLevel, level);
+            double contextPenalty = 0;
             var support = BuildStatWorth.Value(problem, charm, level, result, occupancy, neighbors) - charm.Worth.WeightedAt(level, charm.Weight);
             var complete = charm.Definition.StatWorthCoverageKnown && charm.Definition.StatWorthUnconverted.Count == 0;
             foreach (var bonus in charm.Definition.ContextStats)
@@ -31,13 +33,13 @@ namespace SephPlanner.Core.Solver
                 var count = Count(problem, charm, cell, bonus, neighbors, estimate);
                 var value = At(bonus.AmountByLevel, level) * bonus.WorthPerUnit.Value * count;
                 benefit += Math.Max(0, value);
-                penalty += Math.Min(0, value);
+                contextPenalty += Math.Min(0, value);
                 if (value > 0)
                     support += value * (BuildStatWorth.Weight(problem, bonus.StatusId, charm.Weight, result, occupancy, neighbors) - charm.Weight);
             }
             // 미환산 능력치가 있을 때만 기존 추정 하한을 보충한다. 측정된 손해는 가중하지 않는다.
-            if (!complete) benefit += Math.Max(0, charm.Worth.At(level) - benefit - penalty);
-            return benefit * charm.Weight + penalty + support;
+            if (!complete) benefit += Math.Max(0, charm.Worth.At(level) - benefit - penalty - contextPenalty);
+            return CharmWorth.Weigh(benefit, penalty, basePenalty, charm.Weight) + contextPenalty + support;
         }
 
         private static int Count(PlacementProblem problem, CharmSlot charm, GridPos cell, ContextStatBonus bonus,
