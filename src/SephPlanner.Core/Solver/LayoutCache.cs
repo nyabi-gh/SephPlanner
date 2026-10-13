@@ -130,7 +130,11 @@ namespace SephPlanner.Core.Solver
             if (ReferenceEquals(basis, _basis)) return;
             _basis = basis;
             _composition = PlacementSolver.EstimateSignature(basis);
+            Advice.Clear();
         }
+
+        /// <summary>지금 판(<see cref="BeginPlan"/>의 basis)에 붙인 조언. 판이 바뀌면 비운다.</summary>
+        internal AdviceMemo Advice { get; } = new AdviceMemo();
 
         /// <summary>
         /// 후보를 하나도 집지 않은 지금 판의 배치.

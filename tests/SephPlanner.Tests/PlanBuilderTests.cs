@@ -2,6 +2,7 @@ using SephPlanner.Core.Charms;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
+using SephPlanner.Core.Solver;
 
 namespace SephPlanner.Tests;
 
@@ -104,6 +105,36 @@ public class PlanBuilderTests
 
         Assert.NotEmpty(command.ExpectedCellLevels);
         Assert.Equal(plan.Best.CellLevels, command.ExpectedCellLevels);
+    }
+
+    /// <summary>
+    /// 같은 배치에서 세피라이트 창을 닫았다 다시 열면 후보 조언을 다시 풀지 않는다. 닫는 동안에도
+    /// 버리기·합성 조언은 그대로라 다시 풀지 않는다. 다른 후보가 오면 그것만 새로 푼다.
+    /// </summary>
+    [Fact]
+    public void ReopeningTheSameOffersReusesTheAdvice()
+    {
+        var snapshot = Snapshot();
+        snapshot.Mixer = new MixerState { Cost = 1 };
+        var layouts = new LayoutCache();
+        var placement = PlanBuilder.BuildPlacement(snapshot, Catalog(), null, out _, layouts: layouts)!;
+
+        snapshot.Offers.Add(new OfferedItem { DefinitionId = CharmEntity, Kind = "charm" });
+        var opened = PlanBuilder.BuildAdvice(placement, snapshot, Catalog(), null, layouts)!;
+        snapshot.Offers.Clear();
+        var closed = PlanBuilder.BuildAdvice(placement, snapshot, Catalog(), null, layouts)!;
+        snapshot.Offers.Add(new OfferedItem { DefinitionId = CharmEntity, Kind = "charm" });
+        var reopened = PlanBuilder.BuildAdvice(placement, snapshot, Catalog(), null, layouts)!;
+
+        Assert.NotEmpty(opened.Offers);
+        Assert.Empty(closed.Offers);
+        Assert.Same(opened.Offers, reopened.Offers);
+        Assert.Same(opened.Mixes, closed.Mixes);
+        Assert.Same(opened.Discards, closed.Discards);
+        Assert.Same(opened.Discards, reopened.Discards);
+
+        snapshot.Offers[0].Price = 10;
+        Assert.NotSame(opened.Offers, PlanBuilder.BuildAdvice(placement, snapshot, Catalog(), null, layouts)!.Offers);
     }
 
     /// <summary>

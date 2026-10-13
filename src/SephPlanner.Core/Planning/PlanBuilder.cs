@@ -176,31 +176,39 @@ namespace SephPlanner.Core.Planning
             var lookahead = new Lookahead(problem);
 
             var mixes = new List<MixAdvice>();
+            var gold = snapshot.Run?.Gold ?? int.MaxValue;
+            // 배치가 같으면 판도 같은 객체다. 열쇠에는 판 밖에서 바뀌는 입력만 넣는다 - 무기·콤보 수·
+            // 설정 값은 배치 지문에 들어 있어 바뀌면 판이 새로 지어지고 기억이 비워진다.
+            var memo = layouts.Advice;
 
             // 합성기를 이미 썼으면 이 층에서는 더 권할 것이 없고, 멀리 있으면 아직 권할 때가
             // 아니다. 재지 않은(null) 자료는 전처럼 돈다.
             if (snapshot.Mixer is { Used: false } mixer && mixer.Near != false)
             {
-                mixes = TabletMixAdvisor.Rank(
-                    problem, catalog, mixer.Cost, snapshot.Run?.Gold ?? int.MaxValue,
-                    layouts: layouts, lookahead: lookahead, cancellation: cancellation);
+                mixes = memo.Get("mix", mixer.Cost + "/" + (mixer.Cost <= gold), () => TabletMixAdvisor.Rank(
+                    problem, catalog, mixer.Cost, gold,
+                    layouts: layouts, lookahead: lookahead, cancellation: cancellation));
             }
 
             var candidates = Candidates(snapshot, catalog, placement.ExpectedWeaponId, out var skippedOffers);
-            var offers = OfferAdvisor.Rank(
-                problem, candidates, snapshot.Run?.Gold ?? int.MaxValue,
-                snapshot.Inventory?.ComboCounts ?? new Dictionary<string, int>(), catalog.Combo,
-                preferences.PriorityCategories, preferences.PresetCharms, values, layouts, lookahead,
-                cancellation);
+            var offers = memo.Get("offer", OfferInput(candidates, gold, preferences), () =>
+            {
+                var ranked = OfferAdvisor.Rank(
+                    problem, candidates, gold,
+                    snapshot.Inventory?.ComboCounts ?? new Dictionary<string, int>(), catalog.Combo,
+                    preferences.PriorityCategories, preferences.PresetCharms, values, layouts, lookahead,
+                    cancellation);
 
-            // 후보마다 이미 배치를 다 풀어 두었다. 그 결과를 버리지 않고 화면이 쓸 모양으로
-            // 옮겨 두면, 증가분이라는 숫자 하나 대신 무엇이 어떻게 달라지는지 보여줄 수 있다.
-            // 기준 배치는 조언이 이미 푼 것을 그대로 받는다 - 여기서 다시 풀지 않는다.
-            if (offers.Count > 0)
-                FillPreviews(offers, problem, layouts.Baseline(problem, SolverOptions.ForAdvice(cancellation)));
+                // 후보마다 이미 배치를 다 풀어 두었다. 그 결과를 버리지 않고 화면이 쓸 모양으로
+                // 옮겨 두면, 증가분이라는 숫자 하나 대신 무엇이 어떻게 달라지는지 보여줄 수 있다.
+                // 기준 배치는 조언이 이미 푼 것을 그대로 받는다 - 여기서 다시 풀지 않는다.
+                if (ranked.Count > 0)
+                    FillPreviews(ranked, problem, layouts.Baseline(problem, SolverOptions.ForAdvice(cancellation)));
+                return ranked;
+            });
 
             var discards = placement.Verification.Passed
-                ? DiscardAdvisor.Rank(problem, placement.Best, layouts, lookahead, cancellation)
+                ? memo.Get("discard", "", () => DiscardAdvisor.Rank(problem, placement.Best, layouts, lookahead, cancellation))
                 : new List<DiscardAdvice>();
 
             // 제단 몫을 다 썼거나 아직 멀면 권할 때가 아니다. 창이 열렸으면 - 물약이 그렇다 -
@@ -208,7 +216,7 @@ namespace SephPlanner.Core.Planning
             // (아티팩트 35개 가방에서 377ms) 층에 제단이 있기만 하면 계속 돌게 두면 안 된다.
             // 화면에 내보내는 것은 그 창이 열렸을 때뿐이다.
             var enchants = snapshot.EnchantChance is { Available: true } && placement.Verification.Passed
-                ? EnchantAdvisor.Rank(problem, placement.Best, layouts, lookahead, cancellation)
+                ? memo.Get("enchant", "", () => EnchantAdvisor.Rank(problem, placement.Best, layouts, lookahead, cancellation))
                 : new List<EnchantAdvice>();
 
             return placement.WithAdvice(offers, mixes, discards, enchants, skippedOffers, AdviceStatus.Ready);
@@ -489,6 +497,18 @@ namespace SephPlanner.Core.Planning
         /// 강도로</b> 푼 배치다. 화면에 늘 떠 있는 <c>Best</c>는 더 촘촘한 탐색에서 나오는데,
         /// 두 탐색이 동점 배치를 다르게 고르면 후보 때문이 아닌 칸까지 금색으로 짚게 된다.
         /// </summary>
+        /// <summary>후보 조언이 판 밖에서 읽는 것. 후보와 그 순서, 살 수 있는지, 프리셋 지정이다.</summary>
+        private static string OfferInput(List<OfferCandidate> candidates, int gold, PlanPreferences preferences)
+        {
+            var builder = new System.Text.StringBuilder();
+            foreach (var candidate in candidates)
+                builder.Append(candidate.Kind).Append(':').Append(candidate.DefinitionId).Append(':')
+                       .Append(candidate.Price).Append(':').Append(candidate.Price <= gold ? '1' : '0').Append(';');
+            builder.Append('|');
+            foreach (var charm in preferences.PresetCharms.OrderBy(value => value)) builder.Append(charm).Append(',');
+            return builder.ToString();
+        }
+
         private static void FillPreviews(
             List<OfferAdvice> offers, PlacementProblem problem, Arrangement baseline)
         {
