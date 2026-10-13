@@ -278,24 +278,24 @@ namespace SephPlanner.Core.Solver
         internal static IEnumerable<string> CategoriesOf(
             CharmSlot charm, GridPos cell, IReadOnlyDictionary<GridPos, CharmSlot>? neighbors = null)
         {
-            // 종이끼리는 갱신 순서와 이전 상태에 의존하므로 정적 정의 대신 최근 관측을 쓴다.
-            if (charm.Definition.Behavior == "Charm_WhitePaper")
-                return charm.ObservedCategories ?? (IEnumerable<string>)System.Array.Empty<string>();
-            if (neighbors is not null && IsNeedle(charm.Definition))
-                return DependencyTarget(charm, cell, neighbors, out var target, out var targetCell)
-                    ? CategoriesOf(target, targetCell, neighbors)
-                    : System.Array.Empty<string>();
-            if (charm.Definition.LineCategories.Count == 0) return charm.Definition.Categories;
-
-            return new[] { LineCategory(charm.Definition, cell) };
+            var categories = new List<string>();
+            AddCategories(charm, cell, categories, neighbors);
+            return categories;
         }
 
-        /// <summary>이웃 없는 <see cref="CategoriesOf"/>와 같은 것을 배열을 짓지 않고 목록에 담는다.</summary>
-        internal static void AddCategories(CharmSlot charm, GridPos cell, List<string> into)
+        /// <summary><see cref="CategoriesOf"/>와 같은 것을 목록에 담는다. 최내곽 루프는 이쪽을 쓴다.</summary>
+        internal static void AddCategories(
+            CharmSlot charm, GridPos cell, List<string> into, IReadOnlyDictionary<GridPos, CharmSlot>? neighbors = null)
         {
+            // 종이끼리는 갱신 순서와 이전 상태에 의존하므로 정적 정의 대신 최근 관측을 쓴다.
             if (charm.Definition.Behavior == "Charm_WhitePaper")
             {
                 if (charm.ObservedCategories is not null) into.AddRange(charm.ObservedCategories);
+            }
+            else if (neighbors is not null && IsNeedle(charm.Definition))
+            {
+                if (DependencyTarget(charm, cell, neighbors, out var target, out var targetCell))
+                    AddCategories(target, targetCell, into, neighbors);
             }
             else if (charm.Definition.LineCategories.Count == 0) into.AddRange(charm.Definition.Categories);
             else into.Add(LineCategory(charm.Definition, cell));
@@ -316,45 +316,48 @@ namespace SephPlanner.Core.Solver
             target = charm;
             targetCell = cell;
 
-            // 사슬은 대개 없거나 한둘이다. 배정 비용 행렬의 최내곽에서 도는 자리라 집합·목록을
-            // 미리 만들지 않고, 사슬이 생길 때만 자리를 잡는다.
-            List<CharmSlot>? chain = null;
-            List<GridPos>? seen = null;
+            // 걸음은 칸만으로 정해지므로 같은 칸을 다시 밟으면 고리다. 밟는 칸은 모두 아티팩트가 있는
+            // 칸이라, 그 수보다 많이 걸었다면 반드시 다시 밟은 것이다 - 배정 비용 행렬의 최내곽에서
+            // 도는 자리라 밟은 칸을 담아 두지 않고 이것으로 센다.
             var current = charm;
             var at = cell;
-
+            var steps = 0;
             while (IsNeedle(current.Definition))
             {
-                at = at.Offset(current.Definition.DependencyOffsetX, current.Definition.DependencyOffsetY);
-
-                if (seen is null) seen = new List<GridPos>(2);
-                if (seen.Contains(at)) return false;
-                seen.Add(at);
-
-                if (!neighbors.TryGetValue(at, out var next)) return false;
-
-                // 직전 반복에서 자기가 서 있던 칸이 대상으로 잡히는 경우다. 배정은 자리 맞바꾸기라
-                // 실제로는 지금 목표 칸에 있는 아티팩트가 그 자리를 채우게 된다 - 조화의 수정이
-                // 이웃을 셀 때와 같은 갈음이다.
-                if (next == charm && !neighbors.TryGetValue(cell, out next)) return false;
-                if (next == charm) return false;
-
-                current = next;
-                if (IsNeedle(current.Definition)) (chain ??= new List<CharmSlot>(2)).Add(current);
+                if (++steps > neighbors.Count) return false;
+                if (!Step(charm, cell, neighbors, ref at, ref current)) return false;
             }
 
-            // 게임은 사슬의 침 전부가 마지막 아티팩트를 대상으로 인정할 때만 물려받는다.
+            // 게임은 사슬의 침 전부가 마지막 아티팩트를 대상으로 인정할 때만 물려받는다. 사슬의 침은
+            // 같은 걸음을 다시 걸어 하나씩 본다.
             if (!IsValidTarget(charm, current)) return false;
-            if (chain is not null)
+            var needle = charm;
+            var position = cell;
+            for (var step = 1; step < steps; step++)
             {
-                foreach (var needle in chain)
-                {
-                    if (!IsValidTarget(needle, current)) return false;
-                }
+                Step(charm, cell, neighbors, ref position, ref needle);
+                if (!IsValidTarget(needle, current)) return false;
             }
 
             target = current;
             targetCell = at;
+            return true;
+        }
+
+        private static bool Step(
+            CharmSlot charm, GridPos cell, IReadOnlyDictionary<GridPos, CharmSlot> neighbors,
+            ref GridPos at, ref CharmSlot current)
+        {
+            at = at.Offset(current.Definition.DependencyOffsetX, current.Definition.DependencyOffsetY);
+            if (!neighbors.TryGetValue(at, out var next)) return false;
+
+            // 직전 반복에서 자기가 서 있던 칸이 대상으로 잡히는 경우다. 배정은 자리 맞바꾸기라
+            // 실제로는 지금 목표 칸에 있는 아티팩트가 그 자리를 채우게 된다 - 조화의 수정이
+            // 이웃을 셀 때와 같은 갈음이다.
+            if (next == charm && !neighbors.TryGetValue(cell, out next)) return false;
+            if (next == charm) return false;
+
+            current = next;
             return true;
         }
 

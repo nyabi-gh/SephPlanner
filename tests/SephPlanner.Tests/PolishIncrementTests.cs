@@ -115,8 +115,9 @@ public class PolishIncrementTests
 
     /// <summary>
     /// 이웃·판 전체를 읽는 성질을 얹는다. 조화의 수정(이웃 여덟), 이웃 강화, 동료 혼돈(같은 줄),
-    /// 그리고 다른 아티팩트의 자리를 훑는 마법 치명타 가중치다. <b>증분 채점이 건너뛰면 안 되는
-    /// 것들이라, 무작위 판에 이것이 없으면 대조가 헛돈다.</b>
+    /// 다른 아티팩트의 자리를 훑는 마법 치명타 가중치, 그리고 방향으로 대상을 고르는 침·모래시계와
+    /// 양옆을 보는 하얀 종이다. <b>증분 채점이 건너뛰면 안 되는 것들이라, 무작위 판에 이것이 없으면
+    /// 대조가 헛돈다.</b> 침·모래시계가 있어야 지원 짝을 함께 옮기는 다듬기도 대조를 거친다.
     /// </summary>
     private static void Season(CharmDefinition definition, Random random)
     {
@@ -146,8 +147,29 @@ public class PolishIncrementTests
                 definition.IsCompanion = true;
                 definition.Categories.Add("GLACIER");
                 break;
+            case 5:
+                var (x, y) = Directions[random.Next(Directions.Length)];
+                definition.DependencyBonusByLevel = new List<double> { 5, 10, 15, 20 };
+                definition.DependencyOffsetX = x;
+                definition.DependencyOffsetY = y;
+                break;
+            case 6:
+                var (dx, dy) = Directions[random.Next(Directions.Length)];
+                definition.MagicSupport = new DirectedMagicSupport
+                {
+                    OffsetX = dx,
+                    OffsetY = dy,
+                    AmountByLevel = new List<double> { 60, 100, 140 },
+                };
+                break;
+            case 7:
+                definition.Behavior = "Charm_WhitePaper";
+                definition.PaperMatch = 1;
+                break;
         }
     }
+
+    private static readonly (int X, int Y)[] Directions = { (0, -1), (0, 1), (-1, 0), (1, 0) };
 
     /// <summary>
     /// 조건이 걸린 석판과 필러·마법 아티팩트를 섞는다. 셋이 섞여야 교환이 점유의 세 갈래
@@ -187,8 +209,10 @@ public class PolishIncrementTests
                 EntityId = 200 + index,
                 MaxLevel = 3,
                 IsMagic = random.Next(3) == 0,
+                IsAttackable = random.Next(2) == 0,
                 CriteriaType = Criteria[random.Next(Criteria.Length)],
             };
+            definition.Categories.Add(random.Next(2) == 0 ? "EMBER" : "GLACIER");
             Season(definition, random);
             problem.Charms.Add(new CharmSlot
             {
@@ -199,6 +223,14 @@ public class PolishIncrementTests
                 Definition = definition,
                 Worth = new CharmWorth { ByLevel = Enumerable.Range(0, 4).Select(_ => (double)random.Next(-2, 9)).ToArray() },
             });
+        }
+
+        // 콤보가 있어야 침·종이가 물려받는 카테고리와 지정 콤보 채점이 돈다.
+        if (random.Next(2) == 0)
+        {
+            problem.Combos = id => new ComboDefinition { Id = id, Thresholds = { 2, 4 } };
+            problem.ComboCounts = new Dictionary<string, int> { ["EMBER"] = random.Next(4), ["GLACIER"] = random.Next(4) };
+            if (random.Next(2) == 0) problem.PriorityCategories.Add("GLACIER");
         }
 
         // 시작 자리를 흩어 놓는다. 앵커가 있어야 다듬기가 실제로 교환을 시도한다.

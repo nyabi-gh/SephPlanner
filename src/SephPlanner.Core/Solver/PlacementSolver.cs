@@ -422,7 +422,7 @@ namespace SephPlanner.Core.Solver
             private bool _primed;
             private bool _all;
             private bool _keep;
-            private GridPos _left, _right;
+            private readonly List<GridPos> _touched = new List<GridPos>(2);
 
             public PolishScoring(PlacementProblem problem)
             {
@@ -435,13 +435,22 @@ namespace SephPlanner.Core.Solver
             }
 
             /// <summary>
-            /// 이번 시도가 고친 두 칸. 효과 행렬까지 달라졌으면 전부 다시 재고 <b>기억하지도
+            /// 이번 시도가 고친 칸. 효과 행렬까지 달라졌으면 전부 다시 재고 <b>기억하지도
             /// 않는다</b> - 기억해 둔 것은 정착한 행렬로 잰 것이어야 하기 때문이다.
             /// </summary>
             public void Begin(GridPos left, GridPos right, bool matrixChanged)
             {
-                _left = left;
-                _right = right;
+                _touched.Clear();
+                _touched.Add(left);
+                _touched.Add(right);
+                _all = matrixChanged;
+                _keep = !matrixChanged;
+            }
+
+            public void Begin(List<GridPos> touched, bool matrixChanged)
+            {
+                _touched.Clear();
+                _touched.AddRange(touched);
                 _all = matrixChanged;
                 _keep = !matrixChanged;
             }
@@ -463,7 +472,7 @@ namespace SephPlanner.Core.Solver
                 if (!_primed || _all || _everywhere[index]) return false;
                 if (!positions.TryGetValue(_problem.Charms[index].InstanceId, out var position))
                     return !score.Placed;
-                return score.Placed && position == _at[index] && position != _left && position != _right;
+                return score.Placed && position == _at[index] && !_touched.Contains(position);
             }
 
             public void Store(int index, Dictionary<int, GridPos> positions, CharmScore score)
@@ -593,7 +602,30 @@ namespace SephPlanner.Core.Solver
             {
                 var leaving = PolishOccupancy.StateOf(occupant);
                 var arriving = PolishOccupancy.StateOf(charm);
-                var changed = Put(from, leaving) | Put(to, arriving);
+                return Simulate(Put(from, leaving) | Put(to, arriving), layout, positions, byCell);
+            }
+
+            /// <summary>
+            /// 여러 칸을 한꺼번에 고친 배치. <paramref name="byCell"/>은 이미 옮긴 뒤의 것이고,
+            /// <paramref name="touched"/>는 그 사이 주인이 바뀌었을 수 있는 칸 전부다.
+            /// </summary>
+            public SimulationResult Apply(
+                List<GridPos> touched, List<TabletPlacement> layout, Dictionary<int, GridPos> positions,
+                Dictionary<GridPos, CharmSlot> byCell)
+            {
+                var changed = false;
+                foreach (var cell in touched)
+                {
+                    byCell.TryGetValue(cell, out var charm);
+                    changed |= Put(cell, PolishOccupancy.StateOf(charm));
+                }
+                return Simulate(changed, layout, positions, byCell);
+            }
+
+            private SimulationResult Simulate(
+                bool changed, List<TabletPlacement> layout, Dictionary<int, GridPos> positions,
+                Dictionary<GridPos, CharmSlot> byCell)
+            {
                 if (_problem.ComboEngraving is not null)
                 {
                     _trialEffects = _problem.EffectsFor(byCell);
@@ -641,6 +673,17 @@ namespace SephPlanner.Core.Solver
             {
                 _occupancy.Put(from, PolishOccupancy.StateOf(charm));
                 _occupancy.Put(to, PolishOccupancy.StateOf(occupant));
+                _trialEffects = _settledEffects;
+            }
+
+            /// <summary><see cref="Apply"/>를 되돌린다. <paramref name="byCell"/>은 이미 되돌린 것이다.</summary>
+            public void Undo(List<GridPos> touched, Dictionary<GridPos, CharmSlot> byCell)
+            {
+                foreach (var cell in touched)
+                {
+                    byCell.TryGetValue(cell, out var charm);
+                    _occupancy.Put(cell, PolishOccupancy.StateOf(charm));
+                }
                 _trialEffects = _settledEffects;
             }
 
@@ -1520,6 +1563,10 @@ namespace SephPlanner.Core.Solver
             return false;
         }
 
+        /// <summary>
+        /// 지원 아티팩트와 대상을 사슬째 함께 옮겨 본다. 시도는 배치를 제자리에서 고쳤다 되돌리고,
+        /// 효과 행렬과 채점은 <see cref="Polish"/>와 같은 작업 공간으로 바뀐 칸만 다시 본다.
+        /// </summary>
         private static bool PolishSupportPairs(
             PlacementProblem problem, List<TabletPlacement> layout, List<GridPos> free,
             Dictionary<int, GridPos> positions, ref GridOccupancy occupancy, ref SimulationResult result,
@@ -1532,8 +1579,16 @@ namespace SephPlanner.Core.Solver
                 positions.ContainsKey(charm.InstanceId)).ToList();
             if (targets.Count == 0) return false;
             var available = new HashSet<GridPos>(free);
-            var currentNeighbors = CharmsByCell(problem, positions);
-            var score = ScoreOf(problem, layout, positions, occupancy, result, currentNeighbors);
+            var byCell = CharmsByCell(problem, positions);
+            var familiarity = Familiarity(problem, layout);
+            var scratch = new PolishScratch(problem, layout, options.VerifyIncrementalPolish);
+            scratch.Reset(layout, positions);
+            var scoring = new PolishScoring(problem);
+            scoring.Prime();
+            var score = ScoreOf(problem, layout, positions, occupancy, result, byCell, familiarity, scoring);
+            var destinations = new Dictionary<int, GridPos>();
+            var distinct = new HashSet<GridPos>();
+            var trial = new SupportTrial();
             var moved = false;
             foreach (var helper in helpers)
             {
@@ -1560,7 +1615,7 @@ namespace SephPlanner.Core.Solver
                                     if (other == helper) continue;
                                     var direction = DirectedCharmSupport.Offset(other);
                                     var adjacent = positions[other.InstanceId].Offset(direction.X, direction.Y);
-                                    if (!currentNeighbors.TryGetValue(adjacent, out var existingTarget) ||
+                                    if (!byCell.TryGetValue(adjacent, out var existingTarget) ||
                                         existingTarget == helper || !DirectedCharmSupport.Accepts(other, existingTarget)) continue;
                                     if (!connected.Contains(other) && !connected.Contains(existingTarget)) continue;
                                     expanded |= connected.Add(other);
@@ -1568,48 +1623,134 @@ namespace SephPlanner.Core.Solver
                                 }
                             } while (expanded);
                         }
-                        var destinations = new Dictionary<int, GridPos> { [target.InstanceId] = targetCell };
+                        destinations.Clear();
+                        destinations[target.InstanceId] = targetCell;
+                        var origin = positions[target.InstanceId];
                         foreach (var other in connected)
                         {
                             var previous = positions[other.InstanceId];
-                            var origin = positions[target.InstanceId];
                             destinations[other.InstanceId] = targetCell.Offset(previous.X - origin.X, previous.Y - origin.Y);
                         }
                         connected.Add(helper);
                         destinations[helper.InstanceId] = cell;
-                        if (destinations.Values.Any(destination => !available.Contains(destination)) ||
-                            destinations.Values.Distinct().Count() != destinations.Count) continue;
+                        if (!Distinct(destinations, available, distinct)) continue;
                         // 연결된 사슬의 상대 위치를 보존하고, 밀려난 아이템은 교환으로 보존한다.
-                        var trial = new Dictionary<int, GridPos>(positions);
-                        var neighbors = CharmsByCell(problem, trial);
+                        trial.Begin();
                         foreach (var other in connected)
+                            trial.Move(positions, byCell, other, destinations[other.InstanceId]);
+                        if (forcedCharm.HasValue && positions[forcedCharm.Value] != forcedCell)
                         {
-                            var destination = destinations[other.InstanceId];
-                            neighbors.TryGetValue(destination, out var displaced);
-                            Move(trial, neighbors, other, trial[other.InstanceId], displaced, destination);
+                            trial.Undo(positions, byCell);
+                            continue;
                         }
-                        if (forcedCharm.HasValue && trial[forcedCharm.Value] != forcedCell) continue;
-                        var trialOccupancy = OccupancyFrom(layout, trial, problem);
-                        var trialResult = TabletSimulator.Run(
-                            WithFixed(problem, layout), trialOccupancy, problem.Grid, problem.EffectsFor(neighbors));
-                        if (!CanUse(problem, helper, trial[helper.InstanceId], trialResult, trialOccupancy, neighbors)) continue;
-                        if (connected.Any(other => DirectedCharmSupport.HasConnection(other) &&
-                            !DirectedCharmSupport.IsConnected(other, trial[other.InstanceId], trialResult,
-                                problem.Grid, trialOccupancy, neighbors))) continue;
-                        var quality = ScoreOf(problem, layout, trial, trialOccupancy, trialResult, neighbors);
-                        if (quality.CompareTo(score) <= 0) continue;
-                        positions.Clear();
-                        foreach (var pair in trial) positions.Add(pair.Key, pair.Value);
-                        currentNeighbors = neighbors;
+                        var trialResult = scratch.Apply(trial.Touched, layout, positions, byCell);
+                        var trialOccupancy = scratch.Occupancy;
+                        if (!CanUse(problem, helper, positions[helper.InstanceId], trialResult, trialOccupancy, byCell) ||
+                            BrokenSupport(problem, connected, positions, trialResult, trialOccupancy, byCell))
+                        {
+                            trial.Undo(positions, byCell);
+                            scratch.Undo(trial.Touched, byCell);
+                            continue;
+                        }
+                        scoring.Begin(trial.Touched, scratch.MatrixChanged);
+                        var quality = ScoreOf(
+                            problem, layout, positions, trialOccupancy, trialResult, byCell, familiarity, scoring);
+                        if (options.VerifyIncrementalPolish) VerifyScoring(
+                            problem, layout, positions, trialOccupancy, trialResult, byCell, familiarity, quality);
+                        if (quality.CompareTo(score) <= 0)
+                        {
+                            trial.Undo(positions, byCell);
+                            scratch.Undo(trial.Touched, byCell);
+                            continue;
+                        }
+                        // 호출자에게 넘기는 것은 작업 공간이 아니라 새로 지은 것이다.
+                        occupancy = OccupancyFrom(layout, positions, problem);
+                        result = TabletSimulator.Run(
+                            WithFixed(problem, layout), occupancy, problem.Grid, problem.EffectsFor(byCell));
+                        scratch.Accept();
+                        scoring.Forget();
                         connected = null;
-                        occupancy = trialOccupancy;
-                        result = trialResult;
                         score = quality;
                         moved = true;
                     }
                 }
             }
             return moved;
+        }
+
+        private static bool Distinct(Dictionary<int, GridPos> destinations, HashSet<GridPos> available, HashSet<GridPos> seen)
+        {
+            seen.Clear();
+            foreach (var destination in destinations.Values)
+                if (!available.Contains(destination) || !seen.Add(destination)) return false;
+            return true;
+        }
+
+        private static bool BrokenSupport(
+            PlacementProblem problem, HashSet<CharmSlot> connected, Dictionary<int, GridPos> positions,
+            SimulationResult result, GridOccupancy occupancy, Dictionary<GridPos, CharmSlot> byCell)
+        {
+            foreach (var other in connected)
+                if (DirectedCharmSupport.HasConnection(other) &&
+                    !DirectedCharmSupport.IsConnected(other, positions[other.InstanceId], result, problem.Grid, occupancy, byCell))
+                    return true;
+            return false;
+        }
+
+        /// <summary>
+        /// 여러 아티팩트를 차례로 옮기고 그대로 되돌릴 수 있게 처음 상태를 적어 두는 자리. 옮기는 동안
+        /// 주인이 바뀌었을 수 있는 칸을 <see cref="Touched"/>로 모은다.
+        /// </summary>
+        private sealed class SupportTrial
+        {
+            private readonly List<(int Id, GridPos Position)> _positions = new List<(int, GridPos)>();
+            private readonly List<(GridPos Cell, CharmSlot? Charm)> _cells = new List<(GridPos, CharmSlot?)>();
+
+            public List<GridPos> Touched { get; } = new List<GridPos>();
+
+            public void Begin()
+            {
+                _positions.Clear();
+                _cells.Clear();
+                Touched.Clear();
+            }
+
+            public void Move(
+                Dictionary<int, GridPos> positions, Dictionary<GridPos, CharmSlot> byCell, CharmSlot charm, GridPos to)
+            {
+                var from = positions[charm.InstanceId];
+                byCell.TryGetValue(to, out var occupant);
+                Remember(positions, charm.InstanceId);
+                if (occupant is not null) Remember(positions, occupant.InstanceId);
+                Remember(byCell, from);
+                Remember(byCell, to);
+                PlacementSolver.Move(positions, byCell, charm, from, occupant, to);
+            }
+
+            public void Undo(Dictionary<int, GridPos> positions, Dictionary<GridPos, CharmSlot> byCell)
+            {
+                foreach (var (cell, charm) in _cells)
+                {
+                    if (charm is null) byCell.Remove(cell);
+                    else byCell[cell] = charm;
+                }
+                foreach (var (id, position) in _positions) positions[id] = position;
+            }
+
+            private void Remember(Dictionary<int, GridPos> positions, int id)
+            {
+                foreach (var (known, _) in _positions)
+                    if (known == id) return;
+                _positions.Add((id, positions[id]));
+            }
+
+            private void Remember(Dictionary<GridPos, CharmSlot> byCell, GridPos cell)
+            {
+                if (Touched.Contains(cell)) return;
+                Touched.Add(cell);
+                byCell.TryGetValue(cell, out var charm);
+                _cells.Add((cell, charm));
+            }
         }
 
         /// <summary>
@@ -1649,7 +1790,12 @@ namespace SephPlanner.Core.Solver
             double score = 0;
             int missing = 0, unpreserved = 0, unheld = 0, waste = 0, unsafeEmpty = 0, supportMatches = 0;
             var designated = problem.DesignatedTargets.Count > 0;
-            var categories = problem.PriorityCategories.Count == 0 || neighbors is null ? null : new List<string>();
+            List<string>? categories = null;
+            if (problem.PriorityCategories.Count > 0 && neighbors is not null)
+            {
+                categories = _scoreCategories ??= new List<string>();
+                categories.Clear();
+            }
             var comboMatches = 0;
             double comboProgress = 0;
             for (var index = 0; index < problem.Charms.Count; index++)
@@ -1687,6 +1833,9 @@ namespace SephPlanner.Core.Solver
                 comboProgress, supportMatches, score, unsafeEmpty, waste, familiarity,
                 problem.Scale.ScoreStep);
         }
+
+        // 한 채점 안에서 채우고 다 읽는다. Contribute 가 부를 때마다 비운다.
+        [ThreadStatic] private static List<string>? _scoreCategories;
 
         /// <summary>
         /// 기억해 쓴 채점이 아티팩트를 전부 다시 잰 것과 같은지 본다. <see cref="SolverOptions"/>의

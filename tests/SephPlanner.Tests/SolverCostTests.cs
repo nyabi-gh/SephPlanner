@@ -77,6 +77,38 @@ public class SolverCostTests
     }
 
     /// <summary>
+    /// 침을 대상과 함께 옮겨 보는 시도가 판을 통째로 새로 짓지 않는다. 지었던 동안에는 침 하나가 든
+    /// 판의 배치·조언 할당이 절반 넘게 이 시도에서 나왔다(제보 <c>1047183d</c>, 조언 한 번 912MB).
+    /// </summary>
+    [Fact]
+    public void MovingSupportPairsDoesNotRebuildTheBoardPerTrial()
+    {
+        static long Allocated(bool needle)
+        {
+            var problem = FullBag(14, spare: 4);
+            foreach (var charm in problem.Charms)
+            {
+                charm.Definition.IsAttackable = true;
+                charm.Worth = new CharmWorth { ByLevel = new[] { 1.0, 2, 3, 4, 5, 6 } };
+            }
+            if (needle)
+            {
+                problem.Charms[0].Definition.DependencyBonusByLevel = new List<double> { 5, 10, 15, 20, 30, 40 };
+                problem.Charms[0].Definition.DependencyOffsetY = -1;
+            }
+
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            PlacementSolver.Solve(problem, new SolverOptions { BeamWidth = 20, ExactCandidates = 4 });
+            return GC.GetAllocatedBytesForCurrentThread() - before;
+        }
+
+        Allocated(true);
+        var without = Allocated(false);
+        var with = Allocated(true);
+        Assert.True(with < without * 1.5, $"침 {with:N0}B, 없음 {without:N0}B");
+    }
+
+    /// <summary>
     /// 빔은 확장마다 배치를 짓지 않는다. 다음 단계로 가는 것은 빔 폭만큼이라, 확장 수만큼 지으면
     /// 석판 11장·41칸 판에서 탐색 한 번이 83MB 를 버렸다(제보 <c>698b2f07</c>).
     /// </summary>

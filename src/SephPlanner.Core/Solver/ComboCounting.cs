@@ -43,21 +43,39 @@ namespace SephPlanner.Core.Solver
             }
 
             if (definition.Behavior != "Charm_WhitePaper") return;
-            var matches = new Dictionary<string, int>();
+            // 처음 본 순서대로 센다. 양옆의 카테고리는 몇 개뿐이라 목록을 훑는다.
+            var matches = _paperMatches ??= new List<(string Category, int Count)>();
+            var side = _paperSide ??= new List<string>();
+            matches.Clear();
             foreach (var offset in PaperSides)
             {
                 var at = cell.Offset(offset, 0);
                 if (!neighbors.TryGetValue(at, out var neighbor) || neighbor == charm || neighbor.IsFiller) continue;
-                foreach (var category in PositionalWorth.CategoriesOf(neighbor, at, neighbors)) Add(matches, category, 1);
+                side.Clear();
+                PositionalWorth.AddCategories(neighbor, at, side, neighbors);
+                foreach (var category in side) Add(matches, category);
             }
-            foreach (var match in matches)
-                if (match.Value >= definition.PaperMatch) into.Add(match.Key);
+            foreach (var (category, count) in matches)
+                if (count >= definition.PaperMatch) into.Add(category);
         }
 
         private static readonly int[] PaperSides = { 1, -1 };
 
         // 한 호출 안에서 채우고 다 읽는다. 각자 저 자신을 부르지 않는다.
-        [ThreadStatic] private static List<string>? _countScratch, _countForScratch;
+        [ThreadStatic] private static List<string>? _countScratch, _countForScratch, _paperSide;
+        [ThreadStatic] private static List<(string Category, int Count)>? _paperMatches;
+
+        private static void Add(List<(string Category, int Count)> matches, string category)
+        {
+            if (string.IsNullOrEmpty(category)) return;
+            for (var index = 0; index < matches.Count; index++)
+            {
+                if (!string.Equals(matches[index].Category, category, StringComparison.Ordinal)) continue;
+                matches[index] = (matches[index].Category, matches[index].Count + 1);
+                return;
+            }
+            matches.Add((category, 1));
+        }
 
         /// <summary>자리에 따라 카테고리가 달라지는 아티팩트인가. 아니면 개수 셈에서 볼 것이 없다.</summary>
         public static bool IsPositional(CharmDefinition definition) =>
