@@ -1366,6 +1366,18 @@ namespace SephPlanner.Core.Solver
                         }
                         Move(positions, byCell, charm, to, occupant, from);
                         scratch.Undo(from, occupant, to, charm);
+
+                        if (occupant is not null && !occupant.Immovable && TryEject(
+                            problem, layout, free, positions, byCell, charm, from, occupant, to, familiarity,
+                            ref score, ref occupancy, ref result))
+                        {
+                            scratch.Reset(layout, positions);
+                            scoring.Forget();
+                            scoring.Prime();
+                            score = ScoreOf(problem, layout, positions, occupancy, result, byCell, familiarity, scoring);
+                            moved = true;
+                            from = to;
+                        }
                     }
                 }
                 if (PolishSupportPairs(problem, layout, free, positions, ref occupancy, ref result, options))
@@ -1379,6 +1391,69 @@ namespace SephPlanner.Core.Solver
                 }
                 if (!moved) return;
             }
+        }
+
+        /// <summary>
+        /// 맞바꾸기가 진 자리에서 <b>밀려나는 쪽을 빈칸으로 보내는</b> 수. 맞바꾸면 밀려난 아티팩트가
+        /// 옮긴 쪽의 옛 칸에서 꺼져 활성 보호에 걸리는데, 빈칸 하나를 거치면 둘 다 켜진 채 좋아지는
+        /// 경우다(제보 <c>008cffa4</c>: ★★★ 자물쇠를 조건 무시 칸으로, 그 칸의 당근을 빈 꼭대기 칸으로).
+        /// 한 칸 이동이나 맞바꾸기로는 중간 배치가 늘 나빠 닿지 못한다.
+        ///
+        /// 그 모양일 때만 시도한다 - 옮기는 쪽이 지금 결과로 어림해 나아지고, 밀려나는 쪽이 지금 칸에서는
+        /// 쓰이는데 옛 칸에서는 못 쓰이며, 쓰일 수 있는 빈칸이 있을 때다. 빈칸은 그중 어림값이 가장 큰
+        /// 하나로 정하고, 받아들일지는 다시 시뮬레이션한 판을 정확히 채점해 정한다. 조건을 좁히지 않으면
+        /// 정확한 채점이 시도마다 판을 새로 지어 조언 시간이 3할 넘게 늘었다.
+        /// </summary>
+        private static bool TryEject(
+            PlacementProblem problem, List<TabletPlacement> layout, List<GridPos> free,
+            Dictionary<int, GridPos> positions, Dictionary<GridPos, CharmSlot> byCell,
+            CharmSlot charm, GridPos from, CharmSlot occupant, GridPos to, double familiarity,
+            ref PlacementQuality score, ref GridOccupancy occupancy, ref SimulationResult result)
+        {
+            if (occupant.IsFiller ||
+                !CanUse(problem, occupant, to, result, occupancy, byCell) ||
+                CanUse(problem, occupant, from, result, occupancy, byCell) ||
+                Objective(problem, charm, to, result, occupancy, byCell) <=
+                Objective(problem, charm, from, result, occupancy, byCell)) return false;
+
+            var found = false;
+            GridPos exit = default;
+            var exitValue = double.NegativeInfinity;
+            foreach (var cell in free)
+            {
+                if (cell == from || cell == to || byCell.ContainsKey(cell) ||
+                    !CanUse(problem, occupant, cell, result, occupancy, byCell)) continue;
+                var value = Objective(problem, occupant, cell, result, occupancy, byCell);
+                if (found && value <= exitValue) continue;
+                found = true;
+                exit = cell;
+                exitValue = value;
+            }
+            if (!found) return false;
+
+            positions[occupant.InstanceId] = exit;
+            positions[charm.InstanceId] = to;
+            byCell.Remove(from);
+            byCell[to] = charm;
+            byCell[exit] = occupant;
+            var trialOccupancy = OccupancyFrom(layout, positions, problem);
+            var trialResult = TabletSimulator.Run(
+                WithFixed(problem, layout), trialOccupancy, problem.Grid, problem.EffectsFor(byCell));
+            var trial = ScoreOf(problem, layout, positions, trialOccupancy, trialResult, byCell, familiarity);
+            if (trial.CompareTo(score) > 0)
+            {
+                occupancy = trialOccupancy;
+                result = trialResult;
+                score = trial;
+                return true;
+            }
+
+            positions[occupant.InstanceId] = to;
+            positions[charm.InstanceId] = from;
+            byCell.Remove(exit);
+            byCell[to] = occupant;
+            byCell[from] = charm;
+            return false;
         }
 
         private static bool PolishSupportPairs(

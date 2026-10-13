@@ -228,4 +228,53 @@ public class SupportTargetTests
         stored.SupportTargets = null;
         Assert.Empty(stored.Restore().SupportTargets);
     }
+
+    /// <summary>
+    /// <see cref="PriorityPlacementTests.AssignmentKeepsTheSelectedComboWhileMovingTwoItemsTogether"/> 의 지정 대상판.
+    /// 배정은 아이템마다 따로 값을 매겨 모래시계와 지정 마법을 짝으로 지키지 못하므로, 새 배정은 마법을
+    /// 값어치 높은 칸으로 빼 연결을 잃고 진다. 지금 배치에서 시작한 맞바꾸기로는 ★★★ 자물쇠를 조건 무시
+    /// 칸에 넣으면 그 칸의 아티팩트가 꺼진다. 밀려나는 쪽을 빈칸으로 보내는 수만 닿는다.
+    /// </summary>
+    [Fact]
+    public void EjectingToAnEmptyCellKeepsTheDesignatedTargetWhileMovingTwoItems()
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(3, 3, 9) };
+        problem.Charms.Add(Hourglass(1));
+        var target = Magic(2, 1);
+        target.IsSupportTarget = true;
+        problem.Charms.Add(target);
+        problem.Charms.Add(new CharmSlot
+        {
+            InstanceId = 3,
+            Weight = 10,
+            Definition = new CharmDefinition { EntityId = 3, MaxLevel = 5, CriteriaType = "CharmActivateCriteria_BothSidesAreEmpty" },
+        });
+        problem.Charms.Add(new CharmSlot
+        {
+            InstanceId = 4,
+            Definition = new CharmDefinition { EntityId = 4, MaxLevel = 5, CriteriaType = "CharmActivateCriteria_TopInInventory" },
+            Worth = new CharmWorth { Base = 1, PerLevel = 0.1 },
+        });
+        var fillers = new[] { new GridPos(0, 0), new GridPos(1, 0), new GridPos(0, 1), new GridPos(2, 1) };
+        for (var index = 0; index < fillers.Length; index++)
+        {
+            problem.Charms.Add(new CharmSlot { InstanceId = 10 + index, IsFiller = true });
+            problem.CurrentCharms[10 + index] = fillers[index];
+        }
+        problem.CurrentCharms[1] = new GridPos(0, 2);
+        problem.CurrentCharms[2] = new GridPos(1, 2);
+        problem.CurrentCharms[3] = new GridPos(2, 2);
+        problem.CurrentCharms[4] = new GridPos(1, 1);
+        problem.FixedEffects.Add(new FixedEffectCell { Position = new GridPos(0, 1), Level = 10 });
+        problem.FixedEffects.Add(new FixedEffectCell { Position = new GridPos(1, 1), Level = 3, IgnoreCriteria = 1 });
+        problem.FixedEffects.Add(new FixedEffectCell { Position = new GridPos(2, 2), Level = -1 });
+
+        var result = PlacementSolver.Solve(problem);
+
+        Assert.Equal(1, result.SupportTargetMatches);
+        Assert.Equal(new GridPos(1, 1), result.CharmPositions[3]);
+        Assert.Equal(0, result.CharmPositions[4].Y);
+        Assert.DoesNotContain(3, result.InactiveCharms);
+        Assert.DoesNotContain(4, result.InactiveCharms);
+    }
 }
