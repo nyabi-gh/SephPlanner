@@ -400,6 +400,12 @@ namespace SephPlanner.Core.Solver
         public double Score { get; set; }
 
         /// <summary>
+        /// 배치를 견줄 때 쓰는 값. <see cref="Score"/>에 꺼진 ★ 아티팩트의 자리 선호를 더한 것이다 -
+        /// 화면 점수는 지금 받는 것만 말하고, 비교는 사용자가 지정한 자리까지 본다.
+        /// </summary>
+        public double Objective { get; set; }
+
+        /// <summary>
         /// 현재 자리와 직전 제안을 유지하는 정도. <see cref="Score"/>와 별도이며 마지막 동점
         /// 비교에만 쓴다. 같은 판의 배치끼리만 견줄 수 있다.
         /// </summary>

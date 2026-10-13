@@ -1562,6 +1562,7 @@ namespace SephPlanner.Core.Solver
             if (full.RetentionFailures == used.RetentionFailures &&
                 full.ActivationFailures == used.ActivationFailures &&
                 full.HoldFailures == used.HoldFailures && full.ComboMatches == used.ComboMatches &&
+                full.SupportMatches == used.SupportMatches &&
                 full.UnsafeEmpty == used.UnsafeEmpty && full.Waste == used.Waste &&
                 full.ComboProgress.Equals(used.ComboProgress) && full.Value.Equals(used.Value) &&
                 full.Familiarity.Equals(used.Familiarity)) return;
@@ -1622,7 +1623,7 @@ namespace SephPlanner.Core.Solver
                 missing, unpreserved,
                 charm.Held && !charm.IsFiller && result.IgnoreCriteriaAt(position) <= 0 ? 1 : 0,
                 Waste(charm, position, result),
-                Value(problem, charm, position, result, occupancy, neighbors),
+                Objective(problem, charm, position, result, occupancy, neighbors),
                 Anchors(problem, charm, position),
                 placed: true,
                 inactive: reason != CharmInactiveReason.None);
@@ -1677,6 +1678,7 @@ namespace SephPlanner.Core.Solver
             var unit = rows + 1.0;
             var comboNeighbors = (IReadOnlyDictionary<GridPos, CharmSlot>?)neighbors ?? new Dictionary<GridPos, CharmSlot>();
             var comboCategories = new List<string>();
+            var designated = problem.DesignatedTargets.Count > 0;
 
             for (var charmIndex = 0; charmIndex < movable.Count; charmIndex++)
             {
@@ -1689,11 +1691,17 @@ namespace SephPlanner.Core.Solver
                     var cell = free[cellIndex];
                     var usable = CanUse(problem, charm, cell, result, occupancy, neighbors);
                     var priority = 0.0;
-                    // 하위 조건의 전체 위반 수보다 큰 기수로 강제 배치·사용 유지·고정·지정 콤보·활성을
+                    // 하위 조건의 전체 위반 수보다 큰 기수로 강제 배치·사용 유지·고정·지정 대상·지정 콤보·활성을
                     // 순서대로 비교한다. PlacementQuality 의 단계 순서와 같아야 한다 - 빠진 단계가 있으면
                     // 배정이 그 단계를 버리고 값어치를 좇아, 그 배치가 비교에서 통째로 진다.
-                    if (RequiresUse(problem, charm) && !charm.IsFiller && usable) priority -= unit * unit * unit;
-                    if (charm.Held && !charm.IsFiller && result.IgnoreCriteriaAt(cell) > 0) priority -= unit * unit;
+                    if (RequiresUse(problem, charm) && !charm.IsFiller && usable) priority -= unit * unit * unit * unit;
+                    if (!ScalesPosition.Accepts(problem, charm, cell)) priority += unit * unit * unit * unit;
+                    if (charm.Held && !charm.IsFiller && result.IgnoreCriteriaAt(cell) > 0) priority -= unit * unit * unit;
+                    if (designated && !charm.IsFiller && DirectedCharmSupport.HasConnection(charm) &&
+                        Reason(charm, cell, result, problem.Grid, occupancy) == CharmInactiveReason.None &&
+                        DirectedCharmSupport.ConnectedTarget(charm, cell, result, problem.Grid, occupancy, neighbors, out var linked) &&
+                        linked.IsSupportTarget)
+                        priority -= unit * unit;
                     if (problem.PriorityCategories.Count > 0 && !charm.IsFiller && PriorityPlacement.Applies(charm.Definition))
                     {
                         comboCategories.Clear();
@@ -1701,13 +1709,12 @@ namespace SephPlanner.Core.Solver
                         if (comboCategories.Exists(problem.PriorityCategories.Contains)) priority -= unit;
                     }
                     if (Preserve(charm) && usable) priority--;
-                    if (!ScalesPosition.Accepts(problem, charm, cell)) priority += unit * unit * unit;
                     var row = charmsAreRows ? charmIndex : cellIndex;
                     var column = charmsAreRows ? cellIndex : charmIndex;
                     if (forcedCharm.HasValue &&
                         ((charm.InstanceId == forcedCharm.Value) != (free[cellIndex] == forcedCell)))
-                        priority += 2 * unit * unit * unit * unit;
-                    var value = Value(problem, charm, cell, result, occupancy, neighbors);
+                        priority += 2 * unit * unit * unit * unit * unit;
+                    var value = Objective(problem, charm, cell, result, occupancy, neighbors);
                     if (usable) value += PositionalWorth.ReceivedEnhanceWorth(
                         charm, cell, neighbors, result, problem.Grid, occupancy);
                     cost[row, column] = new AssignmentCost(priority,
@@ -1757,7 +1764,7 @@ namespace SephPlanner.Core.Solver
             if (charm.ComboOnly)
                 return CharmWorth.ApplyWeight(PositionalWorth.ComboWorth(problem, charm, cell, neighbors), charm.Weight);
             if (inactive && !PositionalWorth.IsNeedle(charm.Definition))
-                return DormantPreference(problem, charm, cell, result, occupancy) + offCombo;
+                return offCombo;
 
             var level = result.EffectiveLevel(cell, charm.Enchant);
 
@@ -1859,7 +1866,6 @@ namespace SephPlanner.Core.Solver
              DirectedCharmSupport.IsConnected(charm, cell, result, problem.Grid, occupancy, neighbors));
 
         /// <summary>
-        /// <summary>
         /// 연동 무기를 안 들어 꺼져 있는데 사용자가 강화 우선을 지정한 아티팩트의 자리 값어치.
         ///
         /// 꺼진 아티팩트는 지금 어느 칸에서도 주는 것이 없으므로 배수를 곱해도 0 이고, 그래서
@@ -1867,8 +1873,9 @@ namespace SephPlanner.Core.Solver
         /// 넣은 바깥 정보다</b> - 꺼진 것에 굳이 별을 주는 이유는 무기를 바꿀 생각이기 때문이다.
         /// 그래서 무기를 바꿨을 때 받게 될 값어치로 자리를 다투게 한다.
         ///
-        /// <b>이 값은 점수에 넣지 않는다</b>(<see cref="Earned"/>). 지금 실제로 받는 것은 여전히
-        /// 0 이고, 화면 점수가 그 사실을 말해야 한다. 자리만 잡아 주고 점수는 정직하게 둔다.
+        /// <b>이 값은 화면 점수에 넣지 않고 견줄 때만 쓴다</b>(<see cref="Objective"/>). 지금 실제로 받는
+        /// 것은 여전히 0 이고, 화면 점수가 그 사실을 말해야 한다. 자리만 잡아 주고 점수는 정직하게 둔다.
+        /// 침과 <c>콤보만</c> 아티팩트는 꺼져도 자리로 값을 내므로 이 몫을 받지 않는다.
         ///
         /// 칸이 죽어 있거나 배치 조건을 못 맞추면 0 이다 - 무기를 바꿔도 켜지지 않는 자리다.
         /// </summary>
@@ -1876,7 +1883,8 @@ namespace SephPlanner.Core.Solver
             PlacementProblem problem, CharmSlot charm, GridPos cell,
             SimulationResult result, GridOccupancy occupancy)
         {
-            if (!charm.IsDormant || charm.Weight <= 1 || charm.IsFiller) return 0;
+            if (!charm.IsDormant || charm.Weight <= 1 || charm.IsFiller || charm.ComboOnly ||
+                PositionalWorth.IsNeedle(charm.Definition)) return 0;
             if (ReasonIgnoringWeapon(charm, cell, result, problem.Grid, occupancy) != CharmInactiveReason.None)
                 return 0;
 
@@ -1884,12 +1892,15 @@ namespace SephPlanner.Core.Solver
             return charm.Worth.WeightedAt(level, charm.Weight);
         }
 
-        /// <summary>화면에 나가는 점수. 자리 선호로만 쓰는 몫은 빼고 실제로 받는 것만 센다.</summary>
-        private static double Earned(
+        /// <summary>
+        /// 배치를 견줄 때 쓰는 몫. 실제로 받는 값어치(<see cref="Value"/>)에 자리 선호를 더한다.
+        /// 배정·채점·최종 비교가 모두 이것을 써야 한 판 안의 탐색과 석판 배치끼리의 비교가 같은 것을 좇는다.
+        /// </summary>
+        private static double Objective(
             PlacementProblem problem, CharmSlot charm, GridPos cell,
             SimulationResult result, GridOccupancy occupancy, Dictionary<GridPos, CharmSlot>? neighbors) =>
             Value(problem, charm, cell, result, occupancy, neighbors)
-            - DormantPreference(problem, charm, cell, result, occupancy);
+            + DormantPreference(problem, charm, cell, result, occupancy);
 
         /// 효과가 꺼졌다면 그 이유. 게임의 <c>Charm_Basic.RefreshCharm</c>이 보는 조건과 같고,
         /// 자리를 옮겨서는 풀 수 없는 무기 불일치를 먼저 본다.
@@ -2023,14 +2034,16 @@ namespace SephPlanner.Core.Solver
                     arrangement.EffectiveLevels[position] = 0;
                     arrangement.InactiveCells[position] = reason;
                     arrangement.InactiveCharms.Add(charm.InstanceId);
-                    var residual = Earned(problem, charm, position, result, occupancy, neighbors);
+                    var residual = Value(problem, charm, position, result, occupancy, neighbors);
                     arrangement.Score += residual;
+                    arrangement.Objective += residual + DormantPreference(problem, charm, position, result, occupancy);
                     continue;
                 }
 
                 arrangement.EffectiveLevels[position] = Math.Max(0, Math.Min(charm.Definition.MaxLevel, level));
-                var value = Earned(problem, charm, position, result, occupancy, neighbors);
+                var value = Value(problem, charm, position, result, occupancy, neighbors);
                 arrangement.Score += value;
+                arrangement.Objective += value;
             }
 
             // 아티팩트가 놓인 칸은 인챈트가 더해진 위 값을, 나머지 칸은 시뮬레이션 값을 쓴다.
@@ -2070,7 +2083,9 @@ namespace SephPlanner.Core.Solver
                 if (!charm.Retained && problem.ProtectedActive.Contains(charm.InstanceId) && (inactive || unlinked))
                     arrangement.UnapprovedDeactivations.Add(charm.InstanceId);
             }
-            arrangement.Score -= CriticalCap.Penalty(problem, positions, result, occupancy);
+            var overflow = CriticalCap.Penalty(problem, positions, result, occupancy);
+            arrangement.Score -= overflow;
+            arrangement.Objective -= overflow;
             PriorityPlacement.Describe(problem, arrangement, neighbors);
             var quality = ScoreOf(problem, layout, positions, occupancy, result, neighbors);
             arrangement.UnsafeEmptyCells = quality.UnsafeEmpty;

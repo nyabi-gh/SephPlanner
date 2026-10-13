@@ -68,4 +68,30 @@ public class DormantPreferenceTests
         Assert.Equal(CharmWorth.Resolve(Definition(2)).At(0), starred.Score, 6);
         Assert.Equal(CharmWorth.Resolve(Definition(2)).At(3), plain.Score, 6);
     }
+
+    /// <summary>
+    /// 석판 배치끼리 견줄 때도 같은 것을 좇아야 한다. 예전에는 한 석판 배치 안에서는 자리 선호를 보고
+    /// 석판 배치끼리는 화면 점수만 견줘, 꺼진 ★ 아티팩트에게 좋은 칸을 주는 석판 배치가 졌다.
+    /// </summary>
+    [Fact]
+    public void TheGoodCellPreferenceAlsoDecidesBetweenTabletLayouts()
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(1, 3, 3) };
+        var top = Definition(1);
+        top.CriteriaType = "CharmActivateCriteria_TopInInventory";
+        problem.Charms.Add(new CharmSlot { InstanceId = 1, Definition = top, IsDormant = true, Weight = 10 });
+        problem.Charms.Add(new CharmSlot { InstanceId = 2, Definition = Definition(2) });
+        var slot = new TabletSlot { InstanceId = 3, Definition = new TabletDefinition { Query = "UP 3" } };
+        problem.Tablets.Add(slot);
+
+        var solved = PlacementSolver.EvaluateLayouts(problem, new[]
+        {
+            new List<TabletPlacement> { slot.At(new GridPos(0, 2), 0) },
+            new List<TabletPlacement> { slot.At(new GridPos(0, 1), 0) },
+        });
+
+        Assert.Equal(new GridPos(0, 1), solved.TabletPositions[3].Position);
+        Assert.Equal(new GridPos(0, 0), solved.CharmPositions[1]);
+        Assert.Equal(CharmWorth.Resolve(Definition(2)).At(0), solved.Score, 6);
+    }
 }
