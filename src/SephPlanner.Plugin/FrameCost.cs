@@ -227,12 +227,12 @@ namespace SephPlanner.Plugin
             return string.Format(
                 CultureInfo.InvariantCulture,
                 "배치 cold {0}회 평균 {1:0}ms / warm {2}회 평균 {3:0}ms / 채점만 {4}회 평균 {5:0}ms, " +
-                "조언 탐색 {6}회, 가방 빔 재탐색 {7}회(처음 {8} 구성 {9} 석판 {10} 각도 {11} 칸 {12} 고정 {13}, " +
-                "취소된 탐색에서 이음 {14})",
+                "조언 탐색 {6}회, 가방 빔 재탐색 {7}회(처음 {8} 구성 {9} 활성 {10} 석판 {11} 각도 {12} 칸 {13} 고정 {14}, " +
+                "취소된 탐색에서 이음 {15})",
                 cold.Count, cold.AverageMs, warmCount, warmCount == 0 ? 0 : warmMs / warmCount,
                 settled.Count, settled.AverageMs, stats.AdviceSearches,
-                reasons.Searches, reasons.First, reasons.Composition, reasons.Tablets, reasons.Rotations,
-                reasons.Grid, reasons.Fixed, reasons.Resumed);
+                reasons.Searches, reasons.First, reasons.Composition, reasons.Protection, reasons.Tablets,
+                reasons.Rotations, reasons.Grid, reasons.Fixed, reasons.Resumed);
         }
 
         private static string Describe(string name, PlanSolveStat stat) =>

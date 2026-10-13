@@ -114,6 +114,7 @@ namespace SephPlanner.Core.Solver
 
         private PlacementProblem? _basis;
         private string _composition = "";
+        private string _protection = "";
 
         /// <summary>
         /// 새 계획을 시작한다. 빔은 두고 채점한 것만 버린다 - 기준 배치와 잣대는 지금 배치와
@@ -129,7 +130,7 @@ namespace SephPlanner.Core.Solver
             _yardsticks.Clear();
             if (ReferenceEquals(basis, _basis)) return;
             _basis = basis;
-            _composition = PlacementSolver.EstimateSignature(basis);
+            (_composition, _protection) = PlacementSolver.EstimateSignature(basis);
             Advice.Clear();
         }
 
@@ -327,6 +328,7 @@ namespace SephPlanner.Core.Solver
             else
             {
                 if (last[Composition] != parts[Composition]) BasisMisses.Composition++;
+                if (last[Protection] != parts[Protection]) BasisMisses.Protection++;
                 if (last[Grid] != parts[Grid]) BasisMisses.Grid++;
                 if (last[Tablets] != parts[Tablets]) BasisMisses.Tablets++;
                 if (last[Rotations] != parts[Rotations]) BasisMisses.Rotations++;
@@ -336,13 +338,14 @@ namespace SephPlanner.Core.Solver
         }
 
         private const string Separator = "\u0001";
-        private const int Composition = 0, Width = 1, Grid = 2, Tablets = 3, Rotations = 4, Fixed = 5;
+        private const int Composition = 0, Width = 1, Grid = 2, Tablets = 3, Rotations = 4, Fixed = 5, Protection = 6;
 
         /// <summary>빔 열쇠를 까닭별 몫으로 나눈 것. 이어 붙이면 열쇠다.</summary>
         private string[] Parts(PlacementProblem problem, SolverOptions options)
         {
-            var parts = new string[Fixed + 1];
+            var parts = new string[Protection + 1];
             parts[Composition] = _composition;
+            parts[Protection] = _protection;
             parts[Width] = options.BeamWidth + "/" + options.ExactCandidates + "/" + options.ParentQuota;
             parts[Grid] = problem.Grid.Width + "x" + problem.Grid.Height + "/" + problem.Grid.Storage;
 
@@ -413,6 +416,9 @@ namespace SephPlanner.Core.Solver
         /// <summary>아티팩트를 줍거나 버렸거나 값어치·지정이 바뀌었다.</summary>
         public int Composition { get; internal set; }
 
+        /// <summary>지금 켜져 있어 지키는 아티팩트가 바뀌었다. 손으로 옮기다 켜고 끈 것이 여기 든다.</summary>
+        public int Protection { get; internal set; }
+
         public int Grid { get; internal set; }
 
         /// <summary>석판을 얻거나 잃었다.</summary>
@@ -433,6 +439,7 @@ namespace SephPlanner.Core.Solver
             Searches += later.Searches - earlier.Searches;
             First += later.First - earlier.First;
             Composition += later.Composition - earlier.Composition;
+            Protection += later.Protection - earlier.Protection;
             Grid += later.Grid - earlier.Grid;
             Tablets += later.Tablets - earlier.Tablets;
             Rotations += later.Rotations - earlier.Rotations;
@@ -445,6 +452,7 @@ namespace SephPlanner.Core.Solver
             Searches = Searches,
             First = First,
             Composition = Composition,
+            Protection = Protection,
             Grid = Grid,
             Tablets = Tablets,
             Rotations = Rotations,

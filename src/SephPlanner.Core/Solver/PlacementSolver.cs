@@ -894,32 +894,37 @@ namespace SephPlanner.Core.Solver
         }
 
         /// <summary>
-        /// 빔 탐색이 아티팩트에서 읽는 것 전부. <see cref="Estimate"/>가 쓰는 어림 모델의 입력을
-        /// 그 순서대로 적는다. 지금·직전 자리(<c>Current</c>·<c>Planned</c>)는 뺀다 - 동률을 가를
-        /// 때만 읽히고, 넣으면 아티팩트 하나를 옮길 때마다 빔을 다시 찾는다.
+        /// 빔 탐색이 아티팩트에서 읽는 것 전부. <see cref="Estimate"/>가 쓰는 어림 모델의 입력을 적는다. 지금·직전
+        /// 자리(<c>Current</c>·<c>Planned</c>)는 뺀다 - 동률을 가를 때만 읽히고, 넣으면 아티팩트 하나를 옮길 때마다
+        /// 빔을 다시 찾는다.
+        ///
+        /// 지금 켜져 있어 보호하는 것(<c>Required</c>)은 따로 적는다. 손으로 옮기다 활성이 바뀌어 빔을 다시 찾는
+        /// 일이 얼마나 되는지 가르는 계측이다. 순위는 적은 값에서 정해지므로 아이템 번호 순으로 적어도 열쇠가
+        /// 담는 것은 같다.
         /// </summary>
-        internal static string EstimateSignature(PlacementProblem problem)
+        internal static (string Composition, string Protection) EstimateSignature(PlacementProblem problem)
         {
             CaptureProtectedActivation(problem);
             var model = BuildEstimateModel(problem);
-            var builder = new System.Text.StringBuilder();
-            builder.Append(model.LevelCap).Append('/').Append(model.HasScales ? '1' : '0').Append(';');
-            for (var rank = 0; rank < model.Items.Length; rank++)
+            var composition = new System.Text.StringBuilder();
+            var protection = new System.Text.StringBuilder();
+            composition.Append(model.LevelCap).Append('/').Append(model.HasScales ? '1' : '0').Append(';');
+            foreach (var rank in Enumerable.Range(0, model.Items.Length).OrderBy(rank => model.Items[rank].InstanceId))
             {
                 var charm = model.Items[rank];
-                builder.Append(charm.InstanceId).Append(':')
-                       .Append(model.Required[rank] ? '1' : '0')
-                       .Append(model.Preserved[rank] ? '1' : '0')
-                       .Append(charm.Held ? '1' : '0')
-                       .Append(charm.IsDormant ? '1' : '0')
-                       .Append(charm.IsFiller ? '1' : '0').Append(':')
-                       .Append(charm.Enchant).Append(':')
-                       .Append(charm.WorthLevelCap).Append(':');
+                composition.Append(charm.InstanceId).Append(':')
+                           .Append(model.Preserved[rank] ? '1' : '0')
+                           .Append(charm.Held ? '1' : '0')
+                           .Append(charm.IsDormant ? '1' : '0')
+                           .Append(charm.IsFiller ? '1' : '0').Append(':')
+                           .Append(charm.Enchant).Append(':')
+                           .Append(charm.WorthLevelCap).Append(':');
                 foreach (var value in model.ValueByRank[rank])
-                    builder.Append(FingerprintNumber.Of(value, FingerprintFormat.Canonical)).Append(',');
-                builder.Append(';');
+                    composition.Append(FingerprintNumber.Of(value, FingerprintFormat.Canonical)).Append(',');
+                composition.Append(';');
+                if (model.Required[rank]) protection.Append(charm.InstanceId).Append(',');
             }
-            return builder.ToString();
+            return (composition.ToString(), protection.ToString());
         }
 
         private static int AnchorIndex(PlacementProblem problem, CharmSlot charm, Dictionary<int, GridPos> anchors) =>

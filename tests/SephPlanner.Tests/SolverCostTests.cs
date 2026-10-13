@@ -712,6 +712,28 @@ public class SolverCostTests
         Assert.Equal(3, layouts.BasisMisses.Searches);
     }
 
+    /// <summary>
+    /// 손으로 옮기다 아티팩트가 꺼져 지키는 것이 바뀐 재탐색은 구성이 아니라 활성으로 센다. 빔 열쇠에서
+    /// 지금 활성을 뺄지는 이 수가 구성보다 큰지를 보고 정한다.
+    /// </summary>
+    [Fact]
+    public void BasisMissesSeparateProtectionFromComposition()
+    {
+        var preferences = new PlanPreferences { Recommendations = false };
+        var (snapshot, catalog) = Board();
+        catalog.Charm(200)!.CriteriaType = "CharmActivateCriteria_TopInInventory";
+        var layouts = new LayoutCache();
+        PlanBuilder.BuildPlacement(snapshot, catalog, preferences, out _, null, layouts);
+
+        var items = snapshot.Inventory!.Items;
+        var low = items.First(item => item.Position.Y > 0);
+        (items[0].Position, low.Position) = (low.Position, items[0].Position);
+        PlanBuilder.BuildPlacement(snapshot, catalog, preferences, out _, null, layouts);
+
+        Assert.Equal(1, layouts.BasisMisses.Protection);
+        Assert.Equal(0, layouts.BasisMisses.Composition);
+    }
+
     /// <summary>실행기는 배치 풀이를 빔을 새로 찾은 것과 돌려 쓴 것으로 갈라 센다.</summary>
     [Fact]
     public void TheRunnerSplitsColdFromWarmPlacements()
