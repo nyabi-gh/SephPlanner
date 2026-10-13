@@ -32,8 +32,8 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         public CharmWorth Worth
         {
-            get => _worth ??= CharmWorth.Resolve(Definition);
-            set => _worth = value;
+            get => Volatile.Read(ref _worth) ?? Interlocked.CompareExchange(ref _worth, CharmWorth.Resolve(Definition), null) ?? _worth!;
+            set => Volatile.Write(ref _worth, value);
         }
 
         /// <summary>
@@ -91,13 +91,21 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         public bool? PreferredLeft { get; set; }
 
-        private CharmCriteriaKind? _criteria;
+        private int _criteria = -1;
 
         /// <summary>
         /// 배치 조건의 종류. 배정 비용 행렬을 채우는 최내곽 루프에서 쓰이므로, 매번 타입 이름을
         /// 문자열로 풀지 않고 한 번만 해석해 둔다. Definition 은 생성 직후 바뀌지 않는다.
         /// </summary>
-        public CharmCriteriaKind Criteria => _criteria ??= CharmCriteria.FromTypeName(Definition.CriteriaType);
+        public CharmCriteriaKind Criteria
+        {
+            get
+            {
+                var criteria = Volatile.Read(ref _criteria);
+                if (criteria < 0) Volatile.Write(ref _criteria, criteria = (int)CharmCriteria.FromTypeName(Definition.CriteriaType));
+                return (CharmCriteriaKind)criteria;
+            }
+        }
 
         /// <summary>
         /// 인챈트만 다른 사본. <see cref="OfferAdvisor.Clone"/>은 목록만 얕게 복사하므로 슬롯을
@@ -181,7 +189,7 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         public ComboEngravingRule? ComboEngraving { get; set; }
 
-        private List<FixedEffectCell>?[]? _effectsByStage;
+        private List<FixedEffectCell>[]? _effectsByStage;
 
         /// <summary>
         /// 배치 점수가 효과를 직접 세는 콤보인가. 신비는 문턱에서 ×2 칸을 심을 뿐이고 그 칸은
@@ -193,7 +201,8 @@ namespace SephPlanner.Core.Solver
 
         /// <summary>
         /// 이 배치에서 칸에 걸려 있을 고정 효과 전부. <paramref name="byCell"/> 이 null 이면 아직
-        /// 배치를 모르는 것이라 게임이 세어 둔 지금 수로 푼다. 단계마다 한 번만 짓는다.
+        /// 배치를 모르는 것이라 게임이 세어 둔 지금 수로 푼다. 단계 목록은 처음 부를 때 다 지어 두고, 여러
+        /// 스레드가 함께 불러도 한 벌만 게시한다 - 다듬기가 목록을 참조로 견주기 때문이다.
         /// </summary>
         internal IReadOnlyList<FixedEffectCell> EffectsFor(Dictionary<GridPos, CharmSlot>? byCell)
         {
@@ -203,10 +212,15 @@ namespace SephPlanner.Core.Solver
             var count = byCell is null
                 ? ComboCounting.Reported(this, rule.Category)
                 : ComboCounting.CountOf(this, rule.Category, byCell);
-            var stage = ComboEngravings.StageAt(rule, count);
-            _effectsByStage ??= new List<FixedEffectCell>?[rule.Tiers.Count + 1];
-            return _effectsByStage[stage] ??=
-                ComboEngravings.Combine(FixedEffects, ComboEngravings.Cells(rule, stage, Grid));
+            var stages = Volatile.Read(ref _effectsByStage);
+            if (stages is null)
+            {
+                stages = new List<FixedEffectCell>[rule.Tiers.Count + 1];
+                for (var index = 0; index < stages.Length; index++)
+                    stages[index] = ComboEngravings.Combine(FixedEffects, ComboEngravings.Cells(rule, index, Grid));
+                stages = Interlocked.CompareExchange(ref _effectsByStage, stages, null) ?? stages;
+            }
+            return stages[ComboEngravings.StageAt(rule, count)];
         }
 
         /// <summary>
@@ -223,7 +237,13 @@ namespace SephPlanner.Core.Solver
         /// <summary>아티팩트 밖에서 오는 치명타. 모르면 <c>null</c> 이고 상한을 보지 않는다.</summary>
         public CriticalBase? Critical { get; set; }
 
-        internal CriticalCap.CriticalModel? CriticalModel { get; set; }
+        private CriticalCap.CriticalModel? _criticalModel;
+
+        internal CriticalCap.CriticalModel? CriticalModel
+        {
+            get => Volatile.Read(ref _criticalModel);
+            set => Volatile.Write(ref _criticalModel, value);
+        }
         internal HashSet<int> ProtectedActive { get; set; } = new HashSet<int>();
         // 획득·제거·합성 가상 배치는 바뀐 가방이 아니라 원래 가방의 활성 보호를 따른다.
         internal bool InheritsActivationBaseline { get; set; }
@@ -232,11 +252,25 @@ namespace SephPlanner.Core.Solver
         /// <see cref="ComboCounts"/>에서 자리 의존 아티팩트의 지금 자리 몫을 뺀 것. <see cref="ComboCounting"/>이
         /// 처음 읽을 때 짓는다. 개수나 지금 자리를 바꾼 뒤에는 null 로 되돌려야 다시 짓는다.
         /// </summary>
-        public Dictionary<string, int>? BaseComboCounts { get; set; }
+        public Dictionary<string, int>? BaseComboCounts
+        {
+            get => Volatile.Read(ref _baseComboCounts);
+            set => Volatile.Write(ref _baseComboCounts, value);
+        }
 
-        /// <summary><see cref="ComboCounting.CountOf"/>가 지금 자리를 센 값. 처음 읽을 때 짓는다.</summary>
-        internal int? CurrentComboCount { get; set; }
-        internal string? CurrentComboCategory { get; set; }
+        private Dictionary<string, int>? _baseComboCounts;
+
+        /// <summary>
+        /// <see cref="ComboCounting.CountOf"/>가 지금 자리를 센 값과 그 카테고리. 처음 읽을 때 짓는다. 둘이 한 몸으로
+        /// 게시되어야 다른 스레드가 한쪽만 바뀐 것을 읽지 않는다.
+        /// </summary>
+        internal (string Category, int Count)? CurrentCombo
+        {
+            get => Volatile.Read(ref _currentCombo) is { } held ? (held.Item1, held.Item2) : null;
+            set => Volatile.Write(ref _currentCombo, value is { } pair ? Tuple.Create(pair.Category, pair.Count) : null);
+        }
+
+        private Tuple<string, int>? _currentCombo;
 
         private List<CharmSlot>? _designatedTargets;
 
@@ -245,9 +279,11 @@ namespace SephPlanner.Core.Solver
         /// 계산이 통째로 빠지도록 여기서 한 번만 모은다.
         /// </summary>
         internal List<CharmSlot> DesignatedTargets =>
-            _designatedTargets ??= Charms.FindAll(charm => charm.IsSupportTarget && !charm.IsFiller);
+            Volatile.Read(ref _designatedTargets) ??
+            Interlocked.CompareExchange(ref _designatedTargets, Charms.FindAll(charm => charm.IsSupportTarget && !charm.IsFiller), null) ??
+            _designatedTargets!;
 
-        private double? _needleTargetWorth;
+        private double _needleTargetWorth = double.NaN;
 
         /// <summary>
         /// 침이 고를 수 있는 대상 가운데 가장 값진 것(상한 레벨 기준). 침의 값어치를 대상의 세기에
@@ -259,7 +295,8 @@ namespace SephPlanner.Core.Solver
         {
             get
             {
-                if (_needleTargetWorth is { } cached) return cached;
+                var cached = Volatile.Read(ref _needleTargetWorth);
+                if (!double.IsNaN(cached)) return cached;
 
                 var best = 0.0;
                 foreach (var charm in Charms)
@@ -269,7 +306,7 @@ namespace SephPlanner.Core.Solver
 
                     best = Math.Max(best, charm.Worth.At(charm.Definition.MaxLevel));
                 }
-                _needleTargetWorth = best;
+                Volatile.Write(ref _needleTargetWorth, best);
                 return best;
             }
         }

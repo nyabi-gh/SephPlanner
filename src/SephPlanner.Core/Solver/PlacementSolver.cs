@@ -185,17 +185,16 @@ namespace SephPlanner.Core.Solver
             var cells = Cells(problem);
             Arrangement? best = null;
             List<TabletPlacement>? bestLayout = null;
-            var evaluated = new List<(List<TabletPlacement> Layout, Arrangement Result)>();
-            foreach (var layout in layouts)
+            var evaluated = new List<(List<TabletPlacement> Layout, Arrangement Result)>(layouts.Count);
+            var results = EvaluateAll(layouts.Count, options, index => Evaluate(problem, cells, layouts[index], options, seed: seed));
+            for (var index = 0; index < layouts.Count; index++)
             {
-                options.Cancellation.ThrowIfCancellationRequested();
-
-                var arrangement = Evaluate(problem, cells, layout, options, seed: seed);
-                evaluated.Add((layout, arrangement));
+                var arrangement = results[index];
+                evaluated.Add((layouts[index], arrangement));
                 if (best != null && PriorityPlacement.Compare(arrangement, best) <= 0) continue;
 
                 best = arrangement;
-                bestLayout = layout;
+                bestLayout = layouts[index];
             }
             if (best is null) best = Evaluate(problem, cells, new List<TabletPlacement>(), options, polish: true);
 
@@ -211,12 +210,60 @@ namespace SephPlanner.Core.Solver
             return PriorityPlacement.Improve(problem, best, options);
         }
 
+        /// <summary>
+        /// 서로 기대지 않는 채점 여럿. 고사양 모드면 스레드로 나누되 결과는 순서대로 담는다 - 고르는 쪽이
+        /// 한 스레드에서 같은 순서로 견주므로 동점에서도 답이 같다.
+        /// </summary>
+        private static Arrangement[] EvaluateAll(int count, SolverOptions options, Func<int, Arrangement> evaluate)
+        {
+            var results = new Arrangement[count];
+            var threads = Math.Min(options.Parallelism, count);
+            if (threads <= 1)
+            {
+                for (var index = 0; index < count; index++)
+                {
+                    options.Cancellation.ThrowIfCancellationRequested();
+                    results[index] = evaluate(index);
+                }
+                return results;
+            }
+
+            try
+            {
+                System.Threading.Tasks.Parallel.For(0, count, new System.Threading.Tasks.ParallelOptions
+                { MaxDegreeOfParallelism = threads, CancellationToken = options.Cancellation }, index =>
+                {
+                    options.Cancellation.ThrowIfCancellationRequested();
+                    results[index] = evaluate(index);
+                });
+            }
+            catch (AggregateException failure) when (failure.InnerExceptions.Count == 1)
+            {
+                // 한 스레드로 풀 때와 같은 예외를 내야 실패 기록이 같은 말을 한다.
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure.InnerExceptions[0]).Throw();
+            }
+            return results;
+        }
+
         private static Arrangement ImproveEmptySides(
             PlacementProblem problem, List<GridPos> cells,
             List<(List<TabletPlacement> Layout, Arrangement Result)> evaluated, Arrangement best, SolverOptions options)
         {
             if (problem.Grid.Storage - problem.Tablets.Count - problem.Charms.Count < 2) return best;
-            var budget = options.EmptySideTrials;
+            var trials = EmptySideTrials(problem, cells, evaluated, options.EmptySideTrials);
+            var results = EvaluateAll(trials.Count, options, index => Evaluate(problem, cells, trials[index].Layout, options,
+                reservedEmpty: trials[index].Empty, forcedCharm: trials[index].Charm, forcedCell: trials[index].Cell));
+            foreach (var trial in results)
+                if (PriorityPlacement.Compare(trial, best) > 0) best = trial;
+            return best;
+        }
+
+        /// <summary>차가운 자물쇠의 양옆을 비워 둘 자리. 앞선 배치 후보의 높은 칸부터 예산만큼이다.</summary>
+        private static List<(List<TabletPlacement> Layout, HashSet<GridPos> Empty, int Charm, GridPos Cell)> EmptySideTrials(
+            PlacementProblem problem, List<GridPos> cells,
+            List<(List<TabletPlacement> Layout, Arrangement Result)> evaluated, int budget)
+        {
+            var trials = new List<(List<TabletPlacement> Layout, HashSet<GridPos> Empty, int Charm, GridPos Cell)>();
             foreach (var candidate in evaluated.OrderByDescending(pair => PlacementQuality.From(pair.Result)))
             {
                 var occupied = new HashSet<GridPos>(candidate.Layout.Select(tablet => tablet.Position));
@@ -228,15 +275,12 @@ namespace SephPlanner.Core.Solver
                         var empty = new HashSet<GridPos> { cell.Offset(-1, 0), cell.Offset(1, 0) };
                         if (cell.X <= 0 || cell.X >= problem.Grid.Width - 1 || occupied.Contains(cell) ||
                             empty.Any(c => !problem.Grid.Contains(c) || occupied.Contains(c))) continue;
-                        if (budget-- <= 0) return best;
-                        options.Cancellation.ThrowIfCancellationRequested();
-                        var trial = Evaluate(problem, cells, candidate.Layout, options,
-                            reservedEmpty: empty, forcedCharm: charm.InstanceId, forcedCell: cell);
-                        if (PriorityPlacement.Compare(trial, best) > 0) best = trial;
+                        if (budget-- <= 0) return trials;
+                        trials.Add((candidate.Layout, empty, charm.InstanceId, cell));
                     }
                 }
             }
-            return best;
+            return trials;
         }
 
         /// <summary>
@@ -978,8 +1022,6 @@ namespace SephPlanner.Core.Solver
                 parts[worker] = new List<(TabletPlacement Placement, PlacementQuality Score, int Parent)>();
                 scratches[worker] = new List<TabletPlacement>(problem.Tablets.Count);
             }
-            // 콤보 각인의 단계별 효과 목록은 처음 부를 때 지어 둔다. 스레드가 나눠 맡기 전에 지어 둔다.
-            problem.EffectsFor(null);
 
             for (var index = progress.Placed; index < problem.Tablets.Count && index < tablets; index++)
             {

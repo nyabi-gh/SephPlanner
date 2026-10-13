@@ -183,7 +183,9 @@ namespace SephPlanner.Core.Solver
         internal static int CountOf(
             PlacementProblem problem, string category, Dictionary<GridPos, CharmSlot> byCell)
         {
-            if (problem.CurrentComboCount is not { } current || problem.CurrentComboCategory != category)
+            int current;
+            if (problem.CurrentCombo is { } known && known.Category == category) current = known.Count;
+            else
             {
                 var now = new Dictionary<GridPos, CharmSlot>();
                 foreach (var charm in problem.Charms)
@@ -191,8 +193,7 @@ namespace SephPlanner.Core.Solver
                     if (problem.CurrentCharms.TryGetValue(charm.InstanceId, out var cell)) now[cell] = charm;
                 }
                 current = Count(now, category);
-                problem.CurrentComboCount = current;
-                problem.CurrentComboCategory = category;
+                problem.CurrentCombo = (category, current);
             }
             return Reported(problem, category) - current + Count(byCell, category);
         }

@@ -82,11 +82,12 @@ public class PolishIncrementTests
     }
 
     /// <summary>
-    /// 고사양 모드는 빔 확장을 여러 스레드로 나눌 뿐 답을 바꾸지 않는다. 고르기의 정렬이 안정 정렬이
-    /// 아니라, 나눠 펼친 것을 한 스레드의 순서대로 이어 붙이지 못하면 동점 후보가 뒤바뀐다.
+    /// 고사양 모드는 빔 확장과 배치 후보의 채점을 여러 스레드로 나눌 뿐 답을 바꾸지 않는다. 고르기의
+    /// 정렬이 안정 정렬이 아니라, 나눠 푼 것을 한 스레드의 순서대로 잇지 못하면 동점 후보가 뒤바뀐다.
+    /// 채점은 판에 지연해 짓는 값(콤보 각인 단계·지금 콤보 수·치명타 모델 등)을 여러 스레드가 함께 읽는다.
     /// </summary>
     [Fact]
-    public void SplittingTheBeamAcrossThreadsGivesTheSameAnswer()
+    public void SplittingTheSolveAcrossThreadsGivesTheSameAnswer()
     {
         for (var seed = 0; seed < 40; seed++)
         {
