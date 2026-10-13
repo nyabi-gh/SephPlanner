@@ -14,7 +14,7 @@ public sealed class RefinementSeedTests
         var original = seed.ToArray();
         var fresh = PlacementSolver.EvaluateLayouts(problem, new[] { layout }, options);
 
-        var continued = PlacementSolver.RefineLayouts(problem, new[] { layout }, seed, options);
+        var continued = PlacementSolver.RefineLayouts(problem, new[] { layout }, seed, options, new());
 
         Assert.True(continued.Score > fresh.Score);
         Assert.True(PriorityPlacement.Compare(continued, PlacementSolver.Score(problem, layout, seed)) >= 0);
@@ -32,7 +32,7 @@ public sealed class RefinementSeedTests
         var options = new SolverOptions();
         var fresh = PlacementSolver.EvaluateLayouts(problem, new[] { layout }, options);
 
-        var continued = PlacementSolver.RefineLayouts(problem, new[] { layout }, seed, options);
+        var continued = PlacementSolver.RefineLayouts(problem, new[] { layout }, seed, options, new());
 
         Assert.True(PriorityPlacement.Compare(continued, fresh) >= 0);
     }
@@ -57,7 +57,7 @@ public sealed class RefinementSeedTests
         var options = new SolverOptions();
         var fresh = PlacementSolver.EvaluateLayouts(problem, new[] { layout }, options);
 
-        var continued = PlacementSolver.RefineLayouts(problem, new[] { layout }, seed, options);
+        var continued = PlacementSolver.RefineLayouts(problem, new[] { layout }, seed, options, new());
 
         Assert.Equal(fresh.Score, continued.Score);
         Assert.Equal(fresh.CharmPositions.OrderBy(pair => pair.Key), continued.CharmPositions.OrderBy(pair => pair.Key));
@@ -76,7 +76,7 @@ public sealed class RefinementSeedTests
         var options = new SolverOptions();
         var fresh = PlacementSolver.EvaluateLayouts(problem, new[] { layout }, options);
 
-        var continued = PlacementSolver.RefineLayouts(problem, new[] { layout }, seed, options);
+        var continued = PlacementSolver.RefineLayouts(problem, new[] { layout }, seed, options, new());
 
         Assert.Equal(pinned, continued.CharmPositions[1]);
         Assert.True(PriorityPlacement.Compare(continued, fresh) >= 0);

@@ -25,7 +25,18 @@ namespace SephPlanner.Core.Solver
         {
             options ??= new SolverOptions();
             var candidates = layouts is null ? SearchLayouts(problem, options) : layouts.Of(problem, options);
-            return ImproveTablets(problem, EvaluateLayouts(problem, candidates, options), options);
+            var evaluated = new List<(List<TabletPlacement> Layout, Arrangement Result)>();
+            var best = ImproveTablets(problem, Choose(problem, candidates, options, null, evaluated), evaluated, options);
+            var cells = Cells(problem);
+            var sided = ImproveEmptySides(problem, cells, evaluated, best, options);
+            if (!ReferenceEquals(sided, best) && options.PolishPasses > 0)
+            {
+                // 빈칸 시도는 다듬지 않은 배정이라 같은 점수에서도 지금 자리를 덜 지킨다(제보 008cffa4).
+                options.Cancellation.ThrowIfCancellationRequested();
+                var polished = Evaluate(problem, cells, sided.Tablets, options, polish: true, seed: sided.CharmPositions);
+                if (PriorityPlacement.Compare(polished, sided) > 0) sided = polished;
+            }
+            return PriorityPlacement.Improve(problem, sided, options);
         }
 
         internal static void CaptureProtectedActivation(PlacementProblem problem)
@@ -42,7 +53,9 @@ namespace SephPlanner.Core.Solver
                     !current.UnlinkedCharms.Contains(charm.InstanceId)) problem.ProtectedActive.Add(charm.InstanceId);
         }
 
-        private static Arrangement ImproveTablets(PlacementProblem problem, Arrangement best, SolverOptions options)
+        private static Arrangement ImproveTablets(
+            PlacementProblem problem, Arrangement best,
+            List<(List<TabletPlacement> Layout, Arrangement Result)> evaluated, SolverOptions options)
         {
             if (best.UnplacedTablets > 0 || problem.Tablets.Count == 0 || options.TabletRefinementTrials <= 0) return best;
             var cells = Cells(problem);
@@ -77,7 +90,7 @@ namespace SephPlanner.Core.Solver
                     .Take(allowance).Select(candidate => candidate.Layout).ToList();
                 if (layouts.Count == 0) break;
                 remaining -= layouts.Count;
-                var improved = RefineLayouts(problem, layouts, best.CharmPositions, options);
+                var improved = RefineLayouts(problem, layouts, best.CharmPositions, options, evaluated);
                 if (PriorityPlacement.Compare(improved, best) <= 0) break;
                 best = improved;
             }
@@ -158,13 +171,25 @@ namespace SephPlanner.Core.Solver
         public static Arrangement EvaluateLayouts(
             PlacementProblem problem, IReadOnlyList<List<TabletPlacement>> layouts,
             SolverOptions? options = null)
-            => EvaluateLayouts(problem, layouts, options ?? new SolverOptions(), null);
+        {
+            options ??= new SolverOptions();
+            var evaluated = new List<(List<TabletPlacement> Layout, Arrangement Result)>(layouts.Count);
+            var best = Choose(problem, layouts, options, null, evaluated);
+            best = ImproveEmptySides(problem, Cells(problem), evaluated, best, options);
+            return PriorityPlacement.Improve(problem, best, options);
+        }
 
+        /// <summary>
+        /// 석판을 옮겨 본 후보들. 양옆 빈칸과 콤보 지정은 채점하지 않는다 - 그 둘은 <see cref="Solve"/>가
+        /// 석판 다듬기를 마친 뒤 한 번만 돌린다.
+        /// </summary>
+        /// <param name="evaluated">채점한 후보를 여기 더한다.</param>
         internal static Arrangement RefineLayouts(
             PlacementProblem problem, IReadOnlyList<List<TabletPlacement>> layouts,
-            IReadOnlyDictionary<int, GridPos> seed, SolverOptions options)
+            IReadOnlyDictionary<int, GridPos> seed, SolverOptions options,
+            List<(List<TabletPlacement> Layout, Arrangement Result)> evaluated)
         {
-            var fresh = EvaluateLayouts(problem, layouts, options);
+            var fresh = Choose(problem, layouts, options, null, evaluated);
             var cells = Cells(problem);
             var continuations = layouts.Where(layout =>
             {
@@ -172,20 +197,20 @@ namespace SephPlanner.Core.Solver
                 return SeedFits(problem, seed, cells.Where(cell => !occupied.Contains(cell)).ToList(), null, default);
             }).ToList();
             if (continuations.Count == 0) return fresh;
-            var continued = EvaluateLayouts(problem, continuations, options, seed);
+            var continued = Choose(problem, continuations, options, seed, evaluated);
             return PriorityPlacement.Compare(continued, fresh) > 0 ? continued : fresh;
         }
 
-        private static Arrangement EvaluateLayouts(
+        private static Arrangement Choose(
             PlacementProblem problem, IReadOnlyList<List<TabletPlacement>> layouts,
-            SolverOptions options, IReadOnlyDictionary<int, GridPos>? seed)
+            SolverOptions options, IReadOnlyDictionary<int, GridPos>? seed,
+            List<(List<TabletPlacement> Layout, Arrangement Result)> evaluated)
         {
             CaptureProtectedActivation(problem);
 
             var cells = Cells(problem);
             Arrangement? best = null;
             List<TabletPlacement>? bestLayout = null;
-            var evaluated = new List<(List<TabletPlacement> Layout, Arrangement Result)>(layouts.Count);
             var results = EvaluateAll(layouts.Count, options, index => Evaluate(problem, cells, layouts[index], options, seed: seed));
             for (var index = 0; index < layouts.Count; index++)
             {
@@ -206,8 +231,7 @@ namespace SephPlanner.Core.Solver
                 var polished = Evaluate(problem, cells, bestLayout, options, polish: true, seed: seed);
                 if (PriorityPlacement.Compare(polished, best) > 0) best = polished;
             }
-            best = ImproveEmptySides(problem, cells, evaluated, best, options);
-            return PriorityPlacement.Improve(problem, best, options);
+            return best;
         }
 
         /// <summary>
