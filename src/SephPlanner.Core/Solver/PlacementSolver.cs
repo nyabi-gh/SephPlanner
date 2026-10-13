@@ -101,14 +101,18 @@ namespace SephPlanner.Core.Solver
         /// 끼우므로, 놓을 자리가 모자라 도중에 멈추면 남은 것은 전부 같은 수까지만 놓은 배치다.
         /// <see cref="WithCurrentAndPlanned"/>가 완전한 배치만 고르는 근거다.
         /// </summary>
+        /// <param name="progress">
+        /// 앞서 취소된 같은 열쇠의 탐색이 마친 단계. 거기서 잇고, 이번에도 취소되면 마친 단계까지 남긴다.
+        /// </param>
+        /// <param name="tablets">이만큼 놓고 멈춘다. 중간 단계를 만들어 보는 시험만 넘긴다.</param>
         internal static List<List<TabletPlacement>> SearchBeam(
-            PlacementProblem problem, SolverOptions options)
+            PlacementProblem problem, SolverOptions options, BeamProgress? progress = null, int tablets = int.MaxValue)
         {
             CaptureProtectedActivation(problem);
 
             var cells = Cells(problem);
             var model = BuildEstimateModel(problem);
-            return SearchTabletLayouts(problem, cells, options, model)
+            return SearchTabletLayouts(problem, cells, options, model, progress ?? new BeamProgress(), tablets)
                 .Take(options.ExactCandidates)
                 .ToList();
         }
@@ -955,9 +959,10 @@ namespace SephPlanner.Core.Solver
         }
 
         private static List<List<TabletPlacement>> SearchTabletLayouts(
-            PlacementProblem problem, List<GridPos> cells, SolverOptions options, EstimateModel model)
+            PlacementProblem problem, List<GridPos> cells, SolverOptions options, EstimateModel model,
+            BeamProgress progress, int tablets)
         {
-            var beam = new List<List<TabletPlacement>> { new List<TabletPlacement>() };
+            var beam = progress.Beam ?? new List<List<TabletPlacement>> { new List<TabletPlacement>() };
             var twin = Twins(problem);
 
             // 확장은 수만 개인데 다음 단계로 가는 것은 빔 폭만큼이다. 확장마다 배치를 새로 지으면
@@ -976,7 +981,7 @@ namespace SephPlanner.Core.Solver
             // 콤보 각인의 단계별 효과 목록은 처음 부를 때 지어 둔다. 스레드가 나눠 맡기 전에 지어 둔다.
             problem.EffectsFor(null);
 
-            for (var index = 0; index < problem.Tablets.Count; index++)
+            for (var index = progress.Placed; index < problem.Tablets.Count && index < tablets; index++)
             {
                 var slot = problem.Tablets[index];
 
@@ -1020,6 +1025,8 @@ namespace SephPlanner.Core.Solver
                 if (expanded.Count == 0) break;
 
                 beam = Select(expanded, beam, options);
+                progress.Placed = index + 1;
+                progress.Beam = beam;
             }
             return beam;
         }

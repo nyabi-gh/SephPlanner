@@ -457,6 +457,58 @@ public class SolverCostTests
     }
 
     /// <summary>
+    /// 마친 단계에서 이은 빔 탐색은 처음부터 끝까지 한 번에 찾은 것과 같다. 판이 바뀔 때마다 풀이가
+    /// 취소되는데, 그때까지 놓은 석판을 버리면 아티팩트를 옮기는 동안 같은 빔을 몇 번이고 처음부터 찾는다.
+    /// </summary>
+    [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
+    [InlineData(5)]
+    public void AResumedBeamSearchMatchesAnUninterruptedOne(int placed)
+    {
+        var problem = FullBag(charmCount: 12, spare: 6);
+        var options = SolverOptions.ForAdvice(default);
+        var whole = PlacementSolver.SearchBeam(problem, options);
+
+        var progress = new BeamProgress();
+        PlacementSolver.SearchBeam(problem, options, progress, placed);
+        Assert.Equal(placed, progress.Placed);
+        var resumed = PlacementSolver.SearchBeam(problem, options, progress);
+
+        Assert.Equal(Describe(whole), Describe(resumed));
+    }
+
+    /// <summary>
+    /// 어디서 취소되든 캐시는 끝난 빔만 내준다. 취소 시점은 기계마다 다르므로 여러 시점으로 두드리고,
+    /// 이어 찾은 것이든 아니든 결과가 처음부터 찾은 것과 같은지만 본다.
+    /// </summary>
+    [Fact]
+    public void ACancelledSearchIsResumedOnlyToTheSameAnswer()
+    {
+        var problem = FullBag(charmCount: 12, spare: 6);
+        var live = SolverOptions.ForAdvice(default);
+        var expected = Describe(new LayoutCache().Of(problem, live));
+
+        for (var delay = 0; delay < 40; delay += 4)
+        {
+            var layouts = new LayoutCache();
+            using var cancel = new CancellationTokenSource(TimeSpan.FromMilliseconds(delay));
+            try
+            {
+                layouts.Of(problem, SolverOptions.ForAdvice(cancel.Token));
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            Assert.Equal(expected, Describe(layouts.Of(problem, live)));
+        }
+    }
+
+    private static List<string> Describe(IEnumerable<List<TabletPlacement>> layouts) =>
+        layouts.Select(layout => string.Join(";", layout.Select(tablet =>
+            $"{tablet.Definition.Id}@{tablet.Position.X},{tablet.Position.Y}/{tablet.Rotation}"))).ToList();
+
+    /// <summary>
     /// <see cref="FullBag"/>와 같은 모양을 스냅샷으로. 빔을 계획 사이에 돌려 쓰는 자리가
     /// <see cref="PlanBuilder"/>라 여기서는 판이 아니라 스냅샷이어야 한다. 검증이 통과해야
     /// 계획이 목표를 내놓고, 그래야 다음 계획이 직전 계획을 앵커로 받는다.

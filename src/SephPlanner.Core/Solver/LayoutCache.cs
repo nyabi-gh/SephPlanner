@@ -55,6 +55,7 @@ namespace SephPlanner.Core.Solver
         private sealed class Entry
         {
             public List<List<TabletPlacement>>? Value;
+            public BeamProgress? Progress;
             public long Used;
 
             /// <summary>빔을 실제 가방의 판으로 찾았는가. 후보 판이 먼저 찾은 빔은 거짓이다.</summary>
@@ -63,6 +64,13 @@ namespace SephPlanner.Core.Solver
 
         /// <summary>빔 열쇠로 찾는 탐색 결과. 계획을 넘어 산다.</summary>
         private readonly Dictionary<string, Entry> _beams = new Dictionary<string, Entry>(StringComparer.Ordinal);
+
+        /// <summary>
+        /// 취소된 빔 탐색이 마친 단계. 판이 바뀔 때마다 풀이가 취소되는데, 아티팩트만 옮긴 판은 빔 열쇠가
+        /// 같아 처음부터 다시 찾을 이유가 없다. 끝난 빔이 아니므로 <see cref="_beams"/>와 섞지 않는다 -
+        /// 중간까지 놓은 빔을 결과로 돌려주면 그 뒤의 계획이 남은 석판을 하나도 놓지 않는다.
+        /// </summary>
+        private readonly Dictionary<string, Entry> _unfinished = new Dictionary<string, Entry>(StringComparer.Ordinal);
 
         /// <summary>채점 열쇠로 찾는 잣대. <see cref="BeginPlan"/>가 계획마다 버린다.</summary>
         private readonly Dictionary<string, Entry> _yardsticks = new Dictionary<string, Entry>(StringComparer.Ordinal);
@@ -190,7 +198,21 @@ namespace SephPlanner.Core.Solver
             {
                 Searches++;
                 if (ofBasis) CountMiss(parts);
-                beam = PlacementSolver.SearchBeam(problem, options);
+                var started = Find(_unfinished, key);
+                var progress = started is not null && (started.OfBasis || !ofBasis) ? started.Progress! : new BeamProgress();
+                if (ofBasis && progress.Placed > 0) BasisMisses.Resumed++;
+                try
+                {
+                    beam = PlacementSolver.SearchBeam(problem, options, progress);
+                }
+                catch (OperationCanceledException)
+                {
+                    var unfinished = Reserve(_unfinished, key);
+                    unfinished.Progress = progress;
+                    unfinished.OfBasis = ofBasis;
+                    throw;
+                }
+                _unfinished.Remove(key);
                 var entry = Reserve(_beams, key);
                 entry.Value = beam;
                 entry.OfBasis = ofBasis;
@@ -398,8 +420,12 @@ namespace SephPlanner.Core.Solver
         /// <summary>각인·고정 칸 효과·콤보 각인 단계·천칭 편·못 박힌 칸이 바뀌었다.</summary>
         public int Fixed { get; internal set; }
 
+        /// <summary>앞서 취소된 같은 열쇠의 탐색이 마친 단계에서 이었다. 위 까닭과 함께 센다.</summary>
+        public int Resumed { get; internal set; }
+
         internal void Add(BeamMisses later, BeamMisses earlier)
         {
+            Resumed += later.Resumed - earlier.Resumed;
             Searches += later.Searches - earlier.Searches;
             First += later.First - earlier.First;
             Composition += later.Composition - earlier.Composition;
@@ -411,6 +437,7 @@ namespace SephPlanner.Core.Solver
 
         internal BeamMisses Copy() => new BeamMisses
         {
+            Resumed = Resumed,
             Searches = Searches,
             First = First,
             Composition = Composition,
@@ -419,5 +446,15 @@ namespace SephPlanner.Core.Solver
             Rotations = Rotations,
             Fixed = Fixed,
         };
+    }
+
+    /// <summary>
+    /// 빔 탐색이 석판을 몇 장째까지 놓았는가와 그때의 빔. 단계를 다 마칠 때만 고치므로 취소가 단계
+    /// 도중에 와도 마친 단계의 것이 남는다.
+    /// </summary>
+    internal sealed class BeamProgress
+    {
+        public int Placed;
+        public List<List<TabletPlacement>>? Beam;
     }
 }
