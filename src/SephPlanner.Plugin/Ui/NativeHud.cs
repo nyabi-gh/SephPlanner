@@ -59,7 +59,7 @@ namespace SephPlanner.Plugin.Ui
             public string Title;
             public Func<string> Body;
 
-            /// <summary>커서가 있는 동안 격자에 붙일 표. 합성 재료를 짚는다.</summary>
+            /// <summary>커서가 있는 동안 격자에서 짚을 칸. 합성 재료와 인챈트 대상을 짚는다.</summary>
             public List<KeyValuePair<GridPos, string>> Badges;
         }
 
@@ -427,7 +427,7 @@ namespace SephPlanner.Plugin.Ui
             _hover.Clear();
             _hoverable = expanded;
             _badged = null;
-            foreach (var cell in _cells) cell.SetBadge("");
+            foreach (var cell in _cells) cell.SetBadge(null);
 
             var previewed = Previewed(plan, frame.PreviewKey);
             var score = previewed?.Preview.Score ?? plan.Best.Score;
@@ -508,7 +508,7 @@ namespace SephPlanner.Plugin.Ui
             }
             RenderOffers(plan, frame, previewed);
             RenderMixes(plan, snapshot.Mixer, frame.MixerOpen, frame.AdviceBusy, previewed == null);
-            RenderEnchants(plan, snapshot.EnchantChance, frame.EnchantOpen, frame.AdviceBusy);
+            RenderEnchants(plan, snapshot.EnchantChance, frame.EnchantOpen, frame.AdviceBusy, previewed == null);
             RenderDiscards(plan, previewed == null);
             RenderChips(snapshot, frame);
         }
@@ -564,7 +564,7 @@ namespace SephPlanner.Plugin.Ui
             if (ReferenceEquals(badges, _badged)) return;
 
             _badged = badges;
-            foreach (var cell in _cells) cell.SetBadge("");
+            foreach (var cell in _cells) cell.SetBadge(null);
             if (badges == null) return;
 
             var width = _gridLayout.constraintCount;
@@ -911,7 +911,7 @@ namespace SephPlanner.Plugin.Ui
         /// 합성 추천이 상점을 열어도 따라 붙던 것과 같은 실수를 반복하지 않는다.
         /// </summary>
         private void RenderEnchants(
-            Plan plan, EnchantChanceState chance, bool enchantOpen, bool adviceBusy)
+            Plan plan, EnchantChanceState chance, bool enchantOpen, bool adviceBusy, bool planDrawn)
         {
             _enchants.Begin();
             for (var i = 0; i < plan.Enchants.Count && i < EnchantRows; i++)
@@ -927,7 +927,8 @@ namespace SephPlanner.Plugin.Ui
                     NativeSkin.Text);
                 Hover(row, advice.Name,
                     () => $"현재 위치: {advice.Position.X + 1}열 {advice.Position.Y + 1}행\n"
-                          + Explain.Join(Explain.Enchant(advice)));
+                          + Explain.Join(Explain.Enchant(advice)),
+                    planDrawn ? EnchantBadges(plan, advice) : null);
             }
             if (enchantOpen && plan.Enchants.Count == 0)
             {
@@ -1012,6 +1013,18 @@ namespace SephPlanner.Plugin.Ui
                     badges.Add(new KeyValuePair<GridPos, string>(target.To, _skin.FirstMark));
                 else if (target.InstanceId == second)
                     badges.Add(new KeyValuePair<GridPos, string>(target.To, _skin.SecondMark));
+            }
+            return badges;
+        }
+
+        /// <summary>인챈트 대상이 격자에 그려진 자리. 하나뿐이라 순번 없이 테두리만 칠한다.</summary>
+        private static List<KeyValuePair<GridPos, string>> EnchantBadges(Plan plan, EnchantAdvice advice)
+        {
+            var badges = new List<KeyValuePair<GridPos, string>>(1);
+            foreach (var target in plan.Targets)
+            {
+                if (!target.IsTablet && target.InstanceId == advice.InstanceId)
+                    badges.Add(new KeyValuePair<GridPos, string>(target.To, ""));
             }
             return badges;
         }
@@ -1287,12 +1300,12 @@ namespace SephPlanner.Plugin.Ui
                 Widgets.SetActive(_icon, icon != null);
             }
 
-            /// <summary>합성 재료 표. 비우면 칠해 둔 테두리로 돌아간다.</summary>
+            /// <summary>짚은 칸 표. 빈 문자열이면 테두리만 칠하고, null 이면 칠해 둔 테두리로 돌아간다.</summary>
             public void SetBadge(string mark)
             {
-                var shown = mark.Length > 0;
-                _badge.text = mark;
-                Widgets.SetActive(_badge, shown);
+                var shown = mark != null;
+                _badge.text = mark ?? "";
+                Widgets.SetActive(_badge, !string.IsNullOrEmpty(mark));
                 _border.color = shown ? NativeSkin.Mint : _edgeColor;
                 Stretch(_fill.rectTransform, shown || _thick ? _edge * 2f : _edge);
             }
