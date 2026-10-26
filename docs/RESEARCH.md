@@ -561,9 +561,11 @@ num += allDamageBonusByLevel.SafeRandomAccess(CurrentLevelToIdx()) * (float)num2
 **친타마니 칸 보너스**(`dungeonTempLevels`). `Charm_Chintamani` 는 치명상을 받으면 회복·무적 처리 뒤 자기 좌표에
 `AddDungeonTempLevel(..., addLevel)`(프리팹 값, 클래스 기본 3)을 부르고 `ForceRemoveItem` 으로 사라진다. 값은
 `levelMatrix` 와 `dungeonTempLevels`(SyncDictionary, 참가자도 읽는다)에 칸 단위로 남아 **옮긴 아이템을 따라가지
-않는다.** `GameReader.ReadFixedEffects` 가 이것을 고정 효과 칸으로 읽고, 시뮬레이터는 각인과 함께 더한 뒤 배수를
-곱한다. 빠뜨리면 빈 칸 하나의 +3 만으로 검증이 실패해 자동 배치가 잠긴다. `ClearDungeonTempLevels` 가 언제
-불리는지는 확인하지 않았다.
+않는다.** 호스트와 참가자 모두 이 표를 읽어 되빼기 전에 빼고(`FixedEffectLayer`), 고정 효과 칸으로 다시 더한다.
+시뮬레이터는 각인과 함께 더한 뒤 배수를 곱한다. 빠뜨리면 빈 칸 하나의 +3 만으로 검증이 실패해 자동 배치가 잠긴다.
+참가자가 이것을 되뺀 값에 두면, 발동하는 순간 아이템이 빠지는 것과 층이 바뀌는 것이 함께 보여 추적기가 "배치를
+따라 바뀐다" 로 센다 - 친타마니 둘이 11초 간격으로 발동해 두 번 만에 모순이 됐다(0.4.26 참가자 제보 `9fac8a07`).
+`ClearDungeonTempLevels` 는 `RestartGame` 이 부른다.
 
 인챈트는 그대로 읽어 스냅샷에 싣는다. `globalItemStatTable`이 `SyncDictionary`라 클라이언트에도
 값이 있다 - 게임의 `UI_CharmTooltip`·`UI_ShopPanel`·`UI_SephiriteRewardPanel`도 참가자 자리에서
@@ -687,7 +689,7 @@ fixedMultiplyLevel)를 들고 있고, 배수는 석판과 같은 `multiplyLevelM
 것까지 세어, 한 번 튄 것이 어긋남으로 올라갔다(0.4.16 참가자 자동 제보 `5642c7be`). 셈이 오르고
 내릴 때마다 전후 층을 플러그인 로그에 한 줄 남기므로, 다음 제보에서는 무엇이 튀었는지 보인다.
 
-호스트는 원본 목록(과 `dungeonTempLevels`)을 그대로 쓰고, 같은 순간의 되뺀 값과 대조해 되빼기
+호스트는 원본 목록을 그대로 쓰고, 같은 순간의 되뺀 값과 대조해 되빼기
 자체를 검증한다. **원본 목록이 행렬의 전부는 아니다.** 행렬은 증분식이라(`GetPermission` 이 빼고
 `ReleasePermission` 이 다시 더한다) 그 사이에 뺄 값의 출처가 사라지면 더해 둔 몫이 칸에 남는다. 인챈트는
 `DungeonManager.globalItemStatTable` 에서 읽는데, 이 표가 비면 인챈트를 빼지 못해 그 칸에 영구히 남는다.

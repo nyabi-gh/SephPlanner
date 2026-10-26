@@ -79,8 +79,9 @@ namespace SephPlanner.Core.Tablets
         }
 
         /// <summary>
-        /// 되뺀 층에서 콤보 각인 몫을 뺀다. 음수가 남으면 게임이 아직 그 각인을 심지 않은 순간이라
-        /// 판단을 미룬다 - 콤보 수와 행렬은 따로 동기화되어 한 폴링 안에서 어긋날 수 있다.
+        /// 되뺀 층에서 출처를 아는 몫(콤보 각인, 친타마니 보너스)을 뺀다. 음수가 남으면 게임이 아직
+        /// 그 각인을 심지 않은 순간이라 판단을 미룬다 - 콤보 수와 행렬은 따로 동기화되어 한 폴링
+        /// 안에서 어긋날 수 있다.
         /// </summary>
         public static FixedEffectResidualResult Without(
             FixedEffectResidualResult residual, IReadOnlyList<FixedEffectCell> engraved)

@@ -238,6 +238,8 @@ namespace SephPlanner.Plugin
                     text.AppendLine($"  콤보 각인 {rule.Category} {count}개: " +
                                     FixedEffectResidual.Describe(layer.Engraved, limit: 64) + $" (좌표{positions})");
                 }
+                if (layer.Temporary.Count > 0)
+                    text.AppendLine("  친타마니 칸 보너스: " + FixedEffectResidual.Describe(layer.Temporary, limit: 64));
                 text.AppendLine(layer.Residual == null
                     ? "  게임 행렬에서 되뺀 값: 게임이 다시 계산하기 전이라 되빼지 않음"
                     : $"  게임 행렬에서 되뺀 값({layer.Residual.Status}): " +

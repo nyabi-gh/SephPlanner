@@ -162,6 +162,37 @@ public class FixedEffectTrackerTests
         Assert.False(tracker.Trustworthy);
     }
 
+    /// <summary>
+    /// 친타마니는 발동하며 가방에서 사라지고 칸에 +3 을 남긴다. 그 몫을 되뺀 값에 두면 아이템이 빠지는
+    /// 것과 층이 바뀌는 것이 함께 보여 두 번 만에 모순이 됐다(제보 9fac8a07, 참가자). 표는 참가자도
+    /// 읽으므로 되빼기 전에 뺀다.
+    /// </summary>
+    [Fact]
+    public void ChintamaniBonusesSubtractedBeforeTrackingDoNotLookLikeTheArrangement()
+    {
+        var first = new[] { new FixedEffectCell { Position = new GridPos(5, 3), Level = 3 } };
+        var both = new[]
+        {
+            new FixedEffectCell { Position = new GridPos(5, 3), Level = 3 },
+            new FixedEffectCell { Position = new GridPos(5, 4), Level = 3 },
+        };
+        var none = Array.Empty<FixedEffectCell>();
+
+        var raw = new FixedEffectTracker();
+        raw.Observe(Extracted(), "t@0,0", "a");
+        raw.Observe(Extracted((5, 3, 3)), "t@0,0", "b");
+        raw.Observe(Extracted((5, 3, 3), (5, 4, 3)), "t@0,0", "c");
+        Assert.True(raw.Contradicted);
+
+        var known = new FixedEffectTracker();
+        known.Observe(ComboEngravings.Without(Extracted(), none), "t@0,0", "a");
+        known.Observe(ComboEngravings.Without(Extracted((5, 3, 3)), first), "t@0,0", "b");
+        known.Observe(ComboEngravings.Without(Extracted((5, 3, 3), (5, 4, 3)), both), "t@0,0", "c");
+        Assert.False(known.Contradicted);
+        Assert.True(known.Trustworthy);
+        Assert.Empty(known.Layer);
+    }
+
     [Fact]
     public void ANewRunStartsFromNothing()
     {

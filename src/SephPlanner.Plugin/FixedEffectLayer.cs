@@ -21,6 +21,9 @@ namespace SephPlanner.Plugin
         /// <summary>지금 콤보 수에서 살아 있는 콤보 각인 몫.</summary>
         public IReadOnlyList<FixedEffectCell> Engraved { get; set; } = new List<FixedEffectCell>();
 
+        /// <summary>친타마니가 좌표에 남긴 보너스(<c>dungeonTempLevels</c>). <see cref="Cells"/> 에 들어 있다.</summary>
+        public IReadOnlyList<FixedEffectCell> Temporary { get; set; } = new List<FixedEffectCell>();
+
         /// <summary>지금 칸에 걸린 것 전부. 게임 행렬과 대조할 때 쓴다.</summary>
         public IReadOnlyList<FixedEffectCell> All { get; set; } = new List<FixedEffectCell>();
 
@@ -116,6 +119,11 @@ namespace SephPlanner.Plugin
                 state.Engraved = ComboEngravings.Cells(rule, ComboEngravings.StageAt(rule, count), view.Grid);
             }
 
+            // 친타마니는 발동하는 순간 가방에서 사라지며 칸에 보너스를 남긴다. 되뺀 값에 두면 추적기가
+            // 아이템이 빠진 것과 층이 바뀐 것을 함께 보고 "배치를 따라 바뀐다" 로 센다(제보 9fac8a07).
+            // 그 표는 동기화되어 참가자도 읽으므로 되빼기 전에 뺀다.
+            state.Temporary = TemporaryLevels(inv, view.Grid);
+
             // 게임이 옛 격자로 적용한 채인 행렬에서 되빼면 그 차이가 고정 효과처럼 남는다. 추적기에도
             // 먹이지 않는다 - 튄 값으로 셀 것이 아니라 게임이 다시 계산하기를 기다릴 것이다.
             var stale = view.Stale.Count > 0;
@@ -123,7 +131,8 @@ namespace SephPlanner.Plugin
             {
                 var observed = TabletSimulator.Run(view.Placements, view.Occupancy, view.Grid);
                 state.Residual = ComboEngravings.Without(
-                    FixedEffectResidual.Extract(view.Grid, observed, view.Matrices(inv)), state.Engraved);
+                    FixedEffectResidual.Extract(view.Grid, observed, view.Matrices(inv)),
+                    ComboEngravings.Combine(state.Engraved, state.Temporary));
                 Tracker.Observe(state.Residual, view.Sources, view.Arrangement);
                 if (Tracker.Note.Length > 0) Log?.Invoke(Tracker.Note);
             }
@@ -134,7 +143,7 @@ namespace SephPlanner.Plugin
                 if (stale || state.Residual.Status != FixedEffectResidualStatus.Extracted ||
                     FixedEffectResidual.Same(original, state.Residual.Cells))
                 {
-                    state.Cells = original;
+                    state.Cells = ComboEngravings.Combine(original, state.Temporary);
                     state.All = ComboEngravings.Combine(state.Cells, state.Engraved);
                     if (stale) state.Pending = PlanVerification.GameNotRecalculated;
                     return state;
@@ -149,7 +158,7 @@ namespace SephPlanner.Plugin
                                  FixedEffectResidual.Describe(state.Residual.Cells);
             }
 
-            state.Cells = Tracker.Layer;
+            state.Cells = ComboEngravings.Combine(Tracker.Layer, state.Temporary);
             state.All = ComboEngravings.Combine(state.Cells, state.Engraved);
             if (view.Severed > 0)
             {
@@ -178,15 +187,18 @@ namespace SephPlanner.Plugin
                 foreach (var pair in engraving.fixedIgnoreCriteria) At(cells, pair.Key).IgnoreCriteria += pair.Value;
                 foreach (var pair in engraving.fixedMultiplyLevel) At(cells, pair.Key).Multiply += pair.Value;
             }
+            return InGrid(cells, GameReader.GridOf(inv));
+        }
 
-            // 친타마니가 사라진 뒤에도 좌표에 남는 보너스다.
-            foreach (var pair in inv.dungeonTempLevels)
-            {
-                if (pair.Value == 0) continue;
-                At(cells, pair.Key).Level += pair.Value;
-            }
+        private static List<FixedEffectCell> TemporaryLevels(GridInventory inv, GridSpec grid)
+        {
+            var cells = new Dictionary<GridPos, FixedEffectCell>();
+            foreach (var pair in inv.dungeonTempLevels) At(cells, pair.Key).Level += pair.Value;
+            return InGrid(cells, grid);
+        }
 
-            var grid = GameReader.GridOf(inv);
+        private static List<FixedEffectCell> InGrid(Dictionary<GridPos, FixedEffectCell> cells, GridSpec grid)
+        {
             var result = new List<FixedEffectCell>();
             foreach (var cell in cells.Values)
                 if (grid.Contains(cell.Position) && !IsEmpty(cell)) result.Add(cell);
