@@ -150,22 +150,14 @@ namespace SephPlanner.Plugin
         private static string CompareEffects(TabletPlacement placement, GridSpec grid, StoneTablet tablet)
         {
             var cells = TabletQuery.Parse(placement.Query, grid, placement.Position, placement.Rotation);
-            if (cells.Count != tablet.EffectRange.Count)
-                return $"효과 칸 수 {cells.Count} != {tablet.EffectRange.Count}";
-
-            for (var i = 0; i < cells.Count; i++)
+            var applied = new List<AppliedTabletEffect>(tablet.EffectRange.Count);
+            foreach (var effect in tablet.EffectRange)
             {
-                var expected = tablet.EffectRange[i];
-                var (kind, levelParam) = QueryValue.ReadEffect(cells[i].Value);
-
-                if (cells[i].Position.X != expected.position.x || cells[i].Position.Y != expected.position.y)
-                    return $"효과 [{i}] 위치 불일치";
-                if ((int)kind != (int)expected.effectType)
-                    return $"효과 [{i}] 종류 {kind} != {expected.effectType}";
-                if (levelParam != expected.levelParam)
-                    return $"효과 [{i}] 수치 {levelParam} != {expected.levelParam}";
+                applied.Add(new AppliedTabletEffect(
+                    new GridPos(effect.position.x, effect.position.y),
+                    (TabletEffectKind)(int)effect.effectType, effect.levelParam));
             }
-            return null;
+            return TabletEffectComparison.FirstDifference(cells, applied);
         }
     }
 }

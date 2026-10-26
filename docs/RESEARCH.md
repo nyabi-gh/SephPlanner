@@ -79,6 +79,11 @@ F10 덤프가 딕셔너리를 있는 그대로 보여준다(덤프 머리에 `Po
 | `IGNORECRITERIA` | `IgnoreCriteria` | 그 칸 아이템의 배치 조건 무시 |
 | `MUL/n` | `MultiplyConstLevel` | 그 칸 아이템의 레벨에 배수 |
 
+그 밖의 값은 `None` 이고 `levelParam` 은 0 이다. `ApplyEffect`·`RemoveEffect` 가 `levelParam` 을 읽는 것은
+`IncreaseConstLevel` 과 `MultiplyConstLevel` 뿐이라 다른 종류의 수치는 행렬에 닿지 않는다. 모드가 거기에 제 표식을
+심기도 한다 - 모드 석판 `Item_MM_Nepr_twin`(300045, 질의 `UPUP NEPR_TWIN` …)의 `None` 칸 수치가 그 석판 번호였다
+(제보 `6c1abf75`). 그래서 검증은 수치를 그 두 종류에서만 견준다(`TabletEffectComparison`).
+
 **조건 (`AdditionCriteriaData`)**:
 
 | 원문 값 | `CriteriaType` | 의미 |

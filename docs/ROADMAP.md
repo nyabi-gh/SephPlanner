@@ -121,7 +121,8 @@
 - **플러그인 파일 넷이 여전히 컴파일 검사 밖이다**(검토 6-1). `FrameCost`·`GameBinding` 은 2026-10-04 에 테스트
   프로젝트로 링크했다. `SimulationVerifier`·`QueryVerifier`·`EffectStateDiagnostics`·`GrowthProgressWatch` 는 게임
   타입(`GridInventory`·`StoneTablet`·`UnitAvatar`)을 직접 읽어 링크되지 않는다. `GrowthProgressWatch` 의 판정은 이미
-  Core(`GrowthProgressReading`)에 있고, 나머지 셋의 비교는 게임 행렬을 읽는 몇 줄이라 떼어 내는 값이 작다.
+  Core(`GrowthProgressReading`)에 있고, `SimulationVerifier` 의 석판 효과 비교는 제보 `6c1abf75` 로
+  `TabletEffectComparison` 에 옮겼다. 남은 행렬 비교는 게임 행렬을 읽는 몇 줄이라 떼어 내는 값이 작다.
   **다시 열 조건:** 이 셋에서 판정이 틀린 제보가 오면 그 비교를 Core 로 옮기며 시험을 붙인다.
 - 도구·CI 의 작은 것(검토 6-4). CI 에 cache·concurrency·timeout 이 없고 push+PR 로 두 번 돈다.
   `CharmValueSource` 가 스키마 오류를 삼킨다. 픽스처 생성 프로그램이 `artifacts/` 에만 있다.
