@@ -78,6 +78,32 @@ public sealed class DiagnosticTests
         Assert.True(policy.TryAccept("칸 (2,0) 배수 0 != 게임 2", throttle));
     }
 
+    /// <summary>
+    /// 한 세션의 같은 원인이 칸 수만 달라 세 번 올라갔다(제보 6d50beb6·fa581f2a·990421e4).
+    /// </summary>
+    [Fact]
+    public void TheSameCellListWithADifferentLengthCountsOnce()
+    {
+        var now = TimeSpan.Zero;
+        var throttle = new DiagnosticUploadThrottle(TimeSpan.FromMinutes(1), () => now);
+        var policy = new AutomaticDiagnosticPolicy();
+        const string stage = "고정 효과 원본 불일치|고정 효과 원본과 게임 행렬에서 되뺀 값이 다릅니다: 원본 없음, 되뺀 값 ";
+
+        now += TimeSpan.FromMinutes(1);
+        Assert.True(policy.TryAccept(stage + "(5,3)=레벨 1 (0,6)=레벨 1 (4,6)=레벨 1 (4,13)=레벨 1", throttle));
+        now += TimeSpan.FromMinutes(1);
+        Assert.False(policy.TryAccept(stage + "(5,3)=레벨 1", throttle));
+        now += TimeSpan.FromMinutes(1);
+        Assert.False(policy.TryAccept(stage + "(5,3)=레벨 1 (0,6)=레벨 1", throttle));
+
+        now += TimeSpan.FromMinutes(1);
+        Assert.True(policy.TryAccept(stage + "(5,3)=레벨 1/배수 2", throttle));
+        now += TimeSpan.FromMinutes(1);
+        Assert.True(policy.TryAccept(
+            "고정 효과 원본 불일치|고정 효과 원본과 게임 행렬에서 되뺀 값이 다릅니다: 원본 (1,1)=레벨 2, 되뺀 값 (5,3)=레벨 1",
+            throttle));
+    }
+
     [Fact]
     public void ManualConsentCannotAuthorizeAutomaticReports()
     {

@@ -37,7 +37,38 @@ namespace SephPlanner.Core.Runtime
                 digits = false;
                 text.Append(letter);
             }
-            return text.ToString();
+            return WithoutRepeats(text.ToString());
+        }
+
+        private const int LongestRepeatedPiece = 6;
+
+        /// <summary>
+        /// 칸을 늘어놓는 문장은 칸마다 같은 조각이 되풀이된다. 숫자만 지우면 칸이 넷인 문장과 하나인
+        /// 문장이 다른 오류가 되어, 한 원인이 칸 수가 바뀔 때마다 다시 올라갔다(제보 6d50beb6·fa581f2a·
+        /// 990421e4). 바로 앞 조각을 되풀이하는 조각은 하나로 접는다.
+        /// </summary>
+        private static string WithoutRepeats(string shape)
+        {
+            var kept = new List<string>();
+            foreach (var word in shape.Split(' '))
+            {
+                kept.Add(word);
+                for (var length = 1; length <= LongestRepeatedPiece && length * 2 <= kept.Count; length++)
+                {
+                    if (!EndsWithRepeat(kept, length)) continue;
+                    kept.RemoveRange(kept.Count - length, length);
+                    break;
+                }
+            }
+            return string.Join(" ", kept);
+        }
+
+        private static bool EndsWithRepeat(List<string> words, int length)
+        {
+            var start = words.Count - length;
+            for (var i = 0; i < length; i++)
+                if (!string.Equals(words[start + i], words[start - length + i], StringComparison.Ordinal)) return false;
+            return true;
         }
     }
 }
