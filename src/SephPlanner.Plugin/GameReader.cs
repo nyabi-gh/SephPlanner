@@ -224,7 +224,7 @@ namespace SephPlanner.Plugin
             MixerState unused = null;
             foreach (var mixer in NetworkRegistry.All<TabletMix>())
             {
-                if (mixer == null) continue;
+                if (mixer == null || IsOthersPersonalMixer(mixer)) continue;
 
                 // 유니티 객체에는 ?? 를 쓰지 않는다. 파괴된 객체를 null 로 보는 것은 유니티가
                 // 덮어쓴 == 뿐이라, ?? 로는 이미 파괴된 것을 붙들게 된다.
@@ -244,6 +244,14 @@ namespace SephPlanner.Plugin
             if (unused != null) return unused;
             return any == null ? null : new MixerState { Cost = any.mixCost, Used = true, Near = false };
         }
+
+        /// <summary>
+        /// 1.1.0 의 개인 합성기(<c>TabletMix_Personal</c>)는 멀티에서 참가자마다 하나씩 생기고, 남의 것은
+        /// 상호작용·몸체·충돌이 꺼져 있어 쓸 수 없다(<c>OnStartClient</c>). 그런데도 네트워크 객체로는 우리 쪽에
+        /// 있으므로 거르지 않으면 쓸 수 없는 합성기로 추천을 준비한다. 1.0.33 에 없는 클래스라 이름으로 본다.
+        /// </summary>
+        private static bool IsOthersPersonalMixer(TabletMix mixer) =>
+            !mixer.isOwned && ItemCatalog.DerivesFrom(mixer.GetType(), "TabletMix_Personal");
 
         private static RunState ReadRun(PlayerAvatar avatar)
         {
