@@ -6,6 +6,11 @@
 세피리아 1.0(App 2436940) 기준. 게임 업데이트로 내부 구조가 바뀔 수 있으니 플러그인이 깨지면
 여기부터 다시 확인한다.
 
+**1.1.0 베타(2026-10-29 `workshop-beta` 브랜치)를 2026-10-30 에 대조했다.** 1.0.33 디컴파일이 없어 이 문서와
+견줬고, 달라진 자리에 `1.1.0` 을 적었다. 바뀐 것은 침(→ 나침반), 레벨 계산의 재계산 반복, 배치 보너스 합치기,
+개인 합성기, 창작마당 모드 시스템이다. 질의 문법·활성 조건 10종·쓰기 경로·인챈트·선택지 감지는 그대로다. 새 석판
+생장(`BOTTOM PLACED` 조건에 `TOP 1`)·반향(`DOWN 1`, `DOWNDOWN 3`)과 회전 가능이 된 분배는 기존 문법 안이다.
+
 ## 런타임
 
 - **Unity Mono 빌드** (`MonoBleedingEdge/`, `Sephiria_Data/Managed/Assembly-CSharp.dll`).
@@ -13,6 +18,8 @@
 - 네트워킹은 **Mirror**, 스팀 연동은 Heathen Steamworks, 직렬화용 **Newtonsoft.Json이 이미 게임에 포함**돼
   있어 플러그인이 따로 들고 갈 필요가 없다.
 - `Assembly-CSharp.dll`에 타입 약 4,000개.
+- 엔진은 Unity 6000.3.21f1 이다(1.0.33·1.1.0 같음 - 1.1.0 업데이트가 `UnityPlayer.dll` 을 바꾸지 않았다).
+  1.1.0 은 `Managed/0Harmony.dll`(Lib.Harmony 2.4.3)을 함께 싣는다(아래 "공식 모드 API").
 
 ## 핵심 타입
 
@@ -181,6 +188,11 @@ F10 덤프가 딕셔너리를 있는 그대로 보여준다(덤프 머리에 `Po
 합성 NPC 는 `TabletMix.HandleInteractive` 에서 `UI_TabletMixPanel.Open(this)` 을 부른다. 상점 재고 창과 다른 창이라
 HUD 의 자동 펼침도 그 창의 `IsOpened` 를 따로 본다.
 
+**1.1.0 에는 개인 합성기가 있다.** `TabletMix_Personal` 은 소유자가 아니면 상호작용·몸체·충돌을 끄고 미니맵에도 올리지
+않는다(`TabletMix_Shared` 는 함께 쓴다). `GameReader.ReadMixer` 는 `TabletMix` 를 전부 훑으므로 멀티에서 남의 개인 합성기를
+쓸 수 있는 것으로 읽을 수 있다. 재료는 가방 밖 일반 각인·보조 가방에서도 찾고(`FindMixableTabletByInstanceID`), 같은
+인스턴스 둘은 거절한다.
+
 합성기는 거리를 보지 않고 읽는다. 미니맵에 뜨는 고정물(`minimapElementName`)이라 층에 있다는
 사실 자체가 이미 보이는 정보이고, 무엇을 합칠지는 합성기 앞에 서기 전에 정해 두는 편이 쓸모
 있기 때문이다. 상자 속 내용물과 달리 숨은 정보가 아니다.
@@ -342,6 +354,15 @@ GridInventory.DoClickAction(ItemPosition)             // 서버면 Local, 아니
 "The MOD System is still under development" 안내와 https://teamhoray.com/mod-api 링크,
 데이터베이스 로드·세션 시작·`GridInventoryStartPermission`/`EndPermission` 등의 이벤트를 제공한다.
 게임이 모드를 공식적으로 상정하고 있다는 근거다.
+
+**1.1.0 에서 창작마당 모드가 들어왔다.** `WorkshopModManager` 가 `HorayModBase` 모드를 싣고 로비에 `Mods`/`HostMods` 를
+적는다. BepInEx 쪽에 닿는 것은 `ModEnvironment` 하나다 - 이름이 `MelonLoader`·`BepInEx`·`UnityModManager`·`SPMod` 로
+시작하는 어셈블리를 보면 `IsModded` 를 세우고 분석 이벤트와 Cloud Diagnostics 예외 업로드를 끈다. 막는 것은 없다.
+같은 클래스가 `AfterAssembliesLoaded` 에 `Assembly.Load("0Harmony")` 로 동봉 Lib.Harmony 2.4.3 을 부르는데, BepInEx
+프리로더가 HarmonyX 를 먼저 올려 두므로 이름으로 찾으면 그쪽이 돌아온다(추정, `Player.log` 의 `[ModEnvironment] 동봉
+Harmony` 줄로 확인한다). 플러그인이 쓰는 인자 여섯의 `Harmony.Patch` 와 `UnpatchSelf` 는 HarmonyX 에만 있어, 순서가
+뒤집히면 패치가 `MissingMethodException` 으로 실패한다. `OnAllDatabasesReady` 는 여전히 `GameDataLoader.Awake` 끝에서
+나가고, 그 앞에 창작마당 모드 활성화가 들어갔다.
 
 **새 판 신호로 `OnStartSessionClientside(isSaved)` 를 쓴다(2026-09-23, 게임 1.0.33).** 서버의
 `HorayNetworkManager.NewGame` 이 `MarkSessionStartedForClients` 를 부르고, 그것이 `RpcStartSession`
@@ -512,6 +533,8 @@ ilspycmd -t GridInventory "<게임경로>/Sephiria_Data/Managed/Assembly-CSharp.
   - **레벨이 0 미만** (0은 살아 있다)
   - 자체 조건 불만족. 단 `ignoreCriteriaMatrix > 0`이면 조건을 건너뛴다
   - 무기 연동 아티팩트인데 해당 무기를 들고 있지 않음
+  - (1.1.0) `GridInventory.globalActiveValue <= 0` 이고 그 칸에 `disableMatrix` 항목이 없음. 바닐라에 `GlobalDisable`
+    을 부르는 곳은 없다 - 창작마당 모드가 부르면 우리 활성 판정이 틀린다
 
 ### 상한 위로 올려도 이웃이 대신 세어 주지는 않는다
 
@@ -557,6 +580,14 @@ num += allDamageBonusByLevel.SafeRandomAccess(CurrentLevelToIdx()) * (float)num2
    시뮬레이터가 같은 규칙을 쓴다.
 
 배치 보너스는 이 파이프라인 뒤에 돌지만 레벨을 바꾸지 않는다(아래 참고).
+
+**1.1.0 은 단계 사이에서 카테고리를 세고, 끝에서 다시 돈다.** 인챈트 다음에 `RefreshCharmCategories`(Order 순으로
+`OnPreSetEffectRefreshed` 를 부르고 카테고리를 셈)와 `SearchSetEffectInInventory` 가 오고, 그 뒤가 2~4단계다.
+`RefreshCharm` 까지 마친 뒤 어떤 아티팩트의 활성이나 유효 레벨이 바뀌었고 카테고리 수도 달라졌으면
+`GetPermission`/`ReleasePermission` 을 통째로 다시 부른다(`categoryRecalculationDepth < 2`, 많아야 세 바퀴).
+나침반의 카테고리가 활성에 달려 있어 생긴 고정점 반복이다(아래 "침은 1.1.0 에서 나침반이 됐다"). 그래서
+`GridInventoryEndPermission` 뒤에 Start/End 가 한 쌍 더 나갈 수 있다. 끝에 붙은 `ApplyUnlimitedCombo` 는 전투
+능력치라 레벨과 무관하다.
 
 **친타마니 칸 보너스**(`dungeonTempLevels`). `Charm_Chintamani` 는 치명상을 받으면 회복·무적 처리 뒤 자기 좌표에
 `AddDungeonTempLevel(..., addLevel)`(프리팹 값, 클래스 기본 3)을 부르고 `ForceRemoveItem` 으로 사라진다. 값은
@@ -726,6 +757,14 @@ QoL 1.12.6 의 코드는 `levelMatrix`·인챈트 표·가방 폭을 건드리�
 따라서 레벨 불일치의 원인 목록에서 배치 보너스는 빠진다. 이 셋의 자리 가치는 아래
 이웃 의존 아티팩트와 같은 부류의 과제다.
 
+**1.1.0 에서는 배치 보너스가 아이템을 지울 수 있다.** 탐색 자체가 플레이어의 `ARRANGEMENTBONUS` 능력치가 0 보다 클
+때만 돈다. 레시피(`ArrangementBonusEntity`)는 좌표가 아니라 필요한 엔티티 묶음이 상하좌우로 이어져 있으면 성립하고,
+활성 여부는 보지 않는다. 성립하면 `stats` 를 아바타에 더한다. `combine.resultItem` 이 있는 합치기형은
+`pendingArrangementBonusCombines` 에 쌓였다가, 서버 `LateUpdate` 의 `CombineArrangementBonus` 가 재료를
+`ForceRemoveItem` 하고 결과 아이템을 새 인스턴스로 기준 칸에 넣는다(인챈트는 합쳐 옮기고 상한에서 자른다). 레벨은
+여전히 안 바꾸지만 **자동 배치가 재료를 붙이는 순간 다음 프레임에 아이템이 사라진다** - 솔버와 적용기는 이 규칙을
+모른다. 그 능력치를 무엇이 주는지와 합치기형 레시피는 확인하지 못했다.
+
 ### 이웃 의존 아티팩트
 
 - **이웃 의존 아티팩트.** 효과의 세기가 자기 레벨이 아니라 다른 칸의 내용에 달린 아티팩트들이다.
@@ -790,7 +829,7 @@ QoL 1.12.6 의 코드는 `levelMatrix`·인챈트 표·가방 폭을 건드리�
 
   | 아티팩트 | 게임 클래스 | 게임이 보는 것 |
   |---|---|---|
-  | 북향의 금빛/파란 침 | `Charm_UpCharmDamage` | `(x+xOffset, y+yOffset)` 칸 하나. 기본은 바로 위 |
+  | 북향의 금빛/파란 침 | `Charm_UpCharmDamage`(1.1.0 은 `Charm_CompassDamageUp`, 아래 "침은 1.1.0 에서 나침반이 됐다") | `(x+xOffset, y+yOffset)` 칸 하나. 기본은 바로 위 |
   | 거대한 망원경 | `Charm_PlanetModule` | 이웃 여덟 칸에서 `Entity.categories` 에 `PLANET` 이 있고 **Charm 이 `Charm_SummonGreenBat`(하위 포함)** 인 것 |
   | 헌신의 휘장 | `Charm_CompanionChaos` | 같은 행 전체(`0..Width-1`)의 `ICompanionCharm` |
   | 캘세더니 열쇠 | `Charm_3Elemental_ByRow` | 자기 행 하나. `lineCategory[YIdx % 개수]` |
@@ -876,6 +915,36 @@ QoL 1.12.6 의 코드는 `levelMatrix`·인챈트 표·가방 폭을 건드리�
   자리 맞바꾸기를 몇 번 돌린다 - 후보마다 걸면 풀이 시간이 두 자릿수 배로 뛴다. 실측으로
   42칸·석판 8·아티팩트 30 판에서 **점수 +2.5, 시간 차이는 측정 잡음 안**이었다.
 
+### 침은 1.1.0 에서 나침반이 됐다
+
+`Charm_UpCharmDamage` 가 사라지고 클래스 셋이 됐다. 프리팹 값은 `sharedassets0.assets` 에서 읽었다.
+
+| 아이템 | 클래스 | `parentOffsets` | 자기 몫 |
+|---|---|---|---|
+| 북향의 금빛 침(1289)·푸른 침(1290) | `Charm_CompassDamageUp` | 위 (0,-1) | 6/8/10%, 언커먼 이하 대상에 15/20/25% 더(1.0.33 과 같음) |
+| 돌파의 나침반(신규) | `Charm_CompassBreakthrough` | 위 | 없음. 아래쪽 침의 희귀도 조건을 없앤다 |
+| 분배의 나침반(1.0.33 카탈로그에 없음) | `Charm_Compass` | 왼쪽·오른쪽 둘 | 없음. 아래 침의 효과를 양쪽에 그대로 넘긴다 |
+
+규칙이 넷 바뀌었다.
+
+- **부모 칸이 여럿이다.** 나침반은 `RefreshCharm` 에서 부모 칸마다 `GridInventory.AddCharmDependency(칸, 자신)` 을
+  등록한다(서버). 목록 `charmDependencies` 는 SyncList 라 참가자도 읽는다.
+- **피해 보너스는 뿌리에서 BFS 로 내려간다.** `RequestCharmDamageBonusOnRoot` 가 뿌리 칸에 등록된 나침반부터
+  `GetCharmDependencies` 를 따라가며 몫을 더한다. **꺼진 나침반은 자기 몫도 0 이고 아래로도 잇지 않는다** - 1.0.33 의
+  "꺼진 중간 침은 연결을 끊지 않는다"와 반대다. 뿌리를 인정하지 않는 나침반(`IsDependencyValid` 거짓)에서도 멈춘다.
+  돌파는 `CharmDamageBonusContext.bypassRarityCondition` 을 세워 그 아래로 넘긴다.
+- **카테고리는 연결된 뿌리 전부의 합집합이다.** `OnPreSetEffectRefreshed` 가 `assignedCategory` 를 비우고
+  `WalkToRoots` 로 모든 부모를 깊이 우선으로 걷는다. 걷는 길의 나침반이 하나라도 꺼져 있으면 그 길은 끊기고, 시작한
+  나침반이 꺼져 있으면 카테고리가 없다. 뿌리는 그 길의 나침반 전부가 인정해야 한다. 방문 표시가 탐색 전체에 하나라
+  먼저 닿은 길이 뿌리를 차지한다.
+- **꺼지면 콤보에서 빠진다.** 1.0.33 침은 `OnDisabledEffect` 가 카테고리를 다시 담아 꺼진 채로도 콤보에 들었다.
+  나침반은 활성에 달려 있어 `ReleasePermission` 에 재계산 반복이 생겼다(위 "레벨이 정해지는 순서").
+
+카탈로그(`ItemCatalog.Dependency`)와 Core 의 침 모델(`PositionalWorth`·`ComboCounting`·`DirectedCharmSupport`, 그리고
+`PlacementSolver` 의 꺼진 침 몫)은 아직 1.0.33 규칙이다. 0.4.27 이하는 1.1.0 에서 `Charm_UpCharmDamage` 를 찾다
+`TypeLoadException` 을 내고 카탈로그를 짓지 못한다 - 화면에는 "데이터 생성 실패" 만 뜬다. 배포 DLL 의 게임 참조를
+Mono.Cecil 로 1.1.0 에 대 보면 깨지는 것은 이 타입과 필드 여섯뿐이다.
+
 ## 아직 모델 밖인 효과
 
 2026-09-09 효과 감사(1.0.30, 아티팩트 299종·동작 클래스 136종 전수 대조)에서 확인한 게임 규칙이다. 일부는 그 뒤
@@ -891,7 +960,7 @@ python scripts/audit-effects.py --catalog "<카탈로그 generation 폴더>" --d
 
 **대상을 찾는 조건과 대상이 이득을 내는 조건은 다르다.** 조화의 수정은 꺼진 이웃의 표시 레벨도 읽고, 침의 피해
 보너스 탐색과 의존성 등록에는 중간 침의 `IsEffectEnabled` 검사가 없다 - 꺼진 중간 침은 연결을 끊지 않고 자기 보너스
-레벨만 0 이 된다. 그래서 모든 연결에 같은 활성 필터를 걸면 게임과 어긋난다.
+레벨만 0 이 된다(1.0.33. 1.1.0 의 나침반은 끊는다). 그래서 모든 연결에 같은 활성 필터를 걸면 게임과 어긋난다.
 
 | 효과 | 게임 근거 | 규칙 |
 |---|---|---|
@@ -921,7 +990,8 @@ B→A 순이면 둘 다 카테고리를 얻는다. 전환은 인벤토리 갱신
 **특수 콤보의 발동 단계는 공통 경로로 모은다.** `ComboEffect_FlameSword`·`Debuff`·`Mystic`·`Alchemy`·`Guardian`·
 `DarkCloud` 는 `OnRequestComboData` 에서 단계를 직접 더한다. 클래스별 숫자를 복사하지 않고
 `ComboEffectBase.RequestComboData(null)` 이 돌려주는 단계를 `addStatByCombo` 와 합친다. 단계는 프리팹 필드에서 오며
-연금술의 둘째 단계는 `activeSecond` 가 켜졌을 때만 나온다. 게임 API 안에서 지역화와 단계 수집이 묶여 있어, 안에서
+연금술의 둘째 단계는 `activeSecond` 가 켜졌을 때만 나온다. 1.1.0 디컴파일의 `DarkCloud` 는 `bigCloudComboCount` 단계를
+`OnRequestComboData` 에 내지 않아(`GetHighestComboCount` 에만 있다) 이 경로로는 그 문턱을 모른다. 게임 API 안에서 지역화와 단계 수집이 묶여 있어, 안에서
 예외가 나면 완전한 목록을 얻을 수 없으므로 그 갱신을 실패로 처리하고 일부만 게시하지 않는다.
 
 **활성 조건.** `CharmActivateCriteria` 10종 중 배치와 무관한 `FullHP` 를 뺀 9종은 게임 `GetCriteria` 와 차이가 없다. 모르는 조건 이름은 `None` 으로
@@ -1308,10 +1378,14 @@ selectionSeedOffset)`으로 내용을 정한다. **고르기 전에 무엇이 �
 - 자리가 카테고리를 정하는 셋은 꺼질 때도 카테고리를 그대로 두고 능력치만 거둔다. 켈세더니 열쇠는
   `OnDisabledEffect` → `SearchCategory(idx, false)` 로 행의 것을, 하얀 종이(`Charm_WhitePaper`)와 침
   (`Charm_UpCharmDamage`)은 `OnDisabledEffect` 가 활성을 묻지 않는 `SearchCategory()` 로 이웃의 것을 다시 담는다.
-  그래서 꺼진 채로도 콤보에 든다(1.0.33).
+  그래서 꺼진 채로도 콤보에 든다(1.0.33). 1.1.0 의 나침반은 꺼지면 카테고리가 없다.
 - 센 결과는 `currentSetEffectCount`(SyncDictionary)로 클라이언트에 동기화된다. 유니크 페어 변환
   (`allowUniquePairIncreaseCombo`)이나 하드모드 중복 금지(`OVERLAPITEMCOMBO`) 같은 보정이 서버
   계산에 섞여 있어, **우리가 다시 세지 않고 이 값을 스냅샷(`ComboCounts`)에 그대로 싣는다.**
+- 1.1.0 의 개수에는 `bonusComboCount`(물약 `PotionEffect_RandomCombo` 가 무작위 카테고리에 더함)도 들어간다. 게임
+  수를 싣고 자리 몫만 빼므로 그대로 맞는다. 점수에 없는 것이 둘 있다 - `UNLIMITEDCOMBO` 는 최고 단계
+  (`GetHighestComboCount`)를 넘긴 개수만큼, `COMBOBONUSDAMAGE` 는 발동한 콤보 수만큼 피해를 준다. 우리 콤보 가치는
+  둘 다 0 으로 본다.
 
 추천 반영은 `OfferAdvisor`가 한다. 후보 아티팩트의 카테고리마다 "하나 더 모으면" 임계값에
 닿는지 보고, 닿으면 레벨 2에 해당하는 보너스, 다가가기만 하면 소액을 줄 세우기에 더한다.
