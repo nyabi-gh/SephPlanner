@@ -39,12 +39,12 @@ namespace SephPlanner.Core.Solver
                 if (!cells.Any(cell => problem.PriorityCategories.Contains(PositionalWorth.LineCategory(charm.Definition, cell))))
                     return "지정 콤보에 해당하는 행이 아직 열리지 않았습니다.";
             }
-            else if (PositionalWorth.IsNeedle(charm.Definition))
+            else if (InheritsTarget(charm.Definition))
             {
-                if (!cells.Any(cell => problem.Grid.Contains(cell.Offset(
-                        charm.Definition.DependencyOffsetX, charm.Definition.DependencyOffsetY))))
+                var parents = TargetOffsets(charm.Definition);
+                if (!cells.Any(cell => parents.Any(offset => problem.Grid.Contains(cell.Offset(offset.X, offset.Y)))))
                     return "침의 방향에 대상을 놓을 칸이 없습니다.";
-                if (!problem.Charms.Any(other => other != charm && !PositionalWorth.IsNeedle(other.Definition) &&
+                if (!problem.Charms.Any(other => other != charm && !InheritsTarget(other.Definition) &&
                         DirectedCharmSupport.Accepts(charm, other) && cells.Any(cell =>
                             PositionalWorth.CategoriesOf(other, cell).Any(problem.PriorityCategories.Contains))))
                     return "지정 콤보를 가진 공격 가능한 대상을 찾지 못했습니다.";
@@ -246,20 +246,23 @@ namespace SephPlanner.Core.Solver
                 yield break;
             }
 
-            if (PositionalWorth.IsNeedle(charm.Definition))
+            if (InheritsTarget(charm.Definition))
             {
-                var targetCell = cell.Offset(charm.Definition.DependencyOffsetX, charm.Definition.DependencyOffsetY);
-                if (targetCell == cell || !problem.Grid.Contains(targetCell)) yield break;
                 // 시드는 아티팩트마다 서로 다른 칸을 쓴다. 솔버 배정은 못 박힌 칸을 뺀 칸에 일대일로 놓고
                 // (PlacementSolver.Cells·Assign), 현재 배치는 칸이 겹치지 않을 때만 시드가 되며, Place 는 맞바꾸기만
                 // 한다. 겹치면 여기서 던지는 것이 맞다 - 한 칸에 둘을 두는 계획은 게임에 옮길 수 없다.
                 var neighbors = problem.Charms.ToDictionary(other => seed.CharmPositions[other.InstanceId]);
-                foreach (var target in problem.Charms.OrderBy(other => seed.CharmPositions[other.InstanceId] == targetCell ? 0 : 1))
+                foreach (var offset in TargetOffsets(charm.Definition))
                 {
-                    if (!DirectedCharmSupport.Accepts(charm, target) ||
-                        !target.IsSupportTarget &&
-                        !PositionalWorth.CategoriesOf(target, targetCell, neighbors).Any(problem.PriorityCategories.Contains)) continue;
-                    yield return new[] { (charm.InstanceId, cell), (target.InstanceId, targetCell) };
+                    var targetCell = cell.Offset(offset.X, offset.Y);
+                    if (targetCell == cell || !problem.Grid.Contains(targetCell)) continue;
+                    foreach (var target in problem.Charms.OrderBy(other => seed.CharmPositions[other.InstanceId] == targetCell ? 0 : 1))
+                    {
+                        if (!DirectedCharmSupport.Accepts(charm, target) ||
+                            !target.IsSupportTarget &&
+                            !PositionalWorth.CategoriesOf(target, targetCell, neighbors).Any(problem.PriorityCategories.Contains)) continue;
+                        yield return new[] { (charm.InstanceId, cell), (target.InstanceId, targetCell) };
+                    }
                 }
                 yield break;
             }
@@ -294,6 +297,16 @@ namespace SephPlanner.Core.Solver
                 }
             }
         }
+
+        /// <summary>대상에게서 카테고리를 물려받는 것 - 1.0.33 침과 1.1.0 나침반.</summary>
+        private static bool InheritsTarget(CharmDefinition definition) =>
+            PositionalWorth.IsNeedle(definition) || Compass.Is(definition);
+
+        /// <summary>대상을 찾는 칸들. 나침반은 부모 칸 전부, 1.0.33 침은 한 칸이다.</summary>
+        private static IReadOnlyList<GridPos> TargetOffsets(CharmDefinition definition) =>
+            Compass.Is(definition)
+                ? definition.DependencyParents
+                : new[] { new GridPos(definition.DependencyOffsetX, definition.DependencyOffsetY) };
 
         /// <summary>
         /// 목표대로 옮긴 배치. 못 옮기는 아이템을 움직이는 조합이면 null 이다 - 그 배치가 이기면

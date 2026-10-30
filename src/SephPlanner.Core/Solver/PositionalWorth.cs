@@ -70,10 +70,20 @@ namespace SephPlanner.Core.Solver
 
             if (!DependencyTarget(charm, cell, neighbors, out var target, out _)) return 0;
 
+            return TargetFactor(problem, charm, target, level, bypassRarity: false);
+        }
+
+        /// <summary>
+        /// 침 하나가 대상 하나에 주는 배수. 1.1.0 의 돌파의 나침반 아래에서는 레어도 조건 없이
+        /// 덤이 붙는다(<c>CharmDamageBonusContext.bypassRarityCondition</c>).
+        /// </summary>
+        internal static double TargetFactor(
+            PlacementProblem problem, CharmSlot needle, CharmSlot target, int level, bool bypassRarity)
+        {
             var share = TargetShare(problem, target);
-            var definition = charm.Definition;
+            var definition = needle.Definition;
             if (!definition.HasDependencyCondition) return share;
-            if (target.Definition.Rarity > definition.DependencyMaxRarity) return share;
+            if (!bypassRarity && target.Definition.Rarity > definition.DependencyMaxRarity) return share;
 
             var wanted = Math.Min(1, target.Weight);
             var baseBonus = At(definition.DependencyBonusByLevel, level);
@@ -88,7 +98,7 @@ namespace SephPlanner.Core.Solver
         /// 레벨로 잰다 - 대상이 옮겨 다닐 때마다 침의 값어치가 따라 흔들리면 배치가 폴링마다
         /// 달라진다. 잰 것은 값어치이지 피해량이 아니므로 어림이다.
         /// </summary>
-        private static double TargetShare(PlacementProblem problem, CharmSlot target)
+        internal static double TargetShare(PlacementProblem problem, CharmSlot target)
         {
             var best = problem.NeedleTargetWorth;
             if (best <= 0) return 1;
@@ -112,11 +122,17 @@ namespace SephPlanner.Core.Solver
         /// <b>꺼져 있어도 같다.</b> 셋 다 꺼질 때 능력치만 거두고 카테고리는 다시 찾아 둔다 - 열쇠는
         /// <c>Charm_3Elemental_ByRow.OnDisabledEffect</c> 가 <c>SearchCategory(idx, false)</c> 로 행의 것을, 종이와
         /// 침은 <c>OnDisabledEffect</c> 가 활성을 묻지 않는 <c>SearchCategory()</c> 로 이웃의 것을 담는다(1.0.33).
-        /// 게임은 활성과 무관하게 콤보를 세므로 꺼진 채로도 콤보에 든다.
+        /// 게임은 활성과 무관하게 콤보를 세므로 꺼진 채로도 콤보에 든다. 1.1.0 의 나침반만 예외라 꺼지면
+        /// 카테고리가 없다 - 그래서 <paramref name="activity"/> 를 받는다.
         /// </summary>
         public static double ComboWorth(
             PlacementProblem problem, CharmSlot charm, GridPos cell,
             IReadOnlyDictionary<GridPos, CharmSlot>? neighbors)
+            => ComboWorth(problem, charm, cell, neighbors, default);
+
+        internal static double ComboWorth(
+            PlacementProblem problem, CharmSlot charm, GridPos cell,
+            IReadOnlyDictionary<GridPos, CharmSlot>? neighbors, in CharmActivity activity)
         {
             if (problem.Combos is null || !ComboCounting.IsPositional(charm.Definition)) return 0;
 
@@ -126,7 +142,7 @@ namespace SephPlanner.Core.Solver
             var categories = _comboWorthScratch ??= new List<string>(2);
             categories.Clear();
             ComboCounting.PositionalCategories(
-                charm, cell, neighbors ?? EmptyNeighbors, categories);
+                charm, cell, neighbors ?? EmptyNeighbors, categories, activity);
 
             var worth = 0.0;
             foreach (var category in categories)
@@ -137,7 +153,7 @@ namespace SephPlanner.Core.Solver
                 if (combo is null) continue;
 
                 var step = problem.Scale.OfComboStep(
-                    combo, ComboCounting.CountFor(problem, charm, category, neighbors), out var completes, out _);
+                    combo, ComboCounting.CountFor(problem, charm, category, neighbors, activity), out var completes, out _);
                 if (completes) worth += step;
             }
             return worth;
@@ -272,7 +288,8 @@ namespace SephPlanner.Core.Solver
         }
 
         /// <summary>
-        /// 열쇠는 행 카테고리, 침은 이웃 배치가 주어지면 사슬 끝 대상의 카테고리를 반환한다.
+        /// 열쇠는 행 카테고리, 침은 이웃 배치가 주어지면 사슬 끝 대상의 카테고리를 반환한다. 나침반은
+        /// 이어진 뿌리 전부의 것이다.
         /// 이웃 없는 조회는 탐색 후보를 좁히는 용도이며 종이 중첩의 갱신 순서는 별도다.
         /// </summary>
         internal static IEnumerable<string> CategoriesOf(
@@ -292,6 +309,10 @@ namespace SephPlanner.Core.Solver
             {
                 if (charm.ObservedCategories is not null) into.AddRange(charm.ObservedCategories);
             }
+            else if (neighbors is not null && Compass.Is(charm.Definition))
+            {
+                Compass.AddCategories(charm, cell, neighbors, default, into);
+            }
             else if (neighbors is not null && IsNeedle(charm.Definition))
             {
                 if (DependencyTarget(charm, cell, neighbors, out var target, out var targetCell))
@@ -301,8 +322,16 @@ namespace SephPlanner.Core.Solver
             else into.Add(LineCategory(charm.Definition, cell));
         }
 
+        /// <summary>대상에게 피해 보너스를 주는 침인가. 1.1.0 에서는 <c>Charm_CompassDamageUp</c> 이 그렇다.</summary>
         public static bool IsNeedle(CharmDefinition definition) =>
             definition.DependencyBonusByLevel.Count > 0;
+
+        /// <summary>
+        /// 꺼져도 자리로 값을 내는가. 1.0.33 침은 <c>DisableEffect</c> 가 보너스 요청을 끄지 않고 레벨만 0 으로
+        /// 만든다. 1.1.0 나침반은 꺼지면 피해 보너스 탐색이 건너뛴다(<c>RequestCharmDamageBonusOnRoot</c>).
+        /// </summary>
+        internal static bool WorksWhileDisabled(CharmDefinition definition) =>
+            IsNeedle(definition) && !Compass.Is(definition);
 
         /// <summary>
         /// 침이 실제로 강화하게 되는 아티팩트. 게임 <c>SearchCategory</c>와 같은 걸음이다 -
@@ -361,7 +390,7 @@ namespace SephPlanner.Core.Solver
             return true;
         }
 
-        /// <summary>게임 <c>Charm_UpCharmDamage.IsDependencyValid</c>와 같은 판정이다.</summary>
+        /// <summary>게임 1.0.33 <c>Charm_UpCharmDamage.IsDependencyValid</c>와 같은 판정이다.</summary>
         private static bool IsValidTarget(CharmSlot needle, CharmSlot target)
         {
             if (needle == target) return false;

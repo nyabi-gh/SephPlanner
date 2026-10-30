@@ -9,18 +9,25 @@ namespace SephPlanner.Core.Solver
     internal static class DirectedCharmSupport
     {
         internal static bool HasConnection(CharmSlot charm) =>
-            charm.Definition.MagicSupport is not null || PositionalWorth.IsNeedle(charm.Definition);
+            charm.Definition.MagicSupport is not null || PositionalWorth.IsNeedle(charm.Definition) ||
+            Compass.Is(charm.Definition);
 
         internal static (int X, int Y) Offset(CharmSlot charm) =>
             charm.Definition.MagicSupport is { } support
                 ? (support.OffsetX, support.OffsetY)
-                : (charm.Definition.DependencyOffsetX, charm.Definition.DependencyOffsetY);
+                : Compass.Is(charm.Definition)
+                    ? Compass.PrimaryOffset(charm.Definition)
+                    : (charm.Definition.DependencyOffsetX, charm.Definition.DependencyOffsetY);
 
         internal static bool Accepts(CharmSlot helper, CharmSlot target) =>
-            helper != target && (PositionalWorth.IsNeedle(helper.Definition)
-                ? PositionalWorth.IsNeedle(target.Definition) ||
-                  !target.IsFiller && !target.IsDormant && (target.IsAttackable ?? target.Definition.IsAttackable)
-                : IsTarget(target));
+            helper != target && (Compass.Is(helper.Definition)
+                ? Compass.Is(target.Definition) || IsAttackableTarget(target)
+                : PositionalWorth.IsNeedle(helper.Definition)
+                    ? PositionalWorth.IsNeedle(target.Definition) || IsAttackableTarget(target)
+                    : IsTarget(target));
+
+        private static bool IsAttackableTarget(CharmSlot target) =>
+            !target.IsFiller && !target.IsDormant && (target.IsAttackable ?? target.Definition.IsAttackable);
 
         internal static bool IsConnected(
             CharmSlot helper, GridPos cell, SimulationResult result, GridSpec grid, GridOccupancy occupancy,
@@ -32,11 +39,17 @@ namespace SephPlanner.Core.Solver
             CharmSlot helper, GridPos cell, SimulationResult result, GridSpec grid, GridOccupancy occupancy,
             IReadOnlyDictionary<GridPos, CharmSlot>? neighbors, out CharmSlot target)
         {
+            if (Compass.Is(helper.Definition))
+            {
+                target = helper;
+                return neighbors is not null &&
+                       Compass.ConnectedRoot(helper, cell, neighbors, new CharmActivity(result, grid, occupancy), out target);
+            }
             if (!PositionalWorth.IsNeedle(helper.Definition))
                 return TryTarget(helper, cell, result, grid, occupancy, neighbors, out target, out _);
 
             target = helper;
-            // 게임의 피해 보너스 탐색은 중간 침의 활성 여부로 사슬을 끊지 않는다.
+            // 1.0.33 게임의 피해 보너스 탐색은 중간 침의 활성 여부로 사슬을 끊지 않는다.
             return neighbors is not null &&
                    PositionalWorth.DependencyTarget(helper, cell, neighbors, out target, out var targetCell) &&
                    PlacementSolver.Reason(target, targetCell, result, grid, occupancy) == CharmInactiveReason.None;

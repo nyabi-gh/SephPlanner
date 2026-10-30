@@ -60,8 +60,10 @@ namespace SephPlanner.Core.Runtime
         /// v25: 아이템 이름을 게임의 표시 이름으로 다시 수집한다.
         /// v26: 콤보 발동 단계에서 게임이 읽지 않는 구형 <c>setStatus</c> 단계를 뺀다. 그 단계(대부분
         ///      3·5, 신비 3·5·6)에도 문턱 가치가 붙고 있었다.
+        /// v27: 게임 1.1.0 나침반의 부모 칸(<c>parentOffsets</c>)을 담는다. 1.1.0 에서는 이 판부터 카탈로그가
+        ///      지어진다.
         /// </summary>
-        public const int CatalogVersion = 26;
+        public const int CatalogVersion = 27;
 
         /// <summary>플러그인이 생성하고 진단 도구가 읽는 데이터 위치.</summary>
         public static string DataDirectory =>

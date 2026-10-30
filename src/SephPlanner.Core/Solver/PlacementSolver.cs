@@ -571,6 +571,7 @@ namespace SephPlanner.Core.Solver
                     definition.Behavior != "Charm_WhitePaper" &&
                     definition.MagicSupport is null &&
                     !PositionalWorth.IsNeedle(definition) &&
+                    !Compass.Is(definition) &&
                     definition.LineCategories.Count == 0 &&
                     definition.ContextStats.Count == 0 &&
                     !ReadsOtherCharms(charm);
@@ -2123,13 +2124,14 @@ namespace SephPlanner.Core.Solver
         {
             if (charm.IsFiller) return 0;
             var inactive = Reason(charm, cell, result, problem.Grid, occupancy) != CharmInactiveReason.None;
+            var activity = new CharmActivity(result, problem.Grid, occupancy);
             var offCombo = inactive
-                ? CharmWorth.ApplyWeight(PositionalWorth.ComboWorth(problem, charm, cell, neighbors), charm.Weight)
+                ? CharmWorth.ApplyWeight(PositionalWorth.ComboWorth(problem, charm, cell, neighbors, activity), charm.Weight)
                 : 0;
 
             if (charm.ComboOnly)
-                return CharmWorth.ApplyWeight(PositionalWorth.ComboWorth(problem, charm, cell, neighbors), charm.Weight);
-            if (inactive && !PositionalWorth.IsNeedle(charm.Definition))
+                return CharmWorth.ApplyWeight(PositionalWorth.ComboWorth(problem, charm, cell, neighbors, activity), charm.Weight);
+            if (inactive && !PositionalWorth.WorksWhileDisabled(charm.Definition))
                 return offCombo;
 
             var level = result.EffectiveLevel(cell, charm.Enchant);
@@ -2142,9 +2144,15 @@ namespace SephPlanner.Core.Solver
 
             // 북향의 침은 강화할 대상이 있어야 제 몫을 한다. 대상 없이 선 침은 값어치가 0 이라,
             // 이것이 없으면 솔버가 침을 아무 데나 세우고도 최적이라고 한다.
-            var factor = PositionalWorth.DependencyFactor(problem, charm, cell, effective, neighbors);
-            if (PositionalWorth.IsNeedle(charm.Definition) && neighbors is not null &&
-                !DirectedCharmSupport.IsConnected(charm, cell, result, problem.Grid, occupancy, neighbors)) factor = 0;
+            double factor;
+            if (Compass.Is(charm.Definition))
+                factor = neighbors is null ? 1 : Compass.Factor(problem, charm, cell, effective, neighbors, activity);
+            else
+            {
+                factor = PositionalWorth.DependencyFactor(problem, charm, cell, effective, neighbors);
+                if (PositionalWorth.IsNeedle(charm.Definition) && neighbors is not null &&
+                    !DirectedCharmSupport.IsConnected(charm, cell, result, problem.Grid, occupancy, neighbors)) factor = 0;
+            }
             // DisableEffect는 침의 보너스 요청을 끄지 않고 limitedEffectEnabledLevel만 0으로 만든다.
             if (inactive) return charm.Worth.WeightedAt(0, charm.Weight) * factor + offCombo;
 
@@ -2157,7 +2165,7 @@ namespace SephPlanner.Core.Solver
                     NearLevelDamageWorth(problem, charm, cell, effective, result, neighbors), charm.Weight);
 
             // 자리가 대상을 정하는 것들. 무엇이 걸리는지는 정의가 답한다.
-            value += CharmWorth.ApplyWeight(PositionalWorth.ComboWorth(problem, charm, cell, neighbors), charm.Weight);
+            value += CharmWorth.ApplyWeight(PositionalWorth.ComboWorth(problem, charm, cell, neighbors, activity), charm.Weight);
             value += CharmWorth.ApplyWeight(PositionalWorth.NeighborEnhanceWorth(charm, cell, neighbors), charm.Weight);
             value += CharmWorth.ApplyWeight(PositionalWorth.RowCompanionWorth(charm, cell, problem.Grid, neighbors), charm.Weight);
 
@@ -2241,7 +2249,7 @@ namespace SephPlanner.Core.Solver
         ///
         /// <b>이 값은 화면 점수에 넣지 않고 견줄 때만 쓴다</b>(<see cref="Objective"/>). 지금 실제로 받는
         /// 것은 여전히 0 이고, 화면 점수가 그 사실을 말해야 한다. 자리만 잡아 주고 점수는 정직하게 둔다.
-        /// 침과 <c>콤보만</c> 아티팩트는 꺼져도 자리로 값을 내므로 이 몫을 받지 않는다.
+        /// 1.0.33 침과 <c>콤보만</c> 아티팩트는 꺼져도 자리로 값을 내므로 이 몫을 받지 않는다.
         ///
         /// 칸이 죽어 있거나 배치 조건을 못 맞추면 0 이다 - 무기를 바꿔도 켜지지 않는 자리다.
         /// </summary>
@@ -2250,7 +2258,7 @@ namespace SephPlanner.Core.Solver
             SimulationResult result, GridOccupancy occupancy)
         {
             if (!charm.IsDormant || charm.Weight <= 1 || charm.IsFiller || charm.ComboOnly ||
-                PositionalWorth.IsNeedle(charm.Definition)) return 0;
+                PositionalWorth.WorksWhileDisabled(charm.Definition)) return 0;
             if (ReasonIgnoringWeapon(charm, cell, result, problem.Grid, occupancy) != CharmInactiveReason.None)
                 return 0;
 

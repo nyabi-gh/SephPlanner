@@ -53,13 +53,20 @@ namespace SephPlanner.Core.Model
         public List<double> NeighborLevelBonus { get; set; } = new List<double>();
 
         /// <summary>
-        /// 이 아티팩트가 강화할 대상을 찾는 칸의 오프셋. 게임 <c>Charm_UpCharmDamage</c>(북향의
+        /// 이 아티팩트가 강화할 대상을 찾는 칸의 오프셋. 1.0.33 <c>Charm_UpCharmDamage</c>(북향의
         /// 침)의 <c>xOffset</c>/<c>yOffset</c>이며 기본은 바로 위 칸이다. 사람이 대상을 고르는
         /// 것이 아니라 <b>자리가 대상을 정한다</b> - 그 칸에 강화할 수 있는 아티팩트가 없으면
         /// 침은 아무 일도 하지 않는다. 해당 없는 아티팩트에서는 둘 다 0이다.
         /// </summary>
         public int DependencyOffsetX { get; set; }
         public int DependencyOffsetY { get; set; }
+
+        /// <summary>
+        /// 1.1.0 나침반(<c>Charm_Compass</c> 계열)이 의존성을 거는 부모 칸들(<c>parentOffsets</c>).
+        /// 침과 돌파는 위 한 칸, 분배는 왼쪽·오른쪽 두 칸이다. 나침반이 아니면 비어 있고, 그때는
+        /// <see cref="DependencyOffsetX"/>/<see cref="DependencyOffsetY"/> 한 칸이 1.0.33 침의 것이다.
+        /// </summary>
+        public List<GridPos> DependencyParents { get; set; } = new List<GridPos>();
 
         /// <summary>침이 대상에게 주는 레벨별 피해 증가(<c>damageBonusByLevel</c>). 비어 있으면 침이 아니다.</summary>
         public List<double> DependencyBonusByLevel { get; set; } = new List<double>();
@@ -75,7 +82,7 @@ namespace SephPlanner.Core.Model
 
         /// <summary>
         /// 공격하는 아티팩트(게임 <c>IAttackableCharm</c>). 북향의 침은 이런 아티팩트나 다른 침만
-        /// 대상으로 삼는다.
+        /// 대상으로 삼는다(1.1.0 은 다른 나침반).
         ///
         /// 마법은 담긴 기술의 공격 가능 여부까지 확인한다. 인스턴스에서 읽은 판정이 있으면
         /// 솔버는 그 값을 우선한다.

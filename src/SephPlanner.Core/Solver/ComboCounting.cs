@@ -22,16 +22,28 @@ namespace SephPlanner.Core.Solver
     public static class ComboCounting
     {
         /// <summary>
-        /// 이 아티팩트가 자리 때문에 더 내보이는 카테고리. 침은 대상에게 물려받은 것, 열쇠는 행이
-        /// 정한 것 하나, 하얀 종이는 양옆이 공유하는 것들이다. 정의 자체의 카테고리는 넣지 않는다.
+        /// 이 아티팩트가 자리 때문에 더 내보이는 카테고리. 침은 대상에게 물려받은 것, 나침반은 이어진
+        /// 뿌리들의 것, 열쇠는 행이 정한 것 하나, 하얀 종이는 양옆이 공유하는 것들이다. 정의 자체의
+        /// 카테고리는 넣지 않는다.
         /// </summary>
         public static void PositionalCategories(
             CharmSlot charm, GridPos cell, IReadOnlyDictionary<GridPos, CharmSlot> neighbors, List<string> into)
+            => PositionalCategories(charm, cell, neighbors, into, default);
+
+        internal static void PositionalCategories(
+            CharmSlot charm, GridPos cell, IReadOnlyDictionary<GridPos, CharmSlot> neighbors, List<string> into,
+            in CharmActivity activity)
         {
             var definition = charm.Definition;
             if (definition.LineCategories.Count > 0)
             {
                 into.Add(PositionalWorth.LineCategory(definition, cell));
+                return;
+            }
+
+            if (Compass.Is(definition))
+            {
+                Compass.AddCategories(charm, cell, neighbors, activity, into);
                 return;
             }
 
@@ -81,6 +93,7 @@ namespace SephPlanner.Core.Solver
         public static bool IsPositional(CharmDefinition definition) =>
             definition.LineCategories.Count > 0 ||
             PositionalWorth.IsNeedle(definition) ||
+            Compass.Is(definition) ||
             definition.Behavior == "Charm_WhitePaper";
 
         /// <summary>
@@ -115,6 +128,11 @@ namespace SephPlanner.Core.Solver
         public static int CountFor(
             PlacementProblem problem, CharmSlot charm, string category,
             IReadOnlyDictionary<GridPos, CharmSlot>? neighbors)
+            => CountFor(problem, charm, category, neighbors, default);
+
+        internal static int CountFor(
+            PlacementProblem problem, CharmSlot charm, string category,
+            IReadOnlyDictionary<GridPos, CharmSlot>? neighbors, in CharmActivity activity)
         {
             BaseCounts(problem).TryGetValue(category, out var count);
             if (neighbors is null) return count;
@@ -127,7 +145,7 @@ namespace SephPlanner.Core.Solver
 
                 positional ??= _countForScratch ??= new List<string>();
                 positional.Clear();
-                PositionalCategories(other, pair.Key, neighbors, positional);
+                PositionalCategories(other, pair.Key, neighbors, positional, activity);
                 foreach (var contributed in positional)
                 {
                     if (contributed == category) count++;
@@ -251,7 +269,9 @@ namespace SephPlanner.Core.Solver
                 if (pair.Value.IsFiller || !IsPositional(pair.Value.Definition)) continue;
 
                 positional.Clear();
-                if (pair.Value.Definition.Behavior == "Charm_WhitePaper" && pair.Value.ObservedCategories is not null)
+                // 종이와 나침반은 게임이 매긴 지금 카테고리를 그대로 뺀다. 종이는 갱신 순서에, 나침반은
+                // 활성에 달려 있어 우리 셈으로는 지금 값을 다시 만들 수 없다.
+                if (ReportsCategories(pair.Value.Definition) && pair.Value.ObservedCategories is not null)
                     positional.AddRange(pair.Value.ObservedCategories);
                 else PositionalCategories(pair.Value, pair.Key, byCell, positional);
                 foreach (var category in positional) Add(counts, category, -1);
@@ -266,6 +286,10 @@ namespace SephPlanner.Core.Solver
             problem.BaseComboCounts = counts;
             return counts;
         }
+
+        /// <summary>스냅샷이 게임의 지금 카테고리를 실어 오는 아티팩트. 플러그인 <c>GameReader</c> 와 맞춘다.</summary>
+        internal static bool ReportsCategories(CharmDefinition definition) =>
+            definition.Behavior == "Charm_WhitePaper" || Compass.Is(definition);
 
         private static void Add(Dictionary<string, int> counts, string category, int amount)
         {

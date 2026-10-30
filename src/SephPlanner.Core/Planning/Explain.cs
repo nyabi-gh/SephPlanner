@@ -115,8 +115,10 @@ namespace SephPlanner.Core.Planning
             if (reason != CharmInactiveReason.None)
             {
                 lines.Add(InactiveReason(reason));
-                if (definition is not null && PositionalWorth.IsNeedle(definition))
+                if (definition is not null && PositionalWorth.WorksWhileDisabled(definition))
                     lines.Add("침은 꺼져 있어도 공격 대상과 연결되면 일부 피해 보너스가 남습니다.");
+                else if (definition is not null && Compass.Is(definition))
+                    lines.Add("나침반은 꺼지면 피해 보너스와 콤보를 잃고, 이 나침반을 거치는 아래 나침반의 연결도 끊깁니다.");
                 return lines;
             }
 
@@ -155,9 +157,11 @@ namespace SephPlanner.Core.Planning
         public static string SupportMissing(CharmDefinition definition) =>
             definition.MagicSupport is { } support
                 ? SupportDirection(support) + "에 사용 가능한 마법이 없어 강화 효과를 받지 못합니다."
-                : PositionalWorth.IsNeedle(definition)
-                    ? "침의 연결 끝에 사용 가능한 공격 아티팩트가 없습니다."
-                    : "강화 대상과 연결되지 않았습니다.";
+                : Compass.Is(definition)
+                    ? "나침반이 이어지는 끝에 사용 가능한 공격 아티팩트가 없습니다. 중간 나침반이 꺼져 있어도 끊깁니다."
+                    : PositionalWorth.IsNeedle(definition)
+                        ? "침의 연결 끝에 사용 가능한 공격 아티팩트가 없습니다."
+                        : "강화 대상과 연결되지 않았습니다.";
 
         private static string SupportDirection(DirectedMagicSupport support)
         {
