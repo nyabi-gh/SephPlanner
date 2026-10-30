@@ -189,8 +189,8 @@ F10 덤프가 딕셔너리를 있는 그대로 보여준다(덤프 머리에 `Po
 HUD 의 자동 펼침도 그 창의 `IsOpened` 를 따로 본다.
 
 **1.1.0 에는 개인 합성기가 있다.** `TabletMix_Personal` 은 소유자가 아니면 상호작용·몸체·충돌을 끄고 미니맵에도 올리지
-않는다(`TabletMix_Shared` 는 함께 쓴다). `GameReader.ReadMixer` 는 `TabletMix` 를 전부 훑으므로 멀티에서 남의 개인 합성기를
-쓸 수 있는 것으로 읽을 수 있다. 재료는 가방 밖 일반 각인·보조 가방에서도 찾고(`FindMixableTabletByInstanceID`), 같은
+않는다(`TabletMix_Shared` 는 함께 쓴다). 그래서 `GameReader.ReadMixer` 는 내 것이 아닌(`isOwned` 거짓) 개인 합성기를
+건너뛴다 - 네트워크 객체로는 우리 쪽에도 있어 거르지 않으면 쓸 수 없는 합성기로 추천을 준비한다. 재료는 가방 밖 일반 각인·보조 가방에서도 찾고(`FindMixableTabletByInstanceID`), 같은
 인스턴스 둘은 거절한다.
 
 합성기는 거리를 보지 않고 읽는다. 미니맵에 뜨는 고정물(`minimapElementName`)이라 층에 있다는
@@ -763,7 +763,18 @@ QoL 1.12.6 의 코드는 `levelMatrix`·인챈트 표·가방 폭을 건드리�
 `pendingArrangementBonusCombines` 에 쌓였다가, 서버 `LateUpdate` 의 `CombineArrangementBonus` 가 재료를
 `ForceRemoveItem` 하고 결과 아이템을 새 인스턴스로 기준 칸에 넣는다(인챈트는 합쳐 옮기고 상한에서 자른다). 레벨은
 여전히 안 바꾸지만 **자동 배치가 재료를 붙이는 순간 다음 프레임에 아이템이 사라진다** - 솔버와 적용기는 이 규칙을
-모른다. 그 능력치를 무엇이 주는지와 합치기형 레시피는 확인하지 못했다.
+모른다.
+
+**1.1.0 베타의 레시피는 둘이고 둘 다 합치기형이 아니다**(2026-10-30, `resources.assets` 의 `ArrangementBonusEntity`).
+
+| 레시피 | 묶음(상하좌우로 이어짐) | `activeBonusIDs` | 받는 쪽의 효과 |
+|---|---|---|---|
+| `0001_BlackHole` | 1241 공허 행성 + 1102 화염 지대(지속) | 행성에 `BLACKHOLE` | `Charm_SummonGreenBat.changedToBlackhole` |
+| `0002_Trio` | 1101 화염 지대(범위) + 1141 전기 + 1175 프로스티움 반지 | 셋 다 `FAST` | `Charm_FrostiumRing.enabledFast`(받는 코드는 반지뿐) |
+
+둘 다 `stats` 가 비었고 `combine.resultItem` 도 없다. 에셋에서 `ARRANGEMENT_BONUS` 를 주는 것은 패시브 오브젝트
+(`PassiveObject_StatusInstance`, `ARRANGEMENT_BONUS/1` 과 `DISABLE_DUAL_ARTIFACT/1`) 하나다. 그래서 지금 콘텐츠로는 아이템이
+사라지지 않고, 우리는 두 효과를 점수에 넣지 않는다([백로그](ROADMAP.md) 4번의 표).
 
 ### 이웃 의존 아티팩트
 
@@ -1396,9 +1407,12 @@ selectionSeedOffset)`으로 내용을 정한다. **고르기 전에 무엇이 �
   (`allowUniquePairIncreaseCombo`)이나 하드모드 중복 금지(`OVERLAPITEMCOMBO`) 같은 보정이 서버
   계산에 섞여 있어, **우리가 다시 세지 않고 이 값을 스냅샷(`ComboCounts`)에 그대로 싣는다.**
 - 1.1.0 의 개수에는 `bonusComboCount`(물약 `PotionEffect_RandomCombo` 가 무작위 카테고리에 더함)도 들어간다. 게임
-  수를 싣고 자리 몫만 빼므로 그대로 맞는다. 점수에 없는 것이 둘 있다 - `UNLIMITEDCOMBO` 는 최고 단계
-  (`GetHighestComboCount`)를 넘긴 개수만큼, `COMBOBONUSDAMAGE` 는 발동한 콤보 수만큼 피해를 준다. 우리 콤보 가치는
-  둘 다 0 으로 본다.
+  수를 싣고 자리 몫만 빼므로 그대로 맞는다.
+- 1.1.0 의 콤보 능력치 둘. `UNLIMITEDCOMBO` 는 콤보마다 최고 단계(`GetHighestComboCount`)를 넘긴 개수 하나당 그 값을
+  `AllDamageBonus` 에 더하고(`ApplyUnlimitedCombo`), `COMBOBONUSDAMAGE` 는 한 단계라도 발동한 콤보 하나당 그 값을
+  `FINAL_DAMAGE` 로 준다. 둘 다 같은 전체 피해 점수라 스냅샷이 플레이어 값을 싣고(`ComboStatBonus`), 콤보 한 걸음
+  (`PlacementProblem.ComboStep`)이 첫 단계를 채울 때와 최고 단계를 넘길 때 `DamageBonus` 로 옮겨 더한다. 먹구름의
+  큰 구름 단계는 우리 단계 목록에 없어 그 콤보의 최고 단계를 낮게 본다.
 
 추천 반영은 `OfferAdvisor`가 한다. 후보 아티팩트의 카테고리마다 "하나 더 모으면" 임계값에
 닿는지 보고, 닿으면 레벨 2에 해당하는 보너스, 다가가기만 하면 소액을 줄 세우기에 더한다.
