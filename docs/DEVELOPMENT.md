@@ -28,6 +28,10 @@ macOS에서는 기본 Steam 경로의 `Sephiria.app/Contents/Resources/Data/Mana
 macOS용 BepInEx와 Doorstop 로더는 `scripts/build-macos-loader.sh`로 빌드하며,
 결과는 `artifacts/macos-loader/`에 놓인다. Xcode 명령줄 도구와 .NET SDK가 필요하다.
 
+**1.0.33 과 1.1.0 을 함께 지원하는 동안** 플러그인은 두 판 어셈블리 모두로 빌드돼야 한다. 설치본 밖에 다른 판의
+`Sephiria_Data/Managed` 사본을 두고 `SEPHIRIA_DIR` 만 바꿔 `scripts/check.ps1` 을 두 번 돈다. 한 판에만 있는 클래스는
+컴파일 시점에 참조하지 않는다([게임 내부 조사](RESEARCH.md)의 "침은 1.1.0 에서 나침반이 됐다").
+
 일반 빌드는 게임 폴더를 변경하지 않는다. 빌드 결과를 설치된 게임에 복사하려면 명시적으로 배치한다.
 
 ```powershell

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Reflection;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Runtime;
 using SephPlanner.Core.Solver;
@@ -276,26 +277,63 @@ namespace SephPlanner.Plugin
         /// 이 아티팩트의 자리 가치를 계산하려면 이 표가 있어야 한다.
         /// </summary>
         /// <summary>
-        /// 북향의 침(<c>Charm_UpCharmDamage</c>)이 대상을 찾는 오프셋과, 대상에게 주는 몫.
-        /// 대상은 사람이 고르는 것이 아니라 자리가 정한다 - 침의 <c>xOffset</c>/<c>yOffset</c>이
-        /// 가리키는 칸에 있는 아티팩트다. 그래서 솔버가 알아서 좋은 자리를 찾을 수 있고,
-        /// 값어치의 크기도 두 표의 비율로만 쓰므로 단위를 옮길 필요가 없다.
+        /// 북향의 침이 대상을 찾는 칸과, 대상에게 주는 몫. 대상은 사람이 고르는 것이 아니라 자리가
+        /// 정한다. 그래서 솔버가 알아서 좋은 자리를 찾을 수 있고, 값어치의 크기도 두 표의 비율로만
+        /// 쓰므로 단위를 옮길 필요가 없다.
+        ///
+        /// 1.0.33 은 <c>Charm_UpCharmDamage</c> 의 <c>xOffset</c>/<c>yOffset</c> 한 칸, 1.1.0 은
+        /// <c>Charm_Compass</c> 계열의 <c>parentOffsets</c> 여러 칸이다. 한 DLL 이 두 판에서 돌아야 하므로
+        /// 어느 클래스도 컴파일 시점에 참조하지 않고 타입·필드 이름으로 읽는다 - 참조하면 그 클래스가 없는
+        /// 판에서 <c>TypeLoadException</c> 이 나 카탈로그가 통째로 지어지지 않는다.
         /// </summary>
         private static void Dependency(Charm_Basic charm, CharmDefinition definition)
         {
-            if (!(charm is Charm_UpCharmDamage needle)) return;
+            if (charm == null) return;
 
-            definition.DependencyOffsetX = needle.xOffset;
-            definition.DependencyOffsetY = needle.yOffset;
-            definition.HasDependencyCondition = needle.hasDependencyCondition;
-            definition.DependencyMaxRarity = (Rarity)(int)needle.maxRarity;
-            definition.DependencyBonusByLevel = Doubles(needle.damageBonusByLevel);
-            definition.DependencyExtraByLevel = Doubles(needle.dependencyDamageBonusByLevel);
+            var type = charm.GetType();
+            if (DerivesFrom(type, "Charm_Compass"))
+            {
+                if (!(GameBinding.PublicField(type, "parentOffsets")?.GetValue(charm) is Vector2Int[] parents)) return;
+                foreach (var parent in parents) definition.DependencyParents.Add(new GridPos(parent.x, parent.y));
+            }
+            else if (DerivesFrom(type, "Charm_UpCharmDamage"))
+            {
+                var x = GameBinding.PublicField(type, "xOffset");
+                var y = GameBinding.PublicField(type, "yOffset");
+                if (x == null || y == null) return;
+                definition.DependencyOffsetX = Convert.ToInt32(x.GetValue(charm), CultureInfo.InvariantCulture);
+                definition.DependencyOffsetY = Convert.ToInt32(y.GetValue(charm), CultureInfo.InvariantCulture);
+            }
+            else return;
+
+            // 분배·돌파의 나침반은 제 몫이 없어 이 필드들이 없다.
+            var bonus = type.GetField("damageBonusByLevel", BindingFlags.Instance | BindingFlags.Public);
+            if (bonus == null) return;
+
+            var condition = GameBinding.PublicField(type, "hasDependencyCondition");
+            var maxRarity = GameBinding.PublicField(type, "maxRarity");
+            var extra = GameBinding.PublicField(type, "dependencyDamageBonusByLevel");
+            if (condition == null || maxRarity == null || extra == null) return;
+
+            definition.HasDependencyCondition = (bool)condition.GetValue(charm);
+            definition.DependencyMaxRarity = (Rarity)Convert.ToInt32(maxRarity.GetValue(charm), CultureInfo.InvariantCulture);
+            definition.DependencyBonusByLevel = Doubles(bonus.GetValue(charm) as int[]);
+            definition.DependencyExtraByLevel = Doubles(extra.GetValue(charm) as int[]);
 
             // 값이 하나도 없으면 솔버가 침으로 알아보지 못한다. 게임 기본값이 다섯 칸이라
             // 실제로는 오지 않는 길이지만, 오면 조용히 평범한 아티팩트가 되는 편이 낫다.
             if (definition.DependencyBonusByLevel.Count == 0)
                 definition.DependencyBonusByLevel.Add(1);
+        }
+
+        /// <summary>게임 <c>is</c> 판정을 이름으로 한다. 하위 클래스도 그 계열이다.</summary>
+        internal static bool DerivesFrom(Type type, string name)
+        {
+            for (var current = type; current != null; current = current.BaseType)
+            {
+                if (current.Name == name) return true;
+            }
+            return false;
         }
 
         /// <summary>

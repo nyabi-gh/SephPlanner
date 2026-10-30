@@ -31,6 +31,13 @@ namespace SephPlanner.Plugin
         public static FieldInfo Field(Type owner, string name) =>
             Found(owner.GetField(name, BindingFlags.Instance | BindingFlags.NonPublic), owner, name);
 
+        /// <summary>
+        /// 판마다 있을 수도 없을 수도 있는 클래스의 공개 필드. 그 클래스를 컴파일 시점에 참조하면
+        /// 없는 판에서 <c>TypeLoadException</c> 이 나므로 이름으로 잡는다.
+        /// </summary>
+        public static FieldInfo PublicField(Type owner, string name) =>
+            Found(owner.GetField(name, BindingFlags.Instance | BindingFlags.Public), owner, name);
+
         public static PropertyInfo Property(Type owner, string name) =>
             Found(owner.GetProperty(name, BindingFlags.Instance | BindingFlags.NonPublic), owner, name);
 

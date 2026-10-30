@@ -274,6 +274,13 @@ namespace SephPlanner.Plugin
             return _critical;
         }
 
+        /// <summary>
+        /// 게임이 매긴 지금 카테고리를 실어 보낼 아티팩트. 하얀 종이는 갱신 순서에, 1.1.0 나침반은 활성에
+        /// 달려 있어 Core 가 다시 만들 수 없다. Core 의 <c>ComboCounting.ReportsCategories</c> 와 맞춘다.
+        /// </summary>
+        private static bool ReportsCategories(Charm_Basic charm) =>
+            charm is Charm_WhitePaper || charm != null && ItemCatalog.DerivesFrom(charm.GetType(), "Charm_Compass");
+
         private static InventoryState ReadInventory(GridInventory inv)
         {
             var state = new InventoryState
@@ -307,8 +314,8 @@ namespace SephPlanner.Plugin
                     DefinitionId = instance.EntityID,
                     InstanceId = identity,
                     Immovable = instance.InstanceID == 0,
-                    ObservedCategories = instance.Charm is Charm_WhitePaper paper
-                        ? new List<string>(paper.GetItemCategory()) : null,
+                    ObservedCategories = ReportsCategories(instance.Charm)
+                        ? new List<string>(instance.Charm.GetItemCategory()) : null,
                     Position = new GridPos(instance.XIdx, instance.YIdx),
                     EffectiveLevel = LookupMatrix(inv.levelMatrix, instance.XIdx, instance.YIdx),
                     IsActive = LookupMatrix(inv.disableMatrix, instance.XIdx, instance.YIdx) <= 0,
