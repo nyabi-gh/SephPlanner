@@ -262,6 +262,8 @@ namespace SephPlanner.Plugin
                     ? weapons.currentWeapon.weaponType.ToString()
                     : "",
                 Gold = avatar.Money,
+                ComboBonus = ComboStatBonus.Of(
+                    avatar.GetCustomStatUnsafe("UNLIMITEDCOMBO"), avatar.GetCustomStatUnsafe("COMBOBONUSDAMAGE")),
             };
         }
 

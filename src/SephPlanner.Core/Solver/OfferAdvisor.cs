@@ -286,7 +286,7 @@ namespace SephPlanner.Core.Solver
 
                 comboCounts.TryGetValue(category, out var current);
                 var next = Math.Max(0, current + pair.Value);
-                var change = ComboValue(combo, next, problem.Scale) - ComboValue(combo, current, problem.Scale);
+                var change = ComboValue(combo, next, problem) - ComboValue(combo, current, problem);
                 if (Math.Abs(change) < 0.000001) continue;
 
                 if (CrossesUp(combo, current, next)) advice.ComboCompletes = true;
@@ -302,14 +302,15 @@ namespace SephPlanner.Core.Solver
         /// <summary>
         /// 콤보 가치는 <see cref="Rank"/>에서 배치 점수와 더해져 줄 세우기가 되므로, 배치를
         /// 채점한 것과 같은 눈금으로 재야 한다. 카탈로그가 잰 눈금은 기본값과 다르다
-        /// (제보들에서 콤보 2.1768 대 2.59).
+        /// (제보들에서 콤보 2.1768 대 2.59). 최고 단계 너머는 <c>UNLIMITEDCOMBO</c> 가 있을 때만 값이 있다.
         /// </summary>
-        private static double ComboValue(ComboDefinition combo, int count, WorthScale scale)
+        private static double ComboValue(ComboDefinition combo, int count, PlacementProblem problem)
         {
             var total = 0.0;
             var cap = combo.Thresholds.Count == 0 ? 0 : combo.Thresholds.Max();
+            if (problem.ComboBonus is { UnlimitedCombo: > 0 }) cap = count;
             for (var current = 0; current < Math.Min(count, cap); current++)
-                total += scale.OfComboStep(combo, current, out _, out _);
+                total += problem.ComboStep(combo, current, out _, out _);
             return total;
         }
 
@@ -542,6 +543,7 @@ namespace SephPlanner.Core.Solver
                 PinnedCharms = problem.PinnedCharms,
                 RetainedCharms = problem.RetainedCharms,
                 Critical = problem.Critical,
+                ComboBonus = problem.ComboBonus,
                 ProtectedActive = new HashSet<int>(problem.ProtectedActive),
                 InheritsActivationBaseline = true,
             };

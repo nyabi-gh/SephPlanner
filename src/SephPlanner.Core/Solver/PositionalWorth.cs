@@ -152,7 +152,7 @@ namespace SephPlanner.Core.Solver
                 var combo = problem.Combos(category);
                 if (combo is null) continue;
 
-                var step = problem.Scale.OfComboStep(
+                var step = problem.ComboStep(
                     combo, ComboCounting.CountFor(problem, charm, category, neighbors, activity), out var completes, out _);
                 if (completes) worth += step;
             }

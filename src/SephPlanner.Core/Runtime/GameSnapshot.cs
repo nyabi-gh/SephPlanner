@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using SephPlanner.Core.Model;
 
@@ -106,6 +107,39 @@ namespace SephPlanner.Core.Runtime
         /// <c>null</c> 이고, 그때는 상한을 보지 않는다(<see cref="Solver.CriticalCap"/>).
         /// </summary>
         public CriticalBase? Critical { get; set; }
+
+        /// <summary>
+        /// 콤보 수에 걸리는 능력치(게임 1.1.0). 둘 다 0 이면 <c>null</c> 이다 - 1.0.33 과 이 값이 없던 재현
+        /// 자료가 그렇고, 그때 지문과 점수가 전과 같아야 한다.
+        /// </summary>
+        public ComboStatBonus? ComboBonus { get; set; }
+    }
+
+    /// <summary>
+    /// 콤보 수로 피해를 올리는 플레이어 능력치. 게임 1.1.0 <c>GridInventory</c> 가 읽는다.
+    /// </summary>
+    public sealed class ComboStatBonus
+    {
+        /// <summary>
+        /// <c>UNLIMITEDCOMBO</c>. 콤보마다 가장 높은 단계(<c>GetHighestComboCount</c>)를 넘긴 개수 하나당 이만큼
+        /// 전체 피해가 오른다(<c>ApplyUnlimitedCombo</c>, <c>AllDamageBonus</c>).
+        /// </summary>
+        public int UnlimitedCombo { get; set; }
+
+        /// <summary>
+        /// <c>COMBOBONUSDAMAGE</c>. 한 단계라도 발동한 콤보 하나당 이만큼 <c>FINAL_DAMAGE</c> 가 오른다
+        /// (<c>SearchSetEffectInInventory</c>).
+        /// </summary>
+        public int ComboBonusDamage { get; set; }
+
+        public static ComboStatBonus? Of(int unlimitedCombo, int comboBonusDamage) =>
+            unlimitedCombo > 0 || comboBonusDamage > 0
+                ? new ComboStatBonus
+                {
+                    UnlimitedCombo = Math.Max(0, unlimitedCombo),
+                    ComboBonusDamage = Math.Max(0, comboBonusDamage),
+                }
+                : null;
     }
 
     /// <summary>게임 단위(100 = 1%)의 치명타 바탕. <see cref="Solver.CriticalCap.Base"/> 가 짓는다.</summary>

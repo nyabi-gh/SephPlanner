@@ -237,6 +237,40 @@ namespace SephPlanner.Core.Solver
         /// <summary>아티팩트 밖에서 오는 치명타. 모르면 <c>null</c> 이고 상한을 보지 않는다.</summary>
         public CriticalBase? Critical { get; set; }
 
+        /// <summary>콤보 수에 걸리는 능력치. 없으면 <c>null</c> 이고 콤보 한 걸음은 눈금만으로 잰다.</summary>
+        public ComboStatBonus? ComboBonus { get; set; }
+
+        /// <summary>
+        /// 이 판에서 콤보 하나를 더 모으는 가치. 눈금의 <see cref="WorthScale.OfComboStep"/> 에 콤보 능력치의
+        /// 몫을 더한다. 둘 다 피해 보너스 점수라 <see cref="WorthScale.DamageBonus"/> 로 옮긴다.
+        ///
+        /// 최고 단계 너머의 걸음은 눈금으로는 0 이지만 <c>UNLIMITEDCOMBO</c> 가 있으면 값이 있으므로 채운
+        /// 걸음으로 친다. 먹구름의 큰 구름 단계는 우리 단계 목록에 없어(docs/RESEARCH.md) 그 콤보의 최고 단계를
+        /// 낮게 본다.
+        /// </summary>
+        internal double ComboStep(ComboDefinition combo, int currentCount, out bool completes, out int goal)
+        {
+            var step = Scale.OfComboStep(combo, currentCount, out completes, out goal);
+            if (ComboBonus is not { } bonus || combo.Thresholds.Count == 0) return step;
+
+            var lowest = int.MaxValue;
+            var highest = int.MinValue;
+            foreach (var threshold in combo.Thresholds)
+            {
+                if (threshold < lowest) lowest = threshold;
+                if (threshold > highest) highest = threshold;
+            }
+
+            var reached = currentCount + 1;
+            if (reached == lowest) step += bonus.ComboBonusDamage * Scale.DamageBonus;
+            if (reached > highest && bonus.UnlimitedCombo > 0)
+            {
+                step += bonus.UnlimitedCombo * Scale.DamageBonus;
+                completes = true;
+            }
+            return step;
+        }
+
         private CriticalCap.CriticalModel? _criticalModel;
 
         internal CriticalCap.CriticalModel? CriticalModel

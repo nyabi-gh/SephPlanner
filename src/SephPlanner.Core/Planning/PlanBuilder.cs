@@ -247,6 +247,7 @@ namespace SephPlanner.Core.Planning
                 PinnedCharms = new Dictionary<int, int>(preferences.PinnedCharms),
                 RetainedCharms = new HashSet<int>(preferences.RetainedCharms),
                 Critical = snapshot.Run?.Critical,
+                ComboBonus = snapshot.Run?.ComboBonus,
             };
 
             // 빔 서치는 후보를 살펴보는 순서에 따라 같은 점수의 다른 배치를 내놓는다. 스냅샷의 순서는

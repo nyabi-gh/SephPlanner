@@ -144,7 +144,7 @@ namespace SephPlanner.Core.Solver
                 matched = true;
                 var combo = problem.Combos?.Invoke(category);
                 if (combo != null)
-                    progress += problem.Scale.OfComboStep(combo,
+                    progress += problem.ComboStep(combo,
                         ComboCounting.CountFor(problem, charm, category, neighbors), out _, out _);
             }
             return matched;

@@ -85,6 +85,11 @@ namespace SephPlanner.Core.Runtime
                 Add(builder, "criticalMagic", critical.Magic);
                 Add(builder, "criticalExecution", critical.Execution);
             }
+            if (snapshot.Run?.ComboBonus is { } comboBonus)
+            {
+                Add(builder, "unlimitedCombo", comboBonus.UnlimitedCombo);
+                Add(builder, "comboBonusDamage", comboBonus.ComboBonusDamage);
+            }
 
             var inventory = snapshot.Inventory;
             Add(builder, "inventory", inventory is not null);
