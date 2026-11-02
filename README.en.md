@@ -76,7 +76,7 @@ Setting a build, per-item rules and more are covered in the [detailed usage guid
 | `F9` | Reload item data |
 | `F10` | Save state for a bug report |
 
-Keys can be changed in `F3`. To use a gamepad, turn on `Open window with pad View button` in `F3`.
+Keys can be changed in `F3`. With a gamepad, press `View` while a game window such as the inventory or a chest is open.
 
 ## Multiplayer
 

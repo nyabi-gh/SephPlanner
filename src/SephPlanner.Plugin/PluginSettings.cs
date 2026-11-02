@@ -214,9 +214,23 @@ namespace SephPlanner.Plugin
                 "동작한다. 기본은 꺼짐이며 같이 하는 사람의 동의를 얻고 켠다.");
 
             PadWindow = config.Bind(
-                "NativePanel", "PadOpensWindow", false,
-                "기본은 꺼짐입니다. 켜면 게임패드의 View(뒤로) 버튼으로 SephPlanner 창을 엽니다. 가방·상자 같은 게임 창이 " +
+                "NativePanel", "PadOpensWindow", true,
+                "게임패드의 View(뒤로) 버튼으로 SephPlanner 창을 엽니다. 가방·상자 같은 게임 창이 " +
                 "떠 있고 지도가 닫혀 있는 동안에만 듣습니다.");
+
+            // 0.4.8~0.5.0 은 기본이 꺼짐이라 설정 파일에 false 가 저장돼 있고, 켜려면 키보드로 F3 을 열어야 해서
+            // 패드만 쓰는 사람은 켤 수 없었다. 일부러 끈 것과 구별할 수 없으므로 한 번만 켜고 그 뒤로는 따른다.
+            var padWindowRestored = config.Bind("General", "PadWindowDefaultRestored", false,
+                "패드 View 버튼 창 열기를 기본 켜짐으로 되돌린 일회성 이전 완료 여부.");
+            if (!padWindowRestored.Value)
+            {
+                if (!PadWindow.Value)
+                {
+                    PadWindow.Value = true;
+                    _log("패드 View 버튼으로 창 열기를 기본값인 켜짐으로 되돌렸습니다. F3 에서 끌 수 있습니다.");
+                }
+                padWindowRestored.Value = true;
+            }
 
             // 게임이 쓰지 않는 키로 고른다. 게임은 수정키를 보지 않으므로 Ctrl+Alt 를 붙여도
             // 글자 키는 게임 조작을 함께 발동시킨다(docs/RESEARCH.md 의 "게임 단축키").
