@@ -434,7 +434,8 @@ namespace SephPlanner.Plugin
 
         /// <summary>
         /// 화면 언어를 정하고, 바뀌었으면 지은 화면을 버린다. 계획은 다음 폴링에서 지문이 바뀌어 새 언어로 다시 풀린다.
-        /// 열린 창은 닫힐 때 버린다 - 열린 채로 부수면 게임의 창 스택이 죽은 창을 쥔다.
+        /// 열린 창은 닫힐 때 버린다 - 열린 채로 부수면 게임의 창 스택이 죽은 창을 쥔다. 언어를 고른 설정 창만은 게임의
+        /// 길로 닫았다가 새 언어로 다시 연다. 닫힐 때까지 미루면 방금 고른 언어가 그 창에 안 보여 안 먹은 것처럼 보였다.
         /// </summary>
         private void ApplyLanguage()
         {
@@ -449,11 +450,17 @@ namespace SephPlanner.Plugin
             _settings.ForgetRows();
             _hud.Destroy();
             _languageStale = true;
+            if (_window != null && _window.IsOpen)
+            {
+                _reopenSettings = true;
+                _window.Close();
+            }
             Log.Info("화면 언어: " + Localization.Code(language));
         }
 
         private bool _languageApplied;
         private bool _languageStale;
+        private bool _reopenSettings;
 
         private void DropStaleWindows()
         {
@@ -466,6 +473,9 @@ namespace SephPlanner.Plugin
                 else window.Destroy();
             }
             _languageStale = open;
+            if (!_reopenSettings || _window.IsOpen) return;
+            _reopenSettings = false;
+            ToggleWindow(_window, _settings.SettingsKey, "설정 창");
         }
 
         private IEnumerable<PlannerWindow> LanguageWindows()
