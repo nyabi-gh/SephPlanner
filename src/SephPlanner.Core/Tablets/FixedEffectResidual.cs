@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using SephPlanner.Core.Model;
-using static SephPlanner.Core.Text.Localization;
+using SephPlanner.Core.Text;
 
 namespace SephPlanner.Core.Tablets
 {
@@ -47,7 +47,7 @@ namespace SephPlanner.Core.Tablets
     {
         public FixedEffectResidualStatus Status { get; set; }
         public List<FixedEffectCell> Cells { get; set; } = new List<FixedEffectCell>();
-        public string Reason { get; set; } = "";
+        public Phrase? Reason { get; set; }
     }
 
     /// <summary>
@@ -89,7 +89,7 @@ namespace SephPlanner.Core.Tablets
                     return new FixedEffectResidualResult
                     {
                         Status = FixedEffectResidualStatus.Overproduced,
-                        Reason = Tr("칸 {0} 의 배수·비활성·제한 해제가 게임보다 많습니다 (배수 {1} 비활성 {2} 제한 해제 {3})",
+                        Reason = new Phrase("칸 {0} 의 배수·비활성·제한 해제가 게임보다 많습니다 (배수 {1} 비활성 {2} 제한 해제 {3})",
                             position, multiply, disable, ignoreCriteria),
                     };
                 }
@@ -102,7 +102,7 @@ namespace SephPlanner.Core.Tablets
                         return new FixedEffectResidualResult
                         {
                             Status = FixedEffectResidualStatus.Unsettled,
-                            Reason = Tr("칸 {0} 의 레벨 {1} 이 배수 {2} 로 나누어떨어지지 않습니다", position, total, multiplier),
+                            Reason = new Phrase("칸 {0} 의 레벨 {1} 이 배수 {2} 로 나누어떨어지지 않습니다", position, total, multiplier),
                         };
                     }
                     total /= multiplier;

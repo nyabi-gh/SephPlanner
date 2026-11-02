@@ -4,8 +4,8 @@ using Mirror;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Tablets;
+using SephPlanner.Core.Text;
 using UnityEngine;
-using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Plugin
 {
@@ -29,10 +29,10 @@ namespace SephPlanner.Plugin
         public IReadOnlyList<FixedEffectCell> All { get; set; } = new List<FixedEffectCell>();
 
         /// <summary>계산을 믿을 수 없는 이유. 우리 쪽 어긋남이라 알릴 값이다.</summary>
-        public string Blocker { get; set; } = "";
+        public Phrase Blocker { get; set; }
 
         /// <summary>아직 판단할 수 없는 이유. 잠시 뒤 풀리므로 알리지 않는다.</summary>
-        public string Pending { get; set; } = "";
+        public Phrase Pending { get; set; }
 
         /// <summary>게임 행렬에서 되뺀 값. 게임이 아직 다시 계산하지 않아 되빼지 않았으면 null 이다.</summary>
         public FixedEffectResidualResult Residual { get; set; }
@@ -163,7 +163,7 @@ namespace SephPlanner.Plugin
             state.All = ComboEngravings.Combine(state.Cells, state.Engraved);
             if (view.Severed > 0)
             {
-                state.Pending = Tr("석판·각인 참조 {0}개를 읽지 못했습니다. 방에 재접속하면 다시 읽습니다.", view.Severed);
+                state.Pending = new Phrase("석판·각인 참조 {0}개를 읽지 못했습니다. 방에 재접속하면 다시 읽습니다.", view.Severed);
                 return state;
             }
             if (stale)

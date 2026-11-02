@@ -93,7 +93,7 @@ public class FixedEffectResidualTests
         var residual = FixedEffectResidual.Extract(Grid, observed, Game(new Dictionary<GridPos, int>()));
 
         Assert.Equal(FixedEffectResidualStatus.Overproduced, residual.Status);
-        Assert.Contains("(0,0)", residual.Reason);
+        Assert.Contains("(0,0)", residual.Reason!.Korean);
     }
 
     [Fact]

@@ -4,7 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Text;
 using System.Text.RegularExpressions;
-using static SephPlanner.Core.Text.Localization;
+using SephPlanner.Core.Text;
 
 namespace SephPlanner.Core.Runtime
 {
@@ -43,7 +43,7 @@ namespace SephPlanner.Core.Runtime
             var version = ManifestVersion.Match(manifest);
             if (!version.Success || !Version.TryParse(version.Groups["version"].Value, out var packaged) ||
                 UpdateClient.Normalize(packaged) != UpdateClient.Normalize(expected))
-                throw new InvalidDataException(Tr("배포 파일의 버전이 기대한 {0} 이 아닙니다.", UpdateClient.Format(expected)));
+                throw new Phrase("배포 파일의 버전이 기대한 {0} 이 아닙니다.", UpdateClient.Format(expected)).As(message => new InvalidDataException(message));
 
             var hashes = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (Match match in FileHash.Matches(manifest))
@@ -55,7 +55,7 @@ namespace SephPlanner.Core.Runtime
                 var path = PluginsEntry + name;
                 var content = ReadEntry(archive, path);
                 if (!hashes.TryGetValue(path.Substring("SephPlanner/".Length), out var hash) || DiagnosticArchive.Hash(content) != hash)
-                    throw new InvalidDataException(Tr("배포 파일의 {0} 이 manifest 와 다릅니다.", name));
+                    throw new Phrase("배포 파일의 {0} 이 manifest 와 다릅니다.", name).As(message => new InvalidDataException(message));
                 files[name] = content;
             }
             return files;
@@ -63,15 +63,15 @@ namespace SephPlanner.Core.Runtime
 
         private static byte[] ReadEntry(ZipArchive archive, string path)
         {
-            var entry = archive.GetEntry(path) ?? throw new InvalidDataException(Tr("배포 파일에 {0} 가 없습니다.", path));
-            if (entry.Length > MaximumFileBytes) throw new InvalidDataException(Tr("배포 파일의 {0} 가 너무 큽니다.", path));
+            var entry = archive.GetEntry(path) ?? throw new Phrase("배포 파일에 {0} 가 없습니다.", path).As(message => new InvalidDataException(message));
+            if (entry.Length > MaximumFileBytes) throw new Phrase("배포 파일의 {0} 가 너무 큽니다.", path).As(message => new InvalidDataException(message));
             using var source = entry.Open();
             using var content = new MemoryStream((int)entry.Length);
             var buffer = new byte[16 * 1024];
             int read;
             while ((read = source.Read(buffer, 0, buffer.Length)) != 0)
             {
-                if (content.Length + read > MaximumFileBytes) throw new InvalidDataException(Tr("배포 파일의 {0} 가 너무 큽니다.", path));
+                if (content.Length + read > MaximumFileBytes) throw new Phrase("배포 파일의 {0} 가 너무 큽니다.", path).As(message => new InvalidDataException(message));
                 content.Write(buffer, 0, read);
             }
             return content.ToArray();
@@ -93,10 +93,16 @@ namespace SephPlanner.Core.Runtime
             "게임을 끄고 ZIP 의 BepInEx/plugins 안 DLL 두 개를 게임 폴더의 같은 위치에 다시 덮어쓰세요.";
 
         public UpdateRollbackException(IReadOnlyList<string> stranded, Exception cause)
-            : base(Tr("업데이트를 되돌리지 못해 SephPlanner 파일이 섞였을 수 있습니다({0}). 게임을 끄고 ZIP 의 BepInEx/plugins 안 DLL 두 개를 게임 폴더의 같은 위치에 다시 덮어쓰세요.",
-                   string.Join(", ", Names(stranded))), cause)
+            : this(stranded, cause, new Phrase("업데이트를 되돌리지 못해 SephPlanner 파일이 섞였을 수 있습니다({0}). 게임을 끄고 ZIP 의 BepInEx/plugins 안 DLL 두 개를 게임 폴더의 같은 위치에 다시 덮어쓰세요.",
+                string.Join(", ", Names(stranded))))
+        {
+        }
+
+        private UpdateRollbackException(IReadOnlyList<string> stranded, Exception cause, Phrase phrase)
+            : base(phrase.Korean, cause)
         {
             Stranded = stranded;
+            phrase.AttachTo(this);
         }
 
         private static IEnumerable<string> Names(IEnumerable<string> paths)
@@ -132,8 +138,8 @@ namespace SephPlanner.Core.Runtime
         {
             foreach (var name in UpdatePackage.Files)
             {
-                if (!files.ContainsKey(name)) throw new InvalidDataException(Tr("받은 파일에 {0} 이 없습니다.", name));
-                if (!targets.ContainsKey(name)) throw new InvalidOperationException(Tr("{0} 의 설치 위치를 모릅니다.", name));
+                if (!files.ContainsKey(name)) throw new Phrase("받은 파일에 {0} 이 없습니다.", name).As(message => new InvalidDataException(message));
+                if (!targets.ContainsKey(name)) throw new Phrase("{0} 의 설치 위치를 모릅니다.", name).As(message => new InvalidOperationException(message));
             }
 
             var staged = new List<string>();

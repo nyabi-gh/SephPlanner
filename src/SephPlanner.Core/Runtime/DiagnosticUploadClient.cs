@@ -5,7 +5,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
-using static SephPlanner.Core.Text.Localization;
+using SephPlanner.Core.Text;
 
 namespace SephPlanner.Core.Runtime
 {
@@ -32,9 +32,9 @@ namespace SephPlanner.Core.Runtime
         {
             if (endpoint.Scheme != Uri.UriSchemeHttps || endpoint.UserInfo.Length != 0 || endpoint.Fragment.Length != 0 ||
                 endpoint.Query.Length != 0 || consent != ConsentKey(endpoint))
-                throw new InvalidOperationException(Tr("진단 수신 주소에 대한 전송 동의가 없습니다."));
+                throw new Phrase("진단 수신 주소에 대한 전송 동의가 없습니다.").As(message => new InvalidOperationException(message));
             if (reportId == Guid.Empty || archive.Length == 0 || archive.Length > DiagnosticArchive.MaximumArchiveBytes)
-                throw new InvalidDataException(Tr("전송할 진단 자료가 올바르지 않습니다."));
+                throw new Phrase("전송할 진단 자료가 올바르지 않습니다.").As(message => new InvalidDataException(message));
             using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
             request.Headers.Add("X-SephPlanner-Report-Id", reportId.ToString("N"));
             request.Headers.Add("X-SephPlanner-SHA256", DiagnosticArchive.Hash(archive));
@@ -42,7 +42,7 @@ namespace SephPlanner.Core.Runtime
             request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
             using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellation).ConfigureAwait(false);
             if (response.StatusCode != HttpStatusCode.Created && response.StatusCode != HttpStatusCode.OK)
-                throw new HttpRequestException(Tr("진단 서버가 전송을 받지 못했습니다. HTTP {0}", (int)response.StatusCode));
+                throw new Phrase("진단 서버가 전송을 받지 못했습니다. HTTP {0}", (int)response.StatusCode).As(message => new HttpRequestException(message));
             using var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
             var bytes = new byte[33];
             var count = 0;
@@ -53,7 +53,7 @@ namespace SephPlanner.Core.Runtime
                 count += read;
             }
             var receipt = System.Text.Encoding.ASCII.GetString(bytes, 0, count);
-            if (receipt != reportId.ToString("N")) throw new InvalidDataException(Tr("진단 접수 번호가 일치하지 않습니다."));
+            if (receipt != reportId.ToString("N")) throw new Phrase("진단 접수 번호가 일치하지 않습니다.").As(message => new InvalidDataException(message));
             return receipt;
         }
 

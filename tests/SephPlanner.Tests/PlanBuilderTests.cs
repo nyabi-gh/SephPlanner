@@ -395,7 +395,7 @@ public class PlanBuilderTests
         var plan = PlanBuilder.Build(snapshot, Catalog());
 
         Assert.Equal(PlanVerificationStatus.Unavailable, plan!.Verification.Status);
-        Assert.Equal(PlanVerification.GameNotRecalculated, plan.Verification.Reason);
+        Assert.Equal(PlanVerification.GameNotRecalculated.ToString(), plan.Verification.Reason);
         Assert.Empty(plan.Targets);
     }
 

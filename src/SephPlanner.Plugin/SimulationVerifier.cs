@@ -2,14 +2,14 @@ using System.Collections.Generic;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Tablets;
-using static SephPlanner.Core.Text.Localization;
+using SephPlanner.Core.Text;
 
 namespace SephPlanner.Plugin
 {
     internal sealed class RuntimeSimulationCheck
     {
         public PlanVerificationStatus Status { get; set; }
-        public string Reason { get; set; } = "";
+        public Phrase Reason { get; set; }
 
         /// <summary>호스트에서 서버 원본으로 설명되지 않아 되뺀 값으로 대신 쓴 칸 수.</summary>
         public int UnexplainedFixedCells { get; set; }
@@ -46,8 +46,8 @@ namespace SephPlanner.Plugin
             LastCheckedTablets = view.Placements.Count;
             LastFixedCells = layer.All.Count;
 
-            if (layer.Pending.Length > 0) return Result(PlanVerificationStatus.Unavailable, layer.Pending);
-            if (layer.Blocker.Length > 0) return Result(PlanVerificationStatus.Failed, layer.Blocker);
+            if (layer.Pending != null) return Result(PlanVerificationStatus.Unavailable, layer.Pending);
+            if (layer.Blocker != null) return Result(PlanVerificationStatus.Failed, layer.Blocker);
 
             var result = TabletSimulator.Run(view.Placements, view.Occupancy, view.Grid, layer.All);
 
@@ -55,29 +55,29 @@ namespace SephPlanner.Plugin
             {
                 if (result.Applied[i] != view.Tablets[i].IsApplied)
                 {
-                    return Result(PlanVerificationStatus.Failed,
-                        Tr("석판 {0} 적용 여부 {1} != {2}", view.Tablets[i].entityID, result.Applied[i], view.Tablets[i].IsApplied) +
-                        Collapsed(inv, view, result));
+                    return Result(PlanVerificationStatus.Failed, Phrase.Join(" - ",
+                        new Phrase("석판 {0} 적용 여부 {1} != {2}", view.Tablets[i].entityID, result.Applied[i], view.Tablets[i].IsApplied),
+                        Collapsed(inv, view, result)));
                 }
 
                 if (!result.Applied[i]) continue;
 
                 var difference = CompareEffects(view.Placements[i], view.Grid, view.Tablets[i]);
                 if (difference != null)
-                    return Result(PlanVerificationStatus.Failed, Tr("석판 {0} {1}", view.Tablets[i].entityID, difference));
+                    return Result(PlanVerificationStatus.Failed, new Phrase("석판 {0} {1}", view.Tablets[i].entityID, difference));
             }
 
             var mismatch = CompareMatrices(inv, view, result);
             return mismatch == null
-                ? Result(PlanVerificationStatus.Passed, "")
+                ? Result(PlanVerificationStatus.Passed, null)
                 : Result(PlanVerificationStatus.Failed, mismatch);
         }
 
-        private static RuntimeSimulationCheck Result(PlanVerificationStatus status, string reason) =>
+        private static RuntimeSimulationCheck Result(PlanVerificationStatus status, Phrase reason) =>
             new RuntimeSimulationCheck
             {
                 Status = status,
-                Reason = status == PlanVerificationStatus.Failed ? Tr("시뮬레이터 불일치: {0}", reason) : reason,
+                Reason = status == PlanVerificationStatus.Failed ? new Phrase("시뮬레이터 불일치: {0}", reason) : reason,
             };
 
         /// <summary>
@@ -90,27 +90,27 @@ namespace SephPlanner.Plugin
         /// 근거가 없어서 - <c>ApplyPlanRoutine.Collapsed</c> 는 그것을 들고 있다 - 아직 아무 석판도
         /// 발동하지 않은 초반 판과 구별되지 않기 때문이다.
         /// </summary>
-        private static string Collapsed(GridInventory inv, InventoryView view, SimulationResult result)
+        private static Phrase Collapsed(GridInventory inv, InventoryView view, SimulationResult result)
         {
             var applied = 0;
             for (var i = 0; i < view.Tablets.Count; i++)
             {
-                if (view.Tablets[i].IsApplied) return "";
+                if (view.Tablets[i].IsApplied) return null;
                 if (result.Applied[i]) applied++;
             }
-            if (applied == 0) return "";
+            if (applied == 0) return null;
 
             for (var index = 0; index < view.Grid.Storage; index++)
             {
                 var position = view.Grid.ToPosition(index);
-                if (LookupLevel(inv, (sbyte)position.X, (sbyte)position.Y) != 0) return "";
+                if (LookupLevel(inv, (sbyte)position.X, (sbyte)position.Y) != 0) return null;
             }
 
-            return " - " + Tr("게임이 계산한 가방 효과가 비어 있습니다(석판 {0}개가 전부 비적용, 칸 레벨도 전부 0). 동기화 중이면 곧 사라지고, 계속 남으면 방을 나갔다 들어오세요.",
+            return new Phrase("게임이 계산한 가방 효과가 비어 있습니다(석판 {0}개가 전부 비적용, 칸 레벨도 전부 0). 동기화 중이면 곧 사라지고, 계속 남으면 방을 나갔다 들어오세요.",
                 view.Tablets.Count);
         }
 
-        private static string CompareMatrices(GridInventory inv, InventoryView view, SimulationResult result)
+        private static Phrase CompareMatrices(GridInventory inv, InventoryView view, SimulationResult result)
         {
             for (var index = 0; index < view.Grid.Storage; index++)
             {
@@ -119,19 +119,19 @@ namespace SephPlanner.Plugin
                 var ours = result.EffectiveLevel(position, enchant);
                 var theirs = LookupLevel(inv, (sbyte)position.X, (sbyte)position.Y);
                 if (ours != theirs)
-                    return Tr("칸 {0} 레벨 {1} != 게임 {2} (인챈트 {3})", position, ours, theirs, enchant);
+                    return new Phrase("칸 {0} 레벨 {1} != 게임 {2} (인챈트 {3})", position, ours, theirs, enchant);
 
                 // 레벨 0인 칸도 배수·제한 해제가 맞아야 옮긴 뒤의 결과를 믿을 수 있다.
                 inv.multiplyLevelMatrix.TryGetValue(new ItemPosition((sbyte)position.X, (sbyte)position.Y), out var multiplier);
                 if (result.MultiplierAt(position) != multiplier)
-                    return Tr("칸 {0} 배수 {1} != 게임 {2}", position, result.MultiplierAt(position), multiplier);
+                    return new Phrase("칸 {0} 배수 {1} != 게임 {2}", position, result.MultiplierAt(position), multiplier);
                 inv.ignoreCriteriaMatrix.TryGetValue(new ItemPosition((sbyte)position.X, (sbyte)position.Y), out var ignore);
                 if (result.IgnoreCriteriaAt(position) != ignore)
-                    return Tr("칸 {0} 제한 해제 {1} != 게임 {2}", position, result.IgnoreCriteriaAt(position), ignore);
+                    return new Phrase("칸 {0} 제한 해제 {1} != 게임 {2}", position, result.IgnoreCriteriaAt(position), ignore);
 
                 var disabled = LookupDisabled(inv, (sbyte)position.X, (sbyte)position.Y);
                 if (result.IsDisabled(position) != disabled)
-                    return Tr("칸 {0} 비활성 {1} != 게임 {2}", position, result.IsDisabled(position), disabled);
+                    return new Phrase("칸 {0} 비활성 {1} != 게임 {2}", position, result.IsDisabled(position), disabled);
             }
             return null;
         }
@@ -148,7 +148,7 @@ namespace SephPlanner.Plugin
             return disabled > 0;
         }
 
-        private static string CompareEffects(TabletPlacement placement, GridSpec grid, StoneTablet tablet)
+        private static Phrase CompareEffects(TabletPlacement placement, GridSpec grid, StoneTablet tablet)
         {
             var cells = TabletQuery.Parse(placement.Query, grid, placement.Position, placement.Rotation);
             var applied = new List<AppliedTabletEffect>(tablet.EffectRange.Count);

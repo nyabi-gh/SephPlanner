@@ -669,7 +669,7 @@ namespace SephPlanner.Core.Planning
                 return new PlanVerification
                 {
                     Status = PlanVerificationStatus.Unavailable,
-                    Reason = PlanVerification.GameNotRecalculated,
+                    Reason = PlanVerification.GameNotRecalculated.ToString(),
                 };
             }
 

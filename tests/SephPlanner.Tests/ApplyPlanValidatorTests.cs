@@ -61,7 +61,7 @@ public class ApplyPlanValidatorTests
     {
         Assert.Contains(
             "인벤토리가 바뀌어",
-            ApplyPlanValidator.Validate(Command(), LiveItems(), width: 6, height: 7, storage: 12));
+            ApplyPlanValidator.Validate(Command(), LiveItems(), width: 6, height: 7, storage: 12)?.Korean);
     }
 
     [Fact]
@@ -73,7 +73,7 @@ public class ApplyPlanValidatorTests
         Assert.Contains(
             "인벤토리가 바뀌어",
             ApplyPlanValidator.Validate(
-                command, LiveItems(), width: 6, height: 7, storage: 6, weaponId: "Dagger"));
+                command, LiveItems(), width: 6, height: 7, storage: 6, weaponId: "Dagger")?.Korean);
     }
 
     [Fact]
@@ -86,7 +86,7 @@ public class ApplyPlanValidatorTests
             "인벤토리가 바뀌어",
             ApplyPlanValidator.Validate(
                 command, LiveItems(), width: 6, height: 7, storage: 6,
-                livePlacementFingerprint: "new"));
+                livePlacementFingerprint: "new")?.Korean);
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public class ApplyPlanValidatorTests
             "인벤토리가 바뀌어",
             ApplyPlanValidator.Validate(
                 Command(), LiveItems(), width: 6, height: 7, storage: 6,
-                livePlacementFingerprint: "current"));
+                livePlacementFingerprint: "current")?.Korean);
     }
 
     private static ApplyPlanCommand Command() => new()
@@ -138,5 +138,5 @@ public class ApplyPlanValidatorTests
     ];
 
     private static string? Validate(ApplyPlanCommand command, IReadOnlyCollection<LivePlanItem> items) =>
-        ApplyPlanValidator.Validate(command, items, width: 6, height: 7, storage: 6);
+        ApplyPlanValidator.Validate(command, items, width: 6, height: 7, storage: 6)?.Korean;
 }

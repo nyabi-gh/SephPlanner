@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using SephPlanner.Core.Model;
-using static SephPlanner.Core.Text.Localization;
+using SephPlanner.Core.Text;
 
 namespace SephPlanner.Core.Tablets
 {
@@ -23,10 +23,10 @@ namespace SephPlanner.Core.Tablets
     public static class TabletEffectComparison
     {
         /// <summary>처음 다른 곳을 적는다. 같으면 <c>null</c> 이다.</summary>
-        public static string? FirstDifference(IReadOnlyList<QueryCell> cells, IReadOnlyList<AppliedTabletEffect> game)
+        public static Phrase? FirstDifference(IReadOnlyList<QueryCell> cells, IReadOnlyList<AppliedTabletEffect> game)
         {
             if (cells.Count != game.Count)
-                return Tr("효과 칸 수 {0} != {1}", cells.Count, game.Count);
+                return new Phrase("효과 칸 수 {0} != {1}", cells.Count, game.Count);
 
             for (var i = 0; i < cells.Count; i++)
             {
@@ -34,11 +34,11 @@ namespace SephPlanner.Core.Tablets
                 var (kind, levelParam) = QueryValue.ReadEffect(cells[i].Value);
 
                 if (cells[i].Position != expected.Position)
-                    return Tr("효과 [{0}] 위치 불일치", i);
+                    return new Phrase("효과 [{0}] 위치 불일치", i);
                 if (kind != expected.Kind)
-                    return Tr("효과 [{0}] 종류 {1} != {2}", i, kind, expected.Kind);
+                    return new Phrase("효과 [{0}] 종류 {1} != {2}", i, kind, expected.Kind);
                 if (ReadsLevelParam(kind) && levelParam != expected.LevelParam)
-                    return Tr("효과 [{0}] 수치 {1} != {2}", i, levelParam, expected.LevelParam);
+                    return new Phrase("효과 [{0}] 수치 {1} != {2}", i, levelParam, expected.LevelParam);
             }
             return null;
         }

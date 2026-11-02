@@ -13,8 +13,8 @@ public sealed class LocalizationGroup
 [Collection("Localization")]
 public sealed class LocalizationTests
 {
-    private static readonly Regex TrCall = new(@"\bTr\(\s*""((?:[^""\\]|\\.)*)""");
-    private static readonly Regex TrNotLiteral = new(@"\bTr\(\s*(?!""|string korean)");
+    private static readonly Regex TrCall = new(@"\b(?:Tr|Phrase)\(\s*""((?:[^""\\]|\\.)*)""");
+    private static readonly Regex TrNotLiteral = new(@"\b(?:Tr|Phrase)\(\s*(?!""|string korean)");
     private static readonly Regex Placeholder = new(@"\{(\d+)(?:\|[^}]*)?(?::[^}]*)?\}");
 
     private static string RepositoryRoot()
@@ -43,7 +43,8 @@ public sealed class LocalizationTests
     [Fact]
     public void TrIsOnlyCalledWithAStringConstant()
     {
-        var offenders = SourceFiles()
+        // Phrase.cs 는 원문 없는 조각(Verbatim·Concat)을 제 생성자로 짓는다.
+        var offenders = SourceFiles().Where(path => Path.GetFileName(path) != "Phrase.cs")
             .SelectMany(path => File.ReadAllLines(path).Select((line, i) => (path, line, i)))
             .Where(item => TrNotLiteral.IsMatch(item.line) && !item.line.TrimStart().StartsWith("//", StringComparison.Ordinal) &&
                            !item.line.TrimStart().StartsWith("///", StringComparison.Ordinal))
@@ -118,6 +119,47 @@ public sealed class LocalizationTests
         using var _ = Localization.Use(Language.Japanese);
         Assert.Equal("표에 없는 문장 3", Localization.Tr("표에 없는 문장 {0}", 3));
         Assert.Equal("言語", Localization.Tr("언어"));
+    }
+
+    [Fact]
+    public void PhraseIsKoreanForLogsAndTheCurrentLanguageOnScreen()
+    {
+        using var _ = Localization.Use(Language.Japanese);
+        var phrase = new Phrase("{0} {1|과/와} {2} {3|을/를} 합칩니다. 재료 둘은 사라집니다.", "①", "쌍성", "②", "전진");
+
+        Assert.Equal("① 쌍성과 ② 전진을 합칩니다. 재료 둘은 사라집니다.", phrase.Korean);
+        Assert.Equal(Localization.Tr("{0} {1|과/와} {2} {3|을/를} 합칩니다. 재료 둘은 사라집니다.", "①", "쌍성", "②", "전진"),
+            phrase.ToString());
+        Assert.NotEqual(phrase.Korean, phrase.ToString());
+    }
+
+    [Fact]
+    public void PhraseArgumentsFollowTheOuterLanguage()
+    {
+        using var _ = Localization.Use(Language.English);
+        var phrase = new Phrase("진단 전송 실패: {0} · 로컬 보관: {1}", new Phrase("배포 파일이 너무 큽니다."), "C:/x");
+
+        Assert.Equal("진단 전송 실패: 배포 파일이 너무 큽니다. · 로컬 보관: C:/x", phrase.Korean);
+        Assert.DoesNotContain("배포", phrase.ToString());
+    }
+
+    [Fact]
+    public void PhraseJoinSkipsEmptyParts()
+    {
+        var joined = Phrase.Join(" ", new Phrase("원래 배치로 되돌렸습니다."), null, Phrase.Verbatim(""), "끝");
+        Assert.Equal("원래 배치로 되돌렸습니다. 끝", joined.Korean);
+    }
+
+    [Fact]
+    public void ExceptionsKeepTheirTypeAndAKoreanMessage()
+    {
+        using var _ = Localization.Use(Language.English);
+        var exception = new Phrase("배포 파일이 너무 큽니다.").As(message => new InvalidDataException(message));
+
+        Assert.IsType<InvalidDataException>(exception);
+        Assert.Equal("배포 파일이 너무 큽니다.", exception.Message);
+        Assert.Equal(Localization.Tr("배포 파일이 너무 큽니다."), Phrase.Of(exception).ToString());
+        Assert.Equal("boom", Phrase.Of(new InvalidOperationException("boom")).ToString());
     }
 
     [Fact]

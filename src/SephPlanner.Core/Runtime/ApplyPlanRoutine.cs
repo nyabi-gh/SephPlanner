@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Tablets;
+using SephPlanner.Core.Text;
 using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Core.Runtime
@@ -40,7 +41,7 @@ namespace SephPlanner.Core.Runtime
         private double _phaseUntil;
         private int _levelsBefore;
         private bool? _collapsed;
-        private string? _stateFailure;
+        private Phrase? _stateFailure;
 
         public ApplyPlanRoutine(
             ApplyPlanCommand command, IInventoryPort port, Func<double> now, bool allowMultiplayer)
@@ -61,11 +62,11 @@ namespace SephPlanner.Core.Runtime
         public double AbandonAt { get; private set; }
 
         /// <summary>끝났을 때 사람이 읽을 한 줄. 반복자가 끝나기 전에는 비어 있다.</summary>
-        public string Result { get; private set; } = "";
+        public Phrase Result { get; private set; } = Phrase.Verbatim("");
 
         /// <summary>쓰기 반영이 불명확하거나 효과 연결이 깨졌다. 같은 인벤토리에 추가 쓰기를 보내면 안 된다.</summary>
         public bool RequiresResync { get; private set; }
-        public string? DiagnosticError { get; private set; }
+        public Phrase? DiagnosticError { get; private set; }
 
         /// <summary>
         /// 계획대로 다 놓였고 레벨까지 예상과 같다. <b>이때만</b> 부르는 쪽이 "지금 놓인 것이 곧
@@ -74,13 +75,13 @@ namespace SephPlanner.Core.Runtime
         /// </summary>
         public bool Settled { get; private set; }
 
-        private static string TidyMessage() => Tr("손으로 정리한 뒤 다시 시도하세요.");
+        private static Phrase TidyMessage() => new Phrase("손으로 정리한 뒤 다시 시도하세요.");
 
-        private static string CollapsedMessage() =>
-            Tr("게임이 계산한 칸 레벨이 전부 0 이 됐습니다 - 가방의 효과가 꺼진 상태입니다. 동기화 중이면 곧 돌아오고, 그대로 남으면 손으로 옮겨도 같은 오류가 되풀이되니 방을 나갔다 들어오거나 게임을 다시 시작하세요. F10 으로 진단을 남겨 주시면 원인을 찾는 데 도움이 됩니다.");
+        private static Phrase CollapsedMessage() =>
+            new Phrase("게임이 계산한 칸 레벨이 전부 0 이 됐습니다 - 가방의 효과가 꺼진 상태입니다. 동기화 중이면 곧 돌아오고, 그대로 남으면 손으로 옮겨도 같은 오류가 되풀이되니 방을 나갔다 들어오거나 게임을 다시 시작하세요. F10 으로 진단을 남겨 주시면 원인을 찾는 데 도움이 됩니다.");
 
-        private static string UncertainMessage() =>
-            Tr("서버 반영 여부를 확인하지 못했습니다. 늦게 적용될 수 있어 추가 이동과 되돌리기를 멈췄습니다. 자동 배치를 다시 쓰려면 방에 재접속하세요.");
+        private static Phrase UncertainMessage() =>
+            new Phrase("서버 반영 여부를 확인하지 못했습니다. 늦게 적용될 수 있어 추가 이동과 되돌리기를 멈췄습니다. 자동 배치를 다시 쓰려면 방에 재접속하세요.");
 
         /// <summary>
         /// 사전 검증을 통과한 뒤 부른다. 실패하면 안전하게 확인된 걸음만 되돌리고,
@@ -103,7 +104,7 @@ namespace SephPlanner.Core.Runtime
             var swapping = ApplySwaps(journal, moves);
             while (Advance(swapping, moves)) yield return null;
             if (moves.Fault != null && moves.Failure == null)
-                moves.Failure = Tr("적용 도중 오류가 나 자동 배치를 중단했습니다({0}).", moves.Fault);
+                moves.Failure = new Phrase("적용 도중 오류가 나 자동 배치를 중단했습니다({0}).", moves.Fault);
 
             if (moves.Failure != null)
             {
@@ -126,7 +127,7 @@ namespace SephPlanner.Core.Runtime
             var turning = Rotate(rotations);
             while (Advance(turning, rotations)) yield return null;
             if (rotations.Fault != null && rotations.Failure == null)
-                rotations.Failure = Tr("회전 중 오류가 나 자동 배치를 중단했습니다({0}).", rotations.Fault);
+                rotations.Failure = new Phrase("회전 중 오류가 나 자동 배치를 중단했습니다({0}).", rotations.Fault);
 
             if (rotations.Failure != null)
             {
@@ -156,27 +157,27 @@ namespace SephPlanner.Core.Runtime
             // 뒤에도 잠시 옛 값이 남아 있으므로, 어긋났다고 알리기 전에 그만큼 기다린다.
             Progress = Tr("자동 배치 - 레벨 확인 중");
             var settle = _now() + (_port.WritesLandImmediately ? 0 : SyncTimeout);
-            while (LevelDrift().Length > 0 && _now() < settle) yield return null;
+            while (LevelDrift() != null && _now() < settle) yield return null;
 
             var drift = TargetDrift();
 
-            var levels = drift is null ? LevelDrift() : "";
+            var levels = drift is null ? LevelDrift() : null;
             // 예상도 전부 0이면 정상 배치다. 예상과 다른 소실만 별도 복구 안내를 붙인다.
-            var collapsed = drift is null && levels.Length == 0 ? null : Collapsed();
-            if (collapsed != null) levels = "";
-            if (levels.Length > 0) DiagnosticError ??= levels;
-            Settled = drift is null && collapsed is null && levels.Length == 0 && !RequiresResync;
-            var done = levels.Length == 0
-                ? Tr("자동 배치 완료 - 이동 {0}건, 회전 {1}건", moves.Count, rotations.Count)
-                : Tr("자동 배치 완료 - 이동 {0}건, 회전 {1}건. {2}", moves.Count, rotations.Count, levels);
+            var collapsed = drift is null && levels == null ? null : Collapsed();
+            if (collapsed != null) levels = null;
+            if (levels != null) DiagnosticError ??= levels;
+            Settled = drift is null && collapsed is null && levels == null && !RequiresResync;
+            var done = levels == null
+                ? new Phrase("자동 배치 완료 - 이동 {0}건, 회전 {1}건", moves.Count, rotations.Count)
+                : new Phrase("자동 배치 완료 - 이동 {0}건, 회전 {1}건. {2}", moves.Count, rotations.Count, levels);
             Result = Join(drift ?? done, collapsed);
         }
 
-        private string? TargetDrift()
+        private Phrase? TargetDrift()
         {
             try
             {
-                if (!_port.Alive) return Tr("인벤토리가 사라져 자동 배치 결과를 확인하지 못했습니다.");
+                if (!_port.Alive) return new Phrase("인벤토리가 사라져 자동 배치 결과를 확인하지 못했습니다.");
                 foreach (var target in _command.Targets)
                 {
                     // 번호 없는 아이템은 번호로 확인할 수 없다. 그 칸이 차 있는지만 본다 -
@@ -184,21 +185,21 @@ namespace SephPlanner.Core.Runtime
                     if (target.Immovable)
                     {
                         if (!_port.Occupied(target.To))
-                            return Tr("적용 중 인벤토리가 바뀌어 목표 배치와 다릅니다. 현재 배치를 확인하세요.");
+                            return new Phrase("적용 중 인벤토리가 바뀌어 목표 배치와 다릅니다. 현재 배치를 확인하세요.");
                         continue;
                     }
 
                     if (_port.InstanceAt(target.To) != target.InstanceId)
-                        return Tr("적용 중 인벤토리가 바뀌어 목표 배치와 다릅니다. 현재 배치를 확인하세요.");
+                        return new Phrase("적용 중 인벤토리가 바뀌어 목표 배치와 다릅니다. 현재 배치를 확인하세요.");
                     if (target.IsTablet && RotationOf(target.InstanceId) != target.Rotation)
-                        return Tr("석판의 최종 각도가 목표와 다릅니다. 현재 배치를 확인하세요.");
+                        return new Phrase("석판의 최종 각도가 목표와 다릅니다. 현재 배치를 확인하세요.");
                 }
                 return null;
             }
             catch (Exception ex)
             {
-                DiagnosticError ??= ex.ToString();
-                return Tr("자동 배치 결과를 확인하지 못했습니다({0}). 현재 배치를 확인하세요.", ex.Message);
+                DiagnosticError ??= Phrase.Verbatim(ex.ToString());
+                return new Phrase("자동 배치 결과를 확인하지 못했습니다({0}). 현재 배치를 확인하세요.", Phrase.Of(ex));
             }
         }
 
@@ -214,8 +215,8 @@ namespace SephPlanner.Core.Runtime
             }
             catch (Exception ex)
             {
-                DiagnosticError ??= ex.ToString();
-                outcome.Fault = ex.Message;
+                DiagnosticError ??= Phrase.Verbatim(ex.ToString());
+                outcome.Fault = Phrase.Of(ex);
                 return false;
             }
         }
@@ -233,20 +234,11 @@ namespace SephPlanner.Core.Runtime
         /// <summary>이 국면에 걸음을 하나 더 보낼 예산이 남았는가. 호스트는 기다리지 않으므로 늘 참이다.</summary>
         private bool BudgetLeft() => _port.WritesLandImmediately || _now() < _phaseUntil;
 
-        private static string Join(params string?[] parts)
-        {
-            var text = "";
-            foreach (var part in parts)
-            {
-                if (string.IsNullOrEmpty(part)) continue;
-                text = text.Length == 0 ? part! : text + " " + part;
-            }
-            return text;
-        }
+        private static Phrase Join(params Phrase?[] parts) => Phrase.Join(" ", parts);
 
-        private string? Undone(Outcome outcome) =>
+        private Phrase? Undone(Outcome outcome) =>
             outcome.Fault != null
-                ? Join(Tr("되돌리는 중 오류가 나 인벤토리가 중간 상태로 남았습니다({0}).", outcome.Fault), Recovery())
+                ? Join(new Phrase("되돌리는 중 오류가 나 인벤토리가 중간 상태로 남았습니다({0}).", outcome.Fault), Recovery())
                 : outcome.Note;
 
         /// <summary>
@@ -278,7 +270,7 @@ namespace SephPlanner.Core.Runtime
         /// 2026-09-15 - 맞바꿈도 되돌리기도 같은 예외로 끝났다). 그 상태를 알아야 하는 이유는
         /// 안내가 달라지기 때문이다.
         /// </summary>
-        private string? Collapsed()
+        private Phrase? Collapsed()
         {
             // 한 번의 실패 안에서 답이 바뀌지 않는다. 가지마다 다시 재면 격자를 몇 번씩 훑는다.
             _collapsed ??= _levelsBefore > 0 && CountLevels() == 0;
@@ -294,15 +286,15 @@ namespace SephPlanner.Core.Runtime
         /// 상태에서는 사람을 헛되이 붙잡는다. 무너졌으면 아무 말도 하지 않는다 - 무엇을 할지는
         /// <see cref="Collapsed"/> 가 결과 끝에 한 번 붙인다.
         /// </summary>
-        private string? Recovery() => Collapsed() is null ? TidyMessage() : null;
+        private Phrase? Recovery() => Collapsed() is null ? TidyMessage() : null;
 
-        private string? InvalidState()
+        private Phrase? InvalidState()
         {
             var error = _port.StateError;
             if (error == null) return null;
             DiagnosticError ??= error;
             RequiresResync = true;
-            _stateFailure = Tr("가방의 아이템과 효과 연결이 어긋나 추가 이동과 되돌리기를 중단했습니다. 방에 재접속하거나 게임을 다시 시작하세요. {0}", error);
+            _stateFailure = new Phrase("가방의 아이템과 효과 연결이 어긋나 추가 이동과 되돌리기를 중단했습니다. 방에 재접속하거나 게임을 다시 시작하세요. {0}", error);
             return _stateFailure;
         }
 
@@ -310,16 +302,16 @@ namespace SephPlanner.Core.Runtime
         private sealed class Outcome
         {
             /// <summary>실패했으면 사람이 읽을 이유. 성공이면 null.</summary>
-            public string? Failure;
+            public Phrase? Failure;
 
             /// <summary>해낸 걸음 수.</summary>
             public int Count;
 
             /// <summary>되돌리기 결과처럼 결과에 덧붙일 한 마디.</summary>
-            public string? Note;
+            public Phrase? Note;
 
             /// <summary><see cref="Advance"/>가 잡은 예외 메시지.</summary>
-            public string? Fault;
+            public Phrase? Fault;
         }
 
         /// <summary>
@@ -348,32 +340,32 @@ namespace SephPlanner.Core.Runtime
         /// 적용이 끝난 상태의 레벨이 계산과 같은지. 어긋나면 우리가 읽지 않는 효과가 걸려 있다는
         /// 뜻이다. 배치 자체는 합법이라 되돌리지 않고 알리기만 한다.
         /// </summary>
-        private string LevelDrift()
+        private Phrase? LevelDrift()
         {
             // 인벤토리가 사라졌으면 견줄 것이 없다. 걸음은 이미 반영된 뒤이므로 실패가 아니다.
-            if (!_port.Alive) return "";
+            if (!_port.Alive) return null;
 
             try
             {
                 var mismatches = 0;
-                var first = "";
+                Phrase? first = null;
                 foreach (var pair in _command.ExpectedCellLevels)
                 {
                     var reported = _port.LevelAt(pair.Key);
                     if (reported == pair.Value) continue;
 
                     mismatches++;
-                    if (first.Length == 0) first = Tr("{0} 계산 {1} != 게임 {2}", pair.Key, pair.Value, reported);
+                    first ??= new Phrase("{0} 계산 {1} != 게임 {2}", pair.Key, pair.Value, reported);
                 }
 
                 return mismatches == 0
-                    ? ""
-                    : Tr("적용 뒤 레벨이 예상과 다른 칸 {0}개({1}) - 계산에 없는 효과가 걸려 있습니다", mismatches, first);
+                    ? null
+                    : new Phrase("적용 뒤 레벨이 예상과 다른 칸 {0}개({1}) - 계산에 없는 효과가 걸려 있습니다", mismatches, first);
             }
             catch (Exception ex)
             {
-                DiagnosticError ??= ex.ToString();
-                return Tr("적용 뒤 레벨을 확인하지 못했습니다({0})", ex.Message);
+                DiagnosticError ??= Phrase.Verbatim(ex.ToString());
+                return new Phrase("적용 뒤 레벨을 확인하지 못했습니다({0})", Phrase.Of(ex));
             }
         }
 
@@ -407,7 +399,7 @@ namespace SephPlanner.Core.Runtime
 
                 if (!positions.TryGetValue(target.InstanceId, out var from))
                 {
-                    outcome.Failure = Tr("계획에 있는 아이템을 가방에서 찾지 못했습니다. 자동 배치를 중단했습니다.");
+                    outcome.Failure = new Phrase("계획에 있는 아이템을 가방에서 찾지 못했습니다. 자동 배치를 중단했습니다.");
                     yield break;
                 }
                 var to = target.To;
@@ -415,26 +407,26 @@ namespace SephPlanner.Core.Runtime
 
                 if (immovable.Contains(to))
                 {
-                    outcome.Failure = Tr("그 칸의 아이템은 옮길 수 없어 자동 배치를 중단했습니다.");
+                    outcome.Failure = new Phrase("그 칸의 아이템은 옮길 수 없어 자동 배치를 중단했습니다.");
                     yield break;
                 }
 
                 if (!_port.Alive)
                 {
-                    outcome.Failure = Tr("적용 도중 인벤토리가 사라져 자동 배치를 중단했습니다.");
+                    outcome.Failure = new Phrase("적용 도중 인벤토리가 사라져 자동 배치를 중단했습니다.");
                     yield break;
                 }
 
                 // 적용을 시작한 뒤에 동료가 접속했을 수 있다. 멀티가 된 순간 더 진행하지 않는다.
                 if (!_allowMultiplayer && _port.IsMultiplayerSession)
                 {
-                    outcome.Failure = Tr("적용 도중 멀티플레이 세션이 되어 자동 배치를 중단했습니다.");
+                    outcome.Failure = new Phrase("적용 도중 멀티플레이 세션이 되어 자동 배치를 중단했습니다.");
                     yield break;
                 }
 
                 if (!BudgetLeft())
                 {
-                    outcome.Failure = Tr("서버 반영이 느려 {0:0}초 안에 끝내지 못해 자동 배치를 중단했습니다.", PhaseTimeout);
+                    outcome.Failure = new Phrase("서버 반영이 느려 {0:0}초 안에 끝내지 못해 자동 배치를 중단했습니다.", PhaseTimeout);
                     yield break;
                 }
 
@@ -443,7 +435,7 @@ namespace SephPlanner.Core.Runtime
 
                 if (!Swapped(to, from, target.InstanceId, expected))
                 {
-                    outcome.Failure = Tr("이동할 칸의 아이템이 바뀌어 자동 배치를 중단했습니다.");
+                    outcome.Failure = new Phrase("이동할 칸의 아이템이 바뀌어 자동 배치를 중단했습니다.");
                     yield break;
                 }
 
@@ -466,7 +458,7 @@ namespace SephPlanner.Core.Runtime
                 {
                     if (_port.WritesLandImmediately && Swapped(from, to, target.InstanceId, expected))
                         journal.Add(new Step(from, to, target.InstanceId, expected));
-                    outcome.Failure = Tr("이동 중 오류({0})가 나 자동 배치를 중단했습니다.", error);
+                    outcome.Failure = new Phrase("이동 중 오류({0})가 나 자동 배치를 중단했습니다.", error);
                     yield break;
                 }
 
@@ -482,8 +474,8 @@ namespace SephPlanner.Core.Runtime
                 if (!_port.Alive || !Swapped(from, to, target.InstanceId, expected))
                 {
                     outcome.Failure = !_port.Alive
-                        ? Tr("적용 도중 인벤토리가 사라져 자동 배치를 중단했습니다.")
-                        : Tr("{0} → {1} 이동이 게임에 반영되지 않아 자동 배치를 중단했습니다.", from, to);
+                        ? new Phrase("적용 도중 인벤토리가 사라져 자동 배치를 중단했습니다.")
+                        : new Phrase("{0} → {1} 이동이 게임에 반영되지 않아 자동 배치를 중단했습니다.", from, to);
                     yield break;
                 }
 
@@ -532,21 +524,21 @@ namespace SephPlanner.Core.Runtime
             {
                 if (!_port.Alive)
                 {
-                    outcome.Note = Tr("되돌리는 중 인벤토리가 사라져 중간 상태로 남았습니다.");
+                    outcome.Note = new Phrase("되돌리는 중 인벤토리가 사라져 중간 상태로 남았습니다.");
                     yield break;
                 }
 
                 if (!BudgetLeft())
                 {
                     outcome.Note = Join(
-                        Tr("되돌리기가 {0:0}초 안에 끝나지 않아 인벤토리가 중간 상태로 남았습니다.", PhaseTimeout), Recovery());
+                        new Phrase("되돌리기가 {0:0}초 안에 끝나지 않아 인벤토리가 중간 상태로 남았습니다.", PhaseTimeout), Recovery());
                     yield break;
                 }
 
                 var step = journal[i];
                 if (!Swapped(step.From, step.To, step.InstanceId, step.Displaced))
                 {
-                    outcome.Note = Tr("되돌릴 칸의 아이템이 바뀌어 추가로 옮기지 않았습니다. 현재 배치를 확인하세요.");
+                    outcome.Note = new Phrase("되돌릴 칸의 아이템이 바뀌어 추가로 옮기지 않았습니다. 현재 배치를 확인하세요.");
                     yield break;
                 }
                 RequiresResync = !_port.WritesLandImmediately;
@@ -566,7 +558,7 @@ namespace SephPlanner.Core.Runtime
                 if (error != null)
                 {
                     outcome.Note = Join(
-                        Tr("되돌리기도 실패해 인벤토리가 중간 상태로 남았습니다({0}).", error),
+                        new Phrase("되돌리기도 실패해 인벤토리가 중간 상태로 남았습니다({0}).", error),
                         RequiresResync ? UncertainMessage() : Recovery());
                     yield break;
                 }
@@ -584,7 +576,7 @@ namespace SephPlanner.Core.Runtime
                 if (!_port.Alive || !Swapped(step.To, step.From, step.InstanceId, step.Displaced))
                 {
                     outcome.Note = Join(
-                        Tr("되돌리기가 게임에 반영되지 않아 인벤토리가 중간 상태로 남았습니다."),
+                        new Phrase("되돌리기가 게임에 반영되지 않아 인벤토리가 중간 상태로 남았습니다."),
                         RequiresResync ? UncertainMessage() : Recovery());
                     yield break;
                 }
@@ -598,7 +590,7 @@ namespace SephPlanner.Core.Runtime
                 {
                     if (!_port.Occupied(target.From))
                     {
-                        outcome.Note = Tr("확인된 이동은 되돌렸지만 원래 배치와 다른 항목이 남았습니다. 현재 배치를 확인하세요.");
+                        outcome.Note = new Phrase("확인된 이동은 되돌렸지만 원래 배치와 다른 항목이 남았습니다. 현재 배치를 확인하세요.");
                         yield break;
                     }
                     continue;
@@ -607,11 +599,11 @@ namespace SephPlanner.Core.Runtime
                 if (_port.InstanceAt(target.From) != target.InstanceId ||
                     target.IsTablet && RotationOf(target.InstanceId) != target.FromRotation)
                 {
-                    outcome.Note = Tr("확인된 이동은 되돌렸지만 원래 배치와 다른 항목이 남았습니다. 현재 배치를 확인하세요.");
+                    outcome.Note = new Phrase("확인된 이동은 되돌렸지만 원래 배치와 다른 항목이 남았습니다. 현재 배치를 확인하세요.");
                     yield break;
                 }
             }
-            outcome.Note = Tr("원래 배치로 되돌렸습니다.");
+            outcome.Note = new Phrase("원래 배치로 되돌렸습니다.");
         }
 
         /// <summary>
@@ -642,17 +634,17 @@ namespace SephPlanner.Core.Runtime
             foreach (var turn in pending)
             {
                 var count = 0;
-                string? failure = null;
+                Phrase? failure = null;
                 while (count < turn.Presses)
                 {
                     var step = new Outcome();
                     var pressing = PressOnce(turn, step);
                     while (Advance(pressing, step)) yield return null;
 
-                    var trouble = step.Fault != null ? Tr("회전 중 오류({0})", step.Fault) : step.Failure;
+                    var trouble = step.Fault != null ? new Phrase("회전 중 오류({0})", step.Fault) : step.Failure;
                     if (trouble != null)
                     {
-                        failure = Tr("{0} - 자동 배치를 중단합니다.", trouble);
+                        failure = new Phrase("{0} - 자동 배치를 중단합니다.", trouble);
                         break;
                     }
                     count++;
@@ -672,7 +664,7 @@ namespace SephPlanner.Core.Runtime
                 var restoring = RestoreRotations(pressed, undone);
                 while (Advance(restoring, undone)) yield return null;
                 outcome.Note = undone.Fault != null
-                    ? Tr("각도를 되돌리는 중 오류가 났습니다({0}).", undone.Fault)
+                    ? new Phrase("각도를 되돌리는 중 오류가 났습니다({0}).", undone.Fault)
                     : undone.Note;
                 yield break;
             }
@@ -690,7 +682,7 @@ namespace SephPlanner.Core.Runtime
                 if (original == null || RotationOf(turn.InstanceId) !=
                     (original.FromRotation + turn.Presses) % TabletRotation.Steps)
                 {
-                    outcome.Note = Tr("각도를 되돌리기 전에 석판 상태가 바뀌어 멈췄습니다. 현재 배치를 확인하세요.");
+                    outcome.Note = new Phrase("각도를 되돌리기 전에 석판 상태가 바뀌어 멈췄습니다. 현재 배치를 확인하세요.");
                     yield break;
                 }
                 for (var i = 0; i < back; i++)
@@ -699,12 +691,12 @@ namespace SephPlanner.Core.Runtime
                     var pressing = PressOnce(turn, step);
                     while (Advance(pressing, step)) yield return null;
 
-                    var trouble = step.Fault != null ? Tr("오류({0})", step.Fault) : step.Failure;
+                    var trouble = step.Fault != null ? new Phrase("오류({0})", step.Fault) : step.Failure;
                     if (trouble == null) continue;
 
                     // 조용히 물러서면 "원래 배치로 되돌렸습니다"라고 보고하면서 석판 하나를
                     // 엉뚱한 각도로 남기게 된다.
-                    outcome.Note = Tr("석판(인스턴스 {0})의 각도를 되돌리지 못했습니다({1}).", turn.InstanceId, trouble);
+                    outcome.Note = new Phrase("석판(인스턴스 {0})의 각도를 되돌리지 못했습니다({1}).", turn.InstanceId, trouble);
                     yield break;
                 }
             }
@@ -721,17 +713,17 @@ namespace SephPlanner.Core.Runtime
             var before = RotationOf(turn.InstanceId);
             if (before is null)
             {
-                outcome.Failure = Tr("석판(인스턴스 {0})이 사라졌습니다", turn.InstanceId);
+                outcome.Failure = new Phrase("석판(인스턴스 {0})이 사라졌습니다", turn.InstanceId);
                 yield break;
             }
             if (_port.InstanceAt(turn.Cell) != turn.InstanceId)
             {
-                outcome.Failure = Tr("석판(인스턴스 {0})이 {1} 에 없습니다", turn.InstanceId, turn.Cell);
+                outcome.Failure = new Phrase("석판(인스턴스 {0})이 {1} 에 없습니다", turn.InstanceId, turn.Cell);
                 yield break;
             }
             if (!BudgetLeft())
             {
-                outcome.Failure = Tr("서버 반영이 느려 {0:0}초 안에 끝내지 못했습니다", PhaseTimeout);
+                outcome.Failure = new Phrase("서버 반영이 느려 {0:0}초 안에 끝내지 못했습니다", PhaseTimeout);
                 yield break;
             }
 
@@ -740,7 +732,7 @@ namespace SephPlanner.Core.Runtime
             var error = _port.Press(turn.Cell);
             if (error != null)
             {
-                outcome.Failure = Tr("회전 중 오류({0})", error);
+                outcome.Failure = new Phrase("회전 중 오류({0})", error);
                 yield break;
             }
 
@@ -749,11 +741,11 @@ namespace SephPlanner.Core.Runtime
                 yield return null;
 
             if (RotationOf(turn.InstanceId) is not int after || after == before)
-                outcome.Failure = Tr("석판(인스턴스 {0}) 회전이 시간 안에 반영되지 않았습니다", turn.InstanceId);
+                outcome.Failure = new Phrase("석판(인스턴스 {0}) 회전이 시간 안에 반영되지 않았습니다", turn.InstanceId);
             else if (after != (before.Value + 1) % TabletRotation.Steps)
             {
                 RequiresResync = true;
-                outcome.Failure = Tr("석판(인스턴스 {0})이 예상과 다른 각도로 바뀌었습니다", turn.InstanceId);
+                outcome.Failure = new Phrase("석판(인스턴스 {0})이 예상과 다른 각도로 바뀌었습니다", turn.InstanceId);
             }
             else RequiresResync = false;
         }
@@ -768,7 +760,7 @@ namespace SephPlanner.Core.Runtime
         /// 돌려야 할 석판과 횟수를 모은다. 솔버도 스냅샷의 인스턴스별 회전 가능 여부를 보지만,
         /// 계산 이후 저주 등으로 잠겼을 수 있어 쓰기 직전에 한 번 더 확인한다.
         /// </summary>
-        private string? Collect(List<TabletTurn> pending)
+        private Phrase? Collect(List<TabletTurn> pending)
         {
             try
             {
@@ -778,13 +770,13 @@ namespace SephPlanner.Core.Runtime
 
                     if (!_port.Alive ||
                         !_port.TryFindTablet(target.InstanceId, out var cell, out var rotation, out var rotatable))
-                        return Tr("적용 도중 석판이 사라져 자동 배치를 중단합니다.");
+                        return new Phrase("적용 도중 석판이 사라져 자동 배치를 중단합니다.");
 
                     var presses = TabletRotation.PressesFrom(rotation, target.Rotation);
                     if (presses == 0) continue;
 
                     if (!rotatable)
-                        return Tr("적용 도중 석판(인스턴스 {0})의 회전이 잠겨 중단합니다.", target.InstanceId);
+                        return new Phrase("적용 도중 석판(인스턴스 {0})의 회전이 잠겨 중단합니다.", target.InstanceId);
 
                     pending.Add(new TabletTurn(target.InstanceId, cell, target.Rotation, presses));
                 }
@@ -792,9 +784,9 @@ namespace SephPlanner.Core.Runtime
             }
             catch (Exception ex)
             {
-                DiagnosticError ??= ex.ToString();
+                DiagnosticError ??= Phrase.Verbatim(ex.ToString());
                 // 아직 아무것도 쓰지 않았다. 회전만 포기하면 이동을 되돌릴지 호출자가 정한다.
-                return Tr("회전 준비 중 오류가 났습니다({0}).", ex.Message);
+                return new Phrase("회전 준비 중 오류가 났습니다({0}).", Phrase.Of(ex));
             }
         }
     }

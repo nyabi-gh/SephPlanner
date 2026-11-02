@@ -1,5 +1,6 @@
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Tablets;
+using SephPlanner.Core.Text;
 
 namespace SephPlanner.Tests;
 
@@ -24,7 +25,7 @@ public class FixedEffectTrackerTests
         tracker.Observe(Extracted((0, 0, 1)), sources: "t@0,0", arrangement: "a");
 
         Assert.True(tracker.Trustworthy);
-        Assert.Equal("", tracker.Reason);
+        Assert.Null(tracker.Reason);
         Assert.Single(tracker.Layer);
     }
 
@@ -54,7 +55,7 @@ public class FixedEffectTrackerTests
 
         Assert.True(tracker.Contradicted);
         Assert.False(tracker.Trustworthy);
-        Assert.Contains("배치", tracker.Reason);
+        Assert.Contains("배치", tracker.Reason!.Korean);
     }
 
     /// <summary>
@@ -140,12 +141,12 @@ public class FixedEffectTrackerTests
         tracker.Observe(Extracted((0, 0, 1)), "t@0,0", "a");
 
         tracker.Observe(
-            new FixedEffectResidualResult { Status = FixedEffectResidualStatus.Unsettled, Reason = "정리 중" },
+            new FixedEffectResidualResult { Status = FixedEffectResidualStatus.Unsettled, Reason = Phrase.Verbatim("정리 중") },
             "t@0,0", "b");
 
         Assert.True(tracker.Trustworthy);
         Assert.Single(tracker.Layer);
-        Assert.Equal("정리 중", tracker.Reason);
+        Assert.Equal("정리 중", tracker.Reason!.Korean);
     }
 
     [Fact]
@@ -155,7 +156,7 @@ public class FixedEffectTrackerTests
         tracker.Observe(Extracted((0, 0, 1)), "t@0,0", "a");
 
         tracker.Observe(
-            new FixedEffectResidualResult { Status = FixedEffectResidualStatus.Overproduced, Reason = "칸 (0, 0)" },
+            new FixedEffectResidualResult { Status = FixedEffectResidualStatus.Overproduced, Reason = Phrase.Verbatim("칸 (0, 0)") },
             "t@0,0", "b");
 
         Assert.True(tracker.Contradicted);

@@ -4,9 +4,9 @@ using System.Collections.Generic;
 using Mirror;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Runtime;
+using SephPlanner.Core.Text;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Plugin
 {
@@ -35,8 +35,8 @@ namespace SephPlanner.Plugin
         private static GridInventory _uncertainInventory;
 
         public static bool RecoveryRequired => _uncertainInventory != null;
-        public static string RecoveryMessage =>
-            Tr("이전 자동 배치의 반영 상태나 가방의 효과 연결을 확인하지 못해 자동 배치를 잠갔습니다. 방에 재접속하거나 게임을 다시 시작하세요.");
+        public static Phrase RecoveryMessage =>
+            new Phrase("이전 자동 배치의 반영 상태나 가방의 효과 연결을 확인하지 못해 자동 배치를 잠갔습니다. 방에 재접속하거나 게임을 다시 시작하세요.");
 
         /// <summary>
         /// 적용이 진행 중인가. 클라이언트에서는 여러 프레임에 걸치므로, 겹쳐 시작하면 두 적용기가
@@ -62,7 +62,7 @@ namespace SephPlanner.Plugin
         /// 계획이므로, 부르는 쪽이 그것으로 다음 재계산을 건너뛴다.
         /// </param>
         public static IEnumerator Apply(
-            ApplyPlanCommand command, bool allowMultiplayer, Action<string, bool> report, Action<string> diagnostic = null)
+            ApplyPlanCommand command, bool allowMultiplayer, Action<Phrase, bool> report, Action<string> diagnostic = null)
         {
             if (RecoveryRequired)
             {
@@ -71,7 +71,7 @@ namespace SephPlanner.Plugin
             }
             if (InProgress)
             {
-                report(Tr("이전 자동 배치가 아직 끝나지 않았습니다. 잠시 뒤 다시 누르세요."), false);
+                report(new Phrase("이전 자동 배치가 아직 끝나지 않았습니다. 잠시 뒤 다시 누르세요."), false);
                 yield break;
             }
 
@@ -102,7 +102,7 @@ namespace SephPlanner.Plugin
                     _uncertainInventory = _routine.RequiresResync ? inventory : null;
                     yield return run.Current;
                 }
-                var detail = port.DiagnosticError ?? _routine.DiagnosticError;
+                var detail = port.DiagnosticError ?? _routine.DiagnosticError?.Korean;
                 if (detail != null) diagnostic?.Invoke(detail);
                 report(_routine.Result, _routine.Settled);
             }
@@ -118,7 +118,7 @@ namespace SephPlanner.Plugin
 
         private sealed class Preparation
         {
-            public string Failure;
+            public Phrase Failure;
             public string DiagnosticError;
             public GridInventory Inventory;
         }
@@ -132,26 +132,26 @@ namespace SephPlanner.Plugin
             try
             {
                 if (!CatalogDump.QueryVerificationPassed())
-                    return Denied(Tr("석판 효과 계산을 검증하지 못해 자동 배치를 실행하지 않습니다. ‘아이템 데이터 다시 읽기’(기본 F9)를 실행하세요."));
+                    return Denied(new Phrase("석판 효과 계산을 검증하지 못해 자동 배치를 실행하지 않습니다. ‘아이템 데이터 다시 읽기’(기본 F9)를 실행하세요."));
                 if (command.ExpectedCatalogGeneration.Length == 0 ||
                     command.ExpectedCatalogGeneration != CatalogDump.ActiveGeneration)
-                    return Denied(Tr("계획을 만든 카탈로그가 더 이상 최신이 아니어서 자동 배치를 실행하지 않습니다."));
+                    return Denied(new Phrase("계획을 만든 카탈로그가 더 이상 최신이 아니어서 자동 배치를 실행하지 않습니다."));
                 if (command.ExpectedPlacementFingerprint.Length == 0 ||
                     command.ExpectedPlanningContextFingerprint.Length == 0)
-                    return Denied(Tr("계획이 어떤 게임 상태에서 나온 것인지 확인할 수 없어 자동 배치를 실행하지 않습니다."));
+                    return Denied(new Phrase("계획이 어떤 게임 상태에서 나온 것인지 확인할 수 없어 자동 배치를 실행하지 않습니다."));
 
                 if (GameReader.IsMultiplayerSession() && !allowMultiplayer)
-                    return Denied(Tr("멀티플레이 세션에서는 자동 배치를 실행하지 않습니다. 설정에서 열 수 있습니다."));
+                    return Denied(new Phrase("멀티플레이 세션에서는 자동 배치를 실행하지 않습니다. 설정에서 열 수 있습니다."));
 
                 // 호스트면 서버 로컬에서 끝나고, 참가자면 Command 로 서버에 간다. 둘 다 아니면
                 // 쓰기가 나갈 곳이 없다.
                 if (!NetworkServer.active && !NetworkClient.active)
-                    return Denied(Tr("네트워크 세션이 없어 자동 배치를 실행할 수 없습니다."));
+                    return Denied(new Phrase("네트워크 세션이 없어 자동 배치를 실행할 수 없습니다."));
 
                 var avatar = GameReader.FindLocalPlayer();
                 var inventory = avatar != null ? avatar.Inventory : null;
                 if (inventory == null || avatar.IsDead)
-                    return Denied(Tr("적용할 인벤토리가 없습니다."));
+                    return Denied(new Phrase("적용할 인벤토리가 없습니다."));
 
                 var liveSnapshot = GameReader.Read(0, includeRecommendations: false);
                 var livePlacementFingerprint = PlanFingerprint.Placement(
@@ -168,15 +168,15 @@ namespace SephPlanner.Plugin
             {
                 return new Preparation
                 {
-                    Failure = Tr("자동 배치를 준비하다 오류가 나 아무것도 바꾸지 않았습니다({0}).", ex.Message),
+                    Failure = new Phrase("자동 배치를 준비하다 오류가 나 아무것도 바꾸지 않았습니다({0}).", Phrase.Of(ex)),
                     DiagnosticError = ex.ToString(),
                 };
             }
         }
 
-        private static Preparation Denied(string reason) => new Preparation { Failure = reason };
+        private static Preparation Denied(Phrase reason) => new Preparation { Failure = reason };
 
-        private static string Validate(
+        private static Phrase Validate(
             ApplyPlanCommand command, GridInventory inventory,
             string livePlacementFingerprint, string liveWeaponId)
         {
@@ -211,7 +211,7 @@ namespace SephPlanner.Plugin
             foreach (var count in cellCounts)
             {
                 if (count.Value > 1 && touchesGrid.Contains(count.Key))
-                    return Tr("여러 칸을 차지하는 아이템(인스턴스 {0})이 있어 자동 배치를 중단합니다.", count.Key);
+                    return new Phrase("여러 칸을 차지하는 아이템(인스턴스 {0})이 있어 자동 배치를 중단합니다.", count.Key);
             }
 
             var tablets = new Dictionary<int, StoneTablet>();
@@ -244,13 +244,13 @@ namespace SephPlanner.Plugin
             foreach (var target in command.Targets)
             {
                 if (!grid.Contains(target.To))
-                    return Tr("목표 칸 {0}이 격자 밖이라 자동 배치를 중단합니다.", target.To);
+                    return new Phrase("목표 칸 {0}이 격자 밖이라 자동 배치를 중단합니다.", target.To);
             }
             return null;
         }
 
         /// <summary>
-        /// 게임의 <c>GridInventory</c> 를 적용기가 보는 모양으로 감싼다. 쓰기는 예외를 이유 문자열로
+        /// 게임의 <c>GridInventory</c> 를 적용기가 보는 모양으로 감싼다. 쓰기는 예외를 이유 문장으로
         /// 바꿔 돌려준다 - 반복자 안에서는 잡을 수 없다.
         /// </summary>
         private sealed class GridInventoryPort : IInventoryPort
@@ -267,7 +267,7 @@ namespace SephPlanner.Plugin
             public bool WritesLandImmediately => NetworkServer.active;
             public bool IsMultiplayerSession => GameReader.IsMultiplayerSession();
 
-            public string StateError
+            public Phrase StateError
             {
                 get
                 {
@@ -279,14 +279,14 @@ namespace SephPlanner.Plugin
                         if (charm == null || charm.Inventory != _inventory ||
                             charm.xIdx != pair.Key.x || charm.yIdx != pair.Key.y ||
                             item == null || item.Charm != charm)
-                            return Tr("아티팩트 효과 연결 불일치: ({0},{1})", pair.Key.x, pair.Key.y);
+                            return new Phrase("아티팩트 효과 연결 불일치: ({0},{1})", pair.Key.x, pair.Key.y);
                     }
                     foreach (var pair in _inventory.inventoryMatrix)
                     {
                         var item = pair.Value;
                         if (item == null || item.Charm == null) continue;
                         if (!_inventory.charms.TryGetValue(pair.Key, out var charm) || charm != item.Charm)
-                            return Tr("아이템의 효과 객체 누락: ({0},{1}), 인스턴스 {2}", pair.Key.x, pair.Key.y, item.InstanceID);
+                            return new Phrase("아이템의 효과 객체 누락: ({0},{1}), 인스턴스 {2}", pair.Key.x, pair.Key.y, item.InstanceID);
                     }
                     return null;
                 }
@@ -311,7 +311,7 @@ namespace SephPlanner.Plugin
                 return false;
             }
 
-            public string Swap(GridPos from, GridPos to)
+            public Phrase Swap(GridPos from, GridPos to)
             {
                 Exception displayError = null;
                 try
@@ -338,7 +338,7 @@ namespace SephPlanner.Plugin
                 catch (Exception ex)
                 {
                     DiagnosticError ??= ex + (displayError == null ? "" : "\n선택 표시 복원 실패: " + displayError);
-                    return ex.Message;
+                    return Phrase.Of(ex);
                 }
             }
 
@@ -362,7 +362,7 @@ namespace SephPlanner.Plugin
                 return false;
             }
 
-            public string Press(GridPos cell)
+            public Phrase Press(GridPos cell)
             {
                 try
                 {
@@ -372,7 +372,7 @@ namespace SephPlanner.Plugin
                 catch (Exception ex)
                 {
                     DiagnosticError ??= ex.ToString();
-                    return ex.Message;
+                    return Phrase.Of(ex);
                 }
             }
 
@@ -381,7 +381,7 @@ namespace SephPlanner.Plugin
             /// 한 번에 처리한다. 일부만 돌아간 채 남지 않게, 도중에 실패하면 이미 돌린 것을 원래
             /// 각도로 되돌린다.
             /// </summary>
-            public string Rotate(IReadOnlyList<TabletTurn> turns)
+            public Phrase Rotate(IReadOnlyList<TabletTurn> turns)
             {
                 var original = new List<KeyValuePair<StoneTablet, int>>();
                 try
@@ -392,7 +392,7 @@ namespace SephPlanner.Plugin
                         {
                             var tablet = TabletOf(turn.InstanceId);
                             if (tablet == null)
-                                throw new InvalidOperationException(Tr("석판(인스턴스 {0})이 사라졌습니다", turn.InstanceId));
+                                throw new Phrase("석판(인스턴스 {0})이 사라졌습니다", turn.InstanceId).As(message => new InvalidOperationException(message));
 
                             original.Add(new KeyValuePair<StoneTablet, int>(tablet, tablet.rotation));
                             tablet.Networkrotation = turn.Rotation;
@@ -411,12 +411,12 @@ namespace SephPlanner.Plugin
                             foreach (var pair in original) pair.Key.Networkrotation = pair.Value;
                         }
                         Announce(original);
-                        return Tr("회전 중 오류가 나 원래 각도로 되돌렸습니다({0}).", ex.Message);
+                        return new Phrase("회전 중 오류가 나 원래 각도로 되돌렸습니다({0}).", Phrase.Of(ex));
                     }
                     catch (Exception restore)
                     {
                         DiagnosticError += "\n되돌리기 실패: " + restore;
-                        return Tr("회전 중 오류가 났고 되돌리기도 실패했습니다({0} / {1}).", ex.Message, restore.Message);
+                        return new Phrase("회전 중 오류가 났고 되돌리기도 실패했습니다({0} / {1}).", Phrase.Of(ex), Phrase.Of(restore));
                     }
                 }
             }

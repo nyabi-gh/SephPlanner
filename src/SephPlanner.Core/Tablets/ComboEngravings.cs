@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using SephPlanner.Core.Model;
-using static SephPlanner.Core.Text.Localization;
+using SephPlanner.Core.Text;
 
 namespace SephPlanner.Core.Tablets
 {
@@ -120,7 +120,7 @@ namespace SephPlanner.Core.Tablets
                     return new FixedEffectResidualResult
                     {
                         Status = FixedEffectResidualStatus.Unsettled,
-                        Reason = Tr("콤보 각인 칸 {0} 의 효과가 게임 행렬에 아직 없습니다", source.Position),
+                        Reason = new Phrase("콤보 각인 칸 {0} 의 효과가 게임 행렬에 아직 없습니다", source.Position),
                     };
                 }
             }

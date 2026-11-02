@@ -1,3 +1,4 @@
+using SephPlanner.Core.Text;
 using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Core.Planning
@@ -11,8 +12,8 @@ namespace SephPlanner.Core.Planning
 
     public sealed class PlanVerification
     {
-        public static string GameNotRecalculated =>
-            Tr("게임이 석판 효과를 아직 지금 가방에 맞춰 다시 계산하지 않았습니다. 아이템을 하나 옮기면 게임이 다시 계산합니다.");
+        public static Phrase GameNotRecalculated =>
+            new Phrase("게임이 석판 효과를 아직 지금 가방에 맞춰 다시 계산하지 않았습니다. 아이템을 하나 옮기면 게임이 다시 계산합니다.");
 
         public PlanVerificationStatus Status { get; set; }
         public int LevelMismatches { get; set; }

@@ -2,6 +2,7 @@ using System.Collections;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Runtime;
 using SephPlanner.Core.Tablets;
+using SephPlanner.Core.Text;
 
 namespace SephPlanner.Tests;
 
@@ -27,6 +28,7 @@ public class ApplyPlanRoutineTests
         public bool WritesLandImmediately { get; set; } = true;
         public bool IsMultiplayerSession { get; set; }
         public string? StateError { get; set; }
+        Phrase? IInventoryPort.StateError => StateError == null ? null : Phrase.Verbatim(StateError);
 
         /// <summary>참가자 모드에서 쓰기가 반영되기까지 걸리는 시간(초).</summary>
         public double Latency { get; set; }
@@ -75,12 +77,12 @@ public class ApplyPlanRoutineTests
 
         public bool Occupied(GridPos cell) => Cells.ContainsKey(cell) || Unnumbered.Contains(cell);
 
-        public string? Swap(GridPos from, GridPos to)
+        public Phrase? Swap(GridPos from, GridPos to)
         {
             var index = _swaps++;
             BeforeSwap?.Invoke(index);
             Log.Add($"swap {from}->{to}");
-            if (FailingSwaps.Contains(index)) return "권한 없음";
+            if (FailingSwaps.Contains(index)) return Phrase.Verbatim("권한 없음");
             if (RejectedSwaps.Contains(index)) return null;
 
             Schedule(() =>
@@ -91,7 +93,7 @@ public class ApplyPlanRoutineTests
                 Put(from, b);
                 AfterSwap?.Invoke(index);
             });
-            return ErrorsAfterSwap.Contains(index) ? "교환 후 오류" : null;
+            return ErrorsAfterSwap.Contains(index) ? Phrase.Verbatim("교환 후 오류") : null;
         }
 
         public bool TryFindTablet(int instanceId, out GridPos cell, out int rotation, out bool rotatable)
@@ -115,7 +117,7 @@ public class ApplyPlanRoutineTests
             return false;
         }
 
-        public string? Press(GridPos cell)
+        public Phrase? Press(GridPos cell)
         {
             var index = _presses++;
             Log.Add($"press {cell}");
@@ -130,10 +132,10 @@ public class ApplyPlanRoutineTests
             return null;
         }
 
-        public string? Rotate(IReadOnlyList<TabletTurn> turns)
+        public Phrase? Rotate(IReadOnlyList<TabletTurn> turns)
         {
             Log.Add($"rotate {turns.Count}");
-            if (RotateError != null) return RotateError;
+            if (RotateError != null) return Phrase.Verbatim(RotateError);
             if (IgnoreHostRotation) return null;
             foreach (var turn in turns)
                 Tablets[turn.InstanceId] = (turn.Rotation, Tablets[turn.InstanceId].Rotatable);
@@ -241,7 +243,7 @@ public class ApplyPlanRoutineTests
 
         Assert.Equal(10, inventory.InstanceAt(At(1, 0)));
         Assert.True(routine.Settled);
-        AssertContains("자동 배치 완료", routine.Result);
+        AssertContains("자동 배치 완료", routine.Result.Korean);
     }
 
     /// <summary>
@@ -260,7 +262,7 @@ public class ApplyPlanRoutineTests
 
         Assert.Equal(0, inventory.SwapCount);
         Assert.False(routine.Settled);
-        AssertContains("옮길 수 없어", routine.Result);
+        AssertContains("옮길 수 없어", routine.Result.Korean);
     }
 
     private static (FakeInventory Inventory, Clock Clock) Host()
@@ -296,7 +298,7 @@ public class ApplyPlanRoutineTests
         Assert.Equal(10, inventory.InstanceAt(At(1, 0)));
         Assert.True(routine.RequiresResync);
         Assert.Equal(1, inventory.SwapCount);
-        AssertContains("늦게 적용될 수 있어", routine.Result);
+        AssertContains("늦게 적용될 수 있어", routine.Result.Korean);
     }
 
     [Fact]
@@ -311,7 +313,7 @@ public class ApplyPlanRoutineTests
         Assert.Equal(2, inventory.Tablets[1].Rotation);
         Assert.True(routine.RequiresResync);
         Assert.Equal(1, inventory.PressCount);
-        Assert.DoesNotContain("자동 배치 완료", routine.Result);
+        Assert.DoesNotContain("자동 배치 완료", routine.Result.Korean);
     }
 
     [Fact]
@@ -323,8 +325,8 @@ public class ApplyPlanRoutineTests
         inventory.IgnoreHostRotation = true;
         var routine = Routine(Command(Tablet(1, At(0, 0), At(0, 0), 0, 1)), inventory, clock);
         Drive(routine, inventory, clock);
-        AssertContains("최종 각도가 목표와 다릅니다", routine.Result);
-        Assert.DoesNotContain("자동 배치 완료", routine.Result);
+        AssertContains("최종 각도가 목표와 다릅니다", routine.Result.Korean);
+        Assert.DoesNotContain("자동 배치 완료", routine.Result.Korean);
     }
 
     [Fact]
@@ -342,8 +344,8 @@ public class ApplyPlanRoutineTests
         Assert.Equal(99, inventory.InstanceAt(At(1, 0)));
         Assert.Equal(11, inventory.InstanceAt(At(4, 0)));
         Assert.DoesNotContain("swap (1,0)->(3,0)", inventory.Log);
-        AssertContains("이동할 칸의 아이템이 바뀌어", routine.Result);
-        Assert.DoesNotContain("원래 배치로 되돌렸습니다", routine.Result);
+        AssertContains("이동할 칸의 아이템이 바뀌어", routine.Result.Korean);
+        Assert.DoesNotContain("원래 배치로 되돌렸습니다", routine.Result.Korean);
     }
 
     [Fact]
@@ -358,7 +360,7 @@ public class ApplyPlanRoutineTests
         Drive(routine, inventory, clock);
         Assert.Equal(99, inventory.InstanceAt(At(2, 0)));
         Assert.Equal(2, inventory.SwapCount);
-        AssertContains("되돌릴 칸의 아이템이 바뀌어", routine.Result);
+        AssertContains("되돌릴 칸의 아이템이 바뀌어", routine.Result.Korean);
     }
 
     [Fact]
@@ -376,8 +378,8 @@ public class ApplyPlanRoutineTests
             inventory.Settle();
             if (routine.Progress == "자동 배치 - 레벨 확인 중") inventory.Cells[At(1, 0)] = 99;
         }
-        AssertContains("목표 배치와 다릅니다", routine.Result);
-        Assert.DoesNotContain("자동 배치 완료", routine.Result);
+        AssertContains("목표 배치와 다릅니다", routine.Result.Korean);
+        Assert.DoesNotContain("자동 배치 완료", routine.Result.Korean);
     }
 
     [Fact]
@@ -408,7 +410,7 @@ public class ApplyPlanRoutineTests
         Assert.Equal(10, inventory.Cells[At(2, 0)]);
         Assert.Equal(11, inventory.Cells[At(0, 0)]);
         Assert.False(inventory.Cells.ContainsKey(At(1, 0)));
-        Assert.Equal("자동 배치 완료 - 이동 2건, 회전 0건", routine.Result);
+        Assert.Equal("자동 배치 완료 - 이동 2건, 회전 0건", routine.Result.Korean);
     }
 
     [Fact]
@@ -431,7 +433,7 @@ public class ApplyPlanRoutineTests
         Assert.Equal(
             new[] { "swap (0,0)->(1,0)", "swap (0,0)->(2,0)" },
             inventory.Log);
-        Assert.Equal("자동 배치 완료 - 이동 2건, 회전 0건", routine.Result);
+        Assert.Equal("자동 배치 완료 - 이동 2건, 회전 0건", routine.Result.Korean);
     }
 
     [Fact]
@@ -450,8 +452,8 @@ public class ApplyPlanRoutineTests
         Assert.Equal(10, inventory.Cells[At(2, 0)]);
         Assert.Equal(11, inventory.Cells[At(1, 0)]);
         Assert.Equal(2, inventory.Cells.Count);
-        AssertContains("(1,0) → (3,0) 이동이 게임에 반영되지 않아", routine.Result);
-        AssertContains("방에 재접속", routine.Result);
+        AssertContains("(1,0) → (3,0) 이동이 게임에 반영되지 않아", routine.Result.Korean);
+        AssertContains("방에 재접속", routine.Result.Korean);
         Assert.True(routine.RequiresResync);
         Assert.Equal(2, inventory.SwapCount);
     }
@@ -472,8 +474,8 @@ public class ApplyPlanRoutineTests
         Drive(routine, inventory, clock);
 
         Assert.Equal(10, inventory.Cells[At(2, 0)]);
-        AssertContains("되돌리기가 게임에 반영되지 않아 인벤토리가 중간 상태로 남았습니다", routine.Result);
-        Assert.DoesNotContain("원래 배치로 되돌렸습니다", routine.Result);
+        AssertContains("되돌리기가 게임에 반영되지 않아 인벤토리가 중간 상태로 남았습니다", routine.Result.Korean);
+        Assert.DoesNotContain("원래 배치로 되돌렸습니다", routine.Result.Korean);
     }
 
     [Fact]
@@ -490,8 +492,8 @@ public class ApplyPlanRoutineTests
 
         Assert.Equal(10, inventory.Cells[At(0, 0)]);
         Assert.Equal(11, inventory.Cells[At(1, 0)]);
-        AssertContains("이동 중 오류(권한 없음)", routine.Result);
-        AssertContains("원래 배치로 되돌렸습니다.", routine.Result);
+        AssertContains("이동 중 오류(권한 없음)", routine.Result.Korean);
+        AssertContains("원래 배치로 되돌렸습니다.", routine.Result.Korean);
     }
 
     /// <summary>
@@ -515,7 +517,7 @@ public class ApplyPlanRoutineTests
 
         Assert.Equal(10, inventory.Cells[At(0, 0)]);
         Assert.Equal(11, inventory.Cells[At(1, 0)]);
-        AssertContains("원래 배치로 되돌렸습니다.", routine.Result);
+        AssertContains("원래 배치로 되돌렸습니다.", routine.Result.Korean);
     }
 
     [Theory]
@@ -537,7 +539,7 @@ public class ApplyPlanRoutineTests
 
         Assert.True(routine.Settled);
         Assert.Equal(10, inventory.Cells[At(2, 0)]);
-        Assert.Equal("자동 배치 완료 - 이동 1건, 회전 0건", routine.Result);
+        Assert.Equal("자동 배치 완료 - 이동 1건, 회전 0건", routine.Result.Korean);
         Assert.Null(routine.DiagnosticError);
         Assert.False(routine.RequiresResync);
     }
@@ -557,9 +559,9 @@ public class ApplyPlanRoutineTests
 
         Assert.False(routine.Settled);
         Assert.Equal(10, inventory.Cells[At(2, 0)]);
-        AssertContains("칸 레벨이 전부 0", routine.Result);
-        Assert.Contains("칸 레벨이 전부 0", routine.DiagnosticError!);
-        Assert.DoesNotContain("계산에 없는 효과", routine.Result);
+        AssertContains("칸 레벨이 전부 0", routine.Result.Korean);
+        Assert.Contains("칸 레벨이 전부 0", routine.DiagnosticError!.Korean);
+        Assert.DoesNotContain("계산에 없는 효과", routine.Result.Korean);
     }
 
     /// <summary>
@@ -581,9 +583,9 @@ public class ApplyPlanRoutineTests
         var routine = Routine(Command(Charm(10, At(0, 0), At(2, 0)), Charm(11, At(1, 0), At(3, 0))), inventory, clock);
         Drive(routine, inventory, clock);
 
-        AssertContains("되돌리기도 실패해", routine.Result);
-        AssertContains("칸 레벨이 전부 0", routine.Result);
-        Assert.DoesNotContain("손으로 정리한 뒤", routine.Result);
+        AssertContains("되돌리기도 실패해", routine.Result.Korean);
+        AssertContains("칸 레벨이 전부 0", routine.Result.Korean);
+        Assert.DoesNotContain("손으로 정리한 뒤", routine.Result.Korean);
     }
 
     [Fact]
@@ -599,9 +601,9 @@ public class ApplyPlanRoutineTests
         var routine = Routine(Command(Charm(10, At(0, 0), At(2, 0)), Charm(11, At(1, 0), At(3, 0))), inventory, clock);
         Drive(routine, inventory, clock);
 
-        AssertContains("되돌리기도 실패해", routine.Result);
-        AssertContains("손으로 정리한 뒤", routine.Result);
-        Assert.DoesNotContain("칸 레벨이 전부 0", routine.Result);
+        AssertContains("되돌리기도 실패해", routine.Result.Korean);
+        AssertContains("손으로 정리한 뒤", routine.Result.Korean);
+        Assert.DoesNotContain("칸 레벨이 전부 0", routine.Result.Korean);
     }
 
     [Fact]
@@ -620,9 +622,9 @@ public class ApplyPlanRoutineTests
         Assert.Equal(1, inventory.SwapCount);
         Assert.True(routine.RequiresResync);
         Assert.False(routine.Settled);
-        Assert.Contains("효과 연결", routine.Result);
-        Assert.Contains("재접속", routine.Result);
-        Assert.DoesNotContain("손으로 정리", routine.Result);
+        Assert.Contains("효과 연결", routine.Result.Korean);
+        Assert.Contains("재접속", routine.Result.Korean);
+        Assert.DoesNotContain("손으로 정리", routine.Result.Korean);
     }
 
     [Fact]
@@ -637,7 +639,7 @@ public class ApplyPlanRoutineTests
 
         Assert.Equal(0, inventory.SwapCount);
         Assert.True(routine.RequiresResync);
-        Assert.Contains("재접속", routine.Result);
+        Assert.Contains("재접속", routine.Result.Korean);
     }
 
     [Fact]
@@ -673,8 +675,8 @@ public class ApplyPlanRoutineTests
         Drive(routine, inventory, clock);
 
         Assert.Equal(10, inventory.Cells[At(0, 0)]);
-        AssertContains("원래 배치로 되돌렸습니다.", routine.Result);
-        AssertContains("칸 레벨이 전부 0", routine.Result);
+        AssertContains("원래 배치로 되돌렸습니다.", routine.Result.Korean);
+        AssertContains("칸 레벨이 전부 0", routine.Result.Korean);
     }
 
     [Fact]
@@ -701,8 +703,8 @@ public class ApplyPlanRoutineTests
             if (++frames == 6) inventory.ThrowOnNextRead = true;
         }
 
-        AssertContains("적용 도중 오류가 나 자동 배치를 중단했습니다(destroyed)", routine.Result);
-        AssertContains("방에 재접속", routine.Result);
+        AssertContains("적용 도중 오류가 나 자동 배치를 중단했습니다(destroyed)", routine.Result.Korean);
+        AssertContains("방에 재접속", routine.Result.Korean);
         Assert.True(routine.RequiresResync);
         Assert.Equal(10, inventory.Cells[At(2, 0)]);
         Assert.Equal(11, inventory.Cells[At(1, 0)]);
@@ -733,8 +735,8 @@ public class ApplyPlanRoutineTests
             if (routine.Progress == "자동 배치 - 되돌리는 중") inventory.Latency = 0.5;
         }
 
-        AssertContains("30초 안에 끝내지 못해", routine.Result);
-        AssertContains("원래 배치로 되돌렸습니다.", routine.Result);
+        AssertContains("30초 안에 끝내지 못해", routine.Result.Korean);
+        AssertContains("원래 배치로 되돌렸습니다.", routine.Result.Korean);
         // 2.5초짜리 걸음 열둘이 30초를 채우고, 열셋째는 보내지 않는다. 되돌리기도 열둘이다.
         Assert.Equal(24, inventory.SwapCount);
         for (var i = 0; i < 14; i++) Assert.Equal(10 + i, inventory.Cells[At(i % Width, i / Width)]);
@@ -759,7 +761,7 @@ public class ApplyPlanRoutineTests
 
         Assert.Equal(3, inventory.PressCount);
         Assert.Equal(0, inventory.Tablets[1].Rotation);
-        Assert.Equal("자동 배치 완료 - 이동 0건, 회전 1건", routine.Result);
+        Assert.Equal("자동 배치 완료 - 이동 0건, 회전 1건", routine.Result.Korean);
     }
 
     [Fact]
@@ -780,7 +782,7 @@ public class ApplyPlanRoutineTests
         Assert.Equal(new[] { "rotate 1" }, inventory.Log);
         Assert.Equal(2, inventory.Tablets[1].Rotation);
         Assert.Equal(3, inventory.Tablets[2].Rotation);
-        Assert.Equal("자동 배치 완료 - 이동 0건, 회전 1건", routine.Result);
+        Assert.Equal("자동 배치 완료 - 이동 0건, 회전 1건", routine.Result.Korean);
     }
 
     [Fact]
@@ -801,8 +803,8 @@ public class ApplyPlanRoutineTests
 
         Assert.Equal(1, inventory.Cells[At(0, 0)]);
         Assert.Equal(10, inventory.Cells[At(2, 0)]);
-        AssertContains("회전 중 오류가 나 원래 각도로 되돌렸습니다(테스트).", routine.Result);
-        AssertContains("원래 배치로 되돌렸습니다.", routine.Result);
+        AssertContains("회전 중 오류가 나 원래 각도로 되돌렸습니다(테스트).", routine.Result.Korean);
+        AssertContains("원래 배치로 되돌렸습니다.", routine.Result.Korean);
     }
 
     [Fact]
@@ -824,9 +826,9 @@ public class ApplyPlanRoutineTests
         Assert.Equal(1, inventory.Tablets[1].Rotation);
         Assert.Equal(10, inventory.Cells[At(3, 0)]);
         Assert.Equal(2, inventory.PressCount);
-        AssertContains("회전이 시간 안에 반영되지 않았습니다", routine.Result);
+        AssertContains("회전이 시간 안에 반영되지 않았습니다", routine.Result.Korean);
         Assert.True(routine.RequiresResync);
-        AssertContains("방에 재접속", routine.Result);
+        AssertContains("방에 재접속", routine.Result.Korean);
     }
 
     [Fact]
@@ -854,8 +856,8 @@ public class ApplyPlanRoutineTests
         }
 
         Assert.Equal(1, inventory.PressCount);
-        AssertContains("(0,0) 에 없습니다", routine.Result);
-        AssertContains("각도를 되돌리지 못했습니다", routine.Result);
+        AssertContains("(0,0) 에 없습니다", routine.Result.Korean);
+        AssertContains("각도를 되돌리지 못했습니다", routine.Result.Korean);
     }
 
     [Fact]
@@ -870,7 +872,7 @@ public class ApplyPlanRoutineTests
         Drive(routine, inventory, clock);
 
         Assert.Empty(inventory.Log);
-        AssertContains("회전이 잠겨 중단합니다", routine.Result);
+        AssertContains("회전이 잠겨 중단합니다", routine.Result.Korean);
     }
 
     [Fact]
@@ -891,7 +893,7 @@ public class ApplyPlanRoutineTests
             if (++frames == 3) inventory.IsMultiplayerSession = true;
         }
 
-        AssertContains("멀티플레이 세션이 되어", routine.Result);
+        AssertContains("멀티플레이 세션이 되어", routine.Result.Korean);
         Assert.Equal(10, inventory.Cells[At(0, 0)]);
         Assert.Equal(11, inventory.Cells[At(1, 0)]);
     }
@@ -914,8 +916,8 @@ public class ApplyPlanRoutineTests
             if (++frames == 6) inventory.Alive = false;
         }
 
-        AssertContains("인벤토리가 사라져", routine.Result);
-        Assert.DoesNotContain("원래 배치로 되돌렸습니다", routine.Result);
+        AssertContains("인벤토리가 사라져", routine.Result.Korean);
+        Assert.DoesNotContain("원래 배치로 되돌렸습니다", routine.Result.Korean);
     }
 
     [Fact]
@@ -932,7 +934,7 @@ public class ApplyPlanRoutineTests
         Drive(routine, inventory, clock);
 
         Assert.Equal(10, inventory.Cells[At(1, 0)]);
-        Assert.StartsWith("자동 배치 완료 - 이동 1건, 회전 0건. 적용 뒤 레벨이 예상과 다른 칸 1개((1,0) 계산 3 != 게임 1)", routine.Result);
+        Assert.StartsWith("자동 배치 완료 - 이동 1건, 회전 0건. 적용 뒤 레벨이 예상과 다른 칸 1개((1,0) 계산 3 != 게임 1)", routine.Result.Korean);
     }
 
     [Fact]
@@ -956,7 +958,7 @@ public class ApplyPlanRoutineTests
             if (++frames == 12) inventory.Levels[At(1, 0)] = 3;
         }
 
-        Assert.Equal("자동 배치 완료 - 이동 1건, 회전 0건", routine.Result);
+        Assert.Equal("자동 배치 완료 - 이동 1건, 회전 0건", routine.Result.Korean);
     }
 
     [Fact]
@@ -970,6 +972,6 @@ public class ApplyPlanRoutineTests
         Drive(routine, inventory, clock);
 
         Assert.Empty(inventory.Log);
-        Assert.Equal("자동 배치 완료 - 이동 0건, 회전 0건", routine.Result);
+        Assert.Equal("자동 배치 완료 - 이동 0건, 회전 0건", routine.Result.Korean);
     }
 }

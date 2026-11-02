@@ -244,7 +244,7 @@ namespace SephPlanner.Plugin
                     ? "  게임 행렬에서 되뺀 값: 게임이 다시 계산하기 전이라 되빼지 않음"
                     : $"  게임 행렬에서 되뺀 값({layer.Residual.Status}): " +
                       FixedEffectResidual.Describe(layer.Residual.Cells, limit: 64) +
-                      (layer.Residual.Reason.Length > 0 ? " - " + layer.Residual.Reason : ""));
+                      (layer.Residual.Reason != null ? " - " + layer.Residual.Reason.Korean : ""));
                 foreach (var tablet in layer.View.Stale)
                 {
                     text.AppendLine(
@@ -254,8 +254,8 @@ namespace SephPlanner.Plugin
                 if (layer.Mismatch.Length > 0)
                     text.AppendLine("  " + layer.Mismatch + " / 원본에 없는 칸: " +
                                     FixedEffectResidual.Describe(layer.Unexplained, limit: 64));
-                if (layer.Blocker.Length > 0) text.AppendLine("  막힘: " + layer.Blocker);
-                if (layer.Pending.Length > 0) text.AppendLine("  보류: " + layer.Pending);
+                if (layer.Blocker != null) text.AppendLine("  막힘: " + layer.Blocker.Korean);
+                if (layer.Pending != null) text.AppendLine("  보류: " + layer.Pending.Korean);
             });
 
             Section("offers", () => WriteOffers(text, inv, player, offerRadius));

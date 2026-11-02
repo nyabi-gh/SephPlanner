@@ -15,6 +15,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using static SephPlanner.Core.Text.Localization;
 using Localization = SephPlanner.Core.Text.Localization;
+using Phrase = SephPlanner.Core.Text.Phrase;
 
 namespace SephPlanner.Plugin
 {
@@ -35,6 +36,7 @@ namespace SephPlanner.Plugin
         private bool _inRun;
         private PlanVerificationStatus _simulationVerification;
         private string _simulationReason = "실시간 시뮬레이션 검증이 아직 완료되지 않았습니다.";
+        private string _simulationReasonKorean = "";
         private string _lastSephiriteReport;
         private int _verifiedTablets;
         private int _verifiedFixedCells;
@@ -61,7 +63,8 @@ namespace SephPlanner.Plugin
         private DiagnosticText _diagnosticLog;
         private DiagnosticUploadClient _diagnosticClient;
         private CancellationTokenSource _diagnosticCancellation;
-        private Task<string> _diagnosticTask;
+        // 화면 문장과 로그 문장. 문장 형식(Phrase)으로 들지 않는 것은 필드 형식이 클래스를 올릴 때 풀려서다(_guideLanguage).
+        private Task<(string Shown, string Logged)> _diagnosticTask;
         private readonly DiagnosticUploadThrottle _diagnosticThrottle = new DiagnosticUploadThrottle(DiagnosticUploadThrottle.DefaultInterval);
         private string _diagnosticNotice;
         private float _diagnosticNoticeUntil;
@@ -726,11 +729,11 @@ namespace SephPlanner.Plugin
             {
                 var seconds = Math.Ceiling(remaining.TotalSeconds);
                 var message = capture.HasFailures
-                    ? Tr("이번 진단은 로컬에 저장했습니다. {0}초 뒤부터 다시 전송할 수 있습니다. 일부 자료 수집에 실패했습니다.", seconds)
-                    : Tr("이번 진단은 로컬에 저장했습니다. {0}초 뒤부터 다시 전송할 수 있습니다.", seconds);
-                ReportDiagnostic(message);
-                Logger.LogInfo(message);
-                try { File.WriteAllText(Path.Combine(capture.DirectoryPath, "upload-result.txt"), message); }
+                    ? new Phrase("이번 진단은 로컬에 저장했습니다. {0}초 뒤부터 다시 전송할 수 있습니다. 일부 자료 수집에 실패했습니다.", seconds)
+                    : new Phrase("이번 진단은 로컬에 저장했습니다. {0}초 뒤부터 다시 전송할 수 있습니다.", seconds);
+                ReportDiagnostic(message.ToString());
+                Logger.LogInfo(message.Korean);
+                try { File.WriteAllText(Path.Combine(capture.DirectoryPath, "upload-result.txt"), message.Korean); }
                 catch (Exception ex) { Logger.LogWarning("진단 전송 제한 기록을 저장하지 못했습니다: " + ex); }
                 return;
             }
@@ -751,23 +754,24 @@ namespace SephPlanner.Plugin
                     File.WriteAllBytes(Path.Combine(capture.DirectoryPath, "report.zip"), archive);
                     var receipt = await _diagnosticClient.SendAsync(new Uri(DiagnosticUploadClient.DefaultEndpoint), consent,
                         capture.Id, archive, cancellation).ConfigureAwait(false);
-                    var message = Tr("진단 접수 완료 · 제보 번호 {0}", receipt);
-                    if (capture.HasFailures) message += " · " + Tr("일부 자료 수집 실패 포함");
-                    try { File.WriteAllText(Path.Combine(capture.DirectoryPath, "upload-result.txt"), message); }
+                    var message = Phrase.Join(" · ", new Phrase("진단 접수 완료 · 제보 번호 {0}", receipt),
+                        capture.HasFailures ? new Phrase("일부 자료 수집 실패 포함") : null);
+                    try { File.WriteAllText(Path.Combine(capture.DirectoryPath, "upload-result.txt"), message.Korean); }
                     catch (Exception saveError)
                     {
                         Logger.LogWarning("진단은 접수됐지만 로컬 접수 기록 저장에 실패했습니다: " + saveError);
-                        message += " · " + Tr("로컬 접수 기록 저장 실패");
+                        message = Phrase.Join(" · ", message, new Phrase("로컬 접수 기록 저장 실패"));
                     }
-                    return message;
+                    return (message.ToString(), message.Korean);
                 }
                 catch (Exception ex)
                 {
-                    var message = Tr("진단 전송 실패: {0} · 로컬 보관: {1}", _diagnosticLog.Redact(ex.Message), capture.DirectoryPath);
-                    Logger.LogWarning(message);
-                    try { File.WriteAllText(Path.Combine(capture.DirectoryPath, "upload-result.txt"), message); }
+                    var message = new Phrase("진단 전송 실패: {0} · 로컬 보관: {1}",
+                        Phrase.Of(ex, _diagnosticLog.Redact), capture.DirectoryPath);
+                    Logger.LogWarning(message.Korean);
+                    try { File.WriteAllText(Path.Combine(capture.DirectoryPath, "upload-result.txt"), message.Korean); }
                     catch (Exception saveError) { Logger.LogWarning("진단 전송 실패 기록도 저장하지 못했습니다: " + saveError); }
-                    return message;
+                    return (message.ToString(), message.Korean);
                 }
             });
             ReportDiagnostic(Tr("진단을 비공개 서버로 전송 중입니다. 게임을 계속할 수 있습니다."));
@@ -783,9 +787,9 @@ namespace SephPlanner.Plugin
             _automaticUpload = false;
             _diagnosticCancellation.Dispose();
             _diagnosticCancellation = null;
-            var message = completed.GetAwaiter().GetResult();
-            Logger.LogInfo(message);
-            ReportDiagnostic(message);
+            var (shown, logged) = completed.GetAwaiter().GetResult();
+            Logger.LogInfo(logged);
+            ReportDiagnostic(shown);
         }
 
         private void ReportDiagnostic(string message)
@@ -870,7 +874,7 @@ namespace SephPlanner.Plugin
                 catch (Exception ex)
                 {
                     Logger.LogWarning("업데이트 실패: " + ex);
-                    return ex is OperationCanceledException ? Tr("시간이 너무 오래 걸려 그만두었습니다.") : ex.Message;
+                    return ex is OperationCanceledException ? Tr("시간이 너무 오래 걸려 그만두었습니다.") : Phrase.Of(ex).ToString();
                 }
             });
         }
@@ -1005,14 +1009,16 @@ namespace SephPlanner.Plugin
 
         private void VerifySimulation(RuntimeSimulationCheck verification)
         {
-            var changed = verification.Status != _simulationVerification ||
-                          verification.Reason != _simulationReason;
+            // 같은 어긋남인지는 한국어로 가른다. 화면 언어를 바꿨다고 새 어긋남으로 다시 알리지 않게.
+            var korean = verification.Reason?.Korean ?? "";
+            var changed = verification.Status != _simulationVerification || korean != _simulationReasonKorean;
             _simulationVerification = verification.Status;
-            _simulationReason = verification.Reason;
+            _simulationReason = verification.Reason?.ToString() ?? "";
+            _simulationReasonKorean = korean;
             if (changed && verification.Status == PlanVerificationStatus.Failed)
             {
-                Logger.LogWarning(verification.Reason);
-                QueueAutomaticDiagnostic("시뮬레이션 불일치", verification.Reason);
+                Logger.LogWarning(korean);
+                QueueAutomaticDiagnostic("시뮬레이션 불일치", korean);
             }
 
             _unexplainedFixedCells = verification.UnexplainedFixedCells;
@@ -1450,7 +1456,7 @@ namespace SephPlanner.Plugin
             // 참가자 세션의 적용은 걸음마다 서버 왕복을 기다려 수 초가 걸린다. 그동안 아무 말이
             // 없으면 인벤토리가 저 혼자 움직이는 것으로만 보인다.
             if (PlanApplier.InProgress) return PlanApplier.Progress;
-            if (PlanApplier.RecoveryRequired) return PlanApplier.RecoveryMessage;
+            if (PlanApplier.RecoveryRequired) return PlanApplier.RecoveryMessage.ToString();
 
             // 이동 중에는 커서 좌표를 그대로 보여준다. 화면이 따라오지 않을 때 커서를 못 읽는
             // 것인지 자리가 안 먹는 것인지, 로그를 뒤지지 않고 화면에서 바로 갈린다.
@@ -1627,15 +1633,15 @@ namespace SephPlanner.Plugin
         /// 직후의 재계산은 답을 이미 아는 문제를 다시 푸는 일이고, 회전이 바뀐 탓에 빔 캐시도
         /// 못 써서 세션에서 가장 비싸다.
         /// </param>
-        private void AutoPlaceFinished(string result, Plan applied)
+        private void AutoPlaceFinished(Phrase result, Plan applied)
         {
-            Logger.LogInfo(result);
+            Logger.LogInfo(result.Korean);
             if (applied != null) _runner?.MarkApplied(applied);
 
             // 자동 배치 결과는 다른 안내보다 오래 띄운다. 실패하면 "손으로 정리한 뒤 다시
             // 시도하세요" 같은 긴 문장이 오는데, 전투 중이면 여섯 초로는 읽다 만다.
             // 이 길이는 재어 본 값이 아니라 읽는 데 걸릴 시간을 어림한 것이다.
-            Report(result, AutoPlaceNoticeSeconds);
+            Report(result.ToString(), AutoPlaceNoticeSeconds);
 
             // 적용 결과가 화면에 바로 보이도록 다음 폴링을 기다리지 않는다.
             _nextPoll = 0;

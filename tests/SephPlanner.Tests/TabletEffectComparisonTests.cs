@@ -31,9 +31,9 @@ public class TabletEffectComparisonTests
     public void NumbersTheGameAppliesMustStillMatch()
     {
         Assert.Equal("효과 [0] 수치 2 != 3", TabletEffectComparison.FirstDifference(
-            Ours("2"), Game(TabletEffectKind.IncreaseConstLevel, 3)));
+            Ours("2"), Game(TabletEffectKind.IncreaseConstLevel, 3))?.Korean);
         Assert.Equal("효과 [0] 수치 2 != 3", TabletEffectComparison.FirstDifference(
-            Ours("MUL/2"), Game(TabletEffectKind.MultiplyConstLevel, 3)));
+            Ours("MUL/2"), Game(TabletEffectKind.MultiplyConstLevel, 3))?.Korean);
         Assert.Null(TabletEffectComparison.FirstDifference(
             Ours("-2"), Game(TabletEffectKind.IncreaseConstLevel, -2)));
     }
@@ -42,10 +42,10 @@ public class TabletEffectComparisonTests
     public void KindCountAndPositionAreAlwaysCompared()
     {
         Assert.Equal("효과 [0] 종류 None != IncreaseConstLevel", TabletEffectComparison.FirstDifference(
-            Ours("NEPR_TWIN"), Game(TabletEffectKind.IncreaseConstLevel, 0)));
+            Ours("NEPR_TWIN"), Game(TabletEffectKind.IncreaseConstLevel, 0))?.Korean);
         Assert.Equal("효과 칸 수 1 != 0", TabletEffectComparison.FirstDifference(
-            Ours("1"), Array.Empty<AppliedTabletEffect>()));
+            Ours("1"), Array.Empty<AppliedTabletEffect>())?.Korean);
         Assert.Equal("효과 [0] 위치 불일치", TabletEffectComparison.FirstDifference(
-            Ours("1"), new[] { new AppliedTabletEffect(new GridPos(0, 0), TabletEffectKind.IncreaseConstLevel, 1) }));
+            Ours("1"), new[] { new AppliedTabletEffect(new GridPos(0, 0), TabletEffectKind.IncreaseConstLevel, 1) })?.Korean);
     }
 }
