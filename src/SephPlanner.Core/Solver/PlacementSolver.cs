@@ -1898,7 +1898,7 @@ namespace SephPlanner.Core.Solver
                     PriorityPlacement.Contribute(problem, charm, true, positions[charm.InstanceId],
                         neighbors!, categories, ref comboProgress))
                     comboMatches++;
-                if (designated && !part.Inactive && DirectedCharmSupport.HasConnection(charm) &&
+                if (designated && !part.Inactive && DirectedCharmSupport.Strengthens(charm) &&
                     DirectedCharmSupport.ConnectedTarget(charm, positions[charm.InstanceId], result, problem.Grid,
                         occupancy, neighbors, out var linked) && linked.IsSupportTarget) supportMatches++;
             }
@@ -2064,7 +2064,7 @@ namespace SephPlanner.Core.Solver
                     if (RequiresUse(problem, charm) && !charm.IsFiller && usable) priority -= unit * unit * unit * unit;
                     if (!ScalesPosition.Accepts(problem, charm, cell)) priority += unit * unit * unit * unit;
                     if (charm.Held && !charm.IsFiller && result.IgnoreCriteriaAt(cell) > 0) priority -= unit * unit * unit;
-                    if (designated && !charm.IsFiller && DirectedCharmSupport.HasConnection(charm) &&
+                    if (designated && !charm.IsFiller && DirectedCharmSupport.Strengthens(charm) &&
                         Reason(charm, cell, result, problem.Grid, occupancy) == CharmInactiveReason.None &&
                         DirectedCharmSupport.ConnectedTarget(charm, cell, result, problem.Grid, occupancy, neighbors, out var linked) &&
                         linked.IsSupportTarget)
@@ -2444,7 +2444,7 @@ namespace SephPlanner.Core.Solver
                     var connected = DirectedCharmSupport.ConnectedTarget(charm, positions[charm.InstanceId], result,
                         problem.Grid, occupancy, neighbors, out var linked);
                     unlinked = !connected;
-                    if (problem.DesignatedTargets.Count > 0)
+                    if (problem.DesignatedTargets.Count > 0 && DirectedCharmSupport.Strengthens(charm))
                     {
                         if (connected && linked.IsSupportTarget) arrangement.SupportTargetMatches++;
                         else if (DirectedCharmSupport.WantsDesignatedTarget(problem, charm))

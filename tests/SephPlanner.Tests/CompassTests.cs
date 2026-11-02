@@ -199,6 +199,27 @@ public class CompassTests
     }
 
     /// <summary>
+    /// 강화 대상 지정은 대상에게 몫을 주는 나침반만 센다. 분배·돌파는 몫이 없어(게임 <c>OnRequestCharmDamageBonus</c>
+    /// 가 0) 지정 대상 옆에 붙여도 얻는 것이 없다 - 세면 점수를 깎아서라도 거기 붙인다.
+    /// </summary>
+    [Fact]
+    public void OnlyCompassesWithTheirOwnBonusMeetADesignatedTarget()
+    {
+        var target = Root(1, "EMBER");
+        target.IsSupportTarget = true;
+        var alone = Score(Problem(new GridSpec(1, 2, 2),
+            (target, new GridPos(0, 0)),
+            (Breakthrough(2), new GridPos(0, 1))));
+        var damage = Score(Problem(new GridSpec(1, 2, 2),
+            (target, new GridPos(0, 0)),
+            (DamageUp(3), new GridPos(0, 1))));
+
+        Assert.Equal(0, alone.SupportTargetMatches);
+        Assert.Empty(alone.UnmatchedSupportCharms);
+        Assert.Equal(1, damage.SupportTargetMatches);
+    }
+
+    /// <summary>
     /// 지금 자리 몫은 게임이 매긴 카테고리로 뺀다. 나침반이 꺼져 있어 게임이 아무것도 세지 않았는데
     /// 우리 셈으로 빼면 바탕 개수가 하나 모자라진다.
     /// </summary>

@@ -8,9 +8,15 @@ namespace SephPlanner.Core.Solver
 {
     internal static class DirectedCharmSupport
     {
-        internal static bool HasConnection(CharmSlot charm) =>
-            charm.Definition.MagicSupport is not null || PositionalWorth.IsNeedle(charm.Definition) ||
-            Compass.Is(charm.Definition);
+        internal static bool HasConnection(CharmSlot charm) => Strengthens(charm) || Compass.Is(charm.Definition);
+
+        /// <summary>
+        /// 이어진 대상에게 제 몫을 주는가. 강화 대상 지정은 이것만 센다 - 분배·돌파의 나침반은 아래 나침반을
+        /// 이어 줄 뿐 몫이 없다(게임 <c>OnRequestCharmDamageBonus</c> 가 0). 그 아래 피해 나침반이 대상에 닿으면
+        /// 그것이 센다.
+        /// </summary>
+        internal static bool Strengthens(CharmSlot charm) =>
+            charm.Definition.MagicSupport is not null || PositionalWorth.IsNeedle(charm.Definition);
 
         internal static (int X, int Y) Offset(CharmSlot charm) =>
             charm.Definition.MagicSupport is { } support

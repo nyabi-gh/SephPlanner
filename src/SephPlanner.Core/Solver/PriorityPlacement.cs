@@ -28,7 +28,7 @@ namespace SephPlanner.Core.Solver
 
             // 강화 대상 지정이 콤보 우선보다 앞서므로, 침이 지정을 따르느라 콤보를 못 보인 것이
             // 가장 흔한 이유다. "자리를 못 찾았다" 로 뭉뚱그리면 사용자가 없는 자리를 찾으러 간다.
-            if (problem.DesignatedTargets.Count > 0 && DirectedCharmSupport.HasConnection(charm) &&
+            if (problem.DesignatedTargets.Count > 0 && DirectedCharmSupport.Strengthens(charm) &&
                 DirectedCharmSupport.WantsDesignatedTarget(problem, charm))
                 return Tr("‘침·모래시계·별조각 우선’으로 지정한 아이템을 강화하느라 이 콤보를 복사하지 못했습니다. 콤보를 우선하려면 빌드 창(기본 F2)에서 강화받는 아이템의 ‘침·모래시계·별조각 우선’을 끄세요.");
 
@@ -91,7 +91,7 @@ namespace SephPlanner.Core.Solver
             if (problem.DesignatedTargets.Count == 0) return warnings;
 
             var helpers = problem.Charms.FindAll(
-                charm => !charm.IsFiller && DirectedCharmSupport.HasConnection(charm));
+                charm => !charm.IsFiller && DirectedCharmSupport.Strengthens(charm));
             if (helpers.Count == 0) return warnings;
 
             foreach (var target in problem.DesignatedTargets)
