@@ -266,6 +266,12 @@ namespace SephPlanner.Plugin
                 Retire(AutoPlaceKey, new Shortcut(KeyCode.Return, KeyCode.LeftControl, KeyCode.LeftAlt));
                 migrated.Value = true;
             }
+            // 해제한 채 닫으면 패드 없이는 창을 다시 열 길이 없고, 창작마당 판에는 손으로 고칠 설정 파일도 없다.
+            if (SettingsKey.Value.MainKey == KeyCode.None)
+            {
+                SettingsKey.Value = SettingsKey.DefaultValue;
+                _log($"{SettingsKey.Key} 가 해제돼 있어 기본값 {SettingsKey.Value} 로 되돌렸습니다.");
+            }
             foreach (var shortcut in _shortcuts)
                 shortcut.SettingChanged += (_, _) => _shortcutRevision++;
             foreach (var shortcut in _shortcuts) WarnIfGameKey(shortcut);
@@ -427,7 +433,8 @@ namespace SephPlanner.Plugin
             var value = entry.Value;
             if (value.MainKey == KeyCode.None)
                 return entry == SettingsKey
-                    ? Tr("설정 창 단축키가 해제됐습니다. 닫기 전에 다시 지정하거나 BepInEx 설정 파일에서 복원하세요.")
+                    ? Tr("설정 창 단축키가 해제됐습니다. 닫기 전에 다시 지정하세요. 해제한 채로 두면 다음 실행 때 {0} 로 돌아갑니다.",
+                        Describe(SettingsKey.DefaultValue))
                     : "";
             var warnings = new List<string>();
             if (GameKeys.Contains(value.MainKey) || value.Modifiers.Any(GameKeys.Contains))
