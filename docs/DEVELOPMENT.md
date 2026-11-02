@@ -7,12 +7,23 @@
 
 ```
 SephPlanner.Core      게임 상태 모델 + 솔버와 배치 계산 (netstandard2.1)
-SephPlanner.Plugin    BepInEx 플러그인. 게임 상태를 읽어 배치를 풀고 게임 HUD 안에 직접
-                      그린다. 멀티 세션의 자동 배치는 설정으로 연다
+SephPlanner.Plugin    플러그인 본체. 게임 상태를 읽어 배치를 풀고 게임 HUD 안에 직접 그린다.
+                      멀티 세션의 자동 배치는 설정으로 연다. 이 프로젝트가 BepInEx 판을 짓는다.
+                      Host/        두 판이 함께 쓰는 설정·단축키·로그 층
+                      BepInExHost/ BepInEx 판에만 드는 것 - 진입점, 설정 파일, 네트워크(진단 전송·게임 안 업데이트)
+SephPlanner.Workshop  창작마당 판. Plugin 소스를 BepInExHost 없이 링크하고 게임 모드 로더의 진입점과
+                      모드 옵션 저장소를 더한다. 게임 1.1.x 로만 빌드된다
 SephPlanner.DataTool  게임 없이 도는 CLI. 텍스트 추출, 스냅샷 대조, 콤보·아티팩트 값어치 측정
 SephPlanner.Diagnostics  F10 진단을 받는 수집 서버(ASP.NET Core). docs/DIAGNOSTIC-UPLOAD.md
 SephPlanner.Tests     Core 단위 테스트. 게임 없이 돈다
+SephPlanner.Plugin.Net  (tests/) BepInExHost/Net 을 배포와 같은 netstandard2.1 로 지어 시험에 넘긴다
 ```
+
+**네트워크 코드는 BepInEx 판의 플러그인 DLL 에만 있다.** 창작마당 모드는 정보 수집·외부 전송이 금지되고 실행 중 DLL 을
+바꾸면 로드되지 않으므로(docs/LEGAL.md 의 "창작마당 모드 규칙") 창작마당 판에는 아예 넣지 않는다. 그렇다고 따로
+어셈블리로 빼지도 않는다 - 0.5.1 까지의 게임 안 업데이트는 ZIP 에서 DLL 둘(`SephPlanner.Plugin.dll`·`SephPlanner.Core.dll`)
+만 꺼내므로, BepInEx 판에 셋째 DLL 이 생기면 옛 판에서 업데이트한 사람의 플러그인이 뜨지 않는다. 플러그인 본체는
+`partial` 클래스이고, 네트워크 자리는 몸체 없는 `partial void` 라 창작마당 판에서는 부르는 자리째 빠진다.
 
 ## 빌드
 
@@ -53,7 +64,35 @@ scripts/check.ps1
 마지막 항목이 따로 필요한 이유가 있다. CI 는 `SephPlanner.Core`, 진단 도구와 테스트를 검사한다. 플러그인은
 게임 어셈블리를 참조하는데 그것을 저장소나 CI 에 둘 수 없기 때문이다(docs/LEGAL.md). 그래서
 **플러그인만 깨지는 변경은 CI 를 초록으로 통과한다.** 릴리스 스크립트가 결국 잡아내지만, 그때는
-이미 배포를 자르는 중이다.
+이미 배포를 자르는 중이다. 게임이 1.1.x 면 `check.ps1` 이 창작마당 판도 세운다. 1.0.33 사본으로 돌리면 그 판에 모드 API 가
+없어 건너뛰고 그렇다고 출력한다. 창작마당 판은 그래서 솔루션에 넣지 않았다.
+
+### 창작마당 판
+
+패키지 폴더(`artifacts/workshop/sephplanner/`)를 짓고, 로컬에서 시험할 때는 게임의 `WorkshopLocal/sephplanner/` 로 복사한다.
+
+```powershell
+dotnet build src/SephPlanner.Workshop -c Release -p:PackWorkshop=true -p:DeployToWorkshopLocal=true
+```
+
+- 패키지는 `metadata.json`, `bin/SephPlanner.Plugin.dll`·`bin/SephPlanner.Core.dll`, 있으면 `thumbnail.png` 다. 원본은
+  `src/SephPlanner.Workshop/package/` 에 있고 `metadata.json` 의 `version` 은 `check.ps1` 이 `Directory.Build.props` 와 대조한다.
+  멀티 로비가 이 값으로 모드 판을 견주므로 내용을 바꾸면 반드시 올린다.
+- `modId` 는 `nyabi.sephplanner` 다. 공개한 뒤에는 바꾸지 않는다 - 다른 모드가 되고 모드 옵션에 저장된 설정도 끊긴다.
+- 어셈블리 이름은 BepInEx 판과 같은 `SephPlanner.Plugin` 이다. BepInEx 판이 깔린 게임에서는 BepInEx 가 먼저 싣고, 게임의
+  모드 로더는 같은 이름이 이미 있으면 창작마당 판을 보류한다. 그래서 **로컬 시험은 BepInEx 를 끄고 한다** - 게임 폴더의
+  `winhttp.dll` 이름을 잠시 바꾸면 BepInEx 가 뜨지 않는다.
+- DLL 모드는 타이틀이 아니라 **월드에 들어갈 때** 켜진다. 로그는 BepInEx 로그가 아니라 게임의
+  `%USERPROFILE%\AppData\LocalLow\TEAMHORAY\Sephiria\Player.log` 에 `[SephPlanner]` 머리로 남는다. 게임 쪽 줄은
+  `[WorkshopModManager]`(계획)·`[WorkshopModRuntime]`(활성화) 다.
+- `WorkshopLocal` 의 모드가 로드된 게임은 멀티가 막힌다. 멀티는 창작마당에 올려 구독한 사본으로 본다.
+- 설정은 게임의 `DeviceOptions.xml` 에 `ModOptions:nyabi.sephplanner:섹션.열쇠` 로 들어간다. 아직 값이 없는 설정은 첫 실행에
+  BepInEx 설정 파일(`BepInEx/config/dev.nyabi.sephplanner.bridge.cfg`)에서 가져온다.
+
+올리기는 게임 안에서만 된다. 타이틀의 창작마당 창은 `WorkshopLocal/` 의 모드를 "내 모드" 로 보여 주는데, 거기서 이 모드를
+고르고 "창작마당에 올리기" 를 누르면 올라가고 DLL 이 들었으므로 검수에 저절로 접수된다. 그 뒤 게임이
+`WorkshopLocal/sephplanner/` 에 만드는 `uploadticket.json` 이 창작마당 글 번호를 들고 있다 - 지우면 다음에 올릴 때 새 글이
+생긴다(위 배치 명령은 이 파일을 지우지 않는다). 처음에는 "목록에 없음" 으로 올라가므로 직접 구독해 돌려 본 뒤 공개로 바꾼다.
 
 게임 안에서 F10을 누르면 그 순간의 상태가 `%LOCALAPPDATA%\SephPlanner\inventory-snapshot.json`
 으로 남는다. 그 스냅샷으로 우리 레벨 계산이 게임 값과 맞는지 게임 없이 다시 볼 수 있다. 어긋나는
@@ -190,8 +229,9 @@ CHANGELOG의 해당 절도 함께 확인한다.
    변경은 소스로는 빌드되지만 옛 DLL 은 런타임에 `MissingMethodException` 을 낸다. 1.1.0 때는 마지막 릴리스 zip 의
    `SephPlanner.Plugin.dll` 이 참조하는 게임 타입·멤버를 Mono.Cecil 로 새 `Managed` 에서 `Resolve()` 해 깨진 것을 골랐다.
    두 판을 함께 지원하는 동안은 두 설치본으로 빌드한 DLL 을 두 판 `Managed` 에 모두 대 본다. 1.1.0 `Managed` 의
-   Lib.Harmony 2.4.3 에는 `Harmony.Patch`(인자 여섯)·`UnpatchSelf` 가 없어 걸리지만, 실행 때는 BepInEx 의 HarmonyX 를
-   쓰므로 깨진 것이 아니다(추정, 실기로 `Player.log` 를 본다).
+   Lib.Harmony 2.4.3 에는 BepInEx 판이 쓰는 `Harmony.Patch`(인자 여섯)가 없어 걸리지만, 실행 때는 BepInEx 의 HarmonyX 를
+   쓰므로 깨진 것이 아니다 - BepInEx 가 깔린 1.1.1 의 `Player.log` 는 `동봉 Harmony 2.9.0.0`(HarmonyX)을 찍는다(2026-11-02).
+   `UnpatchSelf` 는 두 Harmony 에 다 있는 멤버로 바꿨다. 창작마당 판은 게임의 2.4.3 으로 짓는다.
    `GameBinding`·진단·Harmony 대상처럼 문자열로 잡는 멤버는 이 검사에 안 걸리므로 디컴파일에서 이름을 따로 찾는다.
 
 ## 화면 설계

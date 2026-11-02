@@ -359,14 +359,31 @@ GridInventory.DoClickAction(ItemPosition)             // 서버면 Local, 아니
 적는다. BepInEx 쪽에 닿는 것은 `ModEnvironment` 하나다 - 이름이 `MelonLoader`·`BepInEx`·`UnityModManager`·`SPMod` 로
 시작하는 어셈블리를 보면 `IsModded` 를 세우고 분석 이벤트와 Cloud Diagnostics 예외 업로드를 끈다. 막는 것은 없다.
 같은 클래스가 `AfterAssembliesLoaded` 에 `Assembly.Load("0Harmony")` 로 동봉 Lib.Harmony 2.4.3 을 부르는데, BepInEx
-프리로더가 HarmonyX 를 먼저 올려 두므로 이름으로 찾으면 그쪽이 돌아온다(추정, `Player.log` 의 `[ModEnvironment] 동봉
-Harmony` 줄로 확인한다). 플러그인이 쓰는 인자 여섯의 `Harmony.Patch` 와 `UnpatchSelf` 는 HarmonyX 에만 있어, 순서가
-뒤집히면 패치가 `MissingMethodException` 으로 실패한다. `OnAllDatabasesReady` 는 여전히 `GameDataLoader.Awake` 끝에서
-나가고, 그 앞에 창작마당 모드 활성화가 들어갔다.
+프리로더가 HarmonyX 를 먼저 올려 두므로 이름으로 찾으면 그쪽이 돌아온다. **1.1.1 에서 확인했다(2026-11-02 Windows)** -
+BepInEx 가 깔린 채로는 `Player.log` 에 `[ModEnvironment] 동봉 Harmony 2.9.0.0 로드됨`(HarmonyX), 끄면 `2.4.3.0` 이 찍힌다.
+그래서 창작마당 판은 Lib.Harmony 2.4.3 에 맞춰 짓되 HarmonyX 에서도 도는 멤버만 쓴다 - 인자 다섯의 `Patch` 는 둘 다에
+있고, `UnpatchSelf` 는 HarmonyX 에만 있어 `GetPatchedMethods` 와 `Unpatch(메서드, 종류, 주인)` 으로 푼다.
+`OnAllDatabasesReady` 는 여전히 `GameDataLoader.Awake` 끝에서 나가고, 그 앞에 창작마당 모드 활성화가 들어갔다.
 
 **창작마당 DLL 모드의 형식은 공식 가이드에서 읽었다(2026-11-02, [team-horay/sephiria_modding](https://github.com/team-horay/sephiria_modding)
-`be58e1e`). 1.1.1 디컴파일로 대조하지 않았다** - 이 Mac 의 설치본은 기본 브랜치다. 포팅 전에 1.1.1 에서 확인할 것은
-진입 클래스와 로딩 순서, 검수 상태 조회, `local_only` 모드가 로비 비교에서 빠지는지다.
+`be58e1e`). 같은 날 1.1.1(`workshop-beta`, 어셈블리 SHA-256 `383a0d5e…`) 디컴파일로 대조해 아래와 같았다.**
+
+- 활성화는 `GameDataLoader.Awake` → `WorkshopModRuntime.ActivateFromManager` → `WorkshopDllActivator.Activate` 다.
+  `GameDataLoader` 는 타이틀로 나가면 부서지고 월드에 들어갈 때 다시 서지만, 활성화기는 이미 켠 모드를 `AlreadyActive` 로
+  넘기고 인스턴스를 다시 만들지 않는다. 그래서 `OnModLoaded` 는 프로세스당 한 번, 데이터베이스 이벤트는 입장마다 온다.
+  창작마당 모드에 `UnloadMod` 를 부르는 곳은 없다(부르는 곳은 옛 `AddOnLoader` 뿐).
+- 라이브러리(`libraries`)는 같은 이름이 이미 로드돼 있으면 그것을 다시 쓰고 경고만 남긴다. 주 모듈(`dll`)은 같은 이름이
+  다른 위치에서 로드돼 있으면 "어셈블리 이름 충돌" 로 실행을 보류한다(`TryLoadAssembly`). 그 판단은 이름만 본다.
+- 검수 해시는 패키지 안의 `*.dll` 만 본다(`ModGuardWorkshop.HashFolder`, 경로·크기·SHA-256). 다른 파일은 해시에 들지 않는다.
+- `local_only` 는 로비 비교에서 빠진다(`WorkshopLobbyMods.CountsForLobby`). `WorkshopLocal` 패키지가 하나라도 켜져 있으면
+  설치 범위와 무관하게 `HasLoadedLocal` 로 멀티가 막힌다.
+- `ModOptions` 는 `OptionsBinding.Instance.DeviceOptions`(게임의 `DeviceOptions.xml`)에 `ModOptions:<modId>:<열쇠>` 로 둔다.
+  `SaveData` 가 `XmlSerializer` 로 값의 형식을 함께 적어 bool·float·int·string 이 형식 그대로 돌아온다. `Set*` 은 메모리만
+  바꾸고 `Save()` 가 파일에 쓴다.
+- **구식 `Input` 은 꺼져 있다.** 부르면 "switched active Input handling to Input System package" 라는
+  `InvalidOperationException` 이 난다(창작마당 판 실기, `Player.log`). 게임 코드에 구식 호출(Miniscript 편집기)이 남아 있지만
+  켜져 있다는 근거가 아니다 - 이것만 보고 켜져 있다고 판단했다가 실기에서 틀렸다. BepInEx 의 `UnityInput` 은 구식을 한 번
+  불러 보고 이 예외가 나면 새 입력 시스템을 고르므로, BepInEx 판 단축키도 1.1.x 에서는 새 입력 시스템으로 읽혀 왔다.
 
 - 진입점은 `WorkshopModBase`(`HorayModBase` 상속, MonoBehaviour 아님)다. `OnModLoaded` 에서 이벤트를 한 번 구독하고
   `OnModUnloaded` 에서 푼다. `Context.PackageRoot`·`ResolvePath` 로 모드 폴더를 찾고, `Context.Options` 가 기기별 설정과
@@ -377,7 +394,7 @@ Harmony` 줄로 확인한다). 플러그인이 쓰는 인자 여섯의 `Harmony.
 - **DLL 모드는 타이틀이 아니라 월드에 들어갈 때 켜진다.** 순서는 `GameDataLoader` 시작 → DLL 로드와 `OnModLoaded` →
   데이터베이스 이벤트 → `OnAllDatabasesReady` 다.
 - Harmony 는 게임에 든 Lib.Harmony 2.4.3 만 쓴다. 모드에 넣은 `0Harmony.dll` 은 무시된다. BepInEx·MelonLoader 는 지원하지
-  않는다. 우리 플러그인이 쓰는 `UnpatchSelf` 와 인자 여섯의 `Patch` 는 HarmonyX 쪽이라 바꿔야 한다(위 단락).
+  않는다. 두 Harmony 에 함께 있는 멤버만 쓰는 이유는 위 단락.
 - `multiplayer.installation` 은 `local_only`(내 화면만, 로비 비교에서 빠짐)·`host_only`·`everyone` 이다. `WorkshopLocal/`
   의 로컬 모드가 로드된 게임에서는 멀티가 막힌다.
 - DLL 이 든 모드는 게임의 "창작마당에 올리기" 로 올려야 검수에 접수된다. 접수·승인 상태여야 남의 게임에서 돌고, DLL 을
@@ -1644,8 +1661,9 @@ UI의 `Cancel`은 `*/{Cancel}`에 묶이고, `GamepadState`의 `buttonEast`가 �
 
 ### 마우스는 새 InputSystem 으로만 읽힌다
 
-키보드는 구식 `Input` 으로 읽힌다 - BepInEx 단축키가 그 길이고 F9/F10 이 잘 먹는다. **그런데
-마우스는 죽어 있다.** 게임이 `<Mouse>/position`·`leftButton`·`scroll` 을 새 InputSystem 으로
+1.0.x 에서는 키보드가 구식 `Input` 으로 읽혔다 - BepInEx 단축키가 그 길이었고 F9/F10 이 잘 먹었다. **1.1.1 은 구식을
+아예 꺼 두어** 부르면 `InvalidOperationException` 이 나므로, 지금 단축키는 판에 상관없이 새 입력 시스템으로 읽는다
+(`Host/Shortcut.cs` 의 `KeyInput`, 위 "공식 모드 API"). **그런데 마우스는 죽어 있다.** 게임이 `<Mouse>/position`·`leftButton`·`scroll` 을 새 InputSystem 으로
 바인딩하고 있어서, `Input.mousePosition` 은 커서가 한자리에 멈춰 있는 것처럼 돌려준다.
 이동 모드가 "자리를 저장했다"고만 하고 화면이 따라오지 않던 원인이 이것이었다.
 
