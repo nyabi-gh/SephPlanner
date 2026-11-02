@@ -77,6 +77,7 @@ namespace SephPlanner.Plugin
         private float _updatePromptRetryAt;
         private string _startupNotice = "";
         private Version _updatedTo;
+        private bool _filesSplit;
         private string _lastPanelOrigin;
         private string _lastPanelBlocker;
         private readonly Dictionary<string, string> _lastErrors = new Dictionary<string, string>();
@@ -134,7 +135,6 @@ namespace SephPlanner.Plugin
                 if (!_automaticUpload && !_settings.DiagnosticUploadAllowed) _diagnosticCancellation?.Cancel();
             };
             Logger.LogEvent += CaptureOwnLog;
-            Application.logMessageReceivedThreaded += CaptureGameLog;
             GameBinding.LogTo(Logger.LogWarning);
             _harmony = new Harmony(PluginGuid);
             TabletRotationTooltipGuard.Install(_harmony, Logger.LogWarning);
@@ -151,6 +151,9 @@ namespace SephPlanner.Plugin
             _updateWindow = new UpdateWindow(StartUpdateInstall, () => Logger.LogInfo("업데이트를 미뤘습니다. 다음 실행 때 다시 묻습니다."));
             _updateClient = new UpdateClient(Application.platform == RuntimePlatform.OSXPlayer);
             Guarded(FinishPreviousUpdate, "업데이트 정리");
+            // 처리기는 유니티 로그 안에서 불려 Guarded 로 감쌀 수 없다. 판이 섞였으면 옛 Core 에 AppendGame 이
+            // 없어 게임이 로그를 남길 때마다 예외가 유니티로 새므로 아예 걸지 않는다.
+            if (!_filesSplit) Application.logMessageReceivedThreaded += CaptureGameLog;
             Guarded(StartLanguage, "화면 언어");
             if (_settings.UpdateCheck.Value) StartUpdateCheck();
         }
@@ -823,6 +826,7 @@ namespace SephPlanner.Plugin
             // 판 대조를 지우기보다 먼저 한다. 옛 DLL 이 잠겨 지우다 실패해도 알림은 남아야 한다.
             var core = typeof(UpdateClient).Assembly.GetName().Version;
             var split = UpdateClient.Normalize(CurrentVersion()) != UpdateClient.Normalize(core);
+            _filesSplit = split;
             if (split)
             {
                 _startupNotice = "SephPlanner 파일의 판이 서로 다릅니다(플러그인 " + UpdateClient.Format(CurrentVersion()) +
@@ -1477,7 +1481,10 @@ namespace SephPlanner.Plugin
         private bool _guideOffers;
         private int _guideShortcuts = -1;
         private bool _guidePad;
-        private Core.Text.Language _guideLanguage;
+
+        // 언어 형식(Core.Text.Language)이 아니라 코드로 든다. 이 클래스의 필드 형식은 판 대조보다 먼저, 클래스를
+        // 올릴 때 풀린다 - 판이 섞여 Core 가 옛것이면 플러그인이 아예 뜨지 않아 FinishPreviousUpdate 가 돌지 못한다.
+        private string _guideLanguage = "";
 
         private string Guide() => Guide(_runner?.State);
 
@@ -1500,7 +1507,7 @@ namespace SephPlanner.Plugin
             var shortcuts = _settings.ShortcutRevision;
             var pad = _settings.PadWindow.Value && PadInput.InUse();
 
-            var language = Localization.Current;
+            var language = Localization.Code(Localization.Current);
 
             if (_guideExpanded == _expanded && _guideAutoPlace == autoPlace &&
                 _guideOffers == offers && _guideShortcuts == shortcuts && _guidePad == pad &&
