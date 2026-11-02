@@ -1058,16 +1058,18 @@ namespace SephPlanner.Plugin
 
         /// <summary>
         /// 설정 창의 동작 탭이 내주는 버튼들. <b>패드에는 F 키가 없다</b> - 단축키로만 되던 일이
-        /// 닿을 자리가 있어야 한다. 마우스가 있어야 뜻이 서는 이동 모드는 넣지 않고, 불투명도는
-        /// 표시 설정에 이미 줄이 있다.
+        /// 닿을 자리가 있어야 한다. 마우스가 있어야 뜻이 서는 이동 모드는 넣지 않고, 불투명도와
+        /// 화면 숨기기는 일반 설정에 이미 줄이 있다. 접기·펼치기는 후보나 합성 창이 뜰 때 저절로 된다.
         /// </summary>
         private List<ActionRow> WindowActions() => new List<ActionRow>
         {
-            new ActionRow { Label = Tr("자동 배치"), Run = AutoPlace },
-            new ActionRow { Label = Tr("다음 후보 미리보기"), Run = CyclePreview },
-            new ActionRow { Label = Tr("추천 화면 접기 / 펼치기"), Run = ToggleExpand },
-            new ActionRow { Label = Tr("플래너 화면 숨기기 / 보이기"), Run = ToggleHidden },
-            new ActionRow { Label = Tr("빌드 설정 창 열기"), Run = () => ToggleWindow(_build, _settings.BuildKey, "빌드 창") },
+            new ActionRow { Label = Tr("자동 배치"), Key = _settings.AutoPlaceKey, Run = AutoPlace },
+            new ActionRow { Label = Tr("다음 후보 미리보기"), Key = _settings.PreviewKey, Run = CyclePreview },
+            new ActionRow
+            {
+                Label = Tr("빌드 설정 창 열기"), Key = _settings.BuildKey,
+                Run = () => ToggleWindow(_build, _settings.BuildKey, "빌드 창"),
+            },
         };
 
         private void ToggleExpand()

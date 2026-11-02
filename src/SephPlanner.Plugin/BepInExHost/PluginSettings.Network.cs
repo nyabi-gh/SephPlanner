@@ -52,6 +52,7 @@ namespace SephPlanner.Plugin
 
         partial void AddNetworkRows(List<OptionRow> rows)
         {
+            rows.Add(OptionRow.Heading(Tr("진단·업데이트")));
             rows.Add(new OptionRow
             {
                 Label = Tr("진단 서버 전송"),

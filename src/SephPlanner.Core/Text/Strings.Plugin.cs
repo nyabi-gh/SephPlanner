@@ -57,8 +57,6 @@ namespace SephPlanner.Core.Text
             new Entry("{0} 설정", "{0} Settings", "{0} 設定", "{0} 设置", "{0} 設定"),
             new Entry("{0} 또는 ESC 로 닫기", "{0} or ESC to close", "{0} または ESC で閉じる", "按 {0} 或 ESC 关闭", "按 {0} 或 ESC 關閉"),
             new Entry("다음 후보 미리보기", "Preview next candidate", "次の候補をプレビュー", "预览下一个候选", "預覽下一個候選"),
-            new Entry("추천 화면 접기 / 펼치기", "Collapse / expand recommendations", "おすすめ画面を折りたたむ / 広げる", "收起 / 展开推荐界面", "收合 / 展開推薦介面"),
-            new Entry("플래너 화면 숨기기 / 보이기", "Hide / show planner HUD", "プランナー画面を隠す / 表示", "隐藏 / 显示规划器界面", "隱藏 / 顯示規劃器介面"),
             new Entry("빌드 설정 창 열기", "Open build settings", "ビルド設定ウィンドウを開く", "打开构筑设置窗口", "開啟構築設定視窗"),
             new Entry("현재 가방의 배치로 돌아왔습니다. 배치를 확인한 뒤 {0} 를 다시 누르세요.",
                 "Back to the current bag layout. Check it, then press {0} again.",

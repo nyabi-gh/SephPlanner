@@ -25,6 +25,11 @@ namespace SephPlanner.Plugin.Ui
         public Action<Shortcut> Bind;
         public Action Reset;
         public Func<string> Warning;
+
+        /// <summary>고를 값이 없는 줄은 아래 줄들을 묶는 소제목이다.</summary>
+        public bool IsHeading => Choices == null && Shortcut == null;
+
+        public static OptionRow Heading(string label) => new OptionRow { Label = label };
     }
 
     /// <summary>
@@ -34,6 +39,7 @@ namespace SephPlanner.Plugin.Ui
     internal sealed class ActionRow
     {
         public string Label;
+        public Setting<Shortcut> Key;
         public Action Run;
     }
 
@@ -49,6 +55,10 @@ namespace SephPlanner.Plugin.Ui
             new List<(OptionRow, TextMeshProUGUI)>();
         private readonly ShortcutCapture<KeyCode> _capture =
             new ShortcutCapture<KeyCode>(IsModifier, KeyCode.Escape);
+        private readonly List<(Tab Tab, TextMeshProUGUI Label)> _tabs =
+            new List<(Tab, TextMeshProUGUI)>();
+        private readonly List<(ActionRow Action, TextMeshProUGUI Label)> _actionButtons =
+            new List<(ActionRow, TextMeshProUGUI)>();
         private readonly List<KeyCode> _held = new List<KeyCode>();
         private readonly List<KeyCode> _pressed = new List<KeyCode>();
         private KeyCode[] _supported;
@@ -97,9 +107,9 @@ namespace SephPlanner.Plugin.Ui
             _controls = controls.gameObject.AddComponent<CanvasGroup>();
             var tabs = Widgets.Rect("Tabs", controls);
             Widgets.Row(tabs, S(1f));
-            _tabFocus = Button(tabs, Tr("일반 설정"), 8f, () => Show(Tab.Display)).gameObject;
-            Button(tabs, Tr("단축키"), 8f, () => Show(Tab.Keys));
-            Button(tabs, Tr("바로 실행"), 8f, () => Show(Tab.Actions));
+            _tabFocus = TabButton(tabs, Tr("일반 설정"), Tab.Display).gameObject;
+            TabButton(tabs, Tr("단축키"), Tab.Keys);
+            TabButton(tabs, Tr("바로 실행"), Tab.Actions);
 
             var general = Widgets.Rect("General", controls);
             Widgets.Column(general, S(0.25f));
@@ -109,6 +119,15 @@ namespace SephPlanner.Plugin.Ui
             _shortcuts = shortcuts.gameObject;
             foreach (var option in _source())
             {
+                if (option.IsHeading)
+                {
+                    var heading = Widgets.Label(
+                        "Heading_" + option.Label, general, Skin, S(0.75f), NativeSkin.Frame,
+                        TextAlignmentOptions.BottomLeft);
+                    heading.text = option.Label;
+                    Widgets.Fixed(heading.rectTransform, S(1.1f));
+                    continue;
+                }
                 if (option.Shortcut == null)
                 {
                     _rows.Add(new Row(general, Skin, Base, option, Refresh));
@@ -125,6 +144,7 @@ namespace SephPlanner.Plugin.Ui
                 Button(line, Tr("기본값"), 4f, () => Change(option, option.Reset));
                 _keys.Add((option, value));
             }
+            FitValueColumn();
             var actions = Widgets.Rect("Actions", controls);
             Widgets.Column(actions, S(0.25f));
             _actionList = actions.gameObject;
@@ -132,6 +152,7 @@ namespace SephPlanner.Plugin.Ui
             foreach (var action in _actions())
             {
                 var button = Button(actions, action.Label, 0f, () => Run(action));
+                _actionButtons.Add((action, button));
                 _actionFocus ??= button.gameObject;
             }
 
@@ -154,12 +175,38 @@ namespace SephPlanner.Plugin.Ui
             return button;
         }
 
+        private TextMeshProUGUI TabButton(RectTransform parent, string text, Tab tab)
+        {
+            var button = Button(parent, text, 8f, () => Show(tab));
+            _tabs.Add((tab, button));
+            return button;
+        }
+
+        /// <summary>
+        /// 값 칸은 모든 줄이 같은 폭이어야 화살표가 한 줄로 선다. 그 폭을 가장 긴 선택지에 맞춘다 -
+        /// 고정 폭이었을 때 "게임 언어 따라가기" 가 한국어에서도 잘렸고, 번역은 더 길 수 있다.
+        /// </summary>
+        private void FitValueColumn()
+        {
+            var width = S(7f);
+            foreach (var row in _rows) width = Mathf.Max(width, row.WidestChoice() + S(0.6f));
+            width = Mathf.Min(width, S(WidthRatio * 0.4f));
+            foreach (var row in _rows) row.SetValueWidth(width);
+        }
+
         private void Show(Tab tab)
         {
             _tab = tab;
             _general.SetActive(tab == Tab.Display);
             _shortcuts.SetActive(tab == Tab.Keys);
             _actionList.SetActive(tab == Tab.Actions);
+
+            // 초점은 패드로 옮길 때만 생기므로, 마우스로 고른 탭은 밝기만으로는 구분되지 않는다.
+            foreach (var (each, label) in _tabs)
+            {
+                label.color = each == tab ? NativeSkin.GoldEdge : NativeSkin.TextBright;
+                label.fontStyle = each == tab ? FontStyles.Underline : FontStyles.Normal;
+            }
             Refresh();
         }
 
@@ -219,6 +266,8 @@ namespace SephPlanner.Plugin.Ui
             _capture.Cancel();
             _rows.Clear();
             _keys.Clear();
+            _tabs.Clear();
+            _actionButtons.Clear();
             _selected = null;
         }
 
@@ -266,6 +315,7 @@ namespace SephPlanner.Plugin.Ui
                     ? Tr("키 입력 대기…")
                     : (warning.Length > 0 ? "! " : "") + PluginSettings.Describe(row.Option.Shortcut());
             }
+            foreach (var (action, label) in _actionButtons) label.text = ActionText(action);
             if (_controls != null) _controls.interactable = !_capture.BlocksShortcuts;
             if (_cancel != null) _cancel.transform.parent.gameObject.SetActive(_capture.Capturing);
             if (_note == null) return;
@@ -276,12 +326,21 @@ namespace SephPlanner.Plugin.Ui
             Widgets.FitHeight(_note, _noteSize, S(WidthRatio - 1.9f));
         }
 
+        private static readonly string DimTag =
+            "<color=#" + ColorUtility.ToHtmlStringRGB(NativeSkin.TextDim) + ">";
+
+        /// <summary>버튼 옆에 같은 일을 하는 키를 적어, 키보드로 연 사람에게는 단축키 안내가 되게 한다.</summary>
+        private static string ActionText(ActionRow action)
+        {
+            if (action.Key == null || action.Key.Value.MainKey == KeyCode.None) return action.Label;
+            return action.Label + "  " + DimTag + PluginSettings.Describe(action.Key.Value) + "</color>";
+        }
+
         private string Note()
         {
-            if (_tab == Tab.Display) return Tr("화살표로 설정을 바꿉니다. 표시된 값은 현재 상태입니다. 추천을 꺼도 배치 계산과 빌드 지정은 유지됩니다.") + "\n"
-                + Tr("단축키는 ‘단축키’ 탭에서 바꾸고, ‘바로 실행’ 탭에서는 버튼으로 실행합니다.");
+            if (_tab == Tab.Display) return Tr("화살표로 설정을 바꿉니다. 추천을 꺼도 배치 계산과 빌드 지정은 유지됩니다.");
             if (_tab == Tab.Actions)
-                return Tr("버튼을 누르면 이 창을 닫고 해당 기능을 한 번 실행합니다. 패드는 지도가 닫혀 있고 가방·상자·상점 창이 떠 있는 동안 View(뒤로) 버튼으로 이 창을 엽니다. 단축키 지정은 키보드만 받습니다.");
+                return Tr("누르면 이 창을 닫고 한 번 실행합니다. 패드는 가방·상자·상점 창에서 View(뒤로) 버튼으로 이 창을 엽니다.");
             if (_capture.Capturing)
                 return Tr("누른 키를 먼저 놓고 원하는 키를 누르세요. Ctrl·Alt·Shift 조합 가능(좌우 구분). ESC는 취소입니다.");
             return (_result.Length > 0 ? _result + "\n" : "") +
@@ -294,6 +353,7 @@ namespace SephPlanner.Plugin.Ui
         {
             private readonly OptionRow _row;
             private readonly TextMeshProUGUI _value;
+            private readonly LayoutElement _valueSize;
 
             /// <summary>이 줄의 첫 화살표. 창을 열 때 컨트롤러 초점을 여기에 준다.</summary>
             public GameObject First { get; private set; }
@@ -315,7 +375,7 @@ namespace SephPlanner.Plugin.Ui
 
                 _value = Widgets.Label(
                     "Value", line, skin, b * 0.95f, NativeSkin.TextBright, TextAlignmentOptions.Center);
-                Widgets.Fixed(_value.rectTransform, b * 1.5f, b * 7f);
+                _valueSize = Widgets.Fixed(_value.rectTransform, b * 1.5f, b * 7f);
 
                 Arrow(line, skin, b, ">", 1, changed);
             }
@@ -344,6 +404,20 @@ namespace SephPlanner.Plugin.Ui
             {
                 var index = Mathf.Clamp(_row.Read() + delta, 0, _row.Choices.Length - 1);
                 _row.Write(index);
+            }
+
+            public float WidestChoice()
+            {
+                var widest = 0f;
+                foreach (var choice in _row.Choices)
+                    widest = Mathf.Max(widest, _value.GetPreferredValues(choice, float.PositiveInfinity, 0f).x);
+                return widest;
+            }
+
+            public void SetValueWidth(float width)
+            {
+                _valueSize.preferredWidth = width;
+                _valueSize.minWidth = width;
             }
 
             public void Refresh()

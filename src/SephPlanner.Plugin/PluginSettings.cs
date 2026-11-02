@@ -320,6 +320,7 @@ namespace SephPlanner.Plugin
             if (_rows != null) return _rows;
             _rows = new List<OptionRow>
             {
+                OptionRow.Heading(Tr("화면")),
                 Switch(Tr("플래너 화면 표시"), Panel),
                 new OptionRow
                 {
@@ -339,16 +340,18 @@ namespace SephPlanner.Plugin
                 Steps(Tr("폭"), Width, WidthSteps,
                     new[] { Tr("아주 좁게"), Tr("좁게"), Tr("보통"), Tr("넓게"), Tr("아주 넓게") }),
                 Steps(Tr("불투명도"), Opacity, OpacitySteps, new[] { "55%", "70%", "85%", "100%" }),
+                OptionRow.Heading(Tr("추천·계산")),
                 Switch(Tr("획득·합성·인챈트·제거 추천"), Recommendations),
                 Switch(Tr("고사양 모드(여러 코어로 계산)"), HighPerformance),
                 Switch(Tr("새 판에서 지난 판 지정 정리"), ForgetOnNewRun),
-                Steps(Tr("주변 아이템 탐색 범위"), OfferRadius, RadiusSteps,
-                    new[] { Tr("좁게"), Tr("보통"), Tr("넓게"), Tr("아주 넓게") }),
                 Switch(Tr("멀티 자동 배치"), MultiplayerAutoPlace),
             };
             AddNetworkRows(_rows);
             _rows.AddRange(new[]
             {
+                OptionRow.Heading(Tr("세부 조정")),
+                Steps(Tr("주변 아이템 탐색 범위"), OfferRadius, RadiusSteps,
+                    new[] { Tr("좁게"), Tr("보통"), Tr("넓게"), Tr("아주 넓게") }),
                 Steps(Tr("가방 확인 간격"), PollInterval, PollSteps,
                     new[] { Tr("{0}초", "0.15"), Tr("{0}초", "0.25"), Tr("{0}초", "0.5"), Tr("{0}초", "1") }),
                 Switch(Tr("패드 View 버튼으로 창 열기"), PadWindow),
