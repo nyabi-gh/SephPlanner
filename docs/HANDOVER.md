@@ -29,8 +29,8 @@
 
 ## 다음 세션
 
-1. **0.5.1 마무리.** 2026-11-02 에 0.5.1 을 열고 Windows ZIP 만 담은 드래프트를 올렸다(태그 `v0.5.1`). Mac 에서
-   `make-release.ps1` 로 지어 ZIP 을 더하고 `scripts/publish-release.ps1` 로 공개한다. 공개는 사용자가 정한다.
+1. **0.5.1 은 2026-11-02 에 두 ZIP 으로 공개됐다**(태그 `v0.5.1` = `cd96fea`). 다음 판은 열지 않았다. Mac 빌드는 게임
+   어셈블리 경로를 못 찾으면 포맷 단계에서 `Vector2` 같은 Unity 형식 오류로 멈춘다 - `SEPHIRIA_DIR` 를 확인한다.
 2. **실기.** STATUS 표 맨 위 네 줄 - 로그·진단 한국어, 나침반 지정, 번역(글꼴·폭·언어 전환), 진단 게임 로그(동의 창·가림).
    영어 폭은 F2 의 `Needle/Hourglass/Star first`, 후보 안내 줄, F3 단축키 줄이 가장 빠듯하다.
 3. **조건 칸이 낡은 석판**(ROADMAP). `AppliedRangeStale` 이 조건 질의도 게임 `ParseQuery` 와 견주게 한다.
