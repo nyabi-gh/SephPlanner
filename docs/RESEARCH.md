@@ -1408,7 +1408,8 @@ selectionSeedOffset)`으로 내용을 정한다. **고르기 전에 무엇이 �
   계산에 섞여 있어, **우리가 다시 세지 않고 이 값을 스냅샷(`ComboCounts`)에 그대로 싣는다.**
 - 1.1.0 의 개수에는 `bonusComboCount`(물약 `PotionEffect_RandomCombo` 가 무작위 카테고리에 더함)도 들어간다. 게임
   수를 싣고 자리 몫만 빼므로 그대로 맞는다.
-- 1.1.0 의 콤보 능력치 둘. `UNLIMITEDCOMBO` 는 콤보마다 최고 단계(`GetHighestComboCount`)를 넘긴 개수 하나당 그 값을
+- 콤보 능력치 둘. 1.0.33 에도 글자 그대로 있다(`GridInventory.ApplyUnlimitedCombo`, `SearchSetEffectInInventory`, 두 판
+  디컴파일 대조 2026-11-02) - 1.1.0 에서 생긴 것이 아니다. `UNLIMITEDCOMBO` 는 콤보마다 최고 단계(`GetHighestComboCount`)를 넘긴 개수 하나당 그 값을
   `AllDamageBonus` 에 더하고(`ApplyUnlimitedCombo`), `COMBOBONUSDAMAGE` 는 한 단계라도 발동한 콤보 하나당 그 값을
   `FINAL_DAMAGE` 로 준다. 둘 다 같은 전체 피해 점수라 스냅샷이 플레이어 값을 싣고(`ComboStatBonus`), 콤보 한 걸음
   (`PlacementProblem.ComboStep`)이 첫 단계를 채울 때와 최고 단계를 넘길 때 `DamageBonus` 로 옮겨 더한다. 먹구름의
