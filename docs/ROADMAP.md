@@ -37,13 +37,11 @@
 창작마당 판(`src/SephPlanner.Workshop`)은 2026-11-02 에 지어 `WorkshopLocal` 로 게임에서 켜 보았다(활성화, HUD, 카탈로그,
 F3·F4·F10, BepInEx 설정 가져오기). 구조는 [개발 문서](DEVELOPMENT.md)의 "구조" 와 "창작마당 판". 남은 일은 이 순서다.
 
-1. 진단 전송 넣기(위 넷째). 지금 창작마당 판의 F10 은 로컬 저장만 하고 자동 진단은 없다. 진단 전송 코드는
-   `BepInExHost/Net` 에서 업데이트 코드와 함께 있으므로, 전송만 두 판이 함께 쓰는 자리로 옮긴다. 셋째 DLL 은 여전히 만들지 않는다.
-2. 썸네일(`src/SephPlanner.Workshop/package/thumbnail.png`, 1MB 이하 PNG)과 창작마당 설명글 검토.
-3. 게임 안에서 "창작마당에 올리기" - 목록에 없음으로 올려 구독한 사본으로 돌려 보고, 멀티(로컬 모드는 막힌다)도 본다.
+1. 썸네일(`src/SephPlanner.Workshop/package/thumbnail.png`, 1MB 이하 PNG)과 창작마당 설명글 검토.
+2. 게임 안에서 "창작마당에 올리기" - 목록에 없음으로 올려 구독한 사본으로 돌려 보고, 멀티(로컬 모드는 막힌다)도 본다.
    `uploadticket.json` 을 저장소에 둘지는 내용을 보고 정한다(공개 저장소다).
-4. BepInEx 마지막 판(위 둘째).
-5. README·INSTALL·USAGE 를 창작마당 기준으로 고친다.
+3. BepInEx 마지막 판(위 둘째).
+4. README·INSTALL·USAGE 를 창작마당 기준으로 고친다.
 
 ### 매 프레임 / 폴링마다 도는 것
 

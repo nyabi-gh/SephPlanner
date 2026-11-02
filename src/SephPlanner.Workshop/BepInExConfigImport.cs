@@ -11,6 +11,12 @@ namespace SephPlanner.Plugin.Workshop
     /// </summary>
     internal static class BepInExConfigImport
     {
+        /// <summary>
+        /// 진단 전송 동의는 가져오지 않는다. BepInEx 판에서 한 동의를 창작마당 판의 동의로 넘기면 이 판에서는 무엇을
+        /// 보내는지 한 번도 보지 않고 전송이 켜진다 - 창작마당 규칙 5 는 보내는 것을 이용자가 알게 하라고 한다.
+        /// </summary>
+        private const string ConsentSection = "Diagnostics";
+
         /// <summary>"섹션.열쇠" → 설정 파일에 적힌 글자 그대로. 파일이 없거나 못 읽으면 비어 있다.</summary>
         public static IReadOnlyDictionary<string, string> Read(string gameFolder)
         {
@@ -47,6 +53,7 @@ namespace SephPlanner.Plugin.Workshop
                 }
                 var split = line.IndexOf('=');
                 if (split <= 0) continue;
+                if (section == ConsentSection) continue;
                 values[section + "." + line.Substring(0, split).Trim()] = line.Substring(split + 1).Trim();
             }
         }

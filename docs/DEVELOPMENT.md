@@ -10,20 +10,22 @@ SephPlanner.Core      게임 상태 모델 + 솔버와 배치 계산 (netstandar
 SephPlanner.Plugin    플러그인 본체. 게임 상태를 읽어 배치를 풀고 게임 HUD 안에 직접 그린다.
                       멀티 세션의 자동 배치는 설정으로 연다. 이 프로젝트가 BepInEx 판을 짓는다.
                       Host/        두 판이 함께 쓰는 설정·단축키·로그 층
-                      BepInExHost/ BepInEx 판에만 드는 것 - 진입점, 설정 파일, 네트워크(진단 전송·게임 안 업데이트)
+                      Net/         진단 전송(두 판). 화면은 Plugin.Diagnostics.cs 와 Ui/ 의 동의·메모 창
+                      BepInExHost/ BepInEx 판에만 드는 것 - 진입점, 설정 파일, 게임 안 업데이트(Net/ 포함)
 SephPlanner.Workshop  창작마당 판. Plugin 소스를 BepInExHost 없이 링크하고 게임 모드 로더의 진입점과
                       모드 옵션 저장소를 더한다. 게임 1.1.x 로만 빌드된다
 SephPlanner.DataTool  게임 없이 도는 CLI. 텍스트 추출, 스냅샷 대조, 콤보·아티팩트 값어치 측정
 SephPlanner.Diagnostics  F10 진단을 받는 수집 서버(ASP.NET Core). docs/DIAGNOSTIC-UPLOAD.md
 SephPlanner.Tests     Core 단위 테스트. 게임 없이 돈다
-SephPlanner.Plugin.Net  (tests/) BepInExHost/Net 을 배포와 같은 netstandard2.1 로 지어 시험에 넘긴다
+SephPlanner.Plugin.Net  (tests/) Net/ 과 BepInExHost/Net 을 배포와 같은 netstandard2.1 로 지어 시험에 넘긴다
 ```
 
-**네트워크 코드는 BepInEx 판의 플러그인 DLL 에만 있다.** 창작마당 모드는 정보 수집·외부 전송이 금지되고 실행 중 DLL 을
-바꾸면 로드되지 않으므로(docs/LEGAL.md 의 "창작마당 모드 규칙") 창작마당 판에는 아예 넣지 않는다. 그렇다고 따로
-어셈블리로 빼지도 않는다 - 0.5.1 까지의 게임 안 업데이트는 ZIP 에서 DLL 둘(`SephPlanner.Plugin.dll`·`SephPlanner.Core.dll`)
-만 꺼내므로, BepInEx 판에 셋째 DLL 이 생기면 옛 판에서 업데이트한 사람의 플러그인이 뜨지 않는다. 플러그인 본체는
-`partial` 클래스이고, 네트워크 자리는 몸체 없는 `partial void` 라 창작마당 판에서는 부르는 자리째 빠진다.
+**진단 전송은 두 판에, 게임 안 업데이트는 BepInEx 판에만 있다.** 창작마당 규칙 5 는 보내는 것을 이용자에게 알리면 게임
+관련 정보의 전송을 허용하고, 실행 중 DLL 을 바꾸는 모드는 로드되지 않는다(docs/LEGAL.md 의 "창작마당 모드 규칙"). 네트워크
+코드는 따로 어셈블리로 빼지 않는다 - 0.5.1 까지의 게임 안 업데이트는 ZIP 에서 DLL 둘(`SephPlanner.Plugin.dll`·
+`SephPlanner.Core.dll`)만 꺼내므로, BepInEx 판에 셋째 DLL 이 생기면 옛 판에서 업데이트한 사람의 플러그인이 뜨지 않는다.
+플러그인 본체는 `partial` 클래스이고, 업데이트 자리는 몸체 없는 `partial void` 라 창작마당 판에서는 부르는 자리째 빠진다.
+창작마당 판은 BepInEx 판의 진단 전송 동의를 가져오지 않는다(`BepInExConfigImport`) - 이 판에서 보낼 항목을 보고 다시 고른다.
 
 ## 빌드
 

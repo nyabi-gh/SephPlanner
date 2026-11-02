@@ -107,7 +107,8 @@ namespace SephPlanner.Plugin
             FrameCost.PlanStats = () => _runner?.Stats;
             Log.Info(PluginIdentity.Describe());
 
-            StartNetwork();
+            StartDiagnostics();
+            StartUpdates();
             // 처리기는 유니티 로그 안에서 불려 Guarded 로 감쌀 수 없다. 판이 섞였으면 옛 Core 에 AppendGame 이
             // 없어 게임이 로그를 남길 때마다 예외가 유니티로 새므로 아예 걸지 않는다.
             var filesSplit = false;
@@ -149,7 +150,8 @@ namespace SephPlanner.Plugin
             // Player.log 에만 쌓고 우리 로그는 조용하므로, 여기서 잡아 같은 것 한 번씩 남긴다.
             Guarded(HandleInput, "입력 처리");
             Guarded(TakePlanFailure, "자동 진단 처리");
-            PollNetwork();
+            PollDiagnostics();
+            PollUpdates();
             Guarded(DropStaleWindows, "언어 바꾼 창 정리");
 
             var panelStarted = FrameCost.Now;
@@ -372,9 +374,7 @@ namespace SephPlanner.Plugin
 
         private void DumpInventory()
         {
-            var busy = false;
-            CheckDiagnosticBusy(ref busy);
-            if (busy)
+            if (DiagnosticBusy())
             {
                 Report(Tr("진단을 처리 중입니다. 전송 또는 선택이 끝난 뒤 다시 눌러 주세요."));
                 return;
@@ -383,9 +383,7 @@ namespace SephPlanner.Plugin
             {
                 var capture = CollectDiagnostic();
                 _pendingDiagnostic = capture;
-                var asked = false;
-                AskToSend(capture, ref asked);
-                if (!asked) FinishDiagnostic(DiagnosticNote.None);
+                if (!AskToSend(capture)) FinishDiagnostic(DiagnosticNote.None);
             }
             catch (Exception ex)
             {
@@ -482,9 +480,10 @@ namespace SephPlanner.Plugin
         {
             yield return _window;
             yield return _build;
-            var network = new List<PlannerWindow>();
-            AddNetworkWindows(network);
-            foreach (var window in network) yield return window;
+            var more = new List<PlannerWindow>();
+            AddDiagnosticWindows(more);
+            AddUpdateWindows(more);
+            foreach (var window in more) yield return window;
         }
 
         private void CaptureOwnLog(LogLevel level, string message) =>
@@ -526,18 +525,17 @@ namespace SephPlanner.Plugin
             Deliver(capture);
         }
 
-        // 진단 전송과 게임 안 업데이트는 BepInEx 판에만 있다(BepInExHost/Plugin.Network.cs). 아래 partial void 는 몸체가
-        // 없으면 부르는 자리째 빠지고, ref 로 받는 값은 처음 값(거짓) 그대로 남는다 - 창작마당 판이 그렇다.
-        // 창작마당 판은 Deliver 만 따로 채운다(src/SephPlanner.Workshop/Plugin.Local.cs).
-        partial void StartNetwork();
+        // 게임 안 업데이트는 BepInEx 판에만 있다(BepInExHost/Plugin.Update.cs). 아래 partial void 는 몸체가 없으면
+        // 부르는 자리째 빠지고, ref 로 받는 값은 처음 값 그대로 남는다 - 창작마당 판이 그렇다.
+        partial void StartUpdates();
 
-        partial void PollNetwork();
+        partial void PollUpdates();
 
-        partial void StopNetwork();
+        partial void StopUpdates();
 
-        partial void QueueAutomaticDiagnostic(string stage, string detail, PlanFailure failure);
+        partial void AddUpdateWindows(List<PlannerWindow> windows);
 
-        private void QueueAutomaticDiagnostic(string stage, string detail) => QueueAutomaticDiagnostic(stage, detail, null);
+        partial void CheckUpdateWindow(ref bool open);
 
         /// <summary>게임 안 업데이트가 적용됐으면 첫 화면에 띄울 문장을 <see cref="_startupNotice"/> 에 둔다.</summary>
         partial void TakeUpdateNotice();
@@ -545,24 +543,13 @@ namespace SephPlanner.Plugin
         /// <summary>플러그인과 Core 의 판이 다른가(게임 안 업데이트가 반쯤 걸림).</summary>
         partial void DetectFilesSplit(ref bool split);
 
-        partial void AddNetworkWindows(List<PlannerWindow> windows);
-
-        partial void CheckAnsweringWindow(ref bool open);
-
-        /// <summary>앞선 진단을 아직 처리하는 중인가(전송 중이거나 동의·메모 창이 떠 있음).</summary>
-        partial void CheckDiagnosticBusy(ref bool busy);
-
-        /// <summary>F10 으로 모은 진단을 보낼지 물으러 갔으면 참. 거짓이면 곧바로 로컬에 적는다.</summary>
-        partial void AskToSend(DiagnosticCapture capture, ref bool asked);
-
-        /// <summary>설명 파일까지 쓴 진단을 보내거나 로컬에 둔 것을 알린다.</summary>
-        private partial void Deliver(DiagnosticCapture capture);
+        private void QueueAutomaticDiagnostic(string stage, string detail) => QueueAutomaticDiagnostic(stage, detail, null);
 
         /// <summary>물음에 답해야 닫히는 창(진단 동의, 업데이트)이 떠 있는가.</summary>
         private bool AnsweringWindowOpen()
         {
-            var open = false;
-            CheckAnsweringWindow(ref open);
+            var open = DiagnosticWindowOpen();
+            CheckUpdateWindow(ref open);
             return open;
         }
 
@@ -1402,7 +1389,8 @@ namespace SephPlanner.Plugin
         {
             FrameCost.PlanStats = null;
             _runner?.Dispose();
-            StopNetwork();
+            StopDiagnostics();
+            StopUpdates();
             Log.Written -= CaptureOwnLog;
             Application.logMessageReceivedThreaded -= CaptureGameLog;
             LocalizationManager.Instance.OnLanguageChanged -= GameLanguageChanged;

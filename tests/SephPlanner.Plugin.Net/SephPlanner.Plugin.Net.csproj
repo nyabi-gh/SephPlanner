@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    플러그인의 네트워크 코드(진단 전송·게임 안 업데이트, BepInEx 판에만 들어간다)를 배포와 같은 netstandard2.1 로 컴파일해
-    시험에 넘긴다. 배포물에는 쓰지 않는다 - 옛 판의 게임 안 업데이트가 DLL 둘만 바꾸므로 BepInEx 판은 이 코드를 플러그인
-    DLL 안에 담는다. 시험 프로젝트(net10)에 직접 링크하면 netstandard2.1 에 없는 API 를 권하는 분석 경고가 난다.
+    플러그인의 네트워크 코드(진단 전송은 두 판, 게임 안 업데이트는 BepInEx 판)를 배포와 같은 netstandard2.1 로 컴파일해
+    시험에 넘긴다. 배포물에는 쓰지 않는다 - 옛 판의 게임 안 업데이트가 DLL 둘만 바꾸므로 이 코드는 플러그인 DLL 안에
+    담는다. 시험 프로젝트(net10)에 직접 링크하면 netstandard2.1 에 없는 API 를 권하는 분석 경고가 난다.
   -->
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
@@ -12,7 +12,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\src\SephPlanner.Plugin\BepInExHost\Net\*.cs" Link="%(Filename)%(Extension)" />
+    <Compile Include="..\..\src\SephPlanner.Plugin\Net\*.cs;..\..\src\SephPlanner.Plugin\BepInExHost\Net\*.cs" Link="%(Filename)%(Extension)" />
     <ProjectReference Include="..\..\src\SephPlanner.Core\SephPlanner.Core.csproj" />
     <InternalsVisibleTo Include="SephPlanner.Tests" />
   </ItemGroup>

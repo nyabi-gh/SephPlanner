@@ -54,8 +54,8 @@ namespace SephPlanner.Plugin
     /// 빌드 지정(콤보·강화 우선·프리셋 코드)은 여기가 아니라 <see cref="PluginPreferences"/>에
     /// 있다. 목록과 긴 문자열이라 한 줄짜리 설정 항목으로 담기지 않는다.
     ///
-    /// 진단 전송·업데이트 확인처럼 네트워크를 쓰는 설정은 BepInEx 판에만 있다(<c>BepInExHost/PluginSettings.Network.cs</c>).
-    /// 창작마당 판에는 네트워크 코드를 넣지 않는다(docs/LEGAL.md 의 "창작마당 모드 규칙").
+    /// 진단 전송 동의는 <c>PluginSettings.Diagnostics.cs</c>, BepInEx 판에만 있는 업데이트 확인은
+    /// <c>BepInExHost/PluginSettings.Update.cs</c> 에 있다.
     /// </summary>
     internal sealed partial class PluginSettings
     {
@@ -119,7 +119,8 @@ namespace SephPlanner.Plugin
         {
             _config = config;
             _log = log;
-            BindNetwork(config);
+            BindDiagnostics(config);
+            BindUpdates(config);
 
             PollInterval = config.Bind(
                 "General", "PollIntervalSeconds", 0.25f,
@@ -346,7 +347,7 @@ namespace SephPlanner.Plugin
                 Switch(Tr("새 판에서 지난 판 지정 정리"), ForgetOnNewRun),
                 Switch(Tr("멀티 자동 배치"), MultiplayerAutoPlace),
             };
-            AddNetworkRows(_rows);
+            AddDiagnosticRows(_rows);
             _rows.AddRange(new[]
             {
                 OptionRow.Heading(Tr("세부 조정")),
@@ -366,14 +367,14 @@ namespace SephPlanner.Plugin
                 Key(Tr("화면 숨기기/보이기"), HideKey),
                 Key(Tr("설정 창"), SettingsKey),
                 Key(Tr("아이템 데이터 다시 읽기"), DumpKey),
-                Key(Network.Available ? Tr("문제 진단 저장·전송") : Tr("문제 진단 저장"), InventoryDumpKey),
+                Key(Tr("문제 진단 저장·전송"), InventoryDumpKey),
             });
             return _rows;
         }
 
-        partial void BindNetwork(ISettingStore config);
+        partial void BindUpdates(ISettingStore config);
 
-        partial void AddNetworkRows(List<OptionRow> rows);
+        partial void AddUpdateRows(List<OptionRow> rows);
 
         /// <summary>언어가 바뀌면 줄 이름을 새 언어로 다시 짓게 한다.</summary>
         public void ForgetRows() => _rows = null;

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    창작마당 판. 플러그인 소스를 그대로 링크하되 BepInEx 진입점과 네트워크 코드(BepInExHost)는 빼고, 이 폴더의 진입점과
-    설정 저장소를 더한다. 게임 1.1.x 의 Managed 로만 빌드된다(WorkshopModBase 가 1.1.0 에 생겼다).
+    창작마당 판. 플러그인 소스를 그대로 링크하되 BepInEx 에 묶인 것(BepInExHost - 진입점, 설정 파일, 게임 안 업데이트)은
+    빼고, 이 폴더의 진입점과 설정 저장소를 더한다. 게임 1.1.x 의 Managed 로만 빌드된다(WorkshopModBase 가 1.1.0 에 생겼다).
   -->
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
