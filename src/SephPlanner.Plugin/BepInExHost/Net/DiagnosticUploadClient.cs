@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.IO;
 using System.Net;
@@ -5,9 +6,10 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
+using SephPlanner.Core.Runtime;
 using SephPlanner.Core.Text;
 
-namespace SephPlanner.Core.Runtime
+namespace SephPlanner.Plugin.Net
 {
     public sealed class DiagnosticUploadClient : IDisposable
     {

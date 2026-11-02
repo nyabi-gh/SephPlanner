@@ -6,9 +6,8 @@ namespace SephPlanner.Plugin
     /// <summary>
     /// 패드를 읽는 자리.
     ///
-    /// <b>구식 <c>Input</c> 의 조이스틱 KeyCode 로는 읽지 않는다.</b> BepInEx 단축키가 타는
-    /// <c>UnityInput</c> 은 구식과 새 입력 시스템 두 구현 중 하나로 잡히는데, 새 쪽에는 조이스틱
-    /// 버튼이 아예 없고 구식 쪽도 버튼 번호가 기기마다 다르다. 게임이 새 InputSystem 을 쓰므로
+    /// <b>구식 <c>Input</c> 의 조이스틱 KeyCode 로는 읽지 않는다.</b> 구식은 버튼 번호가 기기마다 다르고 1.1.x 에서는 아예
+    /// 꺼져 있다. 키보드 단축키의 <see cref="Host.KeyInput"/> 은 키보드만 잇는다. 게임이 새 InputSystem 을 쓰므로
     /// 마우스와 같은 길로 읽는다(<c>SephPlannerPlugin.Cursor</c>).
     /// </summary>
     internal sealed class PadInput

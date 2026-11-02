@@ -1,5 +1,5 @@
 using System;
-using SephPlanner.Core.Runtime;
+using SephPlanner.Plugin.Net;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;

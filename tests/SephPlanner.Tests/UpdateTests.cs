@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using SephPlanner.Core.Runtime;
+using SephPlanner.Plugin.Net;
 
 namespace SephPlanner.Tests;
 

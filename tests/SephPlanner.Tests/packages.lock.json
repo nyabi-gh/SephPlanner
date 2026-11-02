@@ -99,7 +99,13 @@
       "sephplanner.diagnostics": {
         "type": "Project",
         "dependencies": {
-          "SephPlanner.Core": "[0.2.8, )"
+          "SephPlanner.Core": "[0.5.1, )"
+        }
+      },
+      "sephplanner.plugin.net": {
+        "type": "Project",
+        "dependencies": {
+          "SephPlanner.Core": "[0.5.1, )"
         }
       }
     }

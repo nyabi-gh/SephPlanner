@@ -1,15 +1,12 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
-using BepInEx;
-using BepInEx.Configuration;
 using HarmonyLib;
 using Mirror;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
 using SephPlanner.Core.Solver;
+using SephPlanner.Plugin.Host;
 using SephPlanner.Plugin.Ui;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -22,13 +19,13 @@ namespace SephPlanner.Plugin
     /// <summary>
     /// 세피리아 상태를 읽어 게임 HUD에 배치와 추천을 표시하고, 싱글플레이에서는 제안된 배치를
     /// 게임 자체의 이동 경로로 적용한다. 멀티 세션에서는 읽기만 한다.
+    ///
+    /// 띄우는 쪽은 둘이다 - BepInEx 판은 <c>BepInExHost/BepInExEntry</c>, 창작마당 판은 게임의 모드 로더가 부르는
+    /// <c>SephPlanner.Workshop</c> 의 진입점. 어느 쪽이든 <see cref="PluginHost"/> 를 채운 뒤 이 컴포넌트를 붙인다.
     /// </summary>
-    [BepInPlugin(PluginGuid, "SephPlanner", "0.5.1")]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001", Justification = "Unity의 OnDestroy에서 계산 작업을 정리합니다.")]
-    public sealed class SephPlannerPlugin : BaseUnityPlugin
+    internal sealed partial class SephPlannerPlugin : MonoBehaviour
     {
-        public const string PluginGuid = "dev.nyabi.sephplanner.bridge";
-
         private PluginSettings _settings;
         private Harmony _harmony;
         private float _nextPoll;
@@ -51,36 +48,11 @@ namespace SephPlanner.Plugin
         private bool _newRunPending;
         private PlanRunner _runner;
         private GameSnapshot _lastSnapshot;
-        private DiagnosticConsentWindow _diagnosticWindow;
-        private DiagnosticNoteWindow _noteWindow;
-        private DiagnosticConsentWindow _automaticDiagnosticWindow;
-        private bool _automaticPromptShown;
-        private bool _automaticUpload;
-        private readonly AutomaticDiagnosticPolicy _automaticPolicy = new AutomaticDiagnosticPolicy();
-        private object _automaticIncident;
-        private string _automaticIncidentLog;
         private DiagnosticCapture _pendingDiagnostic;
         private DiagnosticText _diagnosticLog;
-        private DiagnosticUploadClient _diagnosticClient;
-        private CancellationTokenSource _diagnosticCancellation;
-        // 화면 문장과 로그 문장. 문장 형식(Phrase)으로 들지 않는 것은 필드 형식이 클래스를 올릴 때 풀려서다(_guideLanguage).
-        private Task<(string Shown, string Logged)> _diagnosticTask;
-        private readonly DiagnosticUploadThrottle _diagnosticThrottle = new DiagnosticUploadThrottle(DiagnosticUploadThrottle.DefaultInterval);
         private string _diagnosticNotice;
         private float _diagnosticNoticeUntil;
-        private UpdateClient _updateClient;
-        private UpdateWindow _updateWindow;
-        private CancellationTokenSource _updateCancellation;
-        private Task<Version> _updateCheck;
-        private Task<string> _updateInstall;
-        private Version _updateAvailable;
-
-        /// <summary>화면에 띄워야 하는데 아직 못 띄운 단계. 창을 만들 수 있을 때까지 폴링마다 다시 시도한다.</summary>
-        private UpdateWindow.Stage? _updatePrompt;
-        private float _updatePromptRetryAt;
         private string _startupNotice = "";
-        private Version _updatedTo;
-        private bool _filesSplit;
         private string _lastPanelOrigin;
         private string _lastPanelBlocker;
         private readonly Dictionary<string, string> _lastErrors = new Dictionary<string, string>();
@@ -114,56 +86,39 @@ namespace SephPlanner.Plugin
 
         private void Awake()
         {
-            _settings = new PluginSettings(Config, Logger.LogInfo, () => OpenDiagnosticConsent(null), OpenAutomaticDiagnosticConsent);
+            _settings = new PluginSettings(PluginHost.Settings, Log.Info);
             ApplyHighPerformance();
             _settings.HighPerformance.SettingChanged += (_, _) => ApplyHighPerformance();
-            _prefs = PluginPreferences.Load(Logger.LogWarning);
+            _prefs = PluginPreferences.Load(Log.Warning);
             _window = new SettingsWindow(_settings.Rows, WindowActions);
             _build = new BuildWindow(_prefs, CurrentBuild);
-            _diagnosticWindow = new DiagnosticConsentWindow(ChooseDiagnosticConsent, CancelDiagnostic);
-            _automaticDiagnosticWindow = new DiagnosticConsentWindow(ChooseAutomaticDiagnosticConsent,
-                () => _automaticPromptShown = true, automatic: true);
-            _settings.AutomaticDiagnosticConsent.SettingChanged += (_, _) =>
-            {
-                if (_settings.AutomaticDiagnosticAllowed) return;
-                _automaticIncident = null;
-                _automaticIncidentLog = null;
-                if (_automaticUpload) _diagnosticCancellation?.Cancel();
-            };
-            _noteWindow = new DiagnosticNoteWindow(FinishDiagnostic, CancelDiagnostic);
-            _diagnosticLog = new DiagnosticText(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Paths.GameRootPath);
-            _diagnosticClient = new DiagnosticUploadClient();
-            _settings.DiagnosticConsent.SettingChanged += (_, _) =>
-            {
-                if (!_automaticUpload && !_settings.DiagnosticUploadAllowed) _diagnosticCancellation?.Cancel();
-            };
-            Logger.LogEvent += CaptureOwnLog;
-            GameBinding.LogTo(Logger.LogWarning);
-            _harmony = new Harmony(PluginGuid);
-            TabletRotationTooltipGuard.Install(_harmony, Logger.LogWarning);
-            CatalogSource.Install(_harmony, Logger.LogWarning);
-            FixedEffectLayer.Log = Logger.LogInfo;
+            _diagnosticLog = new DiagnosticText(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), PluginHost.GameFolder);
+            Log.Written += CaptureOwnLog;
+            GameBinding.LogTo(Log.Warning);
+            _harmony = new Harmony(PluginIdentity.Guid);
+            TabletRotationTooltipGuard.Install(_harmony, Log.Warning);
+            CatalogSource.Install(_harmony, Log.Warning);
+            FixedEffectLayer.Log = Log.Info;
             HorayModAPI.OnStartSessionClientside += StartSession;
             HorayModAPI.OnAllDatabasesReady += DatabasesReady;
 
             // 실행기는 카탈로그가 준비된 뒤에 생기고 F9 뒤에는 새로 지어진다. 지금 것을 그때그때
             // 묻게 해 두면 계측 쪽이 그 수명을 몰라도 된다.
             FrameCost.PlanStats = () => _runner?.Stats;
-            Logger.LogInfo(PluginIdentity.Describe());
+            Log.Info(PluginIdentity.Describe());
 
-            _updateWindow = new UpdateWindow(StartUpdateInstall, () => Logger.LogInfo("업데이트를 미뤘습니다. 다음 실행 때 다시 묻습니다."));
-            _updateClient = new UpdateClient(Application.platform == RuntimePlatform.OSXPlayer);
-            Guarded(FinishPreviousUpdate, "업데이트 정리");
+            StartNetwork();
             // 처리기는 유니티 로그 안에서 불려 Guarded 로 감쌀 수 없다. 판이 섞였으면 옛 Core 에 AppendGame 이
             // 없어 게임이 로그를 남길 때마다 예외가 유니티로 새므로 아예 걸지 않는다.
-            if (!_filesSplit) Application.logMessageReceivedThreaded += CaptureGameLog;
+            var filesSplit = false;
+            DetectFilesSplit(ref filesSplit);
+            if (!filesSplit) Application.logMessageReceivedThreaded += CaptureGameLog;
             Guarded(StartLanguage, "화면 언어");
-            if (_settings.UpdateCheck.Value) StartUpdateCheck();
         }
 
         /// <summary>
         /// 번역은 0.5.0 다음 판에 생긴 Core 멤버다. 판이 섞여 Core 가 옛것이면 여기서 실패하므로
-        /// <see cref="FinishPreviousUpdate"/> 가 판 불일치를 알린 뒤에 부른다.
+        /// 판 불일치를 알리는 <c>FinishPreviousUpdate</c>(BepInEx 판) 뒤에 부른다.
         /// </summary>
         private void StartLanguage()
         {
@@ -193,9 +148,8 @@ namespace SephPlanner.Plugin
             // 단축키·화면 쪽에서 난 예외가 폴링까지 굶기면 안 된다. Update 안의 예외는 유니티가
             // Player.log 에만 쌓고 우리 로그는 조용하므로, 여기서 잡아 같은 것 한 번씩 남긴다.
             Guarded(HandleInput, "입력 처리");
-            Guarded(CheckDiagnosticUpload, "진단 전송 상태");
-            Guarded(CheckAutomaticDiagnostic, "자동 진단 처리");
-            Guarded(CheckUpdateProgress, "업데이트 진행");
+            Guarded(TakePlanFailure, "자동 진단 처리");
+            PollNetwork();
             Guarded(DropStaleWindows, "언어 바꾼 창 정리");
 
             var panelStarted = FrameCost.Now;
@@ -230,7 +184,7 @@ namespace SephPlanner.Plugin
             _nextCostReport = Time.unscaledTime + 300f;
             if (first || FrameCost.Poll.Count == 0) return;
 
-            Logger.LogInfo(FrameCost.Summary());
+            Log.Info(FrameCost.Summary());
         }
 
         /// <summary>
@@ -257,7 +211,7 @@ namespace SephPlanner.Plugin
             catch (Exception ex)
             {
                 if (NewError(label, ex.GetType().Name + ": " + ex.Message))
-                    Logger.LogError(label + " 실패 - " + ex);
+                    Log.Error(label + " 실패 - " + ex);
                 if (label != "진단 전송 상태" && label != "자동 진단 처리")
                     QueueAutomaticDiagnostic(label, ex.ToString());
             }
@@ -328,7 +282,7 @@ namespace SephPlanner.Plugin
         {
             if (_dumping)
             {
-                Logger.LogInfo("데이터 덤프가 이미 진행 중입니다.");
+                Log.Info("데이터 덤프가 이미 진행 중입니다.");
                 return;
             }
             StartCoroutine(DumpRoutine());
@@ -341,7 +295,7 @@ namespace SephPlanner.Plugin
             // 모드 아이템이 데이터베이스에 등록된 뒤에 읽어야 한다. 타이틀에서 누르면 세이브에 들어갈 때까지 미룬다.
             if (!CatalogSource.DatabasesReady)
             {
-                Logger.LogInfo("데이터 덤프 대기 - 세이브에 들어가 게임 데이터가 준비되면 진행합니다.");
+                Log.Info("데이터 덤프 대기 - 세이브에 들어가 게임 데이터가 준비되면 진행합니다.");
                 while (!CatalogSource.DatabasesReady) yield return new WaitForSecondsRealtime(0.5f);
             }
 
@@ -352,7 +306,7 @@ namespace SephPlanner.Plugin
             }
             catch (Exception ex)
             {
-                Logger.LogError("데이터 덤프를 시작하지 못했습니다: " + ex);
+                Log.Error("데이터 덤프를 시작하지 못했습니다: " + ex);
                 QueueAutomaticDiagnostic("데이터 덤프를 시작하지 못했습니다: ", ex.ToString());
                 _dumping = false;
                 yield break;
@@ -368,7 +322,7 @@ namespace SephPlanner.Plugin
             {
                 if (Time.realtimeSinceStartup >= readyDeadline)
                 {
-                    Logger.LogError("데이터 덤프 보류 - 카탈로그 준비 실패: " + CatalogSource.LastError +
+                    Log.Error("데이터 덤프 보류 - 카탈로그 준비 실패: " + CatalogSource.LastError +
                                     ". 게임 화면이 열린 뒤 F9로 다시 시도하세요.");
                     FailDump(generation, "카탈로그 준비 실패: " + CatalogSource.LastError);
                     _dumping = false;
@@ -379,7 +333,7 @@ namespace SephPlanner.Plugin
 
             // 이터레이터 안에서 던진 예외를 그대로 두면 코루틴이 죽으면서 _dumping 이 영영 참으로
             // 남는다. 한 걸음씩 감싸서 실패해도 플래그를 되돌린다.
-            var steps = CatalogDump.WriteRoutine(Logger.LogInfo, generation);
+            var steps = CatalogDump.WriteRoutine(Log.Info, generation);
             var completed = false;
             while (true)
             {
@@ -393,7 +347,7 @@ namespace SephPlanner.Plugin
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError("데이터 덤프 실패: " + ex);
+                    Log.Error("데이터 덤프 실패: " + ex);
                     QueueAutomaticDiagnostic("데이터 덤프 실패: ", ex.ToString());
                     FailDump(generation, ex.Message);
                     break;
@@ -404,7 +358,7 @@ namespace SephPlanner.Plugin
             _dumping = false;
         }
 
-        private void FailDump(string generation, string reason)
+        private static void FailDump(string generation, string reason)
         {
             try
             {
@@ -412,13 +366,15 @@ namespace SephPlanner.Plugin
             }
             catch (Exception ex)
             {
-                Logger.LogError("카탈로그 실패 상태도 기록하지 못했습니다: " + ex);
+                Log.Error("카탈로그 실패 상태도 기록하지 못했습니다: " + ex);
             }
         }
 
         private void DumpInventory()
         {
-            if (_diagnosticTask != null || _diagnosticWindow.IsOpen || _noteWindow.IsOpen || _automaticDiagnosticWindow.IsOpen)
+            var busy = false;
+            CheckDiagnosticBusy(ref busy);
+            if (busy)
             {
                 Report(Tr("진단을 처리 중입니다. 전송 또는 선택이 끝난 뒤 다시 눌러 주세요."));
                 return;
@@ -427,29 +383,25 @@ namespace SephPlanner.Plugin
             {
                 var capture = CollectDiagnostic();
                 _pendingDiagnostic = capture;
-
-                // 동의를 먼저 묻고 그다음에 메모를 받는다. 보낼지도 정하지 않았는데 무슨 일이
-                // 있었는지부터 적게 하면, 안 보내기로 한 사람은 헛수고를 한 셈이 된다.
-                // 로컬에만 남길 자료에는 읽을 사람이 없으므로 아예 묻지 않는다.
-                if (_settings.DiagnosticUploadAllowed) OpenDiagnosticNote();
-                else if (ConsentPending()) OpenDiagnosticConsent(capture);
-                else FinishDiagnostic(DiagnosticNote.None);
+                var asked = false;
+                AskToSend(capture, ref asked);
+                if (!asked) FinishDiagnostic(DiagnosticNote.None);
             }
             catch (Exception ex)
             {
-                Logger.LogError("인벤토리 덤프 실패: " + ex);
-                ReportDiagnostic(Tr("진단 또는 재현 자료 저장에 실패했습니다. BepInEx 로그를 확인하세요."));
+                Log.Error("인벤토리 덤프 실패: " + ex);
+                ReportDiagnostic(Tr("진단 또는 재현 자료 저장에 실패했습니다. 로그 파일({0})을 확인하세요.", PluginHost.LogFile));
             }
         }
 
         private DiagnosticCapture CollectDiagnostic()
         {
-            var capture = new DiagnosticCapture(_diagnosticLog, Logger.LogWarning);
+            var capture = new DiagnosticCapture(_diagnosticLog, Log.Warning);
 
             // 구역 하나가 터져도 파일은 남지만, 그 사실이 로그와 보고서 요약에도 있어야 한다.
             void DumpSectionFailed(object message)
             {
-                Logger.LogWarning(message);
+                Log.Warning(message);
                 capture.Warn("inventory-dump.txt", message?.ToString() ?? "");
             }
 
@@ -497,7 +449,7 @@ namespace SephPlanner.Plugin
             _settings.ForgetRows();
             _hud.Destroy();
             _languageStale = true;
-            Logger.LogInfo("화면 언어: " + Localization.Code(language));
+            Log.Info("화면 언어: " + Localization.Code(language));
         }
 
         private bool _languageApplied;
@@ -520,120 +472,21 @@ namespace SephPlanner.Plugin
         {
             yield return _window;
             yield return _build;
-            yield return _diagnosticWindow;
-            yield return _automaticDiagnosticWindow;
-            yield return _noteWindow;
-            yield return _updateWindow;
+            var network = new List<PlannerWindow>();
+            AddNetworkWindows(network);
+            foreach (var window in network) yield return window;
         }
 
-        private void CaptureOwnLog(object sender, BepInEx.Logging.LogEventArgs args) =>
-            _diagnosticLog.Append(DateTime.UtcNow.ToString("O") + " [" + args.Level + "] " + args.Data);
+        private void CaptureOwnLog(LogLevel level, string message) =>
+            _diagnosticLog.Append(DateTime.UtcNow.ToString("O") + " [" + level + "] " + message);
 
         // 게임이 Debug.LogError 로만 남기는 단서가 있다(권한 중첩, 고정 각인 칸 누락, 판 재시작 예외).
-        // 사용자가 Player.log 를 찾아 보내지 않아도 진단에 실리게 한다.
-        private void CaptureGameLog(string message, string stackTrace, LogType type) =>
+        // 사용자가 Player.log 를 찾아 보내지 않아도 진단에 실리게 한다. 우리 로그가 유니티 로그로 가는 판(창작마당)
+        // 에서는 우리 줄이 여기로도 돌아오는데, 그것은 CaptureOwnLog 가 이미 담았다.
+        private void CaptureGameLog(string message, string stackTrace, LogType type)
+        {
+            if (PluginHost.IsOwnGameLogLine(message)) return;
             _diagnosticLog.AppendGame((GameLogKind)(int)type, message, stackTrace, DateTime.UtcNow);
-
-        private void OpenAutomaticDiagnosticConsent()
-        {
-            if (!_automaticDiagnosticWindow.IsOpen)
-                _automaticDiagnosticWindow.Toggle(Tr("ESC: 선택 보류"));
-            if (_automaticDiagnosticWindow.IsOpen) _automaticPromptShown = true;
-        }
-
-        private void ChooseAutomaticDiagnosticConsent(bool allowed)
-        {
-            try
-            {
-                _runner?.TakeFailure();
-                _settings.SetAutomaticDiagnosticConsent(allowed);
-                _window.Refresh();
-                ReportDiagnostic(allowed
-                    ? Tr("이후 SephPlanner 오류 진단을 자동 전송합니다. F3에서 철회할 수 있습니다.")
-                    : Tr("오류 진단을 자동 전송하지 않습니다. F10 수동 진단은 계속 사용할 수 있습니다."));
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("자동 진단 동의 저장 실패: " + ex);
-                ReportDiagnostic(Tr("자동 진단 설정을 저장하지 못했습니다. 설정에서 다시 확인해 주세요."));
-            }
-        }
-
-        private void QueueAutomaticDiagnostic(string stage, string detail, PlanFailure failure = null)
-        {
-            try { TryQueueAutomaticDiagnostic(stage, detail, failure); }
-            catch (Exception ex) { Logger.LogError("자동 진단 예약 실패: " + ex); }
-        }
-
-        private void TryQueueAutomaticDiagnostic(string stage, string detail, PlanFailure failure)
-        {
-            if (!_settings.AutomaticDiagnosticAllowed || _automaticIncident != null ||
-                _diagnosticTask != null || _pendingDiagnostic != null || AnsweringWindowOpen()) return;
-            var redacted = _diagnosticLog.Redact(detail);
-            if (!_automaticPolicy.TryAccept(stage + "|" + redacted, _diagnosticThrottle)) return;
-            _automaticIncident = new
-            {
-                Trigger = "automatic",
-                Stage = stage,
-                OccurredUtc = failure?.OccurredUtc ?? DateTime.UtcNow.ToString("O"),
-                Detail = redacted,
-                FailedInput = failure == null ? null : new
-                {
-                    failure.Snapshot,
-                    failure.Preferences,
-                    failure.CatalogGeneration,
-                    Catalog = (failure.Catalog as Catalog)?.Export(),
-                    failure.PreviousTargets,
-                },
-            };
-            _automaticIncidentLog = _diagnosticLog.Snapshot();
-        }
-
-        private void CheckAutomaticDiagnostic()
-        {
-            if (!_automaticPromptShown && _settings.AutomaticDiagnosticChoice.Value != PluginSettings.AutomaticDiagnosticKey &&
-                !AnyWindowOpen() && Time.unscaledTime >= _nextPoll)
-                OpenAutomaticDiagnosticConsent();
-
-            var failure = _runner?.TakeFailure();
-            if (failure != null)
-            {
-                if (NewError(failure.Stage, failure.Detail)) Logger.LogError(failure.Stage + " 실패: " + failure.Detail);
-                QueueAutomaticDiagnostic(failure.Stage, failure.Detail, failure);
-            }
-            if (_automaticIncident == null) return;
-            var incident = _automaticIncident;
-            var log = _automaticIncidentLog;
-            _automaticIncident = null;
-            _automaticIncidentLog = null;
-            if (!_settings.AutomaticDiagnosticAllowed || _diagnosticTask != null || _pendingDiagnostic != null) return;
-            try
-            {
-                var capture = CollectDiagnostic();
-                capture.Finish(PluginIdentity.Describe(),
-                    ReplayPreferences.From(Preferences()), incident: incident, incidentLog: log);
-                StartDiagnosticUpload(capture, automatic: true, reserved: true);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("오류 진단 자동 수집 실패: " + ex);
-                ReportDiagnostic(Tr("오류 진단을 자동 수집하지 못했습니다. BepInEx 로그를 확인하세요."));
-            }
-        }
-
-        /// <summary>아직 전송 동의를 묻거나 다시 물어야 하는 상태인가.</summary>
-        private bool ConsentPending() =>
-            !_settings.DiagnosticChoiceMade.Value || _settings.DiagnosticConsent.Value.Length > 0;
-
-        private void OpenDiagnosticNote()
-        {
-            _noteWindow.Reset();
-            if (!_noteWindow.IsOpen) _noteWindow.Toggle(Tr("Enter: 보내기 · ESC: 취소"));
-            if (_noteWindow.Blocker.Length == 0) return;
-
-            // 창을 못 열었다고 진단을 버리지 않는다. 메모 없이 하던 대로 보낸다.
-            Logger.LogWarning("진단 메모 창을 열지 못했습니다: " + _noteWindow.Blocker);
-            FinishDiagnostic(DiagnosticNote.None);
         }
 
         /// <summary>설명 파일을 쓴다. 실패하면 화면에 알리고 거짓을 돌려준다.</summary>
@@ -643,30 +496,15 @@ namespace SephPlanner.Plugin
             {
                 capture.Finish(PluginIdentity.Describe(),
                     ReplayPreferences.From(_prefs.ToPreferences(_settings.Recommendations.Value)), note);
-                Logger.LogInfo("이번 진단 보관 위치: " + capture.DirectoryPath);
+                Log.Info("이번 진단 보관 위치: " + capture.DirectoryPath);
                 return true;
             }
             catch (Exception ex)
             {
-                Logger.LogError("진단 설명 저장 실패: " + ex);
-                ReportDiagnostic(Tr("진단 설명을 저장하지 못했습니다. BepInEx 로그를 확인하세요."));
+                Log.Error("진단 설명 저장 실패: " + ex);
+                ReportDiagnostic(Tr("진단 설명을 저장하지 못했습니다. 로그 파일({0})을 확인하세요.", PluginHost.LogFile));
                 return false;
             }
-        }
-
-        /// <summary>
-        /// 보내지 않기로 했다. 수집한 자료는 그대로 로컬에 남긴다 - 취소는 전송을 그만두는 것이지
-        /// 진단을 버리는 것이 아니다. 전송을 시작하지 않으므로 전송 간격 제한도 쓰지 않는다.
-        /// </summary>
-        private void CancelDiagnostic()
-        {
-            var cancelled = _pendingDiagnostic;
-            _pendingDiagnostic = null;
-            if (cancelled == null || !WriteDiagnostic(cancelled, DiagnosticNote.None)) return;
-
-            ReportDiagnostic(cancelled.HasFailures
-                ? Tr("이번 진단은 보내지 않았습니다. 저장한 자료와 실패 기록은 이 PC에만 있습니다.")
-                : Tr("이번 진단은 보내지 않았습니다. 자료는 이 PC에만 있습니다."));
         }
 
         /// <summary>메모가 정해진 뒤에 설명 파일을 쓰고 전송 또는 로컬 보관으로 넘긴다.</summary>
@@ -675,121 +513,55 @@ namespace SephPlanner.Plugin
             var capture = _pendingDiagnostic;
             _pendingDiagnostic = null;
             if (capture == null || !WriteDiagnostic(capture, note)) return;
-
-            if (_settings.DiagnosticUploadAllowed) StartDiagnosticUpload(capture);
-            else if (!_settings.DiagnosticChoiceMade.Value || _settings.DiagnosticConsent.Value.Length > 0) OpenDiagnosticConsent(capture);
-            else ReportDiagnostic(capture.HasFailures
-                ? Tr("진단 일부 저장에 실패했습니다. 저장한 자료와 실패 기록은 로컬에 보관했습니다.")
-                : Tr("진단을 로컬에 저장했습니다. F3에서 진단 전송을 켤 수 있습니다."));
+            Deliver(capture);
         }
 
-        private void OpenDiagnosticConsent(DiagnosticCapture capture)
+        // 진단 전송과 게임 안 업데이트는 BepInEx 판에만 있다(BepInExHost/Plugin.Network.cs). 아래 partial void 는 몸체가
+        // 없으면 부르는 자리째 빠지고, ref 로 받는 값은 처음 값(거짓) 그대로 남는다 - 창작마당 판이 그렇다.
+        // 창작마당 판은 Deliver 만 따로 채운다(src/SephPlanner.Workshop/Plugin.Local.cs).
+        partial void StartNetwork();
+
+        partial void PollNetwork();
+
+        partial void StopNetwork();
+
+        partial void QueueAutomaticDiagnostic(string stage, string detail, PlanFailure failure);
+
+        private void QueueAutomaticDiagnostic(string stage, string detail) => QueueAutomaticDiagnostic(stage, detail, null);
+
+        /// <summary>게임 안 업데이트가 적용됐으면 첫 화면에 띄울 문장을 <see cref="_startupNotice"/> 에 둔다.</summary>
+        partial void TakeUpdateNotice();
+
+        /// <summary>플러그인과 Core 의 판이 다른가(게임 안 업데이트가 반쯤 걸림).</summary>
+        partial void DetectFilesSplit(ref bool split);
+
+        partial void AddNetworkWindows(List<PlannerWindow> windows);
+
+        partial void CheckAnsweringWindow(ref bool open);
+
+        /// <summary>앞선 진단을 아직 처리하는 중인가(전송 중이거나 동의·메모 창이 떠 있음).</summary>
+        partial void CheckDiagnosticBusy(ref bool busy);
+
+        /// <summary>F10 으로 모은 진단을 보낼지 물으러 갔으면 참. 거짓이면 곧바로 로컬에 적는다.</summary>
+        partial void AskToSend(DiagnosticCapture capture, ref bool asked);
+
+        /// <summary>설명 파일까지 쓴 진단을 보내거나 로컬에 둔 것을 알린다.</summary>
+        private partial void Deliver(DiagnosticCapture capture);
+
+        /// <summary>물음에 답해야 닫히는 창(진단 동의, 업데이트)이 떠 있는가.</summary>
+        private bool AnsweringWindowOpen()
         {
-            _pendingDiagnostic = capture;
-            if (!_diagnosticWindow.IsOpen) _diagnosticWindow.Toggle(Tr("ESC: 이번에는 전송하지 않기"));
-            if (_diagnosticWindow.Blocker.Length > 0)
-            {
-                Logger.LogWarning("진단 전송 안내를 열지 못했습니다: " + _diagnosticWindow.Blocker);
-                ReportDiagnostic(Tr("전송 안내를 열지 못했습니다. 수집한 진단은 로컬에 보관합니다."));
-            }
+            var open = false;
+            CheckAnsweringWindow(ref open);
+            return open;
         }
 
-        private void ChooseDiagnosticConsent(bool allowed)
+        private void TakePlanFailure()
         {
-            try { _settings.SetDiagnosticConsent(allowed); }
-            catch (Exception ex)
-            {
-                Logger.LogError("진단 전송 설정 저장 실패: " + ex);
-                var stranded = _pendingDiagnostic;
-                _pendingDiagnostic = null;
-                if (stranded != null) WriteDiagnostic(stranded, DiagnosticNote.None);
-                ReportDiagnostic(Tr("전송 설정을 저장하지 못했습니다. 이번 진단은 로컬에 보관합니다."));
-                return;
-            }
-            _window.Refresh();
-
-            // 이제 보내도 된다는 답을 받았으니 무슨 일이 있었는지 묻는다. 전송은 그 뒤다.
-            if (allowed && _pendingDiagnostic != null)
-            {
-                OpenDiagnosticNote();
-                return;
-            }
-
-            var capture = _pendingDiagnostic;
-            _pendingDiagnostic = null;
-            if (capture != null && !WriteDiagnostic(capture, DiagnosticNote.None)) return;
-            ReportDiagnostic(allowed ? Tr("이후 F10 진단을 비공개 서버로 전송합니다.") :
-                capture?.HasFailures == true ? Tr("진단 일부 저장에 실패했습니다. 실패 기록은 로컬에 보관합니다.") : Tr("진단은 로컬에만 저장합니다."));
-        }
-
-        private void StartDiagnosticUpload(DiagnosticCapture capture, bool automatic = false, bool reserved = false)
-        {
-            if (!(automatic ? _settings.AutomaticDiagnosticAllowed : _settings.DiagnosticUploadAllowed) || _diagnosticTask != null) return;
-            if (!reserved && !_diagnosticThrottle.TryStart(out var remaining))
-            {
-                var seconds = Math.Ceiling(remaining.TotalSeconds);
-                var message = capture.HasFailures
-                    ? new Phrase("이번 진단은 로컬에 저장했습니다. {0}초 뒤부터 다시 전송할 수 있습니다. 일부 자료 수집에 실패했습니다.", seconds)
-                    : new Phrase("이번 진단은 로컬에 저장했습니다. {0}초 뒤부터 다시 전송할 수 있습니다.", seconds);
-                ReportDiagnostic(message.ToString());
-                Logger.LogInfo(message.Korean);
-                try { File.WriteAllText(Path.Combine(capture.DirectoryPath, "upload-result.txt"), message.Korean); }
-                catch (Exception ex) { Logger.LogWarning("진단 전송 제한 기록을 저장하지 못했습니다: " + ex); }
-                return;
-            }
-            _automaticUpload = automatic;
-            _diagnosticCancellation = new CancellationTokenSource();
-            // 초기 운영 제한값이다. 느린 연결이 게임 종료나 다음 조작을 붙잡지 않도록 한다.
-            _diagnosticCancellation.CancelAfter(TimeSpan.FromSeconds(60));
-            var cancellation = _diagnosticCancellation.Token;
-            var consent = automatic
-                ? DiagnosticUploadClient.ConsentKey(new Uri(DiagnosticUploadClient.DefaultEndpoint))
-                : _settings.DiagnosticConsent.Value;
-            _diagnosticTask = Task.Run(async () =>
-            {
-                try
-                {
-                    cancellation.ThrowIfCancellationRequested();
-                    var archive = DiagnosticArchive.Create(capture.Files);
-                    File.WriteAllBytes(Path.Combine(capture.DirectoryPath, "report.zip"), archive);
-                    var receipt = await _diagnosticClient.SendAsync(new Uri(DiagnosticUploadClient.DefaultEndpoint), consent,
-                        capture.Id, archive, cancellation).ConfigureAwait(false);
-                    var message = Phrase.Join(" · ", new Phrase("진단 접수 완료 · 제보 번호 {0}", receipt),
-                        capture.HasFailures ? new Phrase("일부 자료 수집 실패 포함") : null);
-                    try { File.WriteAllText(Path.Combine(capture.DirectoryPath, "upload-result.txt"), message.Korean); }
-                    catch (Exception saveError)
-                    {
-                        Logger.LogWarning("진단은 접수됐지만 로컬 접수 기록 저장에 실패했습니다: " + saveError);
-                        message = Phrase.Join(" · ", message, new Phrase("로컬 접수 기록 저장 실패"));
-                    }
-                    return (message.ToString(), message.Korean);
-                }
-                catch (Exception ex)
-                {
-                    var message = new Phrase("진단 전송 실패: {0} · 로컬 보관: {1}",
-                        Phrase.Of(ex, _diagnosticLog.Redact), capture.DirectoryPath);
-                    Logger.LogWarning(message.Korean);
-                    try { File.WriteAllText(Path.Combine(capture.DirectoryPath, "upload-result.txt"), message.Korean); }
-                    catch (Exception saveError) { Logger.LogWarning("진단 전송 실패 기록도 저장하지 못했습니다: " + saveError); }
-                    return (message.ToString(), message.Korean);
-                }
-            });
-            ReportDiagnostic(Tr("진단을 비공개 서버로 전송 중입니다. 게임을 계속할 수 있습니다."));
-        }
-
-        private void CheckDiagnosticUpload()
-        {
-            if (!(_automaticUpload ? _settings.AutomaticDiagnosticAllowed : _settings.DiagnosticUploadAllowed))
-                _diagnosticCancellation?.Cancel();
-            if (_diagnosticTask == null || !_diagnosticTask.IsCompleted) return;
-            var completed = _diagnosticTask;
-            _diagnosticTask = null;
-            _automaticUpload = false;
-            _diagnosticCancellation.Dispose();
-            _diagnosticCancellation = null;
-            var (shown, logged) = completed.GetAwaiter().GetResult();
-            Logger.LogInfo(logged);
-            ReportDiagnostic(shown);
+            var failure = _runner?.TakeFailure();
+            if (failure == null) return;
+            if (NewError(failure.Stage, failure.Detail)) Log.Error(failure.Stage + " 실패: " + failure.Detail);
+            QueueAutomaticDiagnostic(failure.Stage, failure.Detail, failure);
         }
 
         private void ReportDiagnostic(string message)
@@ -800,137 +572,6 @@ namespace SephPlanner.Plugin
         }
 
         private bool AnyWindowOpen() => _window.IsOpen || _build.IsOpen || AnsweringWindowOpen();
-
-        /// <summary>물음에 답해야 닫히는 창. 진단 동의와 업데이트가 그렇다.</summary>
-        private bool AnsweringWindowOpen() =>
-            _diagnosticWindow.IsOpen || _noteWindow.IsOpen || _automaticDiagnosticWindow.IsOpen || _updateWindow.IsOpen;
-
-        private static Version CurrentVersion() => typeof(SephPlannerPlugin).Assembly.GetName().Version;
-
-        /// <summary>
-        /// 지금 로드된 DLL 둘의 자리. 업데이트는 이 파일들을 바꾸는 것이지 <c>plugins</c> 폴더에
-        /// 새로 놓는 것이 아니다 - 하위 폴더에 설치한 사람도 같은 자리를 받는다.
-        /// </summary>
-        private static Dictionary<string, string> UpdateTargets() => new Dictionary<string, string>
-        {
-            [UpdatePackage.PluginFile] = typeof(SephPlannerPlugin).Assembly.Location,
-            [UpdatePackage.CoreFile] = typeof(UpdateClient).Assembly.Location,
-        };
-
-        /// <summary>
-        /// 지난 실행이 밀어 둔 옛 DLL 을 지운다. 있었다면 이번이 새 버전의 첫 실행이다. 두 DLL 의 판이
-        /// 다르면 업데이트가 반쯤 걸린 것이라 알리고 다시 설치하라고 한다.
-        ///
-        /// <b>여기서는 옛 Core 에도 있던 것만 부른다.</b> 판이 섞였다면 Core 가 옛것일 수 있고, 그때 새로 생긴
-        /// 멤버를 부르면 이 메서드가 통째로 못 돌아 알릴 기회를 잃는다. 문자열 상수는 컴파일할 때 박히므로 괜찮다.
-        /// 이 메서드를 부르는 <c>Awake</c> 본문도 같다 - 거기서 새 Core 멤버를 직접 부르면 여기까지 오지 못한다.
-        /// </summary>
-        private void FinishPreviousUpdate()
-        {
-            // 판 대조를 지우기보다 먼저 한다. 옛 DLL 이 잠겨 지우다 실패해도 알림은 남아야 한다.
-            var core = typeof(UpdateClient).Assembly.GetName().Version;
-            var split = UpdateClient.Normalize(CurrentVersion()) != UpdateClient.Normalize(core);
-            _filesSplit = split;
-            if (split)
-            {
-                _startupNotice = "SephPlanner 파일의 판이 서로 다릅니다(플러그인 " + UpdateClient.Format(CurrentVersion()) +
-                                 ", Core " + UpdateClient.Format(core) + "). " + UpdateRollbackException.ReinstallAdvice;
-                Logger.LogError(_startupNotice);
-            }
-            var updated = UpdateInstaller.CleanRetired(UpdateTargets().Values);
-            if (split || !updated) return;
-            // 번역은 새 Core 멤버라 여기서 부를 수 없다. 문장은 화면이 설 때 짓는다.
-            _updatedTo = CurrentVersion();
-            Logger.LogInfo("업데이트가 적용됐습니다. 이전 버전의 DLL 을 지웠습니다.");
-        }
-
-        private void StartUpdateCheck()
-        {
-            _updateCancellation = new CancellationTokenSource();
-            _updateCancellation.CancelAfter(TimeSpan.FromSeconds(30));
-            var cancellation = _updateCancellation.Token;
-            var current = CurrentVersion();
-            _updateCheck = Task.Run(() => _updateClient.CheckAsync(current, cancellation));
-        }
-
-        private void StartUpdateInstall(Version version)
-        {
-            if (_updateInstall != null) return;
-            _updateWindow.Show(UpdateWindow.Stage.Working, version, CurrentVersion());
-            _updateCancellation = new CancellationTokenSource();
-            _updateCancellation.CancelAfter(TimeSpan.FromMinutes(5));
-            var cancellation = _updateCancellation.Token;
-            var targets = UpdateTargets();
-            Logger.LogInfo("업데이트 " + UpdateClient.Format(version) + " 을 받습니다.");
-            _updateInstall = Task.Run(async () =>
-            {
-                try
-                {
-                    var zip = await _updateClient.DownloadAsync(version, cancellation).ConfigureAwait(false);
-                    cancellation.ThrowIfCancellationRequested();
-                    UpdateInstaller.Install(UpdatePackage.Extract(zip, version), targets);
-                    return null;
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogWarning("업데이트 실패: " + ex);
-                    return ex is OperationCanceledException ? Tr("시간이 너무 오래 걸려 그만두었습니다.") : Phrase.Of(ex).ToString();
-                }
-            });
-        }
-
-        /// <summary>
-        /// 확인과 설치의 결과를 메인 스레드에서 걷는다. 창은 게임의 HUD 캔버스가 서야 만들 수
-        /// 있고 다른 창 위에 겹쳐 띄우지 않으므로, 띄울 것이 있으면 될 때까지 폴링마다 되짚는다.
-        /// </summary>
-        private void CheckUpdateProgress()
-        {
-            if (_updateCheck != null && _updateCheck.IsCompleted)
-            {
-                var completed = _updateCheck;
-                _updateCheck = null;
-                DisposeUpdateCancellation();
-                try
-                {
-                    _updateAvailable = completed.GetAwaiter().GetResult();
-                    if (_updateAvailable != null)
-                    {
-                        Logger.LogInfo("새 버전 " + UpdateClient.Format(_updateAvailable) + " 이 있습니다.");
-                        _updatePrompt = UpdateWindow.Stage.Offer;
-                    }
-                    else Logger.LogInfo("최신 안정판입니다.");
-                }
-                catch (Exception ex)
-                {
-                    // 확인은 조용히 실패한다. 오프라인이거나 GitHub 가 잠깐 안 되는 것을 게임 화면에서 알릴 이유가 없다.
-                    Logger.LogWarning("업데이트 확인 실패: " + ex.Message);
-                }
-            }
-
-            if (_updateInstall != null && _updateInstall.IsCompleted)
-            {
-                var completed = _updateInstall;
-                _updateInstall = null;
-                DisposeUpdateCancellation();
-                var error = completed.GetAwaiter().GetResult();
-                if (error == null) Logger.LogInfo("업데이트 " + UpdateClient.Format(_updateAvailable) + " 을 설치했습니다. 다음 실행부터 적용됩니다.");
-                _updateWindow.Show(error == null ? UpdateWindow.Stage.Done : UpdateWindow.Stage.Failed, _updateAvailable, CurrentVersion(), error ?? "");
-                _updatePrompt = _updateWindow.IsOpen ? null : _updateWindow.Current;
-            }
-
-            if (!_updatePrompt.HasValue || AnyWindowOpen() || Time.unscaledTime < _updatePromptRetryAt) return;
-            _updatePromptRetryAt = Time.unscaledTime + 1f;
-            if (_updatePrompt == UpdateWindow.Stage.Offer)
-                _updateWindow.Show(UpdateWindow.Stage.Offer, _updateAvailable, CurrentVersion());
-            _updateWindow.Toggle("");
-            if (_updateWindow.Blocker.Length == 0) _updatePrompt = null;
-        }
-
-        private void DisposeUpdateCancellation()
-        {
-            _updateCancellation?.Dispose();
-            _updateCancellation = null;
-        }
 
         private void PollGameState()
         {
@@ -957,7 +598,7 @@ namespace SephPlanner.Plugin
             catch (Exception ex)
             {
                 // 게임 업데이트로 내부 구조가 바뀌면 여기서 터진다. 게임을 죽이지 않고 물러선다.
-                Logger.LogError("스냅샷 생성 실패: " + ex);
+                Log.Error("스냅샷 생성 실패: " + ex);
                 QueueAutomaticDiagnostic("스냅샷 생성 실패: ", ex.ToString());
                 _nextPoll = Time.unscaledTime + 5f;
             }
@@ -991,7 +632,7 @@ namespace SephPlanner.Plugin
             var forgotten = _prefs.ForgetAbsent(present);
             if (forgotten == 0) return;
 
-            Logger.LogInfo($"새 판 - 가방에 없는 아이템 {forgotten}종의 지정을 정리했습니다.");
+            Log.Info($"새 판 - 가방에 없는 아이템 {forgotten}종의 지정을 정리했습니다.");
             Report(Tr("지난 판의 지정 {0}개를 정리했습니다. F3의 ‘새 판에서 지난 판 지정 정리’로 끌 수 있습니다.", forgotten));
         }
 
@@ -1004,7 +645,7 @@ namespace SephPlanner.Plugin
             if (report == _lastSephiriteReport) return;
 
             _lastSephiriteReport = report;
-            Logger.LogInfo($"세피라이트 {(report.Length == 0 ? "없음" : report)} -> 후보 {snapshot.Offers.Count}개");
+            Log.Info($"세피라이트 {(report.Length == 0 ? "없음" : report)} -> 후보 {snapshot.Offers.Count}개");
         }
 
         private void VerifySimulation(RuntimeSimulationCheck verification)
@@ -1017,7 +658,7 @@ namespace SephPlanner.Plugin
             _simulationReasonKorean = korean;
             if (changed && verification.Status == PlanVerificationStatus.Failed)
             {
-                Logger.LogWarning(korean);
+                Log.Warning(korean);
                 QueueAutomaticDiagnostic("시뮬레이션 불일치", korean);
             }
 
@@ -1026,7 +667,7 @@ namespace SephPlanner.Plugin
             if (mismatch.Length > 0 && mismatch != _reportedFixedEffectMismatch)
             {
                 _reportedFixedEffectMismatch = mismatch;
-                Logger.LogWarning(mismatch);
+                Log.Warning(mismatch);
                 QueueAutomaticDiagnostic("고정 효과 원본 불일치", mismatch);
             }
 
@@ -1038,7 +679,7 @@ namespace SephPlanner.Plugin
             {
                 if (checkedTablets > _verifiedTablets) _verifiedTablets = checkedTablets;
                 if (fixedCells > _verifiedFixedCells) _verifiedFixedCells = fixedCells;
-                Logger.LogInfo(
+                Log.Info(
                     $"시뮬레이터 검증 통과 - 석판 {checkedTablets}개, 고정 효과 {fixedCells}칸과 칸별 레벨까지 일치");
             }
         }
@@ -1065,7 +706,7 @@ namespace SephPlanner.Plugin
                     if (CatalogSource.LastError != _lastCatalogError)
                     {
                         _lastCatalogError = CatalogSource.LastError;
-                        Logger.LogInfo("데이터를 아직 짓지 못했습니다. 다음에 다시 시도합니다 - " +
+                        Log.Info("데이터를 아직 짓지 못했습니다. 다음에 다시 시도합니다 - " +
                                        CatalogSource.LastError);
                     }
                     return;
@@ -1135,7 +776,7 @@ namespace SephPlanner.Plugin
                 if (_lastSnapshot?.Inventory != null && _hud.Blocker != _lastPanelBlocker)
                 {
                     _lastPanelBlocker = _hud.Blocker;
-                    Logger.LogWarning("인게임 화면을 만들지 못했습니다 - " + _hud.Blocker);
+                    Log.Warning("인게임 화면을 만들지 못했습니다 - " + _hud.Blocker);
                 }
                 return;
             }
@@ -1150,11 +791,7 @@ namespace SephPlanner.Plugin
                 Report(Guide());
 
                 // 화면이 처음 서는 순간에 알린다. Awake 에서 걸어 두면 게임이 뜨는 사이에 시효가 지난다.
-                if (_updatedTo != null)
-                {
-                    _startupNotice = Tr("SephPlanner {0} 으로 업데이트됐습니다.", UpdateClient.Format(_updatedTo));
-                    _updatedTo = null;
-                }
+                TakeUpdateNotice();
                 if (_startupNotice.Length > 0)
                 {
                     ReportDiagnostic(_startupNotice);
@@ -1163,7 +800,7 @@ namespace SephPlanner.Plugin
                 if (_hud.Origin != _lastPanelOrigin)
                 {
                     _lastPanelOrigin = _hud.Origin;
-                    Logger.LogInfo("인게임 화면 생성 - " + _hud.Origin);
+                    Log.Info("인게임 화면 생성 - " + _hud.Origin);
                 }
             }
 
@@ -1233,7 +870,7 @@ namespace SephPlanner.Plugin
                 _hud.Invalidate();
 
                 if (NewError("화면 그리기", ex.GetType().Name + ": " + ex.Message))
-                    Logger.LogError("화면 그리기 실패 - " + ex);
+                    Log.Error("화면 그리기 실패 - " + ex);
                 QueueAutomaticDiagnostic("화면 그리기 실패 - ", ex.ToString());
             }
         }
@@ -1279,7 +916,7 @@ namespace SephPlanner.Plugin
             {
                 // 실패는 로그에만 남고 화면은 영영 "준비 중"이었다. 되살릴 키를 여기서 말한다.
                 return CatalogDump.RefreshStatus == CatalogRefreshStatus.Failed
-                    ? Tr("데이터 생성 실패 - {0} 로 다시 시도하세요(BepInEx 로그에 이유가 있습니다).", Describe(_settings.DumpKey))
+                    ? Tr("데이터 생성 실패 - {0} 로 다시 시도하세요(이유는 로그 파일 {1} 에 있습니다).", Describe(_settings.DumpKey), PluginHost.LogFile)
                     : Tr("데이터 준비 중");
             }
 
@@ -1352,7 +989,7 @@ namespace SephPlanner.Plugin
         /// <summary>
         /// 창을 열고 닫는다. 화면이 꺼져 있어도 열린다 - 다시 켜는 자리가 거기다.
         /// </summary>
-        private void ToggleWindow(PlannerWindow window, ConfigEntry<KeyboardShortcut> key, string label)
+        private void ToggleWindow(PlannerWindow window, Setting<Shortcut> key, string label)
         {
             try
             {
@@ -1364,7 +1001,7 @@ namespace SephPlanner.Plugin
                     if (blocker == _lastWindowBlocker) return;
 
                     _lastWindowBlocker = blocker;
-                    Logger.LogWarning(label + "을 만들지 못했습니다 - " + window.Blocker);
+                    Log.Warning(label + "을 만들지 못했습니다 - " + window.Blocker);
                     return;
                 }
 
@@ -1372,18 +1009,18 @@ namespace SephPlanner.Plugin
                 if (origin != _lastWindowOrigin)
                 {
                     _lastWindowOrigin = origin;
-                    Logger.LogInfo(label + " 생성 - " + window.Origin);
+                    Log.Info(label + " 생성 - " + window.Origin);
                 }
             }
             catch (Exception ex)
             {
                 // 창은 곁다리다. 여기서 터져도 표시와 자동 배치는 계속 돌아야 한다.
-                Logger.LogError(label + " 실패: " + ex);
+                Log.Error(label + " 실패: " + ex);
                 QueueAutomaticDiagnostic(label, ex.ToString());
             }
         }
 
-        private static string CloseHint(ConfigEntry<KeyboardShortcut> key) =>
+        private static string CloseHint(Setting<Shortcut> key) =>
             PadInput.InUse() ? Tr("B(취소)로 닫기") : Tr("{0} 또는 ESC 로 닫기", Describe(key));
 
         /// <summary>
@@ -1559,14 +1196,14 @@ namespace SephPlanner.Plugin
             if (_hidden)
             {
                 // 숨긴 뒤에는 화면에 알릴 자리가 없다. 되돌릴 키는 로그에만 남는다.
-                Logger.LogInfo($"인게임 화면을 숨겼습니다. {Describe(_settings.HideKey)} 로 다시 보입니다.");
+                Log.Info($"인게임 화면을 숨겼습니다. {Describe(_settings.HideKey)} 로 다시 보입니다.");
                 return;
             }
 
             Report(Guide());
         }
 
-        private static string Describe(ConfigEntry<KeyboardShortcut> entry) =>
+        private static string Describe(Setting<Shortcut> entry) =>
             PluginSettings.Describe(entry.Value);
 
         /// <summary>
@@ -1621,9 +1258,9 @@ namespace SephPlanner.Plugin
             }
             catch (Exception ex)
             {
-                Logger.LogError("자동 배치 실패: " + ex);
+                Log.Error("자동 배치 실패: " + ex);
                 QueueAutomaticDiagnostic("자동 배치 실패: ", ex.ToString());
-                Report(Tr("자동 배치 중 오류가 났습니다. BepInEx 로그를 확인하세요."));
+                Report(Tr("자동 배치 중 오류가 났습니다. 로그 파일({0})을 확인하세요.", PluginHost.LogFile));
                 _nextPoll = 0;
             }
         }
@@ -1635,7 +1272,7 @@ namespace SephPlanner.Plugin
         /// </param>
         private void AutoPlaceFinished(Phrase result, Plan applied)
         {
-            Logger.LogInfo(result.Korean);
+            Log.Info(result.Korean);
             if (applied != null) _runner?.MarkApplied(applied);
 
             // 자동 배치 결과는 다른 안내보다 오래 띄운다. 실패하면 "손으로 정리한 뒤 다시
@@ -1724,7 +1361,7 @@ namespace SephPlanner.Plugin
             {
                 _hud.BeginDrag(Cursor());
                 Report(Tr("이동 중 - 마우스로 옮기고 {0} 로 고정", Describe(_settings.MoveKey)));
-                Logger.LogInfo($"이동 모드 시작 - 커서 {Cursor()}");
+                Log.Info($"이동 모드 시작 - 커서 {Cursor()}");
                 return;
             }
 
@@ -1737,7 +1374,7 @@ namespace SephPlanner.Plugin
             Report(Tr("자리를 기억했습니다."));
 
             // 커서가 움직이지 않으면 화면도 제자리에 선다. 그때 무엇이 잘못인지는 좌표를 봐야 안다.
-            Logger.LogInfo($"이동 모드 끝 - 커서 {Cursor()} 여백 {margin}");
+            Log.Info($"이동 모드 끝 - 커서 {Cursor()} 여백 {margin}");
         }
 
         private const float NoticeSeconds = 6f;
@@ -1753,18 +1390,13 @@ namespace SephPlanner.Plugin
         {
             FrameCost.PlanStats = null;
             _runner?.Dispose();
-            _diagnosticCancellation?.Cancel();
-            _diagnosticCancellation?.Dispose();
-            _diagnosticClient?.Dispose();
-            _updateCancellation?.Cancel();
-            _updateCancellation?.Dispose();
-            _updateClient?.Dispose();
-            Logger.LogEvent -= CaptureOwnLog;
+            StopNetwork();
+            Log.Written -= CaptureOwnLog;
             Application.logMessageReceivedThreaded -= CaptureGameLog;
             LocalizationManager.Instance.OnLanguageChanged -= GameLanguageChanged;
             HorayModAPI.OnStartSessionClientside -= StartSession;
             HorayModAPI.OnAllDatabasesReady -= DatabasesReady;
-            _harmony?.UnpatchSelf();
+            Unpatch();
             if (_moving && _settings != null && _hud.IsAlive)
             {
                 var margin = _hud.Margin;
@@ -1773,11 +1405,18 @@ namespace SephPlanner.Plugin
             _hud.Destroy();
             _window.Destroy();
             _build.Destroy();
-            _diagnosticWindow.Destroy();
-            _automaticDiagnosticWindow.Destroy();
-            _noteWindow.Destroy();
-            _updateWindow?.Destroy();
             GrowthProgressWatch.Clear();
+        }
+
+        /// <summary>
+        /// 우리가 건 패치만 푼다. BepInEx 의 HarmonyX 와 게임에 든 Lib.Harmony 2.4.3 이 함께 가진 멤버로만 한다 -
+        /// <c>UnpatchSelf</c> 는 HarmonyX 에만 있고, 창작마당 판이라도 BepInEx 가 깔린 게임에서는 HarmonyX 가 대신 실린다.
+        /// </summary>
+        private void Unpatch()
+        {
+            if (_harmony == null) return;
+            foreach (var method in new List<System.Reflection.MethodBase>(_harmony.GetPatchedMethods()))
+                _harmony.Unpatch(method, HarmonyPatchType.All, _harmony.Id);
         }
     }
 }

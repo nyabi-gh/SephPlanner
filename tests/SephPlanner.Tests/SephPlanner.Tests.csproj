@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\SephPlanner.Core\SephPlanner.Core.csproj" />
     <ProjectReference Include="..\..\src\SephPlanner.Diagnostics\SephPlanner.Diagnostics.csproj" />
+    <ProjectReference Include="..\SephPlanner.Plugin.Net\SephPlanner.Plugin.Net.csproj" />
     <Compile Include="..\..\src\SephPlanner.Plugin\DiagnosticCapture.cs" Link="Plugin\DiagnosticCapture.cs" />
     <Compile Include="..\..\src\SephPlanner.Plugin\AdvicePanelExpansion.cs" Link="Plugin\AdvicePanelExpansion.cs" />
     <Compile Include="..\..\src\SephPlanner.Plugin\Ui\HudFrame.cs" Link="Plugin\Ui\HudFrame.cs" />
@@ -31,6 +32,7 @@
     <Compile Include="..\..\src\SephPlanner.Plugin\InventorySelectionTransaction.cs" Link="Plugin\InventorySelectionTransaction.cs" />
     <Compile Include="..\..\src\SephPlanner.Plugin\FrameCost.cs" Link="Plugin\FrameCost.cs" />
     <Compile Include="..\..\src\SephPlanner.Plugin\GameBinding.cs" Link="Plugin\GameBinding.cs" />
+    <Compile Include="..\..\src\SephPlanner.Plugin\Host\Setting.cs" Link="Plugin\Host\Setting.cs" />
     <Compile Include="..\..\src\SephPlanner.DataTool\Prediction\*.cs" Link="Prediction\%(Filename)%(Extension)" />
     <Compile Include="..\..\src\SephPlanner.DataTool\PlanReproduce.cs" Link="DataTool\PlanReproduce.cs" />
     <Compile Include="..\..\src\SephPlanner.DataTool\CommandLine.cs" Link="DataTool\CommandLine.cs" />

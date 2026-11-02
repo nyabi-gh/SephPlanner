@@ -1,7 +1,8 @@
+#nullable enable
 using System;
 using System.Diagnostics;
 
-namespace SephPlanner.Core.Runtime
+namespace SephPlanner.Plugin.Net
 {
     public sealed class DiagnosticUploadThrottle
     {

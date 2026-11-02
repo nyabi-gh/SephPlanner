@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.IO;
 using System.Net;
@@ -6,7 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using SephPlanner.Core.Text;
 
-namespace SephPlanner.Core.Runtime
+namespace SephPlanner.Plugin.Net
 {
     /// <summary>
     /// GitHub Releases 에서 최신 안정판을 찾고 그 zip 을 받는다.

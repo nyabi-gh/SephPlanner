@@ -1,12 +1,14 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
 using System.Text.RegularExpressions;
+using SephPlanner.Core.Runtime;
 using SephPlanner.Core.Text;
 
-namespace SephPlanner.Core.Runtime
+namespace SephPlanner.Plugin.Net
 {
     /// <summary>
     /// 배포 zip 에서 플러그인 DLL 둘을 꺼낸다. 로더(BepInEx)와 안내문은 건드리지 않는다 -

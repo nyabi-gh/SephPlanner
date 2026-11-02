@@ -19,9 +19,9 @@ function Invoke-DotNet([string[]]$Arguments, [string]$Failure) {
 $version = ([xml](Get-Content (Join-Path $root "Directory.Build.props"))).Project.PropertyGroup.Version |
     Where-Object { $_ } | Select-Object -First 1
 if (-not $version) { throw "배포 버전을 읽지 못했습니다." }
-$pluginSource = Get-Content (Join-Path $root "src/SephPlanner.Plugin/Plugin.cs") -Raw
-if ($pluginSource -notmatch [regex]::Escape("[BepInPlugin(PluginGuid, ""SephPlanner"", ""$version"")]")) {
-    throw "[BepInPlugin] 의 버전이 $version 이 아닙니다. Plugin.cs 를 맞추세요."
+$pluginSource = Get-Content (Join-Path $root "src/SephPlanner.Plugin/BepInExHost/BepInExEntry.cs") -Raw
+if ($pluginSource -notmatch [regex]::Escape("[BepInPlugin(PluginIdentity.Guid, ""SephPlanner"", ""$version"")]")) {
+    throw "[BepInPlugin] 의 버전이 $version 이 아닙니다. BepInExHost/BepInExEntry.cs 를 맞추세요."
 }
 $status = Get-Content (Join-Path $root "docs/STATUS.md") -Raw
 if ($status -notmatch [regex]::Escape("**이번 판: $version.**")) {

@@ -1,7 +1,8 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 
-namespace SephPlanner.Core.Runtime
+namespace SephPlanner.Plugin.Net
 {
     public sealed class AutomaticDiagnosticPolicy
     {

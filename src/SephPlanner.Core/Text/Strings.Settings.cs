@@ -42,6 +42,7 @@ namespace SephPlanner.Core.Text
             new Entry("설정 창", "Settings window", "設定ウィンドウ", "设置窗口", "設定視窗"),
             new Entry("아이템 데이터 다시 읽기", "Reload item data", "アイテムデータの再読み込み", "重新读取物品数据", "重新讀取物品資料"),
             new Entry("문제 진단 저장·전송", "Save/send diagnostics", "診断の保存・送信", "保存/发送诊断", "儲存/傳送診斷"),
+            new Entry("문제 진단 저장", "Save diagnostics", "診断の保存", "保存诊断", "儲存診斷"),
             new Entry("설정 창 단축키가 해제됐습니다. 닫기 전에 다시 지정하거나 BepInEx 설정 파일에서 복원하세요.",
                 "The settings window shortcut is unbound. Bind it again before closing, or restore it in the BepInEx config file.",
                 "設定ウィンドウのショートカットが解除されました。閉じる前に割り当て直すか、BepInEx の設定ファイルで復元してください。",

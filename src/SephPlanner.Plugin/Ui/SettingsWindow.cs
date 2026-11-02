@@ -1,8 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using BepInEx;
-using BepInEx.Configuration;
+using SephPlanner.Plugin.Host;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -21,9 +20,9 @@ namespace SephPlanner.Plugin.Ui
         public Func<int> Read;
         public Action<int> Write;
 
-        public ConfigEntry<KeyboardShortcut> ShortcutEntry;
-        public Func<KeyboardShortcut> Shortcut;
-        public Action<KeyboardShortcut> Bind;
+        public Setting<Shortcut> ShortcutEntry;
+        public Func<Shortcut> Shortcut;
+        public Action<Shortcut> Bind;
         public Action Reset;
         public Func<string> Warning;
     }
@@ -122,7 +121,7 @@ namespace SephPlanner.Plugin.Ui
                 Widgets.Fixed(label.rectTransform, S(1.5f)).flexibleWidth = 1;
                 var value = Button(line, "", 15f, () => BeginCapture(option));
                 value.fontSize = S(0.8f);
-                Button(line, Tr("해제"), 3f, () => Change(option, () => option.Bind(KeyboardShortcut.Empty)));
+                Button(line, Tr("해제"), 3f, () => Change(option, () => option.Bind(Shortcut.Empty)));
                 Button(line, Tr("기본값"), 4f, () => Change(option, option.Reset));
                 _keys.Add((option, value));
             }
@@ -227,21 +226,21 @@ namespace SephPlanner.Plugin.Ui
         {
             if (!_capture.BlocksShortcuts) return false;
             if (!HasControl) _capture.Cancel();
-            _supported ??= UnityInput.Current.SupportedKeyCodes
+            _supported ??= KeyInput.Keys
                 .Where(key => key > KeyCode.None && key < KeyCode.Mouse0).Distinct().ToArray();
             _held.Clear();
             _pressed.Clear();
             foreach (var key in _supported)
             {
-                if (UnityInput.Current.GetKey(key)) _held.Add(key);
-                if (UnityInput.Current.GetKeyDown(key)) _pressed.Add(key);
+                if (KeyInput.Held(key)) _held.Add(key);
+                if (KeyInput.Pressed(key)) _pressed.Add(key);
             }
             var capturing = _capture.Capturing;
             var wasBlocked = _capture.BlocksShortcuts;
             var blocked = _capture.Update(Time.frameCount, _held, _pressed, out var captured);
             if (captured.HasValue)
             {
-                var shortcut = new KeyboardShortcut(captured.Value, _held.Where(IsModifier).ToArray());
+                var shortcut = new Shortcut(captured.Value, _held.Where(IsModifier).ToArray());
                 Change(_selected, () => _selected.Bind(shortcut));
             }
             else if (capturing && !_capture.Capturing)

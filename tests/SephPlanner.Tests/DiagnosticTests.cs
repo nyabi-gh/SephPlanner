@@ -5,6 +5,7 @@ using System.Text.Json;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
 using SephPlanner.Plugin;
+using SephPlanner.Plugin.Net;
 
 namespace SephPlanner.Tests;
 

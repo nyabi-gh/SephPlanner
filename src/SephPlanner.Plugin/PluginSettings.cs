@@ -1,8 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using BepInEx.Configuration;
-using SephPlanner.Core.Runtime;
+using SephPlanner.Plugin.Host;
 using SephPlanner.Plugin.Ui;
 using UnityEngine;
 using static SephPlanner.Core.Text.Localization;
@@ -48,63 +47,53 @@ namespace SephPlanner.Plugin
     }
 
     /// <summary>
-    /// 표시 설정과 단축키 전부. BepInEx 설정 파일이 원본이고, 설정 창(<see cref="SettingsWindow"/>)이
-    /// <see cref="Rows"/>로 같은 값을 읽고 쓴다. 두 길이 같은 ConfigEntry 를 보므로 어느 쪽으로
-    /// 고쳐도 어긋나지 않는다.
+    /// 표시 설정과 단축키 전부. 저장소(BepInEx 설정 파일 또는 게임의 모드 옵션)가 원본이고, 설정 창
+    /// (<see cref="SettingsWindow"/>)이 <see cref="Rows"/>로 같은 값을 읽고 쓴다. 두 길이 같은
+    /// <see cref="Setting{T}"/> 를 보므로 어느 쪽으로 고쳐도 어긋나지 않는다.
     ///
     /// 빌드 지정(콤보·강화 우선·프리셋 코드)은 여기가 아니라 <see cref="PluginPreferences"/>에
     /// 있다. 목록과 긴 문자열이라 한 줄짜리 설정 항목으로 담기지 않는다.
+    ///
+    /// 진단 전송·업데이트 확인처럼 네트워크를 쓰는 설정은 BepInEx 판에만 있다(<c>BepInExHost/PluginSettings.Network.cs</c>).
+    /// 창작마당 판에는 네트워크 코드를 넣지 않는다(docs/LEGAL.md 의 "창작마당 모드 규칙").
     /// </summary>
-    internal sealed class PluginSettings
+    internal sealed partial class PluginSettings
     {
         private const float DefaultPanelMargin = 1.5f;
-        public ConfigEntry<float> PollInterval { get; }
-        public ConfigEntry<KeyboardShortcut> DumpKey { get; }
-        public ConfigEntry<KeyboardShortcut> InventoryDumpKey { get; }
-        public ConfigEntry<float> OfferRadius { get; }
+        public Setting<float> PollInterval { get; }
+        public Setting<Shortcut> DumpKey { get; }
+        public Setting<Shortcut> InventoryDumpKey { get; }
+        public Setting<float> OfferRadius { get; }
 
-        public ConfigEntry<bool> Panel { get; }
-        public ConfigEntry<PanelCorner> Corner { get; }
-        public ConfigEntry<float> MarginX { get; }
-        public ConfigEntry<float> MarginY { get; }
-        public ConfigEntry<float> Width { get; }
-        public ConfigEntry<float> Scale { get; }
-        public ConfigEntry<float> Opacity { get; }
-        public ConfigEntry<bool> Recommendations { get; }
-        public ConfigEntry<bool> HighPerformance { get; }
-        public ConfigEntry<bool> MultiplayerAutoPlace { get; }
-        public ConfigEntry<bool> ForgetOnNewRun { get; }
-        public ConfigEntry<bool> PadWindow { get; }
-        public ConfigEntry<string> DiagnosticConsent { get; }
-        public ConfigEntry<bool> DiagnosticChoiceMade { get; }
-        public ConfigEntry<string> AutomaticDiagnosticConsent { get; }
-        public ConfigEntry<string> AutomaticDiagnosticChoice { get; }
-        private readonly Action _reviewAutomaticDiagnostics;
-        public static string AutomaticDiagnosticKey => AutomaticDiagnosticPolicy.ConsentKey(new Uri(DiagnosticUploadClient.DefaultEndpoint));
-        public bool AutomaticDiagnosticAllowed => AutomaticDiagnosticConsent.Value == AutomaticDiagnosticKey;
-        public ConfigEntry<bool> UpdateCheck { get; }
-        public ConfigEntry<string> Language { get; }
+        public Setting<bool> Panel { get; }
+        public Setting<PanelCorner> Corner { get; }
+        public Setting<float> MarginX { get; }
+        public Setting<float> MarginY { get; }
+        public Setting<float> Width { get; }
+        public Setting<float> Scale { get; }
+        public Setting<float> Opacity { get; }
+        public Setting<bool> Recommendations { get; }
+        public Setting<bool> HighPerformance { get; }
+        public Setting<bool> MultiplayerAutoPlace { get; }
+        public Setting<bool> ForgetOnNewRun { get; }
+        public Setting<bool> PadWindow { get; }
+        public Setting<string> Language { get; }
         public const string AutoLanguage = "Auto";
-        private readonly Action _reviewDiagnostics;
 
-        public bool DiagnosticUploadAllowed => DiagnosticConsent.Value ==
-            DiagnosticUploadClient.ConsentKey(new Uri(DiagnosticUploadClient.DefaultEndpoint));
-
-        public ConfigEntry<KeyboardShortcut> ExpandKey { get; }
-        public ConfigEntry<KeyboardShortcut> AutoPlaceKey { get; }
-        public ConfigEntry<KeyboardShortcut> OpacityKey { get; }
-        public ConfigEntry<KeyboardShortcut> MoveKey { get; }
-        public ConfigEntry<KeyboardShortcut> HideKey { get; }
-        public ConfigEntry<KeyboardShortcut> SettingsKey { get; }
-        public ConfigEntry<KeyboardShortcut> BuildKey { get; }
-        public ConfigEntry<KeyboardShortcut> PreviewKey { get; }
-        public ConfigEntry<KeyboardShortcut> PinUpKey { get; }
-        public ConfigEntry<KeyboardShortcut> PinDownKey { get; }
+        public Setting<Shortcut> ExpandKey { get; }
+        public Setting<Shortcut> AutoPlaceKey { get; }
+        public Setting<Shortcut> OpacityKey { get; }
+        public Setting<Shortcut> MoveKey { get; }
+        public Setting<Shortcut> HideKey { get; }
+        public Setting<Shortcut> SettingsKey { get; }
+        public Setting<Shortcut> BuildKey { get; }
+        public Setting<Shortcut> PreviewKey { get; }
+        public Setting<Shortcut> PinUpKey { get; }
+        public Setting<Shortcut> PinDownKey { get; }
 
         private readonly Action<string> _log;
-        private readonly ConfigFile _config;
-        private readonly List<ConfigEntry<KeyboardShortcut>> _shortcuts =
-            new List<ConfigEntry<KeyboardShortcut>>();
+        private readonly ISettingStore _config;
+        private readonly List<Setting<Shortcut>> _shortcuts = new List<Setting<Shortcut>>();
 
         // 오름차순이어야 설정 창에서 왼쪽이 흐리게, 오른쪽이 진하게가 된다.
         public static readonly float[] OpacitySteps = { 0.55f, 0.7f, 0.85f, 1.0f };
@@ -123,43 +112,27 @@ namespace SephPlanner.Plugin
         public static float MaxWidth => WidthSteps[WidthSteps.Length - 1];
 
         /// <summary>
-        /// 범위를 붙여 묶는다. 붙여 두면 BepInEx 가 설정 파일의 값을 잘라 주고 설명에 범위도
+        /// 실수 설정은 범위를 붙여 묶는다. 붙여 두면 저장소의 값이 잘려 들어오고 BepInEx 는 설명에 범위도
         /// 적어 준다. 없으면 NaN 이나 0 이 그대로 들어와, 폴링 주기의 경우 매 프레임 폴링이 된다.
         /// </summary>
-        private static ConfigDescription Ranged(string description, float min, float max) =>
-            new ConfigDescription(description, new AcceptableValueRange<float>(min, max));
-
-        public PluginSettings(ConfigFile config, Action<string> log, Action reviewDiagnostics, Action reviewAutomaticDiagnostics)
+        public PluginSettings(ISettingStore config, Action<string> log)
         {
             _config = config;
             _log = log;
-            _reviewDiagnostics = reviewDiagnostics;
-            _reviewAutomaticDiagnostics = reviewAutomaticDiagnostics;
-            AutomaticDiagnosticConsent = config.Bind("Diagnostics", "AutomaticUploadConsent", "",
-                "오류 자동 전송에 별도로 동의한 항목과 수신처. F3에서 철회할 수 있습니다.");
-            AutomaticDiagnosticChoice = config.Bind("Diagnostics", "AutomaticUploadChoice", "",
-                "자동 전송 안내에 답한 버전. 플러그인 버전만 바뀌면 다시 묻지 않습니다.");
-            DiagnosticConsent = config.Bind("Diagnostics", "UploadConsent", "",
-                "F10 진단을 비공개 서버로 전송하는 데 동의한 대상과 항목 버전. F3에서 변경합니다.");
-            DiagnosticChoiceMade = config.Bind("Diagnostics", "UploadChoiceMade", false,
-                "F10 진단 전송 여부를 사용자가 선택했는지 기록합니다.");
-            // 진단 전송과 달리 동의 창이 없다. GitHub 에 가는 것은 "최신 판이 무엇이냐" 는 물음
-            // 하나뿐이고 받는 것은 창에서 따로 묻는다. 끄는 자리는 F3 에 있다.
-            UpdateCheck = config.Bind("Updates", "CheckOnStart", true,
-                "게임을 켤 때 GitHub Releases 에서 새 안정판이 있는지 확인합니다. 있으면 창으로 물어본 뒤에만 받습니다.");
+            BindNetwork(config);
 
             PollInterval = config.Bind(
-                "General", "PollIntervalSeconds", 0.25f, Ranged(
-                    "인벤토리를 다시 읽는 주기(초).", 0.1f, 5f));
+                "General", "PollIntervalSeconds", 0.25f,
+                "인벤토리를 다시 읽는 주기(초).", 0.1f, 5f);
             DumpKey = config.Bind(
-                "General", "DumpCatalogKey", new KeyboardShortcut(KeyCode.F9),
+                "General", "DumpCatalogKey", new Shortcut(KeyCode.F9),
                 "석판/아티팩트 데이터를 다시 덤프하고 질의 파서를 검증하는 단축키.");
             InventoryDumpKey = config.Bind(
-                "General", "DumpInventoryKey", new KeyboardShortcut(KeyCode.F10),
+                "General", "DumpInventoryKey", new Shortcut(KeyCode.F10),
                 "인벤토리 내용을 그대로 파일로 남기는 단축키. 인식 문제를 확인할 때 쓴다.");
             OfferRadius = config.Bind(
-                "General", "OfferRadius", 12f, Ranged(
-                    "선택지로 볼 상자/상점까지의 거리. 넓히면 멀리 있는 것까지 추천에 들어온다.", 1f, 50f));
+                "General", "OfferRadius", 12f,
+                "선택지로 볼 상자/상점까지의 거리. 넓히면 멀리 있는 것까지 추천에 들어온다.", 1f, 50f);
 
             Panel = config.Bind(
                 "NativePanel", "Enabled", true,
@@ -170,21 +143,21 @@ namespace SephPlanner.Plugin
                 "NativePanel", "Corner", PanelCorner.TopRight,
                 "화면을 붙일 모서리. 게임 HUD 와 겹치면 옮긴다.");
             MarginX = config.Bind(
-                "NativePanel", "MarginX", DefaultPanelMargin, Ranged(
-                    "모서리에서 가로로 띄울 거리. 게임 HUD 글자 크기의 배수라 해상도가 달라도 같게 보인다.",
-                    0f, 40f));
+                "NativePanel", "MarginX", DefaultPanelMargin,
+                "모서리에서 가로로 띄울 거리. 게임 HUD 글자 크기의 배수라 해상도가 달라도 같게 보인다.",
+                0f, 40f);
             MarginY = config.Bind(
-                "NativePanel", "MarginY", DefaultPanelMargin, Ranged(
-                    "모서리에서 세로로 띄울 거리. 이동 모드로 옮기면 여기에 저장된다.", 0f, 40f));
+                "NativePanel", "MarginY", DefaultPanelMargin,
+                "모서리에서 세로로 띄울 거리. 이동 모드로 옮기면 여기에 저장된다.", 0f, 40f);
             Width = config.Bind(
-                "NativePanel", "WidthScale", 26f, Ranged(
-                    "화면의 가로 폭. 역시 게임 HUD 글자 크기의 배수다. 글씨가 잘리면 키운다.",
-                    MinWidth, MaxWidth));
+                "NativePanel", "WidthScale", 26f,
+                "화면의 가로 폭. 역시 게임 HUD 글자 크기의 배수다. 글씨가 잘리면 키운다.",
+                MinWidth, MaxWidth);
             Scale = config.Bind(
-                "NativePanel", "Scale", 1.0f, Ranged(
-                    "화면 전체의 크기 배율. 1 이 게임 HUD 글자와 같은 크기다.", MinScale, MaxScale));
+                "NativePanel", "Scale", 1.0f,
+                "화면 전체의 크기 배율. 1 이 게임 HUD 글자와 같은 크기다.", MinScale, MaxScale);
             Opacity = config.Bind(
-                "NativePanel", "Opacity", 1.0f, Ranged("화면의 불투명도(0~1).", 0.1f, 1f));
+                "NativePanel", "Opacity", 1.0f, "화면의 불투명도(0~1).", 0.1f, 1f);
             Recommendations = config.Bind(
                 "NativePanel", "Recommendations", true,
                 "무엇을 집을지에 대한 후보 추천을 계산할지. 끄면 가리는 것이 아니라 계산 자체를 " +
@@ -236,40 +209,40 @@ namespace SephPlanner.Plugin
             // 글자 키는 게임 조작을 함께 발동시킨다(docs/RESEARCH.md 의 "게임 단축키").
             // F 키는 게임이 하나도 쓰지 않으며 F9/F10 이 이미 같은 이유로 쓰이고 있다.
             ExpandKey = config.Bind(
-                "NativePanel", "ExpandKey", new KeyboardShortcut(KeyCode.F7),
+                "NativePanel", "ExpandKey", new Shortcut(KeyCode.F7),
                 "패널을 접고 펴는 단축키. 상자·상점을 열면 저절로 펼쳐진다.");
             AutoPlaceKey = config.Bind(
-                "NativePanel", "AutoPlaceKey", new KeyboardShortcut(KeyCode.F8),
+                "NativePanel", "AutoPlaceKey", new Shortcut(KeyCode.F8),
                 "제안된 배치를 게임에 적용하는 단축키. 멀티 세션에서는 위 허용을 켜야 동작한다.");
             OpacityKey = config.Bind(
-                "NativePanel", "OpacityKey", new KeyboardShortcut(KeyCode.F5),
+                "NativePanel", "OpacityKey", new Shortcut(KeyCode.F5),
                 "불투명도를 차례로 바꾸는 단축키.");
             MoveKey = config.Bind(
-                "NativePanel", "MoveKey", new KeyboardShortcut(KeyCode.F6),
+                "NativePanel", "MoveKey", new Shortcut(KeyCode.F6),
                 "이동 모드. 한 번 누르면 화면이 커서를 따라오고, 다시 누르면 그 자리에 고정된다.");
             SettingsKey = config.Bind(
-                "NativePanel", "SettingsKey", new KeyboardShortcut(KeyCode.F3),
+                "NativePanel", "SettingsKey", new Shortcut(KeyCode.F3),
                 "설정 창을 여는 단축키. 여는 동안에는 게임 조작이 멈추고 ESC 로도 닫힌다.");
             HideKey = config.Bind(
-                "NativePanel", "HideKey", new KeyboardShortcut(KeyCode.F4),
+                "NativePanel", "HideKey", new Shortcut(KeyCode.F4),
                 "화면을 통째로 숨겼다가 다시 보여준다. 숨어 있어도 계산은 계속 돌아서 다시 " +
                 "켜면 곧바로 최신 배치가 뜬다.");
             BuildKey = config.Bind(
-                "NativePanel", "BuildKey", new KeyboardShortcut(KeyCode.F2),
+                "NativePanel", "BuildKey", new Shortcut(KeyCode.F2),
                 "빌드 창을 여는 단축키. 프리셋 코드 가져오기, 밀고 있는 콤보 지정, 강화 우선 " +
                 "아티팩트 지정을 여기서 한다.");
             PreviewKey = config.Bind(
-                "NativePanel", "PreviewKey", new KeyboardShortcut(KeyCode.F1),
+                "NativePanel", "PreviewKey", new Shortcut(KeyCode.F1),
                 "후보를 차례로 미리보는 단축키. 그 후보를 집었을 때의 격자를 대신 보여주고, " +
                 "마지막 다음은 미리보기 없음으로 돌아온다.");
 
             // 기본 키가 없다. 남은 F 키는 F11(창 모드 전환)·F12(Steam 스크린샷)와 겹칠 수 있어,
             // 쓰는 사람이 F3 에서 고른다.
             PinUpKey = config.Bind(
-                "NativePanel", "PinUpKey", KeyboardShortcut.Empty,
+                "NativePanel", "PinUpKey", Shortcut.Empty,
                 "가방에서 고른 아티팩트의 강화칸 우선을 한 단계 올린다. 빌드 창의 좌클릭과 같다.");
             PinDownKey = config.Bind(
-                "NativePanel", "PinDownKey", KeyboardShortcut.Empty,
+                "NativePanel", "PinDownKey", Shortcut.Empty,
                 "가방에서 고른 아티팩트의 강화칸 우선을 한 단계 내린다(양보). 빌드 창의 우클릭과 같다.");
 
             _shortcuts.Add(ExpandKey);
@@ -289,13 +262,15 @@ namespace SephPlanner.Plugin
                 "이전 기본 단축키의 일회성 이전 완료 여부.");
             if (!migrated.Value)
             {
-                Retire(ExpandKey, new KeyboardShortcut(KeyCode.P, KeyCode.LeftControl, KeyCode.LeftAlt));
-                Retire(AutoPlaceKey, new KeyboardShortcut(KeyCode.Return, KeyCode.LeftControl, KeyCode.LeftAlt));
+                Retire(ExpandKey, new Shortcut(KeyCode.P, KeyCode.LeftControl, KeyCode.LeftAlt));
+                Retire(AutoPlaceKey, new Shortcut(KeyCode.Return, KeyCode.LeftControl, KeyCode.LeftAlt));
                 migrated.Value = true;
             }
             foreach (var shortcut in _shortcuts)
                 shortcut.SettingChanged += (_, _) => _shortcutRevision++;
             foreach (var shortcut in _shortcuts) WarnIfGameKey(shortcut);
+            // 창작마당 판이 BepInEx 설정 파일에서 처음 가져온 값은 여기서 한 번에 적는다.
+            config.Save();
         }
 
         /// <summary>
@@ -336,7 +311,8 @@ namespace SephPlanner.Plugin
 
         public List<OptionRow> Rows()
         {
-            return _rows ??= new List<OptionRow>
+            if (_rows != null) return _rows;
+            _rows = new List<OptionRow>
             {
                 Switch(Tr("플래너 화면 표시"), Panel),
                 new OptionRow
@@ -363,21 +339,10 @@ namespace SephPlanner.Plugin
                 Steps(Tr("주변 아이템 탐색 범위"), OfferRadius, RadiusSteps,
                     new[] { Tr("좁게"), Tr("보통"), Tr("넓게"), Tr("아주 넓게") }),
                 Switch(Tr("멀티 자동 배치"), MultiplayerAutoPlace),
-                new OptionRow
-                {
-                    Label = Tr("진단 서버 전송"),
-                    Choices = new[] { Tr("꺼짐"), Tr("켜짐") },
-                    Read = () => DiagnosticUploadAllowed ? 1 : 0,
-                    Write = i => { if (i == 0) SetDiagnosticConsent(false); else _reviewDiagnostics(); },
-                },
-                new OptionRow
-                {
-                    Label = Tr("오류 진단 자동 전송"),
-                    Choices = new[] { Tr("꺼짐"), Tr("켜짐") },
-                    Read = () => AutomaticDiagnosticAllowed ? 1 : 0,
-                    Write = i => { if (i == 0) SetAutomaticDiagnosticConsent(false); else _reviewAutomaticDiagnostics(); },
-                },
-                Switch(Tr("시작할 때 업데이트 확인"), UpdateCheck),
+            };
+            AddNetworkRows(_rows);
+            _rows.AddRange(new[]
+            {
                 Steps(Tr("가방 확인 간격"), PollInterval, PollSteps,
                     new[] { Tr("{0}초", "0.15"), Tr("{0}초", "0.25"), Tr("{0}초", "0.5"), Tr("{0}초", "1") }),
                 Switch(Tr("패드 View 버튼으로 창 열기"), PadWindow),
@@ -392,9 +357,14 @@ namespace SephPlanner.Plugin
                 Key(Tr("화면 숨기기/보이기"), HideKey),
                 Key(Tr("설정 창"), SettingsKey),
                 Key(Tr("아이템 데이터 다시 읽기"), DumpKey),
-                Key(Tr("문제 진단 저장·전송"), InventoryDumpKey),
-            };
+                Key(Network.Available ? Tr("문제 진단 저장·전송") : Tr("문제 진단 저장"), InventoryDumpKey),
+            });
+            return _rows;
         }
+
+        partial void BindNetwork(ISettingStore config);
+
+        partial void AddNetworkRows(List<OptionRow> rows);
 
         /// <summary>언어가 바뀌면 줄 이름을 새 언어로 다시 짓게 한다.</summary>
         public void ForgetRows() => _rows = null;
@@ -418,40 +388,6 @@ namespace SephPlanner.Plugin
             _config.Save();
         }
 
-        public void SetAutomaticDiagnosticConsent(bool allowed)
-        {
-            var previousChoice = AutomaticDiagnosticChoice.Value;
-            try
-            {
-                AutomaticDiagnosticConsent.Value = allowed ? AutomaticDiagnosticKey : "";
-                AutomaticDiagnosticChoice.Value = AutomaticDiagnosticKey;
-                _config.Save();
-            }
-            catch
-            {
-                AutomaticDiagnosticConsent.Value = "";
-                AutomaticDiagnosticChoice.Value = previousChoice;
-                throw;
-            }
-        }
-
-        public void SetDiagnosticConsent(bool allowed)
-        {
-            var previousChoice = DiagnosticChoiceMade.Value;
-            try
-            {
-                DiagnosticConsent.Value = allowed ? DiagnosticUploadClient.ConsentKey(new Uri(DiagnosticUploadClient.DefaultEndpoint)) : "";
-                DiagnosticChoiceMade.Value = true;
-                _config.Save();
-            }
-            catch
-            {
-                DiagnosticConsent.Value = "";
-                DiagnosticChoiceMade.Value = previousChoice;
-                throw;
-            }
-        }
-
         public void SavePanelMargin(float x, float y)
         {
             MarginX.Value = x;
@@ -459,7 +395,7 @@ namespace SephPlanner.Plugin
             _config.Save();
         }
 
-        private static OptionRow Switch(string label, ConfigEntry<bool> entry) => new OptionRow
+        private static OptionRow Switch(string label, Setting<bool> entry) => new OptionRow
         {
             Label = label,
             Choices = new[] { Tr("꺼짐"), Tr("켜짐") },
@@ -468,7 +404,7 @@ namespace SephPlanner.Plugin
         };
 
         private static OptionRow Steps(
-            string label, ConfigEntry<float> entry, float[] steps, string[] names) => new OptionRow
+            string label, Setting<float> entry, float[] steps, string[] names) => new OptionRow
             {
                 Label = label,
                 Choices = names,
@@ -476,17 +412,17 @@ namespace SephPlanner.Plugin
                 Write = i => entry.Value = steps[i],
             };
 
-        private OptionRow Key(string label, ConfigEntry<KeyboardShortcut> entry) => new OptionRow
+        private OptionRow Key(string label, Setting<Shortcut> entry) => new OptionRow
         {
             Label = label,
             ShortcutEntry = entry,
             Shortcut = () => entry.Value,
             Bind = value => entry.Value = value,
-            Reset = () => entry.Value = (KeyboardShortcut)entry.DefaultValue,
+            Reset = () => entry.Value = entry.DefaultValue,
             Warning = () => ShortcutWarning(entry),
         };
 
-        private string ShortcutWarning(ConfigEntry<KeyboardShortcut> entry)
+        private string ShortcutWarning(Setting<Shortcut> entry)
         {
             var value = entry.Value;
             if (value.MainKey == KeyCode.None)
@@ -519,20 +455,20 @@ namespace SephPlanner.Plugin
         /// 것이므로 남아 있으면 옮긴 뜻이 없다. 정확히 그 값일 때만 새 기본값으로 되돌린다 -
         /// 사용자가 손으로 정한 것은 건드리지 않는다.
         /// </summary>
-        private void Retire(ConfigEntry<KeyboardShortcut> entry, KeyboardShortcut retired)
+        private void Retire(Setting<Shortcut> entry, Shortcut retired)
         {
-            if (entry.Value.ToString() != retired.ToString()) return;
+            if (entry.Value != retired) return;
 
             _shortcutRevision++;
-            entry.Value = (KeyboardShortcut)entry.DefaultValue;
-            _log($"{entry.Definition.Key} 가 게임 키와 겹쳐 {entry.Value} 로 옮겼습니다.");
+            entry.Value = entry.DefaultValue;
+            _log($"{entry.Key} 가 게임 키와 겹쳐 {entry.Value} 로 옮겼습니다.");
         }
 
-        private void WarnIfGameKey(ConfigEntry<KeyboardShortcut> entry)
+        private void WarnIfGameKey(Setting<Shortcut> entry)
         {
             if (!GameKeys.Contains(entry.Value.MainKey)) return;
 
-            _log($"{entry.Definition.Key} 의 {entry.Value.MainKey} 키는 게임도 쓰는 키라 게임 조작이 " +
+            _log($"{entry.Key} 의 {entry.Value.MainKey} 키는 게임도 쓰는 키라 게임 조작이 " +
                  "함께 발동합니다. F 키는 게임이 쓰지 않습니다.");
         }
 
@@ -553,7 +489,7 @@ namespace SephPlanner.Plugin
             KeyCode.LeftControl, KeyCode.LeftShift,
         };
 
-        public static string Describe(KeyboardShortcut shortcut)
+        public static string Describe(Shortcut shortcut)
         {
             if (shortcut.MainKey == KeyCode.None) return Tr("미지정");
             var text = "";

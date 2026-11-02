@@ -6,6 +6,7 @@
     <Project Path="src/SephPlanner.Plugin/SephPlanner.Plugin.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/SephPlanner.Plugin.Net/SephPlanner.Plugin.Net.csproj" />
     <Project Path="tests/SephPlanner.Tests/SephPlanner.Tests.csproj" />
   </Folder>
 </Solution>

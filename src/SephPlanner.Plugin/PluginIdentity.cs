@@ -1,4 +1,4 @@
-using BepInEx;
+using SephPlanner.Plugin.Host;
 using UnityEngine;
 
 namespace SephPlanner.Plugin
@@ -9,6 +9,11 @@ namespace SephPlanner.Plugin
     /// </summary>
     internal static class PluginIdentity
     {
+        /// <summary>
+        /// BepInEx 플러그인 GUID 이자 Harmony 패치 주인 이름. BepInEx 설정 파일 이름이 여기서 나오므로 바꾸지 않는다.
+        /// </summary>
+        public const string Guid = "dev.nyabi.sephplanner.bridge";
+
         public static string Describe()
         {
             var generation = CatalogDump.ActiveGeneration;
@@ -18,7 +23,7 @@ namespace SephPlanner.Plugin
 
             return $"SephPlanner {typeof(PluginIdentity).Assembly.GetName().Version} - " +
                    $"게임 {Application.version} / {CatalogDump.GameAssemblyId()}, " +
-                   $"BepInEx {typeof(BaseUnityPlugin).Assembly.GetName().Version}, 카탈로그 {catalog}";
+                   $"{PluginHost.Loader}, 카탈로그 {catalog}";
         }
     }
 }

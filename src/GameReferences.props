@@ -1,0 +1,72 @@
+<Project>
+  <!-- 게임 어셈블리 참조. BepInEx 판(SephPlanner.Plugin)과 창작마당 판(SephPlanner.Workshop)이 함께 쓴다. SEPHIRIA_DIR 환경변수로 경로를 바꿀 수 있다. -->
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(SephiriaManagedDir)/Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Mirror">
+      <HintPath>$(SephiriaManagedDir)/Mirror.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(SephiriaManagedDir)/Newtonsoft.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(SephiriaManagedDir)/UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(SephiriaManagedDir)/UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.ImageConversionModule">
+      <HintPath>$(SephiriaManagedDir)/UnityEngine.ImageConversionModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- 게임 HUD 캔버스 안에 직접 그리기 위한 것. 게임과 같은 uGUI + TextMeshPro 를 쓴다. -->
+    <Reference Include="UnityEngine.UIModule">
+      <HintPath>$(SephiriaManagedDir)/UnityEngine.UIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>$(SephiriaManagedDir)/UnityEngine.TextRenderingModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(SephiriaManagedDir)/UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>$(SephiriaManagedDir)/Unity.TextMeshPro.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!--
+      커서와 키보드를 읽는다. 게임이 새 InputSystem 을 쓰므로 그쪽으로 읽고, 구식 Input 은 마우스가 잡히지
+      않을 때의 폴백으로만 남긴다. 1.1.x 는 구식을 꺼 두었다(docs/RESEARCH.md 의 "공식 모드 API").
+    -->
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>$(SephiriaManagedDir)/UnityEngine.InputLegacyModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.InputSystem">
+      <HintPath>$(SephiriaManagedDir)/Unity.InputSystem.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!--
+      클립보드(GUIUtility.systemCopyBuffer). 게임도 프리셋 코드를 클립보드로 주고받으므로,
+      빌드 창은 입력 칸 없이 복사해 둔 코드를 그대로 받는다.
+    -->
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(SephiriaManagedDir)/UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <Target Name="WarnIfGameMissing" BeforeTargets="ResolveAssemblyReferences">
+    <Warning Condition="!Exists('$(SephiriaManagedDir)/Assembly-CSharp.dll')"
+             Text="세피리아 설치 경로를 찾을 수 없습니다 ($(SephiriaManagedDir)). SEPHIRIA_DIR 환경변수를 설정하세요." />
+  </Target>
+</Project>
+
