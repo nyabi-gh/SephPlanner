@@ -1,0 +1,63 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    창작마당 판. 플러그인 소스를 그대로 링크하되 BepInEx 진입점과 네트워크 코드(BepInExHost)는 빼고, 이 폴더의 진입점과
+    설정 저장소를 더한다. 게임 1.1.x 의 Managed 로만 빌드된다(WorkshopModBase 가 1.1.0 에 생겼다).
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <!--
+      BepInEx 판과 같은 이름이다. 둘이 함께 깔리면 BepInEx 가 먼저 싣고, 게임의 모드 로더는 같은 이름의 어셈블리가
+      이미 있으면 창작마당 판을 보류한다(1.1.1 WorkshopDllActivator.TryLoadAssembly). 그래서 플래너가 둘 뜨는 일이 없다.
+    -->
+    <AssemblyName>SephPlanner.Plugin</AssemblyName>
+    <RootNamespace>SephPlanner.Plugin</RootNamespace>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <WorkshopPackageDir>$(MSBuildThisFileDirectory)..\..\artifacts\workshop\sephplanner\</WorkshopPackageDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SephPlanner.Core\SephPlanner.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\SephPlanner.Plugin\**\*.cs"
+             Exclude="..\SephPlanner.Plugin\BepInExHost\**;..\SephPlanner.Plugin\obj\**;..\SephPlanner.Plugin\bin\**"
+             LinkBase="Plugin" />
+    <EmbeddedResource Include="..\..\data\values\charms.json" LogicalName="SephPlanner.Values.Charms.json" />
+    <None Remove="package\**" />
+  </ItemGroup>
+
+  <Import Project="..\GameReferences.props" />
+
+  <!-- 게임에 든 Lib.Harmony 2.4.3 을 참조만 한다. 모드에 넣은 0Harmony.dll 은 게임이 무시한다(공식 모드 가이드). -->
+  <ItemGroup>
+    <Reference Include="0Harmony">
+      <HintPath>$(SephiriaManagedDir)/0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!--
+    창작마당 패키지 폴더를 짓는다: package 의 metadata.json·썸네일과 bin 의 DLL 둘. pdb 는 넣지 않는다 - 패키지 안의
+    파일은 모두 검수 대상이다. 게임이 그 폴더에 만든 uploadticket.json 은 지우지 않는다(창작마당 글 번호를 든다).
+    metadata.json 의 version 은 손으로 적고 scripts/check.ps1 이 Directory.Build.props 와 대조한다.
+  -->
+  <Target Name="PackWorkshop" AfterTargets="Build" Condition="'$(PackWorkshop)' == 'true'">
+    <ItemGroup>
+      <WorkshopStatic Include="$(MSBuildThisFileDirectory)package\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(WorkshopStatic)" DestinationFiles="@(WorkshopStatic->'$(WorkshopPackageDir)%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="$(TargetPath);$(TargetDir)SephPlanner.Core.dll" DestinationFolder="$(WorkshopPackageDir)bin" />
+  </Target>
+
+  <!-- 로컬 시험용. WorkshopLocal 의 모드는 기본으로 켜지지만, 로드된 게임에서는 멀티가 막힌다(공식 가이드). -->
+  <Target Name="DeployToWorkshopLocal" AfterTargets="PackWorkshop" Condition="'$(DeployToWorkshopLocal)' == 'true'">
+    <ItemGroup>
+      <WorkshopPackageFile Include="$(WorkshopPackageDir)**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(WorkshopPackageFile)" DestinationFiles="@(WorkshopPackageFile->'$(SephiriaDir)/WorkshopLocal/sephplanner/%(RecursiveDir)%(Filename)%(Extension)')" />
+  </Target>
+</Project>

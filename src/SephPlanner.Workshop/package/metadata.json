@@ -1,0 +1,26 @@
+{
+  "info": {
+    "title": "SephPlanner",
+    "description": {
+      "ko-KR": "세피리아의 석판·아티팩트 배치를 계산해 게임 화면에 보여 주는 모드입니다.\nF7 펼치기, F8 자동 배치, F2 빌드, F3 설정. 내 화면에만 적용되며 멀티플레이 자동 배치는 기본으로 꺼져 있습니다.\n소스와 사용법: https://github.com/nyabi-gh/SephPlanner",
+      "en-US": "A Sephiria mod that works out where to place your Tablets and Artifacts and shows it on the game screen.\nF7 expand, F8 auto-place, F2 build, F3 settings. It only affects your own screen, and multiplayer auto-place is off by default.\nSource and guide: https://github.com/nyabi-gh/SephPlanner",
+      "ja-JP": "セフィリアの石版・アーティファクトの配置を計算してゲーム画面に表示するMODです。\nF7 展開、F8 自動配置、F2 ビルド、F3 設定。自分の画面にだけ適用され、マルチプレイの自動配置は初期状態でオフです。\nソースと使い方: https://github.com/nyabi-gh/SephPlanner",
+      "zh-CN": "计算《塞菲莉亚》石板与神器的摆放位置，并显示在游戏画面上的模组。\nF7 展开，F8 自动布局，F2 构筑，F3 设置。只作用于自己的画面，多人游戏的自动布局默认关闭。\n源码与说明：https://github.com/nyabi-gh/SephPlanner",
+      "zh-TW": "計算《塞菲莉亞》石板與神器的擺放位置，並顯示在遊戲畫面上的模組。\nF7 展開，F8 自動佈局，F2 構築，F3 設定。只作用於自己的畫面，多人遊戲的自動佈局預設關閉。\n原始碼與說明：https://github.com/nyabi-gh/SephPlanner"
+    }
+  },
+  "mod": {
+    "schemaVersion": 1,
+    "modId": "nyabi.sephplanner",
+    "version": "0.5.1",
+    "author": "Nyabi",
+    "multiplayer": { "installation": "local_only" },
+    "modules": [
+      { "type": "dll", "path": "bin/SephPlanner.Plugin.dll", "entryClass": "SephPlanner.Plugin.Workshop.WorkshopEntry" }
+    ],
+    "libraries": [
+      "bin/SephPlanner.Core.dll"
+    ]
+  },
+  "tags": ["QoL"]
+}
