@@ -38,6 +38,7 @@ namespace SephPlanner.Core.Runtime
         private static readonly Regex LongNumber = new Regex(
             @"\b\d{15,}\b", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
+        // 잰 값이 아니라 추정이다. 게임 쪽 호출 지점과 그 위 두세 단계를 보기에 넉넉하다고 본 길이다.
         private const int StackLines = 12;
 
         private readonly object _gate = new object();
@@ -85,6 +86,7 @@ namespace SephPlanner.Core.Runtime
         {
             if (kind == GameLogKind.Log) return;
             message ??= "";
+            // 문장 하나가 몫을 다 먹지 않게 하는 추정 상한이다(전체의 1/8). 실제 문장 길이 분포는 재지 않았다.
             if (message.Length > DiagnosticArchive.MaximumGameLogBytes / 8)
                 message = message.Substring(0, DiagnosticArchive.MaximumGameLogBytes / 8) + " [일부 생략]";
             var key = kind + "\u0001" + message;
