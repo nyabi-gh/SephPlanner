@@ -156,6 +156,11 @@ public sealed class DiagnosticTests
     [InlineData("Joined locked lobby. password='abc', saved='def'. Leaving.", "def")]
     [InlineData("Attempted to add a UI element for member Kim Chulsoo, the attempted failed", "Chulsoo")]
     [InlineData("Error joining lobby AB12CD: timeout", "AB12CD")]
+    [InlineData("1A2B3C4D : DIFF VERSION LOBBY 1.1.0 != 1.1.1", "1A2B3C4D")]
+    [InlineData("e3b0c44298fc1c149afbf4c8996fb924 : DIFF VERSION LOBBY 1.0.33 != 1.1.1", "e3b0c442")]
+    [InlineData("[SteamInvitation] Lobby data unavailable: 1A2B3C4D", "1A2B3C4D")]
+    [InlineData("[SteamInvitation] Join 1A2B3C4D failed (Join): timeout", "1A2B3C4D")]
+    [InlineData("[SteamInvitation] Lobby join timed out: 1A2B3C4D", "1A2B3C4D")]
     [InlineData("Error restoring preserved exp (guid=3f2a9c): boom", "3f2a9c")]
     [InlineData("TryRejoinLastSession: 기존 로비 정리 (id=76561198012345678)", "76561198012345678")]
     [InlineData(@"FileNotFound C:\Users\Someone\AppData\x.json", "Someone")]
@@ -164,6 +169,14 @@ public sealed class DiagnosticTests
         var log = new DiagnosticText();
         log.AppendGame(GameLogKind.Warning, message, "", DateTime.UtcNow);
         Assert.DoesNotContain(secret, log.Snapshot());
+    }
+
+    [Fact]
+    public void LobbyCodeRuleKeepsTheRestOfTheLine()
+    {
+        var log = new DiagnosticText();
+        log.AppendGame(GameLogKind.Warning, "1A2B3C4D : DIFF VERSION LOBBY 1.1.0 != 1.1.1", "", DateTime.UtcNow);
+        Assert.Contains("[Warning] <가림> : DIFF VERSION LOBBY 1.1.0 != 1.1.1", log.Snapshot());
     }
 
     [Fact]

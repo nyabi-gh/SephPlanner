@@ -25,14 +25,20 @@ namespace SephPlanner.Core.Runtime
             @"(?im)(authorization\s*[:=]\s*|(?:access[_-]?token|api[_-]?key|password|secret)\s*[:=]\s*)[^\r\n]+",
             RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
-        // 게임이 경고·오류 줄에 남기는 것 중 남을 가리킬 수 있는 것들이다(1.0.33 디컴파일).
+        // 게임이 경고·오류 줄에 남기는 것 중 남을 가리킬 수 있는 것들이다(1.0.33·1.1.1 디컴파일).
         // 로비 비밀번호는 "locked pw='…'", "password='…', saved='…'" 처럼 형식이 제각각이라 단어 뒤를 줄 끝까지 지운다.
         private static readonly Regex GameSecrets = new Regex(
             @"(?im)\b(pw|passwd|password|ticket|token)\b[^\r\n]*",
             RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
         // 닉네임에는 공백이 들 수 있어 "member " 뒤는 쉼표까지 지운다.
         private static readonly Regex GameIdentities = new Regex(
-            @"(?i)(\bmember\s+)[^,\r\n]+|(\bjoining lobby\s+|\bguid\s*[=:]\s*)[^\s,:()]+",
+            @"(?i)(\bmember\s+)[^,\r\n]+|(\bguid\s*[=:]\s*)[^\s,:()]+",
+            RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+        // 로비 참가 코드는 숫자만이 아니다. 스팀 LobbyData 는 16진 HexId 로, EOS 는 lobbyId 문자열로 찍혀
+        // 앞뒤 문구로만 알아본다.
+        private static readonly Regex LobbyCodes = new Regex(
+            @"(?i)(\bjoining lobby\s+|\blobby data unavailable:\s*|\blobby join timed out:\s*|\[SteamInvitation\]\s+Join\s+)[^\s,:()]+" +
+            @"|[^\s:]+(?=\s*:\s*DIFF VERSION LOBBY\b)",
             RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
         // 스팀 ID·로비 ID 는 17자리 안팎이다. 게임 수치가 이만큼 길어질 일은 없다.
         private static readonly Regex LongNumber = new Regex(
@@ -62,7 +68,9 @@ namespace SephPlanner.Core.Runtime
         }
 
         public string RedactGame(string text) =>
-            LongNumber.Replace(GameIdentities.Replace(GameSecrets.Replace(Redact(text), "$1 <가림>"), "$1$2<가림>"), "<번호>");
+            LongNumber.Replace(
+                LobbyCodes.Replace(GameIdentities.Replace(GameSecrets.Replace(Redact(text), "$1 <가림>"), "$1$2<가림>"), "$1<가림>"),
+                "<번호>");
 
         public void Append(string line)
         {
