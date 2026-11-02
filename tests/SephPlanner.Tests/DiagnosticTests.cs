@@ -105,6 +105,83 @@ public sealed class DiagnosticTests
     }
 
     [Fact]
+    public void GameLogKeepsOnlyWarningsAndErrors()
+    {
+        var log = new DiagnosticText();
+        var at = new DateTime(2026, 11, 1, 0, 0, 0, DateTimeKind.Utc);
+        log.Append("우리 줄");
+        log.AppendGame(GameLogKind.Log, "Kick 닉네임", "", at);
+        log.AppendGame(GameLogKind.Warning, "Buff 12 overwritten", "스택", at);
+        log.AppendGame(GameLogKind.Error, "이미 권한이 있음", "GridInventory.GetPermission ()\nGridInventory.LocalAddStorage ()", at);
+
+        var text = log.Snapshot();
+
+        Assert.StartsWith("우리 줄", text);
+        Assert.DoesNotContain("Kick", text);
+        Assert.Contains("[Warning] Buff 12 overwritten", text);
+        Assert.DoesNotContain("스택", text);
+        Assert.Contains("[Error] 이미 권한이 있음", text);
+        Assert.Contains("    GridInventory.LocalAddStorage ()", text);
+    }
+
+    [Fact]
+    public void RepeatedGameLogLinesAreCountedOnce()
+    {
+        var log = new DiagnosticText();
+        var at = new DateTime(2026, 11, 1, 0, 0, 0, DateTimeKind.Utc);
+        for (var i = 0; i < 500; i++) log.AppendGame(GameLogKind.Error, "Multiply Level Not Found (1, 2)", "", at.AddSeconds(i));
+
+        var text = log.Snapshot();
+
+        Assert.Single(text.Split('\n'), line => line.Contains("Multiply Level Not Found"));
+        Assert.Contains("(500회, 마지막 " + at.AddSeconds(499).ToString("O") + ")", text);
+    }
+
+    [Fact]
+    public void GameLogStaysWithinItsBudget()
+    {
+        var log = new DiagnosticText();
+        var at = new DateTime(2026, 11, 1, 0, 0, 0, DateTimeKind.Utc);
+        for (var i = 0; i < 5000; i++) log.AppendGame(GameLogKind.Error, "오류 " + i + new string('x', 100), "", at);
+
+        var text = log.Snapshot();
+
+        Assert.True(Encoding.UTF8.GetByteCount(text) < DiagnosticArchive.MaximumGameLogBytes * 2);
+        Assert.Contains("오류 4999", text);
+        Assert.DoesNotContain("오류 0x", text);
+    }
+
+    [Theory]
+    [InlineData("Aborting host connect: lobby run already in progress (locked pw='hunter2').", "hunter2")]
+    [InlineData("Joined locked lobby. password='abc', saved='def'. Leaving.", "def")]
+    [InlineData("Attempted to add a UI element for member Kim Chulsoo, the attempted failed", "Chulsoo")]
+    [InlineData("Error joining lobby AB12CD: timeout", "AB12CD")]
+    [InlineData("Error restoring preserved exp (guid=3f2a9c): boom", "3f2a9c")]
+    [InlineData("TryRejoinLastSession: 기존 로비 정리 (id=76561198012345678)", "76561198012345678")]
+    [InlineData(@"FileNotFound C:\Users\Someone\AppData\x.json", "Someone")]
+    public void GameLogHidesIdentities(string message, string secret)
+    {
+        var log = new DiagnosticText();
+        log.AppendGame(GameLogKind.Warning, message, "", DateTime.UtcNow);
+        Assert.DoesNotContain(secret, log.Snapshot());
+    }
+
+    [Fact]
+    public void OwnLogIsNotRewrittenByGameRules()
+    {
+        var log = new DiagnosticText();
+        log.Append("석판 1234567890123456 의 guid=abc");
+        Assert.Equal("석판 1234567890123456 의 guid=abc", log.Snapshot());
+    }
+
+    [Fact]
+    public void ConsentGivenBeforeTheGameLogDoesNotAuthorizeUploads()
+    {
+        var endpoint = new Uri(DiagnosticUploadClient.DefaultEndpoint);
+        Assert.NotEqual(DiagnosticArchive.SchemaVersion + "|" + endpoint.AbsoluteUri, DiagnosticUploadClient.ConsentKey(endpoint));
+    }
+
+    [Fact]
     public void ManualConsentCannotAuthorizeAutomaticReports()
     {
         var endpoint = new Uri(DiagnosticUploadClient.DefaultEndpoint);

@@ -131,6 +131,7 @@ namespace SephPlanner.Plugin
                 if (!_automaticUpload && !_settings.DiagnosticUploadAllowed) _diagnosticCancellation?.Cancel();
             };
             Logger.LogEvent += CaptureOwnLog;
+            Application.logMessageReceivedThreaded += CaptureGameLog;
             GameBinding.LogTo(Logger.LogWarning);
             _harmony = new Harmony(PluginGuid);
             TabletRotationTooltipGuard.Install(_harmony, Logger.LogWarning);
@@ -457,6 +458,11 @@ namespace SephPlanner.Plugin
 
         private void CaptureOwnLog(object sender, BepInEx.Logging.LogEventArgs args) =>
             _diagnosticLog.Append(DateTime.UtcNow.ToString("O") + " [" + args.Level + "] " + args.Data);
+
+        // 게임이 Debug.LogError 로만 남기는 단서가 있다(권한 중첩, 고정 각인 칸 누락, 판 재시작 예외).
+        // 사용자가 Player.log 를 찾아 보내지 않아도 진단에 실리게 한다.
+        private void CaptureGameLog(string message, string stackTrace, LogType type) =>
+            _diagnosticLog.AppendGame((GameLogKind)(int)type, message, stackTrace, DateTime.UtcNow);
 
         private void OpenAutomaticDiagnosticConsent()
         {
@@ -1664,6 +1670,7 @@ namespace SephPlanner.Plugin
             _updateCancellation?.Dispose();
             _updateClient?.Dispose();
             Logger.LogEvent -= CaptureOwnLog;
+            Application.logMessageReceivedThreaded -= CaptureGameLog;
             HorayModAPI.OnStartSessionClientside -= StartSession;
             HorayModAPI.OnAllDatabasesReady -= DatabasesReady;
             _harmony?.UnpatchSelf();

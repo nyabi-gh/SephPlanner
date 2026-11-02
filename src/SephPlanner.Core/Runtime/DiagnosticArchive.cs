@@ -15,6 +15,7 @@ namespace SephPlanner.Core.Runtime
         public const int MaximumArchiveBytes = 8 * 1024 * 1024;
         public const int MaximumExpandedBytes = 16 * 1024 * 1024;
         public const int MaximumLogBytes = 256 * 1024;
+        public const int MaximumGameLogBytes = 64 * 1024;
 
         private static readonly HashSet<string> Names = new HashSet<string>(StringComparer.Ordinal)
         { "report.json", "inventory-dump.txt", "inventory-snapshot.json", "plan.replay", "sephplanner.log" };
