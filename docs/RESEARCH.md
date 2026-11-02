@@ -364,6 +364,32 @@ Harmony` 줄로 확인한다). 플러그인이 쓰는 인자 여섯의 `Harmony.
 뒤집히면 패치가 `MissingMethodException` 으로 실패한다. `OnAllDatabasesReady` 는 여전히 `GameDataLoader.Awake` 끝에서
 나가고, 그 앞에 창작마당 모드 활성화가 들어갔다.
 
+**창작마당 DLL 모드의 형식은 공식 가이드에서 읽었다(2026-11-02, [team-horay/sephiria_modding](https://github.com/team-horay/sephiria_modding)
+`be58e1e`). 1.1.1 디컴파일로 대조하지 않았다** - 이 Mac 의 설치본은 기본 브랜치다. 포팅 전에 1.1.1 에서 확인할 것은
+진입 클래스와 로딩 순서, 검수 상태 조회, `local_only` 모드가 로비 비교에서 빠지는지다.
+
+- 진입점은 `WorkshopModBase`(`HorayModBase` 상속, MonoBehaviour 아님)다. `OnModLoaded` 에서 이벤트를 한 번 구독하고
+  `OnModUnloaded` 에서 푼다. `Context.PackageRoot`·`ResolvePath` 로 모드 폴더를 찾고, `Context.Options` 가 기기별 설정과
+  게임 옵션 화면 항목을 준다.
+- 패키지는 루트의 `metadata.json` 하나로 정의한다. `mod.modules` 의 `dll` 모듈은 `entryClass` 를 반드시 적는다. 보조 DLL
+  (우리 Core)은 `libraries` 에 적어야 참조 해석에 쓰인다. 같은 어셈블리 이름이 이미 로드돼 있으면 게임이 그 모드의 실행을
+  보류한다.
+- **DLL 모드는 타이틀이 아니라 월드에 들어갈 때 켜진다.** 순서는 `GameDataLoader` 시작 → DLL 로드와 `OnModLoaded` →
+  데이터베이스 이벤트 → `OnAllDatabasesReady` 다.
+- Harmony 는 게임에 든 Lib.Harmony 2.4.3 만 쓴다. 모드에 넣은 `0Harmony.dll` 은 무시된다. BepInEx·MelonLoader 는 지원하지
+  않는다. 우리 플러그인이 쓰는 `UnpatchSelf` 와 인자 여섯의 `Patch` 는 HarmonyX 쪽이라 바꿔야 한다(위 단락).
+- `multiplayer.installation` 은 `local_only`(내 화면만, 로비 비교에서 빠짐)·`host_only`·`everyone` 이다. `WorkshopLocal/`
+  의 로컬 모드가 로드된 게임에서는 멀티가 막힌다.
+- DLL 이 든 모드는 게임의 "창작마당에 올리기" 로 올려야 검수에 접수된다. 접수·승인 상태여야 남의 게임에서 돌고, DLL 을
+  바꾸면 다시 접수된다. 실행 중 DLL 목록이 바뀌면 "인가받지 않은 dll" 로 로드가 막힌다. 압축 20MB 이하이고, 모드 폴더의
+  `uploadticket.json` 이 창작마당 글 번호를 들고 있으므로 지우지 않는다.
+
+**기본 브랜치 macOS 빌드(2026-11-02, `Application.version` 1.0.33, 어셈블리 SHA-256 `3e4624af…`)에도 모드 로더가 있다.**
+`AddOnLoader` 가 `<게임 폴더>/AddOns/*/` 의 DLL 에서 `HorayModBase` 를 싣고(가이드는 이것을 구버전 기능이라 부른다),
+`SteamWorkshopLoader` 는 구독 항목을 내려받지만 `LocalizationManager.LoadLanguageFromWorkshop` 이 그 폴더의
+`Localization/*.json` 만 읽는다. 창작마당에서 DLL 을 싣는 길은 이 빌드에 없다. `ModEnvironment` 의 이름 목록에는 `0Harmony`
+가 들어 있다.
+
 **새 판 신호로 `OnStartSessionClientside(isSaved)` 를 쓴다(2026-09-23, 게임 1.0.33).** 서버의
 `HorayNetworkManager.NewGame` 이 `MarkSessionStartedForClients` 를 부르고, 그것이 `RpcStartSession`
 으로 호스트를 포함한 모든 클라이언트에, 늦게 들어온 참가자에게는 `OnStartClient` 로 이 이벤트를
