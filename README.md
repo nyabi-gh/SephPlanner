@@ -10,6 +10,8 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/%EB%9D%BC%EC%9D%B4%EC%84%A0%EC%8A%A4-MIT-b9a7f5?style=flat-square" alt="라이선스"></a>
 </p>
 
+<p align="center"><b>한국어</b> · <a href="README.en.md">English</a> · <a href="README.ja.md">日本語</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.zh-TW.md">繁體中文</a></p>
+
 ## 다운로드
 
 | 플랫폼 | 요구 사항 | 다운로드 |
