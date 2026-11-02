@@ -9,6 +9,7 @@ using SephPlanner.Core.Solver;
 using SephPlanner.Core.Tablets;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Plugin
 {
@@ -85,7 +86,7 @@ namespace SephPlanner.Plugin
                 return new RuntimeSimulationCheck
                 {
                     Status = PlanVerificationStatus.Unavailable,
-                    Reason = "실시간 시뮬레이션을 검증할 인벤토리가 없습니다.",
+                    Reason = Tr("실시간 시뮬레이션을 검증할 인벤토리가 없습니다."),
                 };
             }
 

@@ -6,6 +6,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
+using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Plugin
 {
@@ -65,9 +66,25 @@ namespace SephPlanner.Plugin
         [JsonIgnore] private BuildPreset _decoded;
         [JsonIgnore] private Action<string> _log;
         [JsonIgnore] private bool _saveFailureReported;
-        [JsonIgnore] public string StorageMessage { get; private set; } = "";
+        [JsonIgnore] private StorageProblem _storageProblem;
         [JsonIgnore] private bool _preserveUnreadableFile;
         [JsonIgnore] private string _path = DefaultPath;
+
+        private enum StorageProblem
+        {
+            None,
+            Unreadable,
+            SaveFailed,
+        }
+
+        /// <summary>문장은 읽을 때 짓는다. 화면 언어가 바뀌어도 이 객체는 남는다.</summary>
+        [JsonIgnore]
+        public string StorageMessage => _storageProblem switch
+        {
+            StorageProblem.Unreadable => Tr("빌드 설정을 읽지 못했습니다. 기본값으로 시작하며 원본은 다음 저장 전에 백업합니다."),
+            StorageProblem.SaveFailed => Tr("빌드 설정 저장 실패 · 이번 판에만 유지됩니다. 다음 설정 변경 때 저장을 다시 시도합니다."),
+            _ => "",
+        };
 
         /// <summary>바뀔 때마다 오른다. 스냅샷이 그대로여도 다시 풀어야 하는지를 이걸로 안다.</summary>
         [JsonIgnore] public int Revision { get; private set; }
@@ -279,14 +296,14 @@ namespace SephPlanner.Plugin
         /// <summary>가져온 빌드가 무엇을 알려 주는지 한 줄로.</summary>
         public static string Summary(BuildPreset preset)
         {
-            var text = "가져온 빌드 · 아티팩트 " + preset.FavoriteCharms.Count + "개";
+            var text = Tr("가져온 빌드 · 아티팩트 {0}개", preset.FavoriteCharms.Count);
 
             var avoided = 0;
             foreach (var pair in preset.CategoryBias)
             {
                 if (pair.Value < 0) avoided++;
             }
-            if (avoided > 0) text += " · 회피 콤보 " + avoided + "개는 추천에 미반영";
+            if (avoided > 0) text += " · " + Tr("회피 콤보 {0}개는 추천에 미반영", avoided);
             return text;
         }
 
@@ -374,7 +391,7 @@ namespace SephPlanner.Plugin
                     _log = log,
                     _path = path,
                     _preserveUnreadableFile = true,
-                    StorageMessage = "빌드 설정을 읽지 못했습니다. 기본값으로 시작하며 원본은 다음 저장 전에 백업합니다.",
+                    _storageProblem = StorageProblem.Unreadable,
                 };
             }
             return new PluginPreferences { _log = log, _path = path };
@@ -401,12 +418,12 @@ namespace SephPlanner.Plugin
                 // Delete 뒤 Move 도 그 사이에 죽으면 파일이 없어지므로, 카탈로그와 같은 원자적
                 // 교체를 쓴다.
                 CatalogBundleStore.WriteAtomic(_path, JsonConvert.SerializeObject(this));
-                StorageMessage = "";
+                _storageProblem = StorageProblem.None;
                 _saveFailureReported = false;
             }
             catch (Exception ex)
             {
-                StorageMessage = "빌드 설정 저장 실패 · 이번 판에만 유지됩니다. 다음 설정 변경 때 저장을 다시 시도합니다.";
+                _storageProblem = StorageProblem.SaveFailed;
                 if (_saveFailureReported) return;
 
                 _saveFailureReported = true;

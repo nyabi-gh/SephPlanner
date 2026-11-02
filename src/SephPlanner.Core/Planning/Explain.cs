@@ -4,6 +4,7 @@ using SephPlanner.Core.Charms;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Solver;
 using SephPlanner.Core.Tablets;
+using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Core.Planning
 {
@@ -30,37 +31,35 @@ namespace SephPlanner.Core.Planning
             var lines = new List<string>(definition.EffectLines);
             var worth = CharmWorth.Resolve(definition, entry);
             if (definition.Behavior == "Charm_WhitePaper")
-                lines.Add("종이끼리 연결하면 옮긴 뒤의 콤보가 예상과 다를 수 있습니다.");
+                lines.Add(Tr("종이끼리 연결하면 옮긴 뒤의 콤보가 예상과 다를 수 있습니다."));
 
             if (worth.Source == CharmWorthSource.Curated && entry is { Note.Length: > 0 }) lines.Add(entry.Note);
 
             // 점수는 진행한 만큼 올라가는데 쪽지에 이유가 없으면, 같은 아티팩트가 왜 다르게
             // 매겨지는지 알 길이 없다. 진행도는 인스턴스마다 달라 여기서 숫자를 적지는 못한다.
             if (ScalesPosition.IsSideBound(definition))
-                lines.Add("지금 놓인 쪽을 유지합니다. 우선 콤보와 반대쪽에 있으면 알려 드리니, 원하는 쪽으로 한 번 옮겨 주세요. "
-                          + "왼쪽은 1~3열, 오른쪽은 4열부터입니다.");
+                lines.Add(Tr("지금 놓인 쪽을 유지합니다. 우선 콤보와 반대쪽에 있으면 알려 드리니, 원하는 쪽으로 한 번 옮겨 주세요. 왼쪽은 1~3열, 오른쪽은 4열부터입니다."));
             if (ScalesPosition.FollowsPriority(definition))
-                lines.Add("새로 얻어 아직 옮기지 않은 천칭은 우선 콤보에 잉걸불만 있으면 왼쪽, 빙하만 있으면 "
-                          + "오른쪽으로 보냅니다.");
+                lines.Add(Tr("새로 얻어 아직 옮기지 않은 천칭은 우선 콤보에 잉걸불만 있으면 왼쪽, 빙하만 있으면 오른쪽으로 보냅니다."));
 
             if (definition.GrowthQuestGoal > 0)
-                lines.Add("성장이 끝나면 바뀌는 아티팩트와 현재 성장 정도를 고려해 추천합니다.");
+                lines.Add(Tr("성장이 끝나면 바뀌는 아티팩트와 현재 성장 정도를 고려해 추천합니다."));
 
             if (definition.ContextStats.Count > 0 && worth.Source != CharmWorthSource.Curated)
             {
                 if (definition.ContextStats.Exists(bonus => !bonus.WorthPerUnit.HasValue))
-                    lines.Add("일부 효과는 정확히 비교하기 어려워 추천이 실제 체감과 다를 수 있습니다.");
+                    lines.Add(Tr("일부 효과는 정확히 비교하기 어려워 추천이 실제 체감과 다를 수 있습니다."));
                 return lines;
             }
 
             if (definition.MagicSupport is not null)
             {
-                lines.Add(SupportDirection(definition.MagicSupport) + "의 사용 가능한 마법과 연결돼야 효과를 냅니다.");
+                lines.Add(Tr("{0}의 사용 가능한 마법과 연결돼야 효과를 냅니다.", SupportDirection(definition.MagicSupport)));
                 lines.Add(worth.Source == CharmWorthSource.Curated
-                    ? "연결된 마법을 강화하도록 배치합니다."
+                    ? Tr("연결된 마법을 강화하도록 배치합니다.")
                     : definition.MagicSupport.Effect == MagicSupportEffect.ManaCostReduction
-                        ? "마나를 아끼는 효과를 고려해 추천합니다. 주로 쓰는 마법에 맞춰 선택하세요."
-                        : "마법을 더 자주 쓰는 효과를 고려해 추천합니다. 주로 쓰는 마법에 맞춰 선택하세요.");
+                        ? Tr("마나를 아끼는 효과를 고려해 추천합니다. 주로 쓰는 마법에 맞춰 선택하세요.")
+                        : Tr("마법을 더 자주 쓰는 효과를 고려해 추천합니다. 주로 쓰는 마법에 맞춰 선택하세요."));
                 return lines;
             }
 
@@ -72,11 +71,13 @@ namespace SephPlanner.Core.Planning
         /// <summary>좌우에 따라 효과가 바뀌는 아티팩트가 우선 콤보와 반대쪽에 있을 때(<see cref="ScalesPosition.PriorityLeft"/>).</summary>
         public static string OppositeSide(CharmDefinition definition, bool priorityLeft)
         {
-            var here = definition.Behavior == "Charm_FireIceWeapon"
-                ? priorityLeft ? "오른쪽에서는 화염검이 얼음 속성이 됩니다" : "왼쪽에서는 서리 유물이 화염 피해를 줍니다"
-                : priorityLeft ? "오른쪽에서는 얼음 피해를 더 키웁니다" : "왼쪽에서는 화염 피해를 더 키웁니다";
-            var there = priorityLeft ? "왼쪽(1~3열)" : "오른쪽(4열부터)";
-            return $"{here}. 우선 콤보에 맞추려면 {there}으로 직접 옮기세요. 한 번 옮기면 그다음부터 그쪽을 유지합니다.";
+            if (definition.Behavior == "Charm_FireIceWeapon")
+                return priorityLeft
+                    ? Tr("오른쪽에서는 화염검이 얼음 속성이 됩니다. 우선 콤보에 맞추려면 왼쪽(1~3열)으로 직접 옮기세요. 한 번 옮기면 그다음부터 그쪽을 유지합니다.")
+                    : Tr("왼쪽에서는 서리 유물이 화염 피해를 줍니다. 우선 콤보에 맞추려면 오른쪽(4열부터)으로 직접 옮기세요. 한 번 옮기면 그다음부터 그쪽을 유지합니다.");
+            return priorityLeft
+                ? Tr("오른쪽에서는 얼음 피해를 더 키웁니다. 우선 콤보에 맞추려면 왼쪽(1~3열)으로 직접 옮기세요. 한 번 옮기면 그다음부터 그쪽을 유지합니다.")
+                : Tr("왼쪽에서는 화염 피해를 더 키웁니다. 우선 콤보에 맞추려면 오른쪽(4열부터)으로 직접 옮기세요. 한 번 옮기면 그다음부터 그쪽을 유지합니다.");
         }
 
         /// <summary>
@@ -90,14 +91,14 @@ namespace SephPlanner.Core.Planning
         private static string? Doubt(CharmDefinition definition, CharmWorth worth)
         {
             if (worth.Source == CharmWorthSource.Rarity)
-                return "이 아이템은 레어도를 기준으로 추천합니다. 실제 효과가 더 좋은지는 직접 확인하세요.";
+                return Tr("이 아이템은 레어도를 기준으로 추천합니다. 실제 효과가 더 좋은지는 직접 확인하세요.");
             if (worth.Source is not (CharmWorthSource.Measured or CharmWorthSource.MeasuredFloor)) return null;
 
             var thin = definition.StatEffects.Count > 0 && worth.Confidence < 0.5;
             if (thin && worth.Confidence <= 0)
-                return "다른 아이템과 효과를 비교할 자료가 부족합니다. 추천보다 실제 체감을 우선하세요.";
+                return Tr("다른 아이템과 효과를 비교할 자료가 부족합니다. 추천보다 실제 체감을 우선하세요.");
             return thin || worth.Source == CharmWorthSource.MeasuredFloor
-                ? "일부 효과를 비교할 자료가 부족합니다. 추천보다 실제 체감을 우선하세요."
+                ? Tr("일부 효과를 비교할 자료가 부족합니다. 추천보다 실제 체감을 우선하세요.")
                 : null;
         }
 
@@ -116,14 +117,14 @@ namespace SephPlanner.Core.Planning
             {
                 lines.Add(InactiveReason(reason));
                 if (definition is not null && PositionalWorth.WorksWhileDisabled(definition))
-                    lines.Add("침은 꺼져 있어도 공격 대상과 연결되면 일부 피해 보너스가 남습니다.");
+                    lines.Add(Tr("침은 꺼져 있어도 공격 대상과 연결되면 일부 피해 보너스가 남습니다."));
                 else if (definition is not null && Compass.Is(definition))
-                    lines.Add("나침반은 꺼지면 피해 보너스와 콤보를 잃고, 이 나침반을 거치는 아래 나침반의 연결도 끊깁니다.");
+                    lines.Add(Tr("나침반은 꺼지면 피해 보너스와 콤보를 잃고, 이 나침반을 거치는 아래 나침반의 연결도 끊깁니다."));
                 return lines;
             }
 
             if (level > effective)
-                lines.Add($"칸 레벨 {level}, 이 아티팩트는 {effective}까지만 반영됩니다");
+                lines.Add(Tr("칸 레벨 {0}, 이 아티팩트는 {1}까지만 반영됩니다", level, effective));
 
             lines.AddRange(LevelCosts(definition, effective, values));
             return lines;
@@ -147,8 +148,7 @@ namespace SephPlanner.Core.Planning
             {
                 if (drop.FromLevel != effective) continue;
 
-                lines.Add($"레벨 {drop.ToLevel}로 올리면 늘어나는 손해가 이득보다 커서 값어치가 내려갑니다. "
-                          + "더 높은 칸을 비워 둔 것은 그 때문이며, 올리고 싶으면 직접 옮기세요.");
+                lines.Add(Tr("레벨 {0}로 올리면 늘어나는 손해가 이득보다 커서 값어치가 내려갑니다. 더 높은 칸을 비워 둔 것은 그 때문이며, 올리고 싶으면 직접 옮기세요.", drop.ToLevel));
                 break;
             }
             return lines;
@@ -156,27 +156,29 @@ namespace SephPlanner.Core.Planning
 
         public static string SupportMissing(CharmDefinition definition) =>
             definition.MagicSupport is { } support
-                ? SupportDirection(support) + "에 사용 가능한 마법이 없어 강화 효과를 받지 못합니다."
+                ? Tr("{0}에 사용 가능한 마법이 없어 강화 효과를 받지 못합니다.", SupportDirection(support))
                 : Compass.Is(definition)
-                    ? "나침반이 이어지는 끝에 사용 가능한 공격 아티팩트가 없습니다. 중간 나침반이 꺼져 있어도 끊깁니다."
+                    ? Tr("나침반이 이어지는 끝에 사용 가능한 공격 아티팩트가 없습니다. 중간 나침반이 꺼져 있어도 끊깁니다.")
                     : PositionalWorth.IsNeedle(definition)
-                        ? "침의 연결 끝에 사용 가능한 공격 아티팩트가 없습니다."
-                        : "강화 대상과 연결되지 않았습니다.";
+                        ? Tr("침의 연결 끝에 사용 가능한 공격 아티팩트가 없습니다.")
+                        : Tr("강화 대상과 연결되지 않았습니다.");
 
         private static string SupportDirection(DirectedMagicSupport support)
         {
             var parts = new List<string>();
-            if (support.OffsetX != 0) parts.Add((support.OffsetX > 0 ? "오른쪽 " : "왼쪽 ") + Math.Abs(support.OffsetX) + "칸");
-            if (support.OffsetY != 0) parts.Add((support.OffsetY > 0 ? "아래 " : "위 ") + Math.Abs(support.OffsetY) + "칸");
-            return parts.Count == 0 ? "같은 칸" : string.Join("·", parts);
+            var x = Math.Abs(support.OffsetX);
+            var y = Math.Abs(support.OffsetY);
+            if (support.OffsetX != 0) parts.Add(support.OffsetX > 0 ? Tr("오른쪽 {0}칸", x) : Tr("왼쪽 {0}칸", x));
+            if (support.OffsetY != 0) parts.Add(support.OffsetY > 0 ? Tr("아래 {0}칸", y) : Tr("위 {0}칸", y));
+            return parts.Count == 0 ? Tr("같은 칸") : string.Join("·", parts);
         }
 
         public static string InactiveReason(CharmInactiveReason reason) => reason switch
         {
-            CharmInactiveReason.Weapon => "연동된 무기를 들고 있지 않아 꺼져 있습니다. 옮겨도 켜지지 않습니다.",
-            CharmInactiveReason.Disabled => "석판이 이 칸을 사용 불가로 만들었습니다.",
-            CharmInactiveReason.NegativeLevel => "레벨이 0 미만이라 꺼져 있습니다.",
-            CharmInactiveReason.Criteria => "이 아티팩트의 배치 조건을 만족하지 못했습니다.",
+            CharmInactiveReason.Weapon => Tr("연동된 무기를 들고 있지 않아 꺼져 있습니다. 옮겨도 켜지지 않습니다."),
+            CharmInactiveReason.Disabled => Tr("석판이 이 칸을 사용 불가로 만들었습니다."),
+            CharmInactiveReason.NegativeLevel => Tr("레벨이 0 미만이라 꺼져 있습니다."),
+            CharmInactiveReason.Criteria => Tr("이 아티팩트의 배치 조건을 만족하지 못했습니다."),
             _ => "",
         };
 
@@ -191,12 +193,12 @@ namespace SephPlanner.Core.Planning
 
         /// <summary>줄 오른쪽에 붙는 짧은 표. 감쌀지 말지는 부르는 쪽이 정한다.</summary>
         public static string SoonTag(double gain, double? soon) =>
-            HasSoon(gain, soon) ? $"다음 칸 {soon!.Value:+0.#;-0.#;0}" : "";
+            HasSoon(gain, soon) ? Tr("다음 칸 {0:+0.#;-0.#;0}", soon!.Value) : "";
 
         /// <summary>쪽지에 들어가는 한 줄. 왜 순위가 지금 증가분과 어긋나 보이는지를 답한다.</summary>
         public static string SoonLine(double gain, double? soon) =>
             HasSoon(gain, soon)
-                ? $"가방이 한 칸 더 열렸을 때의 예상 점수 변화는 {soon!.Value:+0.#;-0.#;0}입니다. 추천 순위는 이때의 이득을 기준으로 합니다."
+                ? Tr("가방이 한 칸 더 열렸을 때의 예상 점수 변화는 {0:+0.#;-0.#;0}입니다. 추천 순위는 이때의 이득을 기준으로 합니다.", soon!.Value)
                 : "";
 
         public static string Level(int level) => level > 0 ? "+" + level : level.ToString();
@@ -213,33 +215,33 @@ namespace SephPlanner.Core.Planning
         {
             var lines = Charm(advice.Candidate.Charm, values);
 
-            if (!advice.Available) lines.Add("가방의 공간과 사용 유지 조건을 만족하는 후보 배치를 찾지 못했습니다.");
-            if (!advice.Affordable) lines.Add($"소지금 {gold}골드로는 살 수 없습니다.");
+            if (!advice.Available) lines.Add(Tr("가방의 공간과 사용 유지 조건을 만족하는 후보 배치를 찾지 못했습니다."));
+            if (!advice.Affordable) lines.Add(Tr("소지금 {0}골드로는 살 수 없습니다.", gold));
 
-            if (advice.MatchesPreset) lines.Add("가져온 빌드가 즐겨찾기로 찍어 둔 아티팩트입니다.");
-            if (advice.MatchesPriority) lines.Add("밀고 있는 빌드의 아티팩트입니다.");
-            if (advice.Displaced.Length > 0) lines.Add($"가방이 차 있어, 집으면 빠지는 것: {advice.Displaced}");
+            if (advice.MatchesPreset) lines.Add(Tr("가져온 빌드가 즐겨찾기로 찍어 둔 아티팩트입니다."));
+            if (advice.MatchesPriority) lines.Add(Tr("밀고 있는 빌드의 아티팩트입니다."));
+            if (advice.Displaced.Length > 0) lines.Add(Tr("가방이 차 있어, 집으면 빠지는 것: {0}", advice.Displaced));
 
             if (advice.ComboText.Length > 0)
             {
                 lines.Add(advice.ComboCompletes && advice.ComboLoses
-                    ? $"콤보 구성이 바뀝니다: {advice.ComboText}"
+                    ? Tr("콤보 구성이 바뀝니다: {0}", advice.ComboText)
                     : advice.ComboCompletes
-                        ? $"콤보가 발동합니다: {advice.ComboText}"
+                        ? Tr("콤보가 발동합니다: {0}", advice.ComboText)
                         : advice.ComboLoses
-                            ? $"콤보 효과를 잃습니다: {advice.ComboText}"
-                            : $"콤보 진행: {advice.ComboText}");
+                            ? Tr("콤보 효과를 잃습니다: {0}", advice.ComboText)
+                            : Tr("콤보 진행: {0}", advice.ComboText));
             }
 
             var effect = advice.Effect;
             if (effect.RaisedCells > 0)
-                lines.Add($"{effect.RaisedCells}칸의 레벨을 모두 합쳐 {effect.RaisedTotal} 올립니다.");
+                lines.Add(Tr("{0}칸의 레벨을 모두 합쳐 {1} 올립니다.", effect.RaisedCells, effect.RaisedTotal));
             if (effect.LoweredCells > 0)
-                lines.Add($"{effect.LoweredCells}칸은 합쳐 {effect.LoweredTotal} 내립니다.");
-            if (effect.DisabledCells > 0) lines.Add($"{effect.DisabledCells}칸은 쓸 수 없게 만듭니다.");
-            if (effect.MultipliedCells > 0) lines.Add($"{effect.MultipliedCells}칸에 배수가 걸립니다.");
+                lines.Add(Tr("{0}칸은 합쳐 {1} 내립니다.", effect.LoweredCells, effect.LoweredTotal));
+            if (effect.DisabledCells > 0) lines.Add(Tr("{0}칸은 쓸 수 없게 만듭니다.", effect.DisabledCells));
+            if (effect.MultipliedCells > 0) lines.Add(Tr("{0}칸에 배수가 걸립니다.", effect.MultipliedCells));
             if (effect.IgnoreCriteriaCells > 0)
-                lines.Add($"{effect.IgnoreCriteriaCells}칸은 배치 조건을 무시합니다.");
+                lines.Add(Tr("{0}칸은 배치 조건을 무시합니다.", effect.IgnoreCriteriaCells));
 
             var soon = SoonLine(advice.Gain, advice.SoonGain);
             if (soon.Length > 0) lines.Add(soon);
@@ -255,15 +257,15 @@ namespace SephPlanner.Core.Planning
         {
             var lines = new List<string>
             {
-                $"인챈트 {advice.Enchant - 1} → {advice.Enchant} (상한 {advice.MaxEnchant}). "
-                + "인챈트는 아이템을 따라다니므로 자리를 옮겨도 남습니다.",
+                Tr("인챈트 {0} → {1} (상한 {2}). 인챈트는 아이템을 따라다니므로 자리를 옮겨도 남습니다.",
+                    advice.Enchant - 1, advice.Enchant, advice.MaxEnchant),
             };
 
             if (advice.Enchant >= advice.MaxEnchant)
-                lines.Add("이 아티팩트가 받을 수 있는 마지막 인챈트입니다.");
+                lines.Add(Tr("이 아티팩트가 받을 수 있는 마지막 인챈트입니다."));
 
             if (advice.Activated.Count > 0)
-                lines.Add("이 인챈트로 효과가 되살아납니다: " + string.Join(", ", advice.Activated));
+                lines.Add(Tr("이 인챈트로 효과가 되살아납니다: {0}", string.Join(", ", advice.Activated)));
 
             var soon = SoonLine(advice.Gain, advice.SoonGain);
             if (soon.Length > 0) lines.Add(soon);
@@ -284,17 +286,17 @@ namespace SephPlanner.Core.Planning
             var (one, two) = MixNames(advice);
             var lines = new List<string>
             {
-                $"{first} {With(one, "과", "와")} {second} {With(two, "을", "를")} 합칩니다. 재료 둘은 사라집니다.",
+                Tr("{0} {1|과/와} {2} {3|을/를} 합칩니다. 재료 둘은 사라집니다.", first, one, second, two),
                 Turn(advice, first, second),
-                advice.Rotatable ? "결과는 돌릴 수 있습니다."
-                : advice.RotatableA != advice.RotatableB ? "한쪽이 돌아가지 않아 결과는 돌릴 수 없습니다. 합칠 때 게임이 한 번 더 묻습니다."
-                : "결과는 돌릴 수 없습니다.",
+                advice.Rotatable ? Tr("결과는 돌릴 수 있습니다.")
+                : advice.RotatableA != advice.RotatableB ? Tr("한쪽이 돌아가지 않아 결과는 돌릴 수 없습니다. 합칠 때 게임이 한 번 더 묻습니다.")
+                : Tr("결과는 돌릴 수 없습니다."),
             };
 
             var reach = Reach(advice.Effect);
-            if (reach.Length > 0) lines.Add($"결과가 미치는 범위: {reach}");
+            if (reach.Length > 0) lines.Add(Tr("결과가 미치는 범위: {0}", reach));
 
-            if (!advice.Affordable) lines.Add("소지금이 모자랍니다.");
+            if (!advice.Affordable) lines.Add(Tr("소지금이 모자랍니다."));
 
             var soon = SoonLine(advice.Gain, advice.SoonGain);
             if (soon.Length > 0) lines.Add(soon);
@@ -309,10 +311,11 @@ namespace SephPlanner.Core.Planning
         {
             if (effect.IsEmpty) return "";
 
-            var text = effect.RaisedCells > 0 ? $"{effect.RaisedCells}칸 +{effect.RaisedTotal}" : "";
-            if (effect.LoweredCells > 0) text += $" −{effect.LoweredTotal}";
-            if (effect.DisabledCells > 0) text += $" 막힘{effect.DisabledCells}";
-            return text.Trim();
+            var parts = new List<string>();
+            if (effect.RaisedCells > 0) parts.Add(Tr("{0}칸 +{1}", effect.RaisedCells, effect.RaisedTotal));
+            if (effect.LoweredCells > 0) parts.Add($"−{effect.LoweredTotal}");
+            if (effect.DisabledCells > 0) parts.Add(Tr("막힘{0}", effect.DisabledCells));
+            return string.Join(" ", parts);
         }
 
         /// <summary>
@@ -322,27 +325,22 @@ namespace SephPlanner.Core.Planning
         /// </summary>
         public static string Turn(MixAdvice advice, string first = FirstMark, string second = SecondMark)
         {
-            if (advice.Turns == 0) return "합성 창에 넣은 방향 그대로 합치면 됩니다.";
+            if (advice.Turns == 0) return Tr("합성 창에 넣은 방향 그대로 합치면 됩니다.");
 
             var (one, two) = MixNames(advice);
-            return $"합성 창에 {first} {With(one, "을", "를")} 먼저 넣고 우클릭 {advice.Turns}번 돌린 뒤 " +
-                   $"{second} {With(two, "을", "를")} 넣으세요(한 번에 90°).";
+            return Tr("합성 창에 {0} {1|을/를} 먼저 넣고 우클릭 {2}번 돌린 뒤 {3} {4|을/를} 넣으세요(한 번에 90°).",
+                first, one, advice.Turns, second, two);
         }
 
         /// <summary>합성 추천 줄에 붙는 짧은 표. 자세한 것은 <see cref="Turn"/>이 쪽지에서 말한다.</summary>
         public static string TurnTag(MixAdvice advice, string first = FirstMark) =>
-            advice.Turns == 0 ? "" : $"{first} 회전 {advice.Turns}번";
+            advice.Turns == 0 ? "" : Tr("{0} 회전 {1}번", first, advice.Turns);
 
         /// <summary>
         /// 받침을 보고 조사를 붙인다. 한글로 끝나지 않는 이름은 받침을 알 수 없어 둘을 함께 적는다.
         /// </summary>
-        internal static string With(string word, string afterConsonant, string afterVowel)
-        {
-            if (word.Length == 0) return afterConsonant + "(" + afterVowel + ")";
-            var last = word[word.Length - 1];
-            if (last < '가' || last > '힣') return $"{word}{afterConsonant}({afterVowel})";
-            return word + ((last - '가') % 28 != 0 ? afterConsonant : afterVowel);
-        }
+        internal static string With(string word, string afterConsonant, string afterVowel) =>
+            word + Particle(word, afterConsonant, afterVowel);
 
         public static string Join(IReadOnlyList<string> lines) => string.Join(Environment.NewLine, lines);
     }

@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Tablets;
+using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Core.Runtime
 {
@@ -73,16 +74,13 @@ namespace SephPlanner.Core.Runtime
         /// </summary>
         public bool Settled { get; private set; }
 
-        private const string TidyMessage = "손으로 정리한 뒤 다시 시도하세요.";
+        private static string TidyMessage() => Tr("손으로 정리한 뒤 다시 시도하세요.");
 
-        private const string CollapsedMessage =
-            "게임이 계산한 칸 레벨이 전부 0 이 됐습니다 - 가방의 효과가 꺼진 상태입니다. " +
-            "동기화 중이면 곧 돌아오고, 그대로 남으면 손으로 옮겨도 같은 오류가 되풀이되니 " +
-            "방을 나갔다 들어오거나 게임을 다시 시작하세요. F10 으로 진단을 남겨 주시면 원인을 찾는 데 도움이 됩니다.";
+        private static string CollapsedMessage() =>
+            Tr("게임이 계산한 칸 레벨이 전부 0 이 됐습니다 - 가방의 효과가 꺼진 상태입니다. 동기화 중이면 곧 돌아오고, 그대로 남으면 손으로 옮겨도 같은 오류가 되풀이되니 방을 나갔다 들어오거나 게임을 다시 시작하세요. F10 으로 진단을 남겨 주시면 원인을 찾는 데 도움이 됩니다.");
 
-        private const string UncertainMessage =
-            "서버 반영 여부를 확인하지 못했습니다. 늦게 적용될 수 있어 추가 이동과 되돌리기를 멈췄습니다. " +
-            "자동 배치를 다시 쓰려면 방에 재접속하세요.";
+        private static string UncertainMessage() =>
+            Tr("서버 반영 여부를 확인하지 못했습니다. 늦게 적용될 수 있어 추가 이동과 되돌리기를 멈췄습니다. 자동 배치를 다시 쓰려면 방에 재접속하세요.");
 
         /// <summary>
         /// 사전 검증을 통과한 뒤 부른다. 실패하면 안전하게 확인된 걸음만 되돌리고,
@@ -105,13 +103,13 @@ namespace SephPlanner.Core.Runtime
             var swapping = ApplySwaps(journal, moves);
             while (Advance(swapping, moves)) yield return null;
             if (moves.Fault != null && moves.Failure == null)
-                moves.Failure = $"적용 도중 오류가 나 자동 배치를 중단했습니다({moves.Fault}).";
+                moves.Failure = Tr("적용 도중 오류가 나 자동 배치를 중단했습니다({0}).", moves.Fault);
 
             if (moves.Failure != null)
             {
                 if (RequiresResync)
                 {
-                    Result = Join(moves.Failure, _stateFailure == null ? UncertainMessage : null);
+                    Result = Join(moves.Failure, _stateFailure == null ? UncertainMessage() : null);
                     yield break;
                 }
                 var undone = new Outcome();
@@ -120,7 +118,7 @@ namespace SephPlanner.Core.Runtime
                 // 무너짐은 여기서 한 번만 붙인다. 되돌리기가 어느 가지로 빠져나가든 - 되돌릴
                 // 걸음이 없었든, 칸이 바뀌어 멈췄든 - 안내가 빠지지 않게 하려는 것이다.
                 Result = Join(moves.Failure, Undone(undone), Collapsed(),
-                    RequiresResync && _stateFailure == null ? UncertainMessage : null);
+                    RequiresResync && _stateFailure == null ? UncertainMessage() : null);
                 yield break;
             }
 
@@ -128,13 +126,13 @@ namespace SephPlanner.Core.Runtime
             var turning = Rotate(rotations);
             while (Advance(turning, rotations)) yield return null;
             if (rotations.Fault != null && rotations.Failure == null)
-                rotations.Failure = $"회전 중 오류가 나 자동 배치를 중단했습니다({rotations.Fault}).";
+                rotations.Failure = Tr("회전 중 오류가 나 자동 배치를 중단했습니다({0}).", rotations.Fault);
 
             if (rotations.Failure != null)
             {
                 if (RequiresResync)
                 {
-                    Result = Join(rotations.Failure, UncertainMessage);
+                    Result = Join(rotations.Failure, UncertainMessage());
                     yield break;
                 }
                 // 옮겨졌지만 안 돌아간 배치는 솔버가 평가한 적 없는 상태다. 이동도 함께 되돌린다.
@@ -143,7 +141,7 @@ namespace SephPlanner.Core.Runtime
                 while (Advance(undo, undone)) yield return null;
                 Result = Join(
                     rotations.Failure, rotations.Note, Undone(undone), Collapsed(),
-                    RequiresResync && _stateFailure == null ? UncertainMessage : null);
+                    RequiresResync && _stateFailure == null ? UncertainMessage() : null);
                 yield break;
             }
 
@@ -156,7 +154,7 @@ namespace SephPlanner.Core.Runtime
 
             // 레벨은 서버가 다시 계산해 따로 동기화한다. 참가자 세션에서는 마지막 걸음이 반영된
             // 뒤에도 잠시 옛 값이 남아 있으므로, 어긋났다고 알리기 전에 그만큼 기다린다.
-            Progress = "자동 배치 - 레벨 확인 중";
+            Progress = Tr("자동 배치 - 레벨 확인 중");
             var settle = _now() + (_port.WritesLandImmediately ? 0 : SyncTimeout);
             while (LevelDrift().Length > 0 && _now() < settle) yield return null;
 
@@ -168,15 +166,17 @@ namespace SephPlanner.Core.Runtime
             if (collapsed != null) levels = "";
             if (levels.Length > 0) DiagnosticError ??= levels;
             Settled = drift is null && collapsed is null && levels.Length == 0 && !RequiresResync;
-            Result = Join(
-                drift ?? $"자동 배치 완료 - 이동 {moves.Count}건, 회전 {rotations.Count}건" + levels, collapsed);
+            var done = levels.Length == 0
+                ? Tr("자동 배치 완료 - 이동 {0}건, 회전 {1}건", moves.Count, rotations.Count)
+                : Tr("자동 배치 완료 - 이동 {0}건, 회전 {1}건. {2}", moves.Count, rotations.Count, levels);
+            Result = Join(drift ?? done, collapsed);
         }
 
         private string? TargetDrift()
         {
             try
             {
-                if (!_port.Alive) return "인벤토리가 사라져 자동 배치 결과를 확인하지 못했습니다.";
+                if (!_port.Alive) return Tr("인벤토리가 사라져 자동 배치 결과를 확인하지 못했습니다.");
                 foreach (var target in _command.Targets)
                 {
                     // 번호 없는 아이템은 번호로 확인할 수 없다. 그 칸이 차 있는지만 본다 -
@@ -184,21 +184,21 @@ namespace SephPlanner.Core.Runtime
                     if (target.Immovable)
                     {
                         if (!_port.Occupied(target.To))
-                            return "적용 중 인벤토리가 바뀌어 목표 배치와 다릅니다. 현재 배치를 확인하세요.";
+                            return Tr("적용 중 인벤토리가 바뀌어 목표 배치와 다릅니다. 현재 배치를 확인하세요.");
                         continue;
                     }
 
                     if (_port.InstanceAt(target.To) != target.InstanceId)
-                        return "적용 중 인벤토리가 바뀌어 목표 배치와 다릅니다. 현재 배치를 확인하세요.";
+                        return Tr("적용 중 인벤토리가 바뀌어 목표 배치와 다릅니다. 현재 배치를 확인하세요.");
                     if (target.IsTablet && RotationOf(target.InstanceId) != target.Rotation)
-                        return "석판의 최종 각도가 목표와 다릅니다. 현재 배치를 확인하세요.";
+                        return Tr("석판의 최종 각도가 목표와 다릅니다. 현재 배치를 확인하세요.");
                 }
                 return null;
             }
             catch (Exception ex)
             {
                 DiagnosticError ??= ex.ToString();
-                return $"자동 배치 결과를 확인하지 못했습니다({ex.Message}). 현재 배치를 확인하세요.";
+                return Tr("자동 배치 결과를 확인하지 못했습니다({0}). 현재 배치를 확인하세요.", ex.Message);
             }
         }
 
@@ -246,7 +246,7 @@ namespace SephPlanner.Core.Runtime
 
         private string? Undone(Outcome outcome) =>
             outcome.Fault != null
-                ? Join($"되돌리는 중 오류가 나 인벤토리가 중간 상태로 남았습니다({outcome.Fault}).", Recovery())
+                ? Join(Tr("되돌리는 중 오류가 나 인벤토리가 중간 상태로 남았습니다({0}).", outcome.Fault), Recovery())
                 : outcome.Note;
 
         /// <summary>
@@ -282,8 +282,10 @@ namespace SephPlanner.Core.Runtime
         {
             // 한 번의 실패 안에서 답이 바뀌지 않는다. 가지마다 다시 재면 격자를 몇 번씩 훑는다.
             _collapsed ??= _levelsBefore > 0 && CountLevels() == 0;
-            if (_collapsed.Value) DiagnosticError ??= CollapsedMessage;
-            return _collapsed.Value ? CollapsedMessage : null;
+            if (!_collapsed.Value) return null;
+            var message = CollapsedMessage();
+            DiagnosticError ??= message;
+            return message;
         }
 
         /// <summary>
@@ -292,7 +294,7 @@ namespace SephPlanner.Core.Runtime
         /// 상태에서는 사람을 헛되이 붙잡는다. 무너졌으면 아무 말도 하지 않는다 - 무엇을 할지는
         /// <see cref="Collapsed"/> 가 결과 끝에 한 번 붙인다.
         /// </summary>
-        private string? Recovery() => Collapsed() is null ? TidyMessage : null;
+        private string? Recovery() => Collapsed() is null ? TidyMessage() : null;
 
         private string? InvalidState()
         {
@@ -300,8 +302,7 @@ namespace SephPlanner.Core.Runtime
             if (error == null) return null;
             DiagnosticError ??= error;
             RequiresResync = true;
-            _stateFailure = "가방의 아이템과 효과 연결이 어긋나 추가 이동과 되돌리기를 중단했습니다. " +
-                "방에 재접속하거나 게임을 다시 시작하세요. " + error;
+            _stateFailure = Tr("가방의 아이템과 효과 연결이 어긋나 추가 이동과 되돌리기를 중단했습니다. 방에 재접속하거나 게임을 다시 시작하세요. {0}", error);
             return _stateFailure;
         }
 
@@ -362,17 +363,17 @@ namespace SephPlanner.Core.Runtime
                     if (reported == pair.Value) continue;
 
                     mismatches++;
-                    if (first.Length == 0) first = $"{pair.Key} 계산 {pair.Value} != 게임 {reported}";
+                    if (first.Length == 0) first = Tr("{0} 계산 {1} != 게임 {2}", pair.Key, pair.Value, reported);
                 }
 
                 return mismatches == 0
                     ? ""
-                    : $". 적용 뒤 레벨이 예상과 다른 칸 {mismatches}개({first}) - 계산에 없는 효과가 걸려 있습니다";
+                    : Tr("적용 뒤 레벨이 예상과 다른 칸 {0}개({1}) - 계산에 없는 효과가 걸려 있습니다", mismatches, first);
             }
             catch (Exception ex)
             {
                 DiagnosticError ??= ex.ToString();
-                return $". 적용 뒤 레벨을 확인하지 못했습니다({ex.Message})";
+                return Tr("적용 뒤 레벨을 확인하지 못했습니다({0})", ex.Message);
             }
         }
 
@@ -406,7 +407,7 @@ namespace SephPlanner.Core.Runtime
 
                 if (!positions.TryGetValue(target.InstanceId, out var from))
                 {
-                    outcome.Failure = "계획에 있는 아이템을 가방에서 찾지 못했습니다. 자동 배치를 중단했습니다.";
+                    outcome.Failure = Tr("계획에 있는 아이템을 가방에서 찾지 못했습니다. 자동 배치를 중단했습니다.");
                     yield break;
                 }
                 var to = target.To;
@@ -414,26 +415,26 @@ namespace SephPlanner.Core.Runtime
 
                 if (immovable.Contains(to))
                 {
-                    outcome.Failure = "그 칸의 아이템은 옮길 수 없어 자동 배치를 중단했습니다.";
+                    outcome.Failure = Tr("그 칸의 아이템은 옮길 수 없어 자동 배치를 중단했습니다.");
                     yield break;
                 }
 
                 if (!_port.Alive)
                 {
-                    outcome.Failure = "적용 도중 인벤토리가 사라져 자동 배치를 중단했습니다.";
+                    outcome.Failure = Tr("적용 도중 인벤토리가 사라져 자동 배치를 중단했습니다.");
                     yield break;
                 }
 
                 // 적용을 시작한 뒤에 동료가 접속했을 수 있다. 멀티가 된 순간 더 진행하지 않는다.
                 if (!_allowMultiplayer && _port.IsMultiplayerSession)
                 {
-                    outcome.Failure = "적용 도중 멀티플레이 세션이 되어 자동 배치를 중단했습니다.";
+                    outcome.Failure = Tr("적용 도중 멀티플레이 세션이 되어 자동 배치를 중단했습니다.");
                     yield break;
                 }
 
                 if (!BudgetLeft())
                 {
-                    outcome.Failure = $"서버 반영이 느려 {PhaseTimeout:0}초 안에 끝내지 못해 자동 배치를 중단했습니다.";
+                    outcome.Failure = Tr("서버 반영이 느려 {0:0}초 안에 끝내지 못해 자동 배치를 중단했습니다.", PhaseTimeout);
                     yield break;
                 }
 
@@ -442,11 +443,11 @@ namespace SephPlanner.Core.Runtime
 
                 if (!Swapped(to, from, target.InstanceId, expected))
                 {
-                    outcome.Failure = "이동할 칸의 아이템이 바뀌어 자동 배치를 중단했습니다.";
+                    outcome.Failure = Tr("이동할 칸의 아이템이 바뀌어 자동 배치를 중단했습니다.");
                     yield break;
                 }
 
-                Progress = $"자동 배치 중 - 이동 {outcome.Count + 1}번째 반영 대기";
+                Progress = Tr("자동 배치 중 - 이동 {0}번째 반영 대기", outcome.Count + 1);
                 var stateError = InvalidState();
                 if (stateError != null)
                 {
@@ -465,7 +466,7 @@ namespace SephPlanner.Core.Runtime
                 {
                     if (_port.WritesLandImmediately && Swapped(from, to, target.InstanceId, expected))
                         journal.Add(new Step(from, to, target.InstanceId, expected));
-                    outcome.Failure = $"이동 중 오류({error})가 나 자동 배치를 중단했습니다.";
+                    outcome.Failure = Tr("이동 중 오류({0})가 나 자동 배치를 중단했습니다.", error);
                     yield break;
                 }
 
@@ -481,15 +482,15 @@ namespace SephPlanner.Core.Runtime
                 if (!_port.Alive || !Swapped(from, to, target.InstanceId, expected))
                 {
                     outcome.Failure = !_port.Alive
-                        ? "적용 도중 인벤토리가 사라져 자동 배치를 중단했습니다."
-                        : $"{from} → {to} 이동이 게임에 반영되지 않아 자동 배치를 중단했습니다.";
+                        ? Tr("적용 도중 인벤토리가 사라져 자동 배치를 중단했습니다.")
+                        : Tr("{0} → {1} 이동이 게임에 반영되지 않아 자동 배치를 중단했습니다.", from, to);
                     yield break;
                 }
 
                 RequiresResync = false;
                 journal.Add(new Step(from, to, target.InstanceId, expected));
                 outcome.Count++;
-                Progress = $"자동 배치 중 - 이동 {outcome.Count}/{total}";
+                Progress = Tr("자동 배치 중 - 이동 {0}/{1}", outcome.Count, total);
 
                 if (displaced)
                 {
@@ -520,32 +521,32 @@ namespace SephPlanner.Core.Runtime
         {
             if (RequiresResync)
             {
-                outcome.Note = UncertainMessage;
+                outcome.Note = UncertainMessage();
                 yield break;
             }
             if (journal.Count == 0) yield break;
 
             NewPhase();
-            Progress = "자동 배치 - 되돌리는 중";
+            Progress = Tr("자동 배치 - 되돌리는 중");
             for (var i = journal.Count - 1; i >= 0; i--)
             {
                 if (!_port.Alive)
                 {
-                    outcome.Note = "되돌리는 중 인벤토리가 사라져 중간 상태로 남았습니다.";
+                    outcome.Note = Tr("되돌리는 중 인벤토리가 사라져 중간 상태로 남았습니다.");
                     yield break;
                 }
 
                 if (!BudgetLeft())
                 {
                     outcome.Note = Join(
-                        $"되돌리기가 {PhaseTimeout:0}초 안에 끝나지 않아 인벤토리가 중간 상태로 남았습니다.", Recovery());
+                        Tr("되돌리기가 {0:0}초 안에 끝나지 않아 인벤토리가 중간 상태로 남았습니다.", PhaseTimeout), Recovery());
                     yield break;
                 }
 
                 var step = journal[i];
                 if (!Swapped(step.From, step.To, step.InstanceId, step.Displaced))
                 {
-                    outcome.Note = "되돌릴 칸의 아이템이 바뀌어 추가로 옮기지 않았습니다. 현재 배치를 확인하세요.";
+                    outcome.Note = Tr("되돌릴 칸의 아이템이 바뀌어 추가로 옮기지 않았습니다. 현재 배치를 확인하세요.");
                     yield break;
                 }
                 RequiresResync = !_port.WritesLandImmediately;
@@ -565,8 +566,8 @@ namespace SephPlanner.Core.Runtime
                 if (error != null)
                 {
                     outcome.Note = Join(
-                        $"되돌리기도 실패해 인벤토리가 중간 상태로 남았습니다({error}).",
-                        RequiresResync ? UncertainMessage : Recovery());
+                        Tr("되돌리기도 실패해 인벤토리가 중간 상태로 남았습니다({0}).", error),
+                        RequiresResync ? UncertainMessage() : Recovery());
                     yield break;
                 }
 
@@ -583,8 +584,8 @@ namespace SephPlanner.Core.Runtime
                 if (!_port.Alive || !Swapped(step.To, step.From, step.InstanceId, step.Displaced))
                 {
                     outcome.Note = Join(
-                        "되돌리기가 게임에 반영되지 않아 인벤토리가 중간 상태로 남았습니다.",
-                        RequiresResync ? UncertainMessage : Recovery());
+                        Tr("되돌리기가 게임에 반영되지 않아 인벤토리가 중간 상태로 남았습니다."),
+                        RequiresResync ? UncertainMessage() : Recovery());
                     yield break;
                 }
                 RequiresResync = false;
@@ -597,7 +598,7 @@ namespace SephPlanner.Core.Runtime
                 {
                     if (!_port.Occupied(target.From))
                     {
-                        outcome.Note = "확인된 이동은 되돌렸지만 원래 배치와 다른 항목이 남았습니다. 현재 배치를 확인하세요.";
+                        outcome.Note = Tr("확인된 이동은 되돌렸지만 원래 배치와 다른 항목이 남았습니다. 현재 배치를 확인하세요.");
                         yield break;
                     }
                     continue;
@@ -606,11 +607,11 @@ namespace SephPlanner.Core.Runtime
                 if (_port.InstanceAt(target.From) != target.InstanceId ||
                     target.IsTablet && RotationOf(target.InstanceId) != target.FromRotation)
                 {
-                    outcome.Note = "확인된 이동은 되돌렸지만 원래 배치와 다른 항목이 남았습니다. 현재 배치를 확인하세요.";
+                    outcome.Note = Tr("확인된 이동은 되돌렸지만 원래 배치와 다른 항목이 남았습니다. 현재 배치를 확인하세요.");
                     yield break;
                 }
             }
-            outcome.Note = "원래 배치로 되돌렸습니다.";
+            outcome.Note = Tr("원래 배치로 되돌렸습니다.");
         }
 
         /// <summary>
@@ -648,14 +649,14 @@ namespace SephPlanner.Core.Runtime
                     var pressing = PressOnce(turn, step);
                     while (Advance(pressing, step)) yield return null;
 
-                    var trouble = step.Fault != null ? $"회전 중 오류({step.Fault})" : step.Failure;
+                    var trouble = step.Fault != null ? Tr("회전 중 오류({0})", step.Fault) : step.Failure;
                     if (trouble != null)
                     {
-                        failure = trouble + " - 자동 배치를 중단합니다.";
+                        failure = Tr("{0} - 자동 배치를 중단합니다.", trouble);
                         break;
                     }
                     count++;
-                    Progress = $"자동 배치 중 - 회전 {outcome.Count + 1}/{pending.Count}";
+                    Progress = Tr("자동 배치 중 - 회전 {0}/{1}", outcome.Count + 1, pending.Count);
                 }
 
                 pressed.Add(new TabletTurn(turn.InstanceId, turn.Cell, turn.Rotation, count));
@@ -671,7 +672,7 @@ namespace SephPlanner.Core.Runtime
                 var restoring = RestoreRotations(pressed, undone);
                 while (Advance(restoring, undone)) yield return null;
                 outcome.Note = undone.Fault != null
-                    ? $"각도를 되돌리는 중 오류가 났습니다({undone.Fault})."
+                    ? Tr("각도를 되돌리는 중 오류가 났습니다({0}).", undone.Fault)
                     : undone.Note;
                 yield break;
             }
@@ -681,7 +682,7 @@ namespace SephPlanner.Core.Runtime
         private IEnumerator RestoreRotations(List<TabletTurn> pressed, Outcome outcome)
         {
             NewPhase();
-            Progress = "자동 배치 - 각도를 되돌리는 중";
+            Progress = Tr("자동 배치 - 각도를 되돌리는 중");
             foreach (var turn in pressed)
             {
                 var back = TabletRotation.PressesBack(turn.Presses);
@@ -689,7 +690,7 @@ namespace SephPlanner.Core.Runtime
                 if (original == null || RotationOf(turn.InstanceId) !=
                     (original.FromRotation + turn.Presses) % TabletRotation.Steps)
                 {
-                    outcome.Note = "각도를 되돌리기 전에 석판 상태가 바뀌어 멈췄습니다. 현재 배치를 확인하세요.";
+                    outcome.Note = Tr("각도를 되돌리기 전에 석판 상태가 바뀌어 멈췄습니다. 현재 배치를 확인하세요.");
                     yield break;
                 }
                 for (var i = 0; i < back; i++)
@@ -698,12 +699,12 @@ namespace SephPlanner.Core.Runtime
                     var pressing = PressOnce(turn, step);
                     while (Advance(pressing, step)) yield return null;
 
-                    var trouble = step.Fault != null ? $"오류({step.Fault})" : step.Failure;
+                    var trouble = step.Fault != null ? Tr("오류({0})", step.Fault) : step.Failure;
                     if (trouble == null) continue;
 
                     // 조용히 물러서면 "원래 배치로 되돌렸습니다"라고 보고하면서 석판 하나를
                     // 엉뚱한 각도로 남기게 된다.
-                    outcome.Note = $"석판(인스턴스 {turn.InstanceId})의 각도를 되돌리지 못했습니다({trouble}).";
+                    outcome.Note = Tr("석판(인스턴스 {0})의 각도를 되돌리지 못했습니다({1}).", turn.InstanceId, trouble);
                     yield break;
                 }
             }
@@ -720,26 +721,26 @@ namespace SephPlanner.Core.Runtime
             var before = RotationOf(turn.InstanceId);
             if (before is null)
             {
-                outcome.Failure = $"석판(인스턴스 {turn.InstanceId})이 사라졌습니다";
+                outcome.Failure = Tr("석판(인스턴스 {0})이 사라졌습니다", turn.InstanceId);
                 yield break;
             }
             if (_port.InstanceAt(turn.Cell) != turn.InstanceId)
             {
-                outcome.Failure = $"석판(인스턴스 {turn.InstanceId})이 {turn.Cell} 에 없습니다";
+                outcome.Failure = Tr("석판(인스턴스 {0})이 {1} 에 없습니다", turn.InstanceId, turn.Cell);
                 yield break;
             }
             if (!BudgetLeft())
             {
-                outcome.Failure = $"서버 반영이 느려 {PhaseTimeout:0}초 안에 끝내지 못했습니다";
+                outcome.Failure = Tr("서버 반영이 느려 {0:0}초 안에 끝내지 못했습니다", PhaseTimeout);
                 yield break;
             }
 
-            Progress = "자동 배치 중 - 회전 반영 대기";
+            Progress = Tr("자동 배치 중 - 회전 반영 대기");
             RequiresResync = !_port.WritesLandImmediately;
             var error = _port.Press(turn.Cell);
             if (error != null)
             {
-                outcome.Failure = $"회전 중 오류({error})";
+                outcome.Failure = Tr("회전 중 오류({0})", error);
                 yield break;
             }
 
@@ -748,11 +749,11 @@ namespace SephPlanner.Core.Runtime
                 yield return null;
 
             if (RotationOf(turn.InstanceId) is not int after || after == before)
-                outcome.Failure = $"석판(인스턴스 {turn.InstanceId}) 회전이 시간 안에 반영되지 않았습니다";
+                outcome.Failure = Tr("석판(인스턴스 {0}) 회전이 시간 안에 반영되지 않았습니다", turn.InstanceId);
             else if (after != (before.Value + 1) % TabletRotation.Steps)
             {
                 RequiresResync = true;
-                outcome.Failure = $"석판(인스턴스 {turn.InstanceId})이 예상과 다른 각도로 바뀌었습니다";
+                outcome.Failure = Tr("석판(인스턴스 {0})이 예상과 다른 각도로 바뀌었습니다", turn.InstanceId);
             }
             else RequiresResync = false;
         }
@@ -777,13 +778,13 @@ namespace SephPlanner.Core.Runtime
 
                     if (!_port.Alive ||
                         !_port.TryFindTablet(target.InstanceId, out var cell, out var rotation, out var rotatable))
-                        return "적용 도중 석판이 사라져 자동 배치를 중단합니다.";
+                        return Tr("적용 도중 석판이 사라져 자동 배치를 중단합니다.");
 
                     var presses = TabletRotation.PressesFrom(rotation, target.Rotation);
                     if (presses == 0) continue;
 
                     if (!rotatable)
-                        return $"적용 도중 석판(인스턴스 {target.InstanceId})의 회전이 잠겨 중단합니다.";
+                        return Tr("적용 도중 석판(인스턴스 {0})의 회전이 잠겨 중단합니다.", target.InstanceId);
 
                     pending.Add(new TabletTurn(target.InstanceId, cell, target.Rotation, presses));
                 }
@@ -793,7 +794,7 @@ namespace SephPlanner.Core.Runtime
             {
                 DiagnosticError ??= ex.ToString();
                 // 아직 아무것도 쓰지 않았다. 회전만 포기하면 이동을 되돌릴지 호출자가 정한다.
-                return $"회전 준비 중 오류가 났습니다({ex.Message}).";
+                return Tr("회전 준비 중 오류가 났습니다({0}).", ex.Message);
             }
         }
     }

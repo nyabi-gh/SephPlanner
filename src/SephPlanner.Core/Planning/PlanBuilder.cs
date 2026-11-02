@@ -7,6 +7,7 @@ using SephPlanner.Core.Model;
 using SephPlanner.Core.Runtime;
 using SephPlanner.Core.Solver;
 using SephPlanner.Core.Tablets;
+using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Core.Planning
 {
@@ -399,17 +400,17 @@ namespace SephPlanner.Core.Planning
                 RetentionWarnings = problem.Charms.Where(charm => best.UnretainedCharms.Contains(charm.InstanceId))
                     .Select(charm => RetentionWarning(charm, best)).ToList(),
                 SupportWarnings = problem.Charms.Where(charm => best.UnlinkedCharms.Contains(charm.InstanceId) && !charm.Retained)
-                    .Select(charm => Naming.Of(charm.Definition.Names, charm.Definition.Id, "아티팩트") + ": " +
+                    .Select(charm => Naming.Of(charm.Definition.Names, charm.Definition.Id, Tr("아티팩트")) + ": " +
                         Explain.SupportMissing(charm.Definition)).ToList(),
                 HasUnapprovedDeactivation = unapprovedDeactivation,
                 ActivationWarnings = problem.Charms.Where(charm => best.UnpreservedCharms.Contains(charm.InstanceId) &&
                         !charm.Retained && !best.UnlinkedCharms.Contains(charm.InstanceId))
-                    .Select(charm => Naming.Of(charm.Definition.Names, charm.Definition.Id, "아티팩트") +
-                        ": 활성 배치를 찾지 못했습니다. " +
-                        (best.CharmPositions.TryGetValue(charm.InstanceId, out var cell) && best.InactiveCells.TryGetValue(cell, out var reason)
-                            ? Explain.InactiveReason(reason) : "놓을 자리가 부족합니다.") +
-                        (unapprovedDeactivation ? " 끄기 허용 없이 새로 비활성화하는 배치는 적용하지 않습니다." : ""))
-                    .Concat(best.WrongSideCharms.Select(_ => "대립의 천칭: 있어야 할 쪽에 두는 배치를 찾지 못했습니다. 직접 원하는 쪽으로 옮긴 뒤 다시 계산하세요."))
+                    .Select(charm => Naming.Of(charm.Definition.Names, charm.Definition.Id, Tr("아티팩트")) + ": " +
+                        Tr("활성 배치를 찾지 못했습니다. {0}",
+                            best.CharmPositions.TryGetValue(charm.InstanceId, out var cell) && best.InactiveCells.TryGetValue(cell, out var reason)
+                                ? Explain.InactiveReason(reason) : Tr("놓을 자리가 부족합니다.")) +
+                        (unapprovedDeactivation ? " " + Tr("끄기 허용 없이 새로 비활성화하는 배치는 적용하지 않습니다.") : ""))
+                    .Concat(best.WrongSideCharms.Select(_ => Tr("대립의 천칭: 있어야 할 쪽에 두는 배치를 찾지 못했습니다. 직접 원하는 쪽으로 옮긴 뒤 다시 계산하세요.")))
                     .Concat(DormantPreferences(problem)).ToList(),
                 TabletWarnings = EmptyMixedTablets(problem),
                 ManualMoveInstructionsAvailable = manualMovesAvailable,
@@ -430,10 +431,10 @@ namespace SephPlanner.Core.Planning
         {
             var reason = best.CharmPositions.TryGetValue(charm.InstanceId, out var cell)
                 ? best.InactiveCells.TryGetValue(cell, out var inactive) ? Explain.InactiveReason(inactive) : ""
-                : "놓을 자리를 확보하지 못했습니다.";
+                : Tr("놓을 자리를 확보하지 못했습니다.");
             if (best.UnlinkedCharms.Contains(charm.InstanceId)) reason = Explain.SupportMissing(charm.Definition);
-            return Naming.Of(charm.Definition.Names, charm.Definition.Id, "아티팩트") +
-                ": 사용 유지 배치를 찾지 못했습니다. " + reason;
+            return Naming.Of(charm.Definition.Names, charm.Definition.Id, Tr("아티팩트")) + ": " +
+                Tr("사용 유지 배치를 찾지 못했습니다. {0}", reason);
         }
 
         /// <summary>
@@ -444,9 +445,8 @@ namespace SephPlanner.Core.Planning
         internal static List<string> DormantPreferences(PlacementProblem problem) =>
             problem.Charms
                 .Where(charm => charm.IsDormant && !charm.IsFiller && charm.Weight > 1)
-                .Select(charm => Naming.Of(charm.Definition.Names, charm.Definition.Id, "아티팩트") + ": " +
-                    "연동된 무기를 들고 있지 않아 꺼져 있습니다. 강화 우선(★) 지정대로 자리는 잡아 두었으니 " +
-                    "무기를 바꾸면 그대로 켜집니다. 그때까지는 점수에 들어가지 않습니다.")
+                .Select(charm => Naming.Of(charm.Definition.Names, charm.Definition.Id, Tr("아티팩트")) + ": " +
+                    Tr("연동된 무기를 들고 있지 않아 꺼져 있습니다. 강화 우선(★) 지정대로 자리는 잡아 두었으니 무기를 바꾸면 그대로 켜집니다. 그때까지는 점수에 들어가지 않습니다."))
                 .ToList();
 
         /// <summary>
@@ -458,7 +458,7 @@ namespace SephPlanner.Core.Planning
         {
             var names = problem.Tablets
                 .Where(slot => slot.Definition.IsCustom && slot.InstanceQuery is { Length: 0 })
-                .Select(slot => string.IsNullOrEmpty(slot.InstanceName) ? "이름 없음" : slot.InstanceName!)
+                .Select(slot => string.IsNullOrEmpty(slot.InstanceName) ? Tr("이름 없음") : slot.InstanceName!)
                 .ToList();
             if (names.Count == 0) return new List<string>();
 
@@ -466,7 +466,7 @@ namespace SephPlanner.Core.Planning
                 .Select(group => group.Count() > 1 ? group.Key + " " + group.Count() : group.Key);
             return new List<string>
             {
-                $"합성 석판 {names.Count}개({string.Join(", ", kinds)})의 효과가 게임에 남아 있지 않아 아무 칸에도 영향을 주지 않습니다.",
+                Tr("합성 석판 {0}개({1})의 효과가 게임에 남아 있지 않아 아무 칸에도 영향을 주지 않습니다.", names.Count, string.Join(", ", kinds)),
             };
         }
 
@@ -475,7 +475,7 @@ namespace SephPlanner.Core.Planning
             var warnings = new List<string>();
             foreach (var charm in problem.Charms)
             {
-                var name = Naming.Of(charm.Definition.Names, charm.Definition.Id, "아티팩트");
+                var name = Naming.Of(charm.Definition.Names, charm.Definition.Id, Tr("아티팩트"));
                 if (best.UnmatchedComboCharms.Contains(charm.InstanceId))
                     warnings.Add(name + ": " + PriorityPlacement.FailureReason(problem, charm));
                 if (best.UnmatchedSupportCharms.Contains(charm.InstanceId))
@@ -588,7 +588,7 @@ namespace SephPlanner.Core.Planning
             {
                 if (!best.CharmPositions.TryGetValue(charm.InstanceId, out var position)) continue;
                 names[position] = Naming.Of(
-                    charm.Definition.Names, charm.Definition.Id, charm.IsFiller ? "아이템" : "아티팩트");
+                    charm.Definition.Names, charm.Definition.Id, charm.IsFiller ? Tr("아이템") : Tr("아티팩트"));
             }
             return names;
         }
@@ -658,7 +658,7 @@ namespace SephPlanner.Core.Planning
                 return new PlanVerification
                 {
                     Status = PlanVerificationStatus.Unavailable,
-                    Reason = "게임의 레벨 또는 비활성 행렬을 읽지 못해 계획을 검증할 수 없습니다.",
+                    Reason = Tr("게임의 레벨 또는 비활성 행렬을 읽지 못해 계획을 검증할 수 없습니다."),
                 };
             }
 
@@ -691,7 +691,7 @@ namespace SephPlanner.Core.Planning
                         Status = PlanVerificationStatus.Failed,
                         LevelMismatches = levelMismatches,
                         DisabledMismatches = 1,
-                        Reason = "게임의 비활성 칸 좌표를 해석할 수 없어 자동 배치를 잠갔습니다.",
+                        Reason = Tr("게임의 비활성 칸 좌표를 해석할 수 없어 자동 배치를 잠갔습니다."),
                     };
                 }
                 if (grid.Contains(cell)) reportedDisabled.Add(cell);
@@ -735,8 +735,8 @@ namespace SephPlanner.Core.Planning
                 DisabledMismatches = disabledMismatches,
                 TabletMismatches = tabletMismatches,
                 Reason = total == 0
-                    ? "게임 상태와 계획 시뮬레이션이 일치합니다."
-                    : $"게임 상태와 계산 결과의 검증 항목 {total}개가 달라 자동 배치를 잠갔습니다.",
+                    ? Tr("게임 상태와 계획 시뮬레이션이 일치합니다.")
+                    : Tr("게임 상태와 계산 결과의 검증 항목 {0}개가 달라 자동 배치를 잠갔습니다.", total),
             };
         }
 
@@ -800,7 +800,7 @@ namespace SephPlanner.Core.Planning
                 pending.Add(new Relocation
                 {
                     Name = Naming.Of(
-                        charm.Definition.Names, charm.Definition.Id, charm.IsFiller ? "아이템" : "아티팩트"),
+                        charm.Definition.Names, charm.Definition.Id, charm.IsFiller ? Tr("아이템") : Tr("아티팩트")),
                     From = from,
                     To = to,
                 });

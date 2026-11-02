@@ -5,6 +5,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Core.Runtime
 {
@@ -22,22 +23,22 @@ namespace SephPlanner.Core.Runtime
 
         public static byte[] Create(IReadOnlyDictionary<string, string> files)
         {
-            if (!files.ContainsKey("report.json")) throw new InvalidDataException("진단 설명 파일이 없습니다.");
+            if (!files.ContainsKey("report.json")) throw new InvalidDataException(Tr("진단 설명 파일이 없습니다."));
             using var output = new MemoryStream();
             long total = 0;
             using (var archive = new ZipArchive(output, ZipArchiveMode.Create, true))
             {
                 foreach (var file in files.OrderBy(pair => pair.Key, StringComparer.Ordinal))
                 {
-                    if (!Names.Contains(file.Key)) throw new InvalidDataException("허용하지 않는 진단 파일입니다.");
+                    if (!Names.Contains(file.Key)) throw new InvalidDataException(Tr("허용하지 않는 진단 파일입니다."));
                     var bytes = Encoding.UTF8.GetBytes(file.Value);
                     total += bytes.Length;
-                    if (total > MaximumExpandedBytes) throw new InvalidDataException("진단 자료가 전송 크기 제한을 넘었습니다.");
+                    if (total > MaximumExpandedBytes) throw new InvalidDataException(Tr("진단 자료가 전송 크기 제한을 넘었습니다."));
                     using var stream = archive.CreateEntry(file.Key, CompressionLevel.Optimal).Open();
                     stream.Write(bytes, 0, bytes.Length);
                 }
             }
-            if (output.Length > MaximumArchiveBytes) throw new InvalidDataException("압축한 진단 자료가 전송 크기 제한을 넘었습니다.");
+            if (output.Length > MaximumArchiveBytes) throw new InvalidDataException(Tr("압축한 진단 자료가 전송 크기 제한을 넘었습니다."));
             return output.ToArray();
         }
 

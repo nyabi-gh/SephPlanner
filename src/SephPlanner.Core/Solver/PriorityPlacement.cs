@@ -4,6 +4,7 @@ using System.Linq;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Tablets;
+using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Core.Solver
 {
@@ -29,36 +30,35 @@ namespace SephPlanner.Core.Solver
             // 가장 흔한 이유다. "자리를 못 찾았다" 로 뭉뚱그리면 사용자가 없는 자리를 찾으러 간다.
             if (problem.DesignatedTargets.Count > 0 && DirectedCharmSupport.HasConnection(charm) &&
                 DirectedCharmSupport.WantsDesignatedTarget(problem, charm))
-                return "‘침·모래시계·별조각 우선’으로 지정한 아이템을 강화하느라 이 콤보를 복사하지 못했습니다. "
-                       + "콤보를 우선하려면 빌드 창(기본 F2)에서 강화받는 아이템의 ‘침·모래시계·별조각 우선’을 끄세요.";
+                return Tr("‘침·모래시계·별조각 우선’으로 지정한 아이템을 강화하느라 이 콤보를 복사하지 못했습니다. 콤보를 우선하려면 빌드 창(기본 F2)에서 강화받는 아이템의 ‘침·모래시계·별조각 우선’을 끄세요.");
 
             if (charm.Definition.LineCategories.Count > 0)
             {
                 if (!charm.Definition.LineCategories.Any(problem.PriorityCategories.Contains))
-                    return "열쇠가 제공하는 콤보 중 F2에서 선택한 것이 없습니다.";
+                    return Tr("열쇠가 제공하는 콤보 중 F2에서 선택한 것이 없습니다.");
                 if (!cells.Any(cell => problem.PriorityCategories.Contains(PositionalWorth.LineCategory(charm.Definition, cell))))
-                    return "지정 콤보에 해당하는 행이 아직 열리지 않았습니다.";
+                    return Tr("지정 콤보에 해당하는 행이 아직 열리지 않았습니다.");
             }
             else if (InheritsTarget(charm.Definition))
             {
                 var parents = TargetOffsets(charm.Definition);
                 if (!cells.Any(cell => parents.Any(offset => problem.Grid.Contains(cell.Offset(offset.X, offset.Y)))))
-                    return "침의 방향에 대상을 놓을 칸이 없습니다.";
+                    return Tr("침의 방향에 대상을 놓을 칸이 없습니다.");
                 if (!problem.Charms.Any(other => other != charm && !InheritsTarget(other.Definition) &&
                         DirectedCharmSupport.Accepts(charm, other) && cells.Any(cell =>
                             PositionalWorth.CategoriesOf(other, cell).Any(problem.PriorityCategories.Contains))))
-                    return "지정 콤보를 가진 공격 가능한 대상을 찾지 못했습니다.";
+                    return Tr("지정 콤보를 가진 공격 가능한 대상을 찾지 못했습니다.");
             }
             else
             {
                 var centers = cells.Where(cell => problem.Grid.Contains(cell.Offset(-1, 0)) &&
                                                  problem.Grid.Contains(cell.Offset(1, 0))).ToList();
-                if (centers.Count == 0) return "종이를 끼울 가로 세 칸이 없습니다.";
+                if (centers.Count == 0) return Tr("종이를 끼울 가로 세 칸이 없습니다.");
                 if (!centers.Any(cell => problem.PriorityCategories.Any(category => problem.Charms.Count(other =>
                         other != charm && !other.IsFiller && PositionalWorth.CategoriesOf(other, cell).Contains(category)) >= 2)))
-                    return "지정 콤보를 공유하는 양옆 아티팩트 둘을 찾지 못했습니다.";
+                    return Tr("지정 콤보를 공유하는 양옆 아티팩트 둘을 찾지 못했습니다.");
             }
-            return "자리·활성 조건·‘조건 무시 칸’ 지정을 만족하는 콤보 배치를 찾지 못했습니다.";
+            return Tr("자리·활성 조건·‘조건 무시 칸’ 지정을 만족하는 콤보 배치를 찾지 못했습니다.");
         }
 
         internal static string SupportFailureReason(PlacementProblem problem, CharmSlot charm)
@@ -66,19 +66,18 @@ namespace SephPlanner.Core.Solver
             var (dx, dy) = DirectedCharmSupport.Offset(charm);
             var cells = Enumerable.Range(0, problem.Grid.Storage).Select(problem.Grid.ToPosition);
             if (!cells.Any(cell => problem.Grid.Contains(cell.Offset(dx, dy))))
-                return "강화 방향에 대상을 놓을 칸이 없습니다.";
+                return Tr("강화 방향에 대상을 놓을 칸이 없습니다.");
 
             // 지정한 대상이 지금 꺼져 있으면 옮겨 봐야 연결이 서지 않는다. 자리 이야기를 하면
             // 사용자가 칸을 옮겨 보며 시간을 버린다.
             var blocked = problem.DesignatedTargets
                 .Where(target => DirectedCharmSupport.Accepts(charm, target) && target.IsDormant)
-                .Select(target => Naming.Of(target.Definition.Names, target.Definition.Id, "아티팩트"))
+                .Select(target => Naming.Of(target.Definition.Names, target.Definition.Id, Tr("아티팩트")))
                 .ToList();
             if (blocked.Count > 0)
-                return $"‘침·모래시계·별조각 우선’으로 지정한 아이템({string.Join(", ", blocked)})이 꺼져 있어 강화할 수 없습니다.";
+                return Tr("‘침·모래시계·별조각 우선’으로 지정한 아이템({0})이 꺼져 있어 강화할 수 없습니다.", string.Join(", ", blocked));
 
-            return "‘침·모래시계·별조각 우선’으로 지정한 아이템에 닿는 배치를 찾지 못했습니다. 다른 지정과 부딪히거나 "
-                   + "대상이 그 자리에서 조건을 만족하지 못하는 경우입니다.";
+            return Tr("‘침·모래시계·별조각 우선’으로 지정한 아이템에 닿는 배치를 찾지 못했습니다. 다른 지정과 부딪히거나 대상이 그 자리에서 조건을 만족하지 못하는 경우입니다.");
         }
 
         /// <summary>
@@ -99,9 +98,8 @@ namespace SephPlanner.Core.Solver
             {
                 if (helpers.Exists(helper => DirectedCharmSupport.Accepts(helper, target))) continue;
 
-                warnings.Add(Naming.Of(target.Definition.Names, target.Definition.Id, "아티팩트") + ": " +
-                    "‘침·모래시계·별조각 우선’이 켜져 있지만 가방의 지원 아이템이 연결할 수 없는 종류입니다. " +
-                    "침은 공격 가능한 아티팩트만, 모래시계와 별조각은 마법만 지원합니다.");
+                warnings.Add(Naming.Of(target.Definition.Names, target.Definition.Id, Tr("아티팩트")) + ": " +
+                    Tr("‘침·모래시계·별조각 우선’이 켜져 있지만 가방의 지원 아이템이 연결할 수 없는 종류입니다. 침은 공격 가능한 아티팩트만, 모래시계와 별조각은 마법만 지원합니다."));
             }
             return warnings;
         }

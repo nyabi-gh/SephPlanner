@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Tablets;
+using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Plugin
 {
@@ -55,7 +56,7 @@ namespace SephPlanner.Plugin
                 if (result.Applied[i] != view.Tablets[i].IsApplied)
                 {
                     return Result(PlanVerificationStatus.Failed,
-                        $"석판 {view.Tablets[i].entityID} 적용 여부 {result.Applied[i]} != {view.Tablets[i].IsApplied}" +
+                        Tr("석판 {0} 적용 여부 {1} != {2}", view.Tablets[i].entityID, result.Applied[i], view.Tablets[i].IsApplied) +
                         Collapsed(inv, view, result));
                 }
 
@@ -63,7 +64,7 @@ namespace SephPlanner.Plugin
 
                 var difference = CompareEffects(view.Placements[i], view.Grid, view.Tablets[i]);
                 if (difference != null)
-                    return Result(PlanVerificationStatus.Failed, $"석판 {view.Tablets[i].entityID} {difference}");
+                    return Result(PlanVerificationStatus.Failed, Tr("석판 {0} {1}", view.Tablets[i].entityID, difference));
             }
 
             var mismatch = CompareMatrices(inv, view, result);
@@ -76,7 +77,7 @@ namespace SephPlanner.Plugin
             new RuntimeSimulationCheck
             {
                 Status = status,
-                Reason = status == PlanVerificationStatus.Failed ? "시뮬레이터 불일치: " + reason : reason,
+                Reason = status == PlanVerificationStatus.Failed ? Tr("시뮬레이터 불일치: {0}", reason) : reason,
             };
 
         /// <summary>
@@ -105,8 +106,8 @@ namespace SephPlanner.Plugin
                 if (LookupLevel(inv, (sbyte)position.X, (sbyte)position.Y) != 0) return "";
             }
 
-            return $" - 게임이 계산한 가방 효과가 비어 있습니다(석판 {view.Tablets.Count}개가 전부 비적용, " +
-                   "칸 레벨도 전부 0). 동기화 중이면 곧 사라지고, 계속 남으면 방을 나갔다 들어오세요.";
+            return " - " + Tr("게임이 계산한 가방 효과가 비어 있습니다(석판 {0}개가 전부 비적용, 칸 레벨도 전부 0). 동기화 중이면 곧 사라지고, 계속 남으면 방을 나갔다 들어오세요.",
+                view.Tablets.Count);
         }
 
         private static string CompareMatrices(GridInventory inv, InventoryView view, SimulationResult result)
@@ -118,19 +119,19 @@ namespace SephPlanner.Plugin
                 var ours = result.EffectiveLevel(position, enchant);
                 var theirs = LookupLevel(inv, (sbyte)position.X, (sbyte)position.Y);
                 if (ours != theirs)
-                    return $"칸 {position} 레벨 {ours} != 게임 {theirs} (인챈트 {enchant})";
+                    return Tr("칸 {0} 레벨 {1} != 게임 {2} (인챈트 {3})", position, ours, theirs, enchant);
 
                 // 레벨 0인 칸도 배수·제한 해제가 맞아야 옮긴 뒤의 결과를 믿을 수 있다.
                 inv.multiplyLevelMatrix.TryGetValue(new ItemPosition((sbyte)position.X, (sbyte)position.Y), out var multiplier);
                 if (result.MultiplierAt(position) != multiplier)
-                    return $"칸 {position} 배수 {result.MultiplierAt(position)} != 게임 {multiplier}";
+                    return Tr("칸 {0} 배수 {1} != 게임 {2}", position, result.MultiplierAt(position), multiplier);
                 inv.ignoreCriteriaMatrix.TryGetValue(new ItemPosition((sbyte)position.X, (sbyte)position.Y), out var ignore);
                 if (result.IgnoreCriteriaAt(position) != ignore)
-                    return $"칸 {position} 제한 해제 {result.IgnoreCriteriaAt(position)} != 게임 {ignore}";
+                    return Tr("칸 {0} 제한 해제 {1} != 게임 {2}", position, result.IgnoreCriteriaAt(position), ignore);
 
                 var disabled = LookupDisabled(inv, (sbyte)position.X, (sbyte)position.Y);
                 if (result.IsDisabled(position) != disabled)
-                    return $"칸 {position} 비활성 {result.IsDisabled(position)} != 게임 {disabled}";
+                    return Tr("칸 {0} 비활성 {1} != 게임 {2}", position, result.IsDisabled(position), disabled);
             }
             return null;
         }

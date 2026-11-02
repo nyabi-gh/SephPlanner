@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Solver;
+using SephPlanner.Core.Text;
 
 namespace SephPlanner.Core.Runtime
 {
@@ -99,6 +100,7 @@ namespace SephPlanner.Core.Runtime
             public string PlacementFingerprint = "";
             public string PlanningContextFingerprint = "";
             public string CatalogGeneration = "";
+            public Language Language;
             public Plan? Previous;
 
             /// <summary>요청이 들어온 때. 여기서 게시까지가 사용자가 기다리는 시간이다.</summary>
@@ -175,6 +177,8 @@ namespace SephPlanner.Core.Runtime
         private PlanPreferences _preferences = PlanPreferences.None;
         private string _catalogGeneration = "";
         private string _contextFingerprint = "";
+        private Language _language;
+        private Language _replayLanguage;
         private string _placementFingerprint = "";
         private string _fullFingerprint = "";
 
@@ -306,7 +310,8 @@ namespace SephPlanner.Core.Runtime
             if (snapshot is null) throw new ArgumentNullException(nameof(snapshot));
             if (preferences is null) throw new ArgumentNullException(nameof(preferences));
 
-            var contextFingerprint = PlanFingerprint.PlanningContext(preferences, catalogGeneration);
+            var language = Localization.Current;
+            var contextFingerprint = PlanFingerprint.PlanningContext(preferences, catalogGeneration, language);
             var placementFingerprint = PlanFingerprint.Placement(snapshot, contextFingerprint);
             var fingerprint = PlanFingerprint.Full(snapshot, preferences, catalogGeneration, placementFingerprint);
 
@@ -320,6 +325,7 @@ namespace SephPlanner.Core.Runtime
                 _preferences = preferences;
                 _catalogGeneration = catalogGeneration;
                 _contextFingerprint = contextFingerprint;
+                _language = language;
 
                 if (placementFingerprint != _placementFingerprint)
                 {
@@ -444,6 +450,7 @@ namespace SephPlanner.Core.Runtime
                         _replayPreviousTargets ?? new System.Collections.Generic.List<PlanTarget>()),
                     Settled = _replaySettled,
                     Expected = ReplayResult.From(_latest),
+                    Language = _replayLanguage == Language.Korean ? null : Localization.Code(_replayLanguage),
                 };
             }
         }
@@ -495,6 +502,7 @@ namespace SephPlanner.Core.Runtime
                     PlacementFingerprint = _placementFingerprint,
                     PlanningContextFingerprint = _contextFingerprint,
                     CatalogGeneration = _catalogGeneration,
+                    Language = _language,
                     Previous = _latest,
                     RequestedAt = _placementRequestedAt,
                     Settled = _settled,
@@ -516,6 +524,7 @@ namespace SephPlanner.Core.Runtime
                 PlacementFingerprint = _placementFingerprint,
                 PlanningContextFingerprint = _contextFingerprint,
                 CatalogGeneration = _catalogGeneration,
+                Language = _language,
             });
         }
 
@@ -621,6 +630,7 @@ namespace SephPlanner.Core.Runtime
             _latest = plan;
             _replaySnapshot = request.Snapshot;
             _replayPreferences = request.Preferences;
+            _replayLanguage = request.Language;
             _replayPreviousTargets = new System.Collections.Generic.List<PlanTarget>(
                 request.Previous?.Targets ?? new System.Collections.Generic.List<PlanTarget>());
             _replaySettled = request.Settled;
@@ -665,6 +675,7 @@ namespace SephPlanner.Core.Runtime
             plan.RequestFingerprint = request.Fingerprint;
             _replaySnapshot = request.Snapshot;
             _replayPreferences = request.Preferences;
+            _replayLanguage = request.Language;
             _latest = plan;
             _advicePublished = request.Generation;
         }

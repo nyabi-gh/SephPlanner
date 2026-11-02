@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Tablets;
+using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Core.Planning
 {
@@ -39,7 +40,7 @@ namespace SephPlanner.Core.Planning
                 if (from == item.To) continue;
                 occupied.TryGetValue(item.To, out var displaced);
                 moves.Add(new Move(item.Name, from, item.To, displaced != null
-                    ? $"{from} ↔ {item.To} 교환 ({displaced.Name})"
+                    ? Tr("{0} ↔ {1} 교환 ({2})", from, item.To, displaced.Name)
                     : $"{from} → {item.To}"));
                 occupied.Remove(from);
                 if (displaced != null)
@@ -55,7 +56,7 @@ namespace SephPlanner.Core.Planning
             {
                 if (item.FromRotation != item.ToRotation)
                     moves.Add(new Move(item.Name, item.To, item.To,
-                        $"{item.To} 회전 {item.FromRotation} → {item.ToRotation}"));
+                        Tr("{0} 회전 {1} → {2}", item.To, item.FromRotation, item.ToRotation)));
             }
             complete = true;
             return moves;

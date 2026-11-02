@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using SephPlanner.Core.Runtime;
 using TMPro;
 using UnityEngine;
+using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Plugin.Ui
 {
@@ -33,7 +34,7 @@ namespace SephPlanner.Plugin.Ui
             _cancel = cancel;
         }
 
-        protected override string Title => "문제 진단 메모";
+        protected override string Title => Tr("문제 진단 메모");
         protected override float WidthRatio => 34f;
         protected override GameObject DefaultFocus => _input == null ? null : _input.gameObject;
 
@@ -49,7 +50,7 @@ namespace SephPlanner.Plugin.Ui
         protected override void BuildBody(RectTransform content)
         {
             var ask = Widgets.Paragraph("Ask", content, Skin, S(0.85f), NativeSkin.Text);
-            ask.text = "무엇이 이상했는지 알려 주시면 훨씬 빨리 찾습니다. 적지 않고 보내도 되고, 취소하면 이번 진단은 보내지 않고 이 PC에만 남습니다.";
+            ask.text = Tr("무엇이 이상했는지 알려 주시면 훨씬 빨리 찾습니다. 적지 않고 보내도 되고, 취소하면 이번 진단은 보내지 않고 이 PC에만 남습니다.");
             Widgets.FitHeight(ask, Widgets.Fixed(ask.rectTransform, S(1f)), S(WidthRatio - 2f));
 
             BuildCategories(content);
@@ -57,7 +58,7 @@ namespace SephPlanner.Plugin.Ui
 
             _input = Widgets.Input("Note", content, Skin, S(0.85f), DiagnosticNote.MaximumTextLength, S(0.4f));
             Widgets.Fixed(_input.GetComponent<RectTransform>(), S(5.5f));
-            ((TextMeshProUGUI)_input.placeholder).text = "예: 자물쇠가 F8 마다 다른 자리로 갑니다 (선택)";
+            ((TextMeshProUGUI)_input.placeholder).text = Tr("예: 자물쇠가 F8 마다 다른 자리로 갑니다 (선택)");
             _input.onValueChanged.AddListener(_ => UpdateCount());
             _input.onSubmit.AddListener(_ => Send());
 
@@ -67,10 +68,10 @@ namespace SephPlanner.Plugin.Ui
             var row = Widgets.Rect("Actions", content);
             Widgets.Row(row, S(0.5f));
             var send = Widgets.Clickable("Send", row, Skin, S(0.85f), NativeSkin.Mint, Send);
-            send.text = "보내기 (Enter)";
+            send.text = Tr("보내기 (Enter)");
             Widgets.Fixed(send.rectTransform, S(1.8f), S(13f));
             var cancel = Widgets.Clickable("Cancel", row, Skin, S(0.85f), NativeSkin.Text, Cancel);
-            cancel.text = "전송 안 함 (ESC)";
+            cancel.text = Tr("전송 안 함 (ESC)");
             Widgets.Fixed(cancel.rectTransform, S(1.8f), S(13f));
 
             UpdateCount();

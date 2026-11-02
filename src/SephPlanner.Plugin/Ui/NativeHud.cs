@@ -10,6 +10,7 @@ using SephPlanner.Core.Tablets;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Plugin.Ui
 {
@@ -225,11 +226,11 @@ namespace SephPlanner.Plugin.Ui
 
             var detail = Mathf.Min(S(12f), _inner * 0.55f);
             BuildGrid(_detail);
-            _moves = new Section(_detail, _skin, _base, "옮길 것", NativeSkin.TextDim, MoveRows, detail);
+            _moves = new Section(_detail, _skin, _base, Tr("옮길 것"), NativeSkin.TextDim, MoveRows, detail);
             BuildOffers(_detail, detail);
-            _mixes = new Section(_detail, _skin, _base, "석판 합성기", NativeSkin.Mint, MixRows, detail);
-            _enchants = new Section(_detail, _skin, _base, "인챈트", NativeSkin.Mint, EnchantRows, detail);
-            _discards = new Section(_detail, _skin, _base, "하나 빼기 검토 · 자동 제거 안 함", NativeSkin.Mint, 3, detail);
+            _mixes = new Section(_detail, _skin, _base, Tr("석판 합성기"), NativeSkin.Mint, MixRows, detail);
+            _enchants = new Section(_detail, _skin, _base, Tr("인챈트"), NativeSkin.Mint, EnchantRows, detail);
+            _discards = new Section(_detail, _skin, _base, Tr("하나 빼기 검토 · 자동 제거 안 함"), NativeSkin.Mint, 3, detail);
             _chips = Widgets.Paragraph("Chips", _detail, _skin, S(0.8f), NativeSkin.TextDim);
             _chips.richText = true;
             _chipSize = Widgets.Fixed(_chips.rectTransform, S(1.1f));
@@ -342,7 +343,7 @@ namespace SephPlanner.Plugin.Ui
         private void BuildOffers(RectTransform parent, float detail)
         {
             _offers = new Section(
-                parent, _skin, _base, "지금 집을 수 있는 것", NativeSkin.Mint, OfferRows, detail);
+                parent, _skin, _base, Tr("지금 집을 수 있는 것"), NativeSkin.Mint, OfferRows, detail);
 
             // 순위를 그대로 믿으면 안 된다는 것은 늘 보여야 한다. 머리글 바로 밑이라야 목록을
             // 읽기 전에 눈에 들어온다.
@@ -433,23 +434,23 @@ namespace SephPlanner.Plugin.Ui
             var score = previewed?.Preview.Score ?? plan.Best.Score;
             var gain = score - plan.Current.Score;
             _score.text = previewed != null
-                ? $"추정 점수: 현재 {plan.Current.Score:0.#} → 획득 후 {score:0.#}"
-                : $"추정 점수: 현재 {plan.Current.Score:0.#} → 제안 {score:0.#}";
-            Hover(_score.rectTransform, "배치 평가 점수", () =>
-                "배치를 비교하기 위한 점수이며 실제 피해량은 아닙니다. 빌드 설정에 따라 달라지며, 점수가 낮아져도 지정한 효과나 콤보를 먼저 지킬 수 있습니다.");
+                ? Tr("추정 점수: 현재 {0:0.#} → 획득 후 {1:0.#}", plan.Current.Score, score)
+                : Tr("추정 점수: 현재 {0:0.#} → 제안 {1:0.#}", plan.Current.Score, score);
+            Hover(_score.rectTransform, Tr("배치 평가 점수"), () =>
+                Tr("배치를 비교하기 위한 점수이며 실제 피해량은 아닙니다. 빌드 설정에 따라 달라지며, 점수가 낮아져도 지정한 효과나 콤보를 먼저 지킬 수 있습니다."));
             _gain.text = gain > 0.001 ? $"+{gain:0.#}" : gain < -0.001 ? $"{gain:0.#}" :
-                previewed == null && plan.HasPlacementChanges ? "배치 정리" : "변경 없음";
+                previewed == null && plan.HasPlacementChanges ? Tr("배치 정리") : Tr("변경 없음");
             _gain.color = gain > 0.001 ? NativeSkin.Good : gain < -0.001 ? NativeSkin.Bad : NativeSkin.TextDim;
             if (previewed == null && plan.HasPlacementChanges)
             {
                 if (plan.Best.UnpreservedCharms.Count < plan.Current.UnpreservedCharms.Count)
                 {
-                    _gain.text = $"효과 유지 ({gain:+0.#;-0.#;0})";
+                    _gain.text = Tr("효과 유지 ({0:+0.#;-0.#;0})", gain);
                     _gain.color = NativeSkin.Mint;
                 }
                 else if (Math.Abs(gain) <= 0.001 && plan.Best.UnsafeEmptyCells < plan.Current.UnsafeEmptyCells)
                 {
-                    _gain.text = "불리한 칸 먼저 채우기";
+                    _gain.text = Tr("불리한 칸 먼저 채우기");
                     _gain.color = NativeSkin.Mint;
                 }
             }
@@ -457,21 +458,21 @@ namespace SephPlanner.Plugin.Ui
                 (plan.Best.PriorityComboMatches > plan.Current.PriorityComboMatches ||
                  plan.Best.PriorityComboProgress > plan.Current.PriorityComboProgress))
             {
-                _gain.text = $"지정 콤보 우선 ({gain:+0.#;-0.#;0})";
+                _gain.text = Tr("지정 콤보 우선 ({0:+0.#;-0.#;0})", gain);
                 _gain.color = NativeSkin.Mint;
             }
 
             if (previewed == null && plan.HasPlacementChanges &&
                 plan.Best.SupportTargetMatches > plan.Current.SupportTargetMatches)
             {
-                _gain.text = $"침·모래시계·별조각 우선 ({gain:+0.#;-0.#;0})";
+                _gain.text = Tr("침·모래시계·별조각 우선 ({0:+0.#;-0.#;0})", gain);
                 _gain.color = NativeSkin.Mint;
             }
 
             if (previewed == null && plan.HasPlacementChanges &&
                 plan.Best.UnretainedCharms.Count < plan.Current.UnretainedCharms.Count)
             {
-                _gain.text = $"사용 유지 우선 ({gain:+0.#;-0.#;0})";
+                _gain.text = Tr("사용 유지 우선 ({0:+0.#;-0.#;0})", gain);
                 _gain.color = NativeSkin.Mint;
             }
 
@@ -502,8 +503,8 @@ namespace SephPlanner.Plugin.Ui
             else
             {
                 _moves.Begin();
-                _moves.Add("획득 후 예상 배치", previewed.Candidate.Name, NativeSkin.Mint);
-                _moves.Add("자동 배치", "미리보기를 종료한 뒤 실행하세요.", NativeSkin.TextDim);
+                _moves.Add(Tr("획득 후 예상 배치"), previewed.Candidate.Name, NativeSkin.Mint);
+                _moves.Add(Tr("자동 배치"), Tr("미리보기를 종료한 뒤 실행하세요."), NativeSkin.TextDim);
                 _moves.End();
             }
             RenderOffers(plan, frame, previewed);
@@ -608,13 +609,13 @@ namespace SephPlanner.Plugin.Ui
 
             // 아래 경고들이 전부 이 계획을 근거로 하므로 낡았다는 것이 먼저 와야 한다.
             if (stale)
-                warnings.Add("갱신 중 - 가방이 바뀌어 다시 계산하고 있습니다. 아래는 직전 계획입니다.");
+                warnings.Add(Tr("갱신 중 - 가방이 바뀌어 다시 계산하고 있습니다. 아래는 직전 계획입니다."));
 
             if (!queryVerified)
-                warnings.Add("석판 효과 계산을 검증하지 못해 자동 배치를 사용할 수 없습니다. ‘아이템 데이터 다시 읽기’(기본 F9)를 실행하세요.");
+                warnings.Add(Tr("석판 효과 계산을 검증하지 못해 자동 배치를 사용할 수 없습니다. ‘아이템 데이터 다시 읽기’(기본 F9)를 실행하세요."));
 
             if (plan.Best.UnplacedTablets > 0)
-                warnings.Add($"석판 {plan.Best.UnplacedTablets}개는 놓을 자리가 없어 계산에서 빠졌습니다.");
+                warnings.Add(Tr("석판 {0}개는 놓을 자리가 없어 계산에서 빠졌습니다.", plan.Best.UnplacedTablets));
 
             if (!plan.Verification.Passed)
                 warnings.Add(plan.Verification.Reason);
@@ -625,16 +626,16 @@ namespace SephPlanner.Plugin.Ui
                 warnings.Add(runtimeVerificationReason);
 
             if (unexplainedFixedCells > 0)
-                warnings.Add($"가방에 이유를 알 수 없는 칸 효과 {unexplainedFixedCells}칸이 있어 게임에 보이는 값 그대로 계산했습니다.");
+                warnings.Add(Tr("가방에 이유를 알 수 없는 칸 효과 {0}칸이 있어 게임에 보이는 값 그대로 계산했습니다.", unexplainedFixedCells));
 
             if (!plan.ManualMoveInstructionsAvailable)
-                warnings.Add("목표 배치가 유효하지 않아 수동 이동 순서를 만들 수 없습니다.");
+                warnings.Add(Tr("목표 배치가 유효하지 않아 수동 이동 순서를 만들 수 없습니다."));
 
             if (plan.SkippedOffers > 0)
-                warnings.Add($"선택지가 많아 {plan.SkippedOffers}개는 평가하지 못했습니다.");
+                warnings.Add(Tr("선택지가 많아 {0}개는 평가하지 못했습니다.", plan.SkippedOffers));
 
             if (plan.Best.UnheldCharms.Count > 0)
-                warnings.Add($"배치 조건을 무시하는 칸이 모자라 ‘조건 무시 칸’ 지정 {plan.Best.UnheldCharms.Count}개를 지키지 못했습니다.");
+                warnings.Add(Tr("배치 조건을 무시하는 칸이 모자라 ‘조건 무시 칸’ 지정 {0}개를 지키지 못했습니다.", plan.Best.UnheldCharms.Count));
 
             warnings.AddRange(plan.ComboPlacementWarnings);
             warnings.AddRange(plan.RetentionWarnings);
@@ -645,8 +646,8 @@ namespace SephPlanner.Plugin.Ui
             if (snapshot.IsMultiplayer)
             {
                 warnings.Add(multiplayerAutoPlace
-                    ? "멀티플레이 세션 - 자동 배치 허용됨. 같이 하는 사람의 동의를 받으세요."
-                    : "멀티플레이 세션 - 제안만 표시합니다.");
+                    ? Tr("멀티플레이 세션 - 자동 배치 허용됨. 같이 하는 사람의 동의를 받으세요.")
+                    : Tr("멀티플레이 세션 - 제안만 표시합니다."));
             }
             return string.Join("\n", warnings);
         }
@@ -697,7 +698,7 @@ namespace SephPlanner.Plugin.Ui
                     cell.SetTablet(
                         name, rotation, marked.Contains(position),
                         IconOf(tablet.Definition.EntityId));
-                    Hover(cell.Rect, name, () => "회전 " + rotation * 90 + "°");
+                    Hover(cell.Rect, name, () => Tr("회전 {0}°", rotation * 90));
                 }
                 else if (levels.TryGetValue(position, out var level))
                 {
@@ -733,34 +734,35 @@ namespace SephPlanner.Plugin.Ui
                 // 첫 줄은 쪽지의 제목으로 올라간다.
                 lines.RemoveAt(0);
                 if (definition?.HasNoActivationEffect == true)
-                    lines.Add("불리한 칸을 다른 아이템 대신 채울 수 있습니다.");
+                    lines.Add(Tr("불리한 칸을 다른 아이템 대신 채울 수 있습니다."));
                 if (pinned > 0)
                 {
                     lines.Add(
-                        $"강화칸 우선 {new string('★', pinned)}: 좋은 강화칸을 먼저 받도록 배치합니다." +
+                        Tr("강화칸 우선 {0}: 좋은 강화칸을 먼저 받도록 배치합니다.", new string('★', pinned)) +
                         (reason == CharmInactiveReason.Weapon
-                            ? " 꺼져 있어도 자리는 이 지정대로 잡습니다."
+                            ? Tr(" 꺼져 있어도 자리는 이 지정대로 잡습니다.")
                             : ""));
                 }
                 else if (pinned < 0)
                 {
                     lines.Add(
-                        $"강화칸 양보 {string.Concat(System.Linq.Enumerable.Repeat(_skin.YieldMark, -pinned))}: 좋은 강화칸을 다른 아이템에 양보합니다. 효과를 끄거나 침 연결을 막지는 않습니다.");
+                        Tr("강화칸 양보 {0}: 좋은 강화칸을 다른 아이템에 양보합니다. 효과를 끄거나 침 연결을 막지는 않습니다.",
+                            string.Concat(System.Linq.Enumerable.Repeat(_skin.YieldMark, -pinned))));
                 }
                 if (frame.Prefs != null && frame.Prefs.IsRetained(charmId))
-                    lines.Add("사용 유지: 효과와 연결을 지키며, 빼거나 교체하라는 추천을 하지 않습니다.");
+                    lines.Add(Tr("사용 유지: 효과와 연결을 지키며, 빼거나 교체하라는 추천을 하지 않습니다."));
                 if (frame.Prefs != null && frame.Prefs.IsHeld(charmId))
-                    lines.Add("조건 무시 칸: 배치 조건을 무시해 주는 칸에 놓습니다.");
+                    lines.Add(Tr("조건 무시 칸: 배치 조건을 무시해 주는 칸에 놓습니다."));
                 if (frame.Prefs != null && frame.Prefs.IsSupportTarget(charmId))
-                    lines.Add("침·모래시계·별조각 우선: 이 아이템에 먼저 붙입니다.");
+                    lines.Add(Tr("침·모래시계·별조각 우선: 이 아이템에 먼저 붙입니다."));
                 if (frame.Prefs != null && frame.Prefs.IsDeactivationAllowed(charmId))
-                    lines.Add("끄기 허용: 배치 이득이 있으면 효과를 꺼도 됩니다. 항상 끄지는 않으며 사용 유지가 함께 켜져 있으면 효과를 유지합니다.");
+                    lines.Add(Tr("끄기 허용: 배치 이득이 있으면 효과를 꺼도 됩니다. 항상 끄지는 않으며 사용 유지가 함께 켜져 있으면 효과를 유지합니다."));
                 if (frame.Prefs?.LevelCap(charmId) is int cap)
                     lines.Add(cap == PlanPreferences.ComboOnly
-                        ? "콤보만: 효과가 꺼져도 콤보 수만 채우고, 좋은 강화칸은 다른 아이템에 양보합니다."
+                        ? Tr("콤보만: 효과가 꺼져도 콤보 수만 채우고, 좋은 강화칸은 다른 아이템에 양보합니다.")
                         : cap == 0
-                        ? "강화 양보 기준: 효과만 켜 두고 강화칸은 다른 아이템에 양보합니다. 남는 칸이면 더 높은 레벨에도 놓일 수 있습니다."
-                        : $"강화 양보 기준: {cap}레벨을 넘는 강화칸은 다른 아이템에 양보합니다. 남는 칸이면 더 높은 레벨에도 놓일 수 있습니다.");
+                        ? Tr("강화 양보 기준: 효과만 켜 두고 강화칸은 다른 아이템에 양보합니다. 남는 칸이면 더 높은 레벨에도 놓일 수 있습니다.")
+                        : Tr("강화 양보 기준: {0}레벨을 넘는 강화칸은 다른 아이템에 양보합니다. 남는 칸이면 더 높은 레벨에도 놓일 수 있습니다.", cap));
                 return Explain.Join(lines);
             });
         }
@@ -781,7 +783,7 @@ namespace SephPlanner.Plugin.Ui
             _moves.Begin();
             if (!plan.ManualMoveInstructionsAvailable)
             {
-                _moves.Add("수동 이동 불가", "목표 배치를 다시 계산해야 합니다.", NativeSkin.Amber);
+                _moves.Add(Tr("수동 이동 불가"), Tr("목표 배치를 다시 계산해야 합니다."), NativeSkin.Amber);
                 _moves.End();
                 return;
             }
@@ -790,7 +792,7 @@ namespace SephPlanner.Plugin.Ui
                 var move = plan.Moves[i];
                 var last = i == MoveRows - 1 && plan.Moves.Count > MoveRows;
                 _moves.Add(
-                    last ? $"… 외 {plan.Moves.Count - MoveRows + 1}개" : move.Label,
+                    last ? Tr("… 외 {0}개", plan.Moves.Count - MoveRows + 1) : move.Label,
                     last ? "" : move.Detail,
                     NativeSkin.Text);
             }
@@ -831,10 +833,10 @@ namespace SephPlanner.Plugin.Ui
             var pending = plan.Offers.Count == 0 && frame.AdviceBusy &&
                           frame.Snapshot != null && frame.Snapshot.Offers.Count > 0;
             _offerNotice.text = pending
-                ? "후보를 계산하고 있습니다."
+                ? Tr("후보를 계산하고 있습니다.")
                 : guessed > 0
-                    ? "효과를 충분히 비교하지 못한 아이템이 있습니다. 실제 체감도 함께 고려하세요."
-                    : "순위는 참고용입니다.";
+                    ? Tr("효과를 충분히 비교하지 못한 아이템이 있습니다. 실제 체감도 함께 고려하세요.")
+                    : Tr("순위는 참고용입니다.");
             Widgets.SetActive(_offerNotice, plan.Offers.Count > 0 || pending);
         }
 
@@ -851,9 +853,9 @@ namespace SephPlanner.Plugin.Ui
         {
             var parts = new StringBuilder();
 
-            if (!advice.Available) return Tint("배치 못 찾음", NativeSkin.Bad);
+            if (!advice.Available) return Tint(Tr("배치 못 찾음"), NativeSkin.Bad);
 
-            if (advice.MatchesPreset) parts.Append(Tint("빌드", NativeSkin.Mint)).Append("  ");
+            if (advice.MatchesPreset) parts.Append(Tint(Tr("빌드"), NativeSkin.Mint)).Append("  ");
 
             if (advice.ComboText.Length > 0)
             {
@@ -869,7 +871,7 @@ namespace SephPlanner.Plugin.Ui
             if (advice.Candidate.Price > 0)
             {
                 parts.Append(Tint(
-                    advice.Candidate.Price + "골드",
+                    Tr("{0}골드", advice.Candidate.Price),
                     advice.Affordable ? NativeSkin.TextDim : NativeSkin.Bad)).Append("  ");
             }
 
@@ -890,17 +892,16 @@ namespace SephPlanner.Plugin.Ui
             _discards.Begin();
             foreach (var advice in plan.Discards)
             {
-                var row = _discards.Add(advice.Name, $"제외 후 재배치 +{advice.Gain:0.#}", NativeSkin.Text);
+                var row = _discards.Add(advice.Name, Tr("제외 후 재배치 +{0:0.#}", advice.Gain), NativeSkin.Text);
                 Hover(row, advice.Name, () =>
-                    $"현재 위치: {advice.Position.X + 1}열 {advice.Position.Y + 1}행\n" +
-                    "직접 뺀 뒤 자동 배치를 실행하세요. 자동 배치가 아이템을 제거하지는 않습니다.\n" +
-                    "콤보 단계가 유지되는 후보입니다. 실제 체감과 다를 수 있습니다." +
+                    Tr("현재 위치: {0}열 {1}행", advice.Position.X + 1, advice.Position.Y + 1) + "\n" +
+                    Tr("직접 뺀 뒤 자동 배치를 실행하세요. 자동 배치가 아이템을 제거하지는 않습니다.") + "\n" +
+                    Tr("콤보 단계가 유지되는 후보입니다. 실제 체감과 다를 수 있습니다.") +
                     (advice.SoonGain.HasValue
-                        ? $"\n가방이 한 칸 더 열려도 여전히 이득입니다({advice.SoonGain.Value:+0.#;-0.#;0}). "
-                          + "그렇지 않은 것은 목록에서 뺐습니다."
+                        ? "\n" + Tr("가방이 한 칸 더 열려도 여전히 이득입니다({0:+0.#;-0.#;0}). 그렇지 않은 것은 목록에서 뺐습니다.", advice.SoonGain.Value)
                         : "") +
-                    (advice.ReducesComboCount ? "\n콤보 개수는 줄어 다음 단계가 멀어질 수 있습니다." : "") +
-                    (advice.Activated.Count > 0 ? "\n켜지는 아티팩트: " + string.Join(", ", advice.Activated) : ""));
+                    (advice.ReducesComboCount ? "\n" + Tr("콤보 개수는 줄어 다음 단계가 멀어질 수 있습니다.") : "") +
+                    (advice.Activated.Count > 0 ? "\n" + Tr("켜지는 아티팩트: {0}", string.Join(", ", advice.Activated)) : ""));
             }
             _discards.End();
             Widgets.SetActive(_discards.Root, visible && plan.Discards.Count > 0);
@@ -926,7 +927,7 @@ namespace SephPlanner.Plugin.Ui
                         advice.Gain > 0.001 ? NativeSkin.Good : NativeSkin.TextDim),
                     NativeSkin.Text);
                 Hover(row, advice.Name,
-                    () => $"현재 위치: {advice.Position.X + 1}열 {advice.Position.Y + 1}행\n"
+                    () => Tr("현재 위치: {0}열 {1}행", advice.Position.X + 1, advice.Position.Y + 1) + "\n"
                           + Explain.Join(Explain.Enchant(advice)),
                     planDrawn ? EnchantBadges(plan, advice) : null);
             }
@@ -934,12 +935,12 @@ namespace SephPlanner.Plugin.Ui
             {
                 // 조언은 배치보다 뒤에 붙는다. 그 사이에 "없음" 이라고 하면 거짓말이 된다.
                 if (adviceBusy)
-                    _enchants.Add("계산 중", "인챈트 추천을 계산하고 있습니다.", NativeSkin.TextDim);
+                    _enchants.Add(Tr("계산 중"), Tr("인챈트 추천을 계산하고 있습니다."), NativeSkin.TextDim);
                 else
-                    _enchants.Add("추천 대상 없음", chance == null ? "제단 정보를 읽는 중입니다." :
-                        !chance.Available ? "제단에서 떨어져 있어 아직 계산하지 않았습니다. 가까이 가면 계산합니다." :
-                        "인챈트로 값이 오르는 아티팩트를 찾지 못했습니다. 인챈트가 이미 상한에 "
-                        + "닿았거나, 올려도 효과에 반영되지 않는 자리입니다.", NativeSkin.TextDim);
+                    _enchants.Add(Tr("추천 대상 없음"), chance == null ? Tr("제단 정보를 읽는 중입니다.") :
+                        !chance.Available ? Tr("제단에서 떨어져 있어 아직 계산하지 않았습니다. 가까이 가면 계산합니다.") :
+                        Tr("인챈트로 값이 오르는 아티팩트를 찾지 못했습니다. 인챈트가 이미 상한에 닿았거나, 올려도 효과에 반영되지 않는 자리입니다."),
+                        NativeSkin.TextDim);
             }
             _enchants.End();
 
@@ -971,12 +972,12 @@ namespace SephPlanner.Plugin.Ui
             {
                 // 조언은 배치보다 뒤에 붙는다. 그 사이에 "없음" 이라고 하면 거짓말이 된다.
                 if (adviceBusy)
-                    _mixes.Add("계산 중", "합성 추천을 계산하고 있습니다.", NativeSkin.TextDim);
+                    _mixes.Add(Tr("계산 중"), Tr("합성 추천을 계산하고 있습니다."), NativeSkin.TextDim);
                 else
-                    _mixes.Add("추천 조합 없음", mixer == null ? "합성기 정보를 읽는 중입니다." :
-                        mixer.Used ? "이 합성기는 이미 사용했습니다." :
-                        mixer.Near == false ? "합성기에서 떨어져 있어 아직 계산하지 않았습니다. 가까이 가면 계산합니다." :
-                        "현재 석판에서 추천할 수 있는 조합을 찾지 못했습니다.", NativeSkin.TextDim);
+                    _mixes.Add(Tr("추천 조합 없음"), mixer == null ? Tr("합성기 정보를 읽는 중입니다.") :
+                        mixer.Used ? Tr("이 합성기는 이미 사용했습니다.") :
+                        mixer.Near == false ? Tr("합성기에서 떨어져 있어 아직 계산하지 않았습니다. 가까이 가면 계산합니다.") :
+                        Tr("현재 석판에서 추천할 수 있는 조합을 찾지 못했습니다."), NativeSkin.TextDim);
             }
             _mixes.End();
 
@@ -1276,7 +1277,7 @@ namespace SephPlanner.Plugin.Ui
 
                 if (reason != CharmInactiveReason.None)
                 {
-                    _level.text = star + "꺼짐";
+                    _level.text = star + Tr("꺼짐");
                     _level.color = NativeSkin.Bad;
                     return;
                 }

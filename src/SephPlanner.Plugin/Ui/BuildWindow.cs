@@ -10,6 +10,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
+using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Plugin.Ui
 {
@@ -79,7 +80,7 @@ namespace SephPlanner.Plugin.Ui
             _source = source;
         }
 
-        protected override string Title => "SephPlanner 빌드";
+        protected override string Title => Tr("SephPlanner 빌드");
         protected override float WidthRatio => 38f;
         protected override GameObject DefaultFocus =>
             _presetButton != null ? _presetButton.gameObject : null;
@@ -124,12 +125,12 @@ namespace SephPlanner.Plugin.Ui
 
             _presetClear = Widgets.Clickable(
                 "Clear", row, Skin, S(0.95f), NativeSkin.TextDim, ClearPreset);
-            _presetClear.text = "코드 해제";
+            _presetClear.text = Tr("코드 해제");
             Widgets.Fixed(_presetClear.rectTransform, S(1.4f), S(5f));
 
             var reset = Widgets.Clickable(
                 "ResetBuild", row, Skin, S(0.95f), NativeSkin.TextDim, ResetBuild);
-            reset.text = "빌드 지정 초기화";
+            reset.text = Tr("빌드 지정 초기화");
             Widgets.Fixed(reset.rectTransform, S(1.4f), S(9f));
 
             _presetStatus = Widgets.Label("PresetStatus", content, Skin, S(0.75f), NativeSkin.TextDim);
@@ -142,8 +143,8 @@ namespace SephPlanner.Plugin.Ui
             Widgets.Row(row, S(0.6f));
             Widgets.Fixed(row, S(1.4f));
 
-            _comboTab = Tab_(row, "콤보 우선", Tab.Combos);
-            _charmTab = Tab_(row, "아티팩트 설정", Tab.Charms);
+            _comboTab = Tab_(row, Tr("콤보 우선"), Tab.Combos);
+            _charmTab = Tab_(row, Tr("아티팩트 설정"), Tab.Charms);
         }
 
         private TextMeshProUGUI Tab_(RectTransform row, string label, Tab tab)
@@ -253,7 +254,7 @@ namespace SephPlanner.Plugin.Ui
         private void RenderPreset()
         {
             var preset = _prefs.Preset();
-            _presetButton.text = preset == null ? "빌드 코드 붙여넣기" : "빌드 코드 바꾸기";
+            _presetButton.text = preset == null ? Tr("빌드 코드 붙여넣기") : Tr("빌드 코드 바꾸기");
             Widgets.SetActive(_presetClear, preset != null);
 
             if (_prefs.StorageMessage.Length > 0)
@@ -272,7 +273,7 @@ namespace SephPlanner.Plugin.Ui
 
             _presetStatus.text = preset != null
                 ? PluginPreferences.Summary(preset)
-                : "게임에서 빌드 코드를 복사한 뒤 누르세요.";
+                : Tr("게임에서 빌드 코드를 복사한 뒤 누르세요.");
             _presetStatus.color = NativeSkin.TextDim;
         }
 
@@ -283,11 +284,10 @@ namespace SephPlanner.Plugin.Ui
 
             if (_tab == Tab.Combos)
             {
-                _note.text = "원하는 콤보를 누르면 우선해서 맞춥니다. ●는 선택한 콤보입니다.\n"
-                    + "열쇠·종이·침은 강화칸보다 선택한 콤보를 먼저 맞춥니다. "
-                    + "양보한 아이템에도 콤보를 맞추려고 침이 붙을 수 있습니다.\n"
-                    + "특정 아이템에 먼저 침을 붙이려면 ‘아티팩트 설정’에서 ‘침·모래시계·별조각 우선’을 켜세요."
-                    + (_context.Recommendations ? "" : "\n획득·합성·인챈트·제거 추천은 꺼져 있지만 배치 지정은 적용됩니다.");
+                _note.text = Tr("원하는 콤보를 누르면 우선해서 맞춥니다. ●는 선택한 콤보입니다.") + "\n"
+                    + Tr("열쇠·종이·침은 강화칸보다 선택한 콤보를 먼저 맞춥니다. 양보한 아이템에도 콤보를 맞추려고 침이 붙을 수 있습니다.") + "\n"
+                    + Tr("특정 아이템에 먼저 침을 붙이려면 ‘아티팩트 설정’에서 ‘침·모래시계·별조각 우선’을 켜세요.")
+                    + (_context.Recommendations ? "" : "\n" + Tr("획득·합성·인챈트·제거 추천은 꺼져 있지만 배치 지정은 적용됩니다."));
                 _note.color = _context.Recommendations ? NativeSkin.TextDim : NativeSkin.Amber;
                 return;
             }
@@ -323,17 +323,17 @@ namespace SephPlanner.Plugin.Ui
             }
 
             _pageLabel.text = $"{_page + 1} / {LastPage + 1}";
-            _pageKeys.text = PadInput.InUse() ? "LB/RB" : "Q/E · 휠";
+            _pageKeys.text = PadInput.InUse() ? "LB/RB" : Tr("Q/E · 휠");
             Widgets.SetActive(_pager, _entries.Count > RowsPerPage);
 
             if (_entries.Count > 0) return;
 
             // 빈 목록은 아무 말도 하지 않는다. 왜 비었는지는 여기서만 알 수 있다.
             _note.text = _context.Plan == null
-                ? "탐험 중이 아닙니다."
+                ? Tr("탐험 중이 아닙니다.")
                 : _tab == Tab.Combos
-                    ? "가방에 콤보가 걸린 아티팩트가 없습니다."
-                    : "가방에 아티팩트가 없습니다.";
+                    ? Tr("가방에 콤보가 걸린 아티팩트가 없습니다.")
+                    : Tr("가방에 아티팩트가 없습니다.");
             _note.color = NativeSkin.TextDim;
         }
 
@@ -462,25 +462,22 @@ namespace SephPlanner.Plugin.Ui
         /// </summary>
         private string PinNote()
         {
-            var note = new StringBuilder("아이템 이름 좌클릭: 강화칸 우선 ");
+            var raise = new StringBuilder();
             for (var level = 1; level <= PlanPreferences.MaxPinLevel; level++)
-            {
-                note.Append(Marks(level)).Append(' ')
-                    .Append(PlanPreferences.WeightOf(level).ToString("0.##")).Append("배 → ");
-            }
-            note.Append("해제. 우클릭: 강화칸 양보 ");
+                raise.Append(PinStep(level));
+            var lower = new StringBuilder();
             for (var level = -1; level >= PlanPreferences.MinPinLevel; level--)
-            {
-                note.Append(Marks(level)).Append(' ')
-                    .Append(PlanPreferences.WeightOf(level).ToString("0.##")).Append("배 → ");
-            }
-            return note.Append("해제. 반대로 누르면 한 단계 되돌립니다. 게임 효과가 배로 커지는 것은 아닙니다.\n"
-                + "민트색 버튼은 켜진 설정입니다. 같은 종류의 아이템에 함께 적용됩니다.\n"
-                + "사용 유지: 효과와 연결을 지키며 빼거나 교체하라는 추천을 하지 않습니다. 끄기 허용: 다른 아이템에 이득이면 꺼져도 됩니다. 함께 켜면 사용 유지가 우선합니다.\n"
-                + "침·모래시계·별조각 우선: 콤보와 강화칸보다 먼저 이 아이템에 붙입니다.\n"
-                + "강화 양보 기준: 정한 레벨을 넘는 강화칸을 양보합니다. 남는 칸이면 더 높은 레벨에도 놓일 수 있습니다. 0은 효과만 사용하고, 콤보만은 효과가 꺼져도 콤보 수를 채웁니다. 좌클릭으로 올리고 우클릭으로 내립니다.\n"
-                + "조건 무시 칸: 배치 조건을 무시해 주는 칸에 놓습니다. 자리를 고정하지는 않습니다. 양보해도 효과를 끄거나 침 연결을 막지는 않습니다.").ToString();
+                lower.Append(PinStep(level));
+            return Tr("아이템 이름 좌클릭: 강화칸 우선 {0}해제. 우클릭: 강화칸 양보 {1}해제. 반대로 누르면 한 단계 되돌립니다. 게임 효과가 배로 커지는 것은 아닙니다.", raise.ToString(), lower.ToString()) + "\n"
+                + Tr("민트색 버튼은 켜진 설정입니다. 같은 종류의 아이템에 함께 적용됩니다.") + "\n"
+                + Tr("사용 유지: 효과와 연결을 지키며 빼거나 교체하라는 추천을 하지 않습니다. 끄기 허용: 다른 아이템에 이득이면 꺼져도 됩니다. 함께 켜면 사용 유지가 우선합니다.") + "\n"
+                + Tr("침·모래시계·별조각 우선: 콤보와 강화칸보다 먼저 이 아이템에 붙입니다.") + "\n"
+                + Tr("강화 양보 기준: 정한 레벨을 넘는 강화칸을 양보합니다. 남는 칸이면 더 높은 레벨에도 놓일 수 있습니다. 0은 효과만 사용하고, 콤보만은 효과가 꺼져도 콤보 수를 채웁니다. 좌클릭으로 올리고 우클릭으로 내립니다.") + "\n"
+                + Tr("조건 무시 칸: 배치 조건을 무시해 주는 칸에 놓습니다. 자리를 고정하지는 않습니다. 양보해도 효과를 끄거나 침 연결을 막지는 않습니다.");
         }
+
+        private string PinStep(int level) =>
+            Tr("{0} {1}배 → ", Marks(level), PlanPreferences.WeightOf(level).ToString("0.##"));
 
         /// <summary>단계를 기호로. 양수는 ★, 음수는 양보 표시를 단계 수만큼.</summary>
         private string Marks(int level) =>
@@ -544,7 +541,7 @@ namespace SephPlanner.Plugin.Ui
                     var entry = new Entry
                     {
                         EntityId = entityId,
-                        Name = string.IsNullOrEmpty(name) ? "아티팩트" : name,
+                        Name = string.IsNullOrEmpty(name) ? Tr("아티팩트") : name,
                         Count = 1,
                         Level = level,
                         LowestLevel = level,
@@ -577,9 +574,9 @@ namespace SephPlanner.Plugin.Ui
                 {
                     EntityId = entityId,
                     Name = definition != null
-                        ? Naming.Of(definition.Names, definition.Id, "아티팩트")
-                        : "아티팩트 #" + entityId,
-                    Detail = favorites.Contains(entityId) ? "빌드 · 가방에 없음" : "가방에 없음",
+                        ? Naming.Of(definition.Names, definition.Id, Tr("아티팩트"))
+                        : Tr("아티팩트 #{0}", entityId),
+                    Detail = favorites.Contains(entityId) ? Tr("빌드 · 가방에 없음") : Tr("가방에 없음"),
                     Selected = _prefs.IsPinned(entityId),
                     Mark = PinMark(_prefs.PinLevel(entityId)),
                     Held = _prefs.IsHeld(entityId),
@@ -604,7 +601,7 @@ namespace SephPlanner.Plugin.Ui
                 var entry = found[entityId];
                 if (entry.Detail.Length == 0)
                 {
-                    entry.Detail = (favorites.Contains(entityId) ? "빌드  " : "") +
+                    entry.Detail = (favorites.Contains(entityId) ? Tr("빌드") + "  " : "") +
                                    Explain.LevelRange(entry.LowestLevel, entry.Level) +
                                    (entry.Count > 1 ? "  x" + entry.Count : "");
                 }
@@ -656,7 +653,7 @@ namespace SephPlanner.Plugin.Ui
             }
             catch (Exception)
             {
-                _presetMessage = "클립보드를 읽지 못했습니다. 잠시 뒤 다시 눌러 보세요.";
+                _presetMessage = Tr("클립보드를 읽지 못했습니다. 잠시 뒤 다시 눌러 보세요.");
                 Refresh();
                 return;
             }
@@ -754,18 +751,18 @@ namespace SephPlanner.Plugin.Ui
                 Widgets.Row(_options, b * 0.3f);
                 Widgets.Fixed(_options, b * 1.3f);
                 _retain = Widgets.Clickable("Retain", _options, skin, b * 0.75f, NativeSkin.TextDim, () => onRetain(_entry));
-                _retain.text = "사용 유지";
+                _retain.text = Tr("사용 유지");
                 Widgets.Fixed(_retain.rectTransform, b * 1.3f, b * 4.2f);
                 _deactivation = Widgets.Clickable("Deactivation", _options, skin, b * 0.75f, NativeSkin.TextDim, () => onDeactivation(_entry));
-                _deactivation.text = "끄기 허용";
+                _deactivation.text = Tr("끄기 허용");
                 Widgets.Fixed(_deactivation.rectTransform, b * 1.3f, b * 4.2f);
                 _support = Widgets.Clickable("Support", _options, skin, b * 0.75f, NativeSkin.TextDim, () => onSupport(_entry));
-                _support.text = "침·모래시계·별조각 우선";
+                _support.text = Tr("침·모래시계·별조각 우선");
                 Widgets.Fixed(_support.rectTransform, b * 1.3f, b * 10.5f);
                 _cap = Widgets.Clickable("Cap", _options, skin, b * 0.75f, NativeSkin.TextDim, () => onCap(_entry, 1));
                 Widgets.Fixed(_cap.rectTransform, b * 1.3f, b * 5.2f);
                 _hold = Widgets.Clickable("Hold", _options, skin, b * 0.75f, NativeSkin.TextDim, () => onHold(_entry));
-                _hold.text = "조건 무시 칸";
+                _hold.text = Tr("조건 무시 칸");
                 _hold.alignment = TextAlignmentOptions.MidlineRight;
                 Widgets.Fixed(_hold.rectTransform, b * 1.3f, b * 6f);
             }
@@ -792,8 +789,8 @@ namespace SephPlanner.Plugin.Ui
                 _support.color = entry.SupportTarget ? NativeSkin.Mint : NativeSkin.TextDim;
                 Widgets.SetActive(_support, entry.EntityId != 0 && (entry.CanSupport || entry.SupportTarget));
                 _cap.text = entry.LevelCap is int cap
-                    ? cap == PlanPreferences.ComboOnly ? "콤보만" : cap + "레벨까지"
-                    : "강화 양보 기준";
+                    ? cap == PlanPreferences.ComboOnly ? Tr("콤보만") : Tr("{0}레벨까지", cap)
+                    : Tr("강화 양보 기준");
                 _cap.color = entry.LevelCap.HasValue ? NativeSkin.Mint : NativeSkin.TextDim;
                 Widgets.SetActive(_cap, entry.EntityId != 0);
                 _hold.color = entry.Held ? NativeSkin.Mint : NativeSkin.TextDim;

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using SephPlanner.Core.Model;
+using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Core.Tablets
 {
@@ -25,7 +26,7 @@ namespace SephPlanner.Core.Tablets
         public static string? FirstDifference(IReadOnlyList<QueryCell> cells, IReadOnlyList<AppliedTabletEffect> game)
         {
             if (cells.Count != game.Count)
-                return $"효과 칸 수 {cells.Count} != {game.Count}";
+                return Tr("효과 칸 수 {0} != {1}", cells.Count, game.Count);
 
             for (var i = 0; i < cells.Count; i++)
             {
@@ -33,11 +34,11 @@ namespace SephPlanner.Core.Tablets
                 var (kind, levelParam) = QueryValue.ReadEffect(cells[i].Value);
 
                 if (cells[i].Position != expected.Position)
-                    return $"효과 [{i}] 위치 불일치";
+                    return Tr("효과 [{0}] 위치 불일치", i);
                 if (kind != expected.Kind)
-                    return $"효과 [{i}] 종류 {kind} != {expected.Kind}";
+                    return Tr("효과 [{0}] 종류 {1} != {2}", i, kind, expected.Kind);
                 if (ReadsLevelParam(kind) && levelParam != expected.LevelParam)
-                    return $"효과 [{i}] 수치 {levelParam} != {expected.LevelParam}";
+                    return Tr("효과 [{0}] 수치 {1} != {2}", i, levelParam, expected.LevelParam);
             }
             return null;
         }

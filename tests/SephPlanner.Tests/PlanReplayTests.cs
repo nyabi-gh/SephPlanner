@@ -476,17 +476,17 @@ public sealed class PlanReplayTests : IDisposable
         return RoundTrip(runner.CaptureReplay()!);
     }
 
-    private static T RoundTrip<T>(T input) =>
+    internal static T RoundTrip<T>(T input) =>
         System.Text.Json.JsonSerializer.Deserialize<T>(JsonConvert.SerializeObject(input))!;
 
     /// <summary>배치와 조언 둘 다 끝날 때까지. 재현 자료는 조언까지 붙은 계획을 잡아야 한다.</summary>
-    private static void Await(PlanRunner runner) =>
+    internal static void Await(PlanRunner runner) =>
         Assert.True(
             SpinWait.SpinUntil(
                 () => runner.State.IsCurrent && runner.State.AdviceIsCurrent, TimeSpan.FromSeconds(10)),
             runner.State.Error ?? runner.State.AdviceError);
 
-    private static (Catalog Catalog, GameSnapshot Snapshot, PlanPreferences Preferences) Inputs()
+    internal static (Catalog Catalog, GameSnapshot Snapshot, PlanPreferences Preferences) Inputs()
     {
         var catalog = new Catalog(
             new[] { new TabletDefinition { EntityId = 2001, Id = "tablet", Query = "RIGHT 2", IsRotatable = true } },

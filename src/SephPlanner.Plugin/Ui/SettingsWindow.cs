@@ -7,6 +7,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Plugin.Ui
 {
@@ -71,7 +72,7 @@ namespace SephPlanner.Plugin.Ui
             _actions = actions;
         }
 
-        protected override string Title => "SephPlanner 설정";
+        protected override string Title => Tr("SephPlanner 설정");
         protected override float WidthRatio => 38f;
 
         /// <summary>
@@ -97,9 +98,9 @@ namespace SephPlanner.Plugin.Ui
             _controls = controls.gameObject.AddComponent<CanvasGroup>();
             var tabs = Widgets.Rect("Tabs", controls);
             Widgets.Row(tabs, S(1f));
-            _tabFocus = Button(tabs, "일반 설정", 8f, () => Show(Tab.Display)).gameObject;
-            Button(tabs, "단축키", 8f, () => Show(Tab.Keys));
-            Button(tabs, "바로 실행", 8f, () => Show(Tab.Actions));
+            _tabFocus = Button(tabs, Tr("일반 설정"), 8f, () => Show(Tab.Display)).gameObject;
+            Button(tabs, Tr("단축키"), 8f, () => Show(Tab.Keys));
+            Button(tabs, Tr("바로 실행"), 8f, () => Show(Tab.Actions));
 
             var general = Widgets.Rect("General", controls);
             Widgets.Column(general, S(0.25f));
@@ -121,8 +122,8 @@ namespace SephPlanner.Plugin.Ui
                 Widgets.Fixed(label.rectTransform, S(1.5f)).flexibleWidth = 1;
                 var value = Button(line, "", 15f, () => BeginCapture(option));
                 value.fontSize = S(0.8f);
-                Button(line, "해제", 3f, () => Change(option, () => option.Bind(KeyboardShortcut.Empty)));
-                Button(line, "기본값", 4f, () => Change(option, option.Reset));
+                Button(line, Tr("해제"), 3f, () => Change(option, () => option.Bind(KeyboardShortcut.Empty)));
+                Button(line, Tr("기본값"), 4f, () => Change(option, option.Reset));
                 _keys.Add((option, value));
             }
             var actions = Widgets.Rect("Actions", controls);
@@ -139,7 +140,7 @@ namespace SephPlanner.Plugin.Ui
             _noteSize = Widgets.Fixed(_note.rectTransform, S(1.1f));
             var cancelRow = Widgets.Rect("CancelRow", content);
             Widgets.Row(cancelRow, 0f);
-            _cancel = Button(cancelRow, "지정 취소", 8f, CancelCapture);
+            _cancel = Button(cancelRow, Tr("지정 취소"), 8f, CancelCapture);
             var cancelButton = _cancel.GetComponent<Button>();
             cancelButton.navigation = new Navigation { mode = Navigation.Mode.None };
             Show(_tab);
@@ -192,8 +193,8 @@ namespace SephPlanner.Plugin.Ui
             }
             catch (Exception ex)
             {
-                _result = "단축키 저장 실패: " + ex.Message;
-                Debug.LogError(_result);
+                _result = Tr("단축키 저장 실패: {0}", ex.Message);
+                Debug.LogError("단축키 저장 실패: " + ex.Message);
             }
             Refresh();
         }
@@ -201,7 +202,7 @@ namespace SephPlanner.Plugin.Ui
         private void CancelCapture()
         {
             _capture.Cancel();
-            _result = "지정을 취소했습니다.";
+            _result = Tr("지정을 취소했습니다.");
             Refresh();
         }
 
@@ -244,7 +245,7 @@ namespace SephPlanner.Plugin.Ui
                 Change(_selected, () => _selected.Bind(shortcut));
             }
             else if (capturing && !_capture.Capturing)
-                _result = "지정을 취소했습니다.";
+                _result = Tr("지정을 취소했습니다.");
             if (IsOpen && (capturing != _capture.Capturing || wasBlocked != _capture.BlocksShortcuts)) Refresh();
             return blocked;
         }
@@ -263,31 +264,30 @@ namespace SephPlanner.Plugin.Ui
             {
                 var warning = row.Option.Warning();
                 row.Value.text = _capture.Capturing && row.Option == _selected
-                    ? "키 입력 대기…"
+                    ? Tr("키 입력 대기…")
                     : (warning.Length > 0 ? "! " : "") + PluginSettings.Describe(row.Option.Shortcut());
             }
             if (_controls != null) _controls.interactable = !_capture.BlocksShortcuts;
             if (_cancel != null) _cancel.transform.parent.gameObject.SetActive(_capture.Capturing);
             if (_note == null) return;
             SetHint(PadInput.InUse()
-                ? "B(취소)로 닫기"
-                : "ESC로 닫기 · 키 지정 중에는 ESC로 취소");
+                ? Tr("B(취소)로 닫기")
+                : Tr("ESC로 닫기 · 키 지정 중에는 ESC로 취소"));
             _note.text = Note();
             Widgets.FitHeight(_note, _noteSize, S(WidthRatio - 1.9f));
         }
 
         private string Note()
         {
-            if (_tab == Tab.Display) return "화살표로 설정을 바꿉니다. 표시된 값은 현재 상태입니다. 추천을 꺼도 배치 계산과 빌드 지정은 유지됩니다.\n"
-                + "단축키는 ‘단축키’ 탭에서 바꾸고, ‘바로 실행’ 탭에서는 버튼으로 실행합니다.";
+            if (_tab == Tab.Display) return Tr("화살표로 설정을 바꿉니다. 표시된 값은 현재 상태입니다. 추천을 꺼도 배치 계산과 빌드 지정은 유지됩니다.") + "\n"
+                + Tr("단축키는 ‘단축키’ 탭에서 바꾸고, ‘바로 실행’ 탭에서는 버튼으로 실행합니다.");
             if (_tab == Tab.Actions)
-                return "버튼을 누르면 이 창을 닫고 해당 기능을 한 번 실행합니다. 패드는 지도가 닫혀 있고 가방·상자·상점 창이 떠 있는 동안 " +
-                       "View(뒤로) 버튼으로 이 창을 엽니다. 단축키 지정은 키보드만 받습니다.";
+                return Tr("버튼을 누르면 이 창을 닫고 해당 기능을 한 번 실행합니다. 패드는 지도가 닫혀 있고 가방·상자·상점 창이 떠 있는 동안 View(뒤로) 버튼으로 이 창을 엽니다. 단축키 지정은 키보드만 받습니다.");
             if (_capture.Capturing)
-                return "누른 키를 먼저 놓고 원하는 키를 누르세요. Ctrl·Alt·Shift 조합 가능(좌우 구분). ESC는 취소입니다.";
+                return Tr("누른 키를 먼저 놓고 원하는 키를 누르세요. Ctrl·Alt·Shift 조합 가능(좌우 구분). ESC는 취소입니다.");
             return (_result.Length > 0 ? _result + "\n" : "") +
                    (_selected != null && _selected.Warning().Length > 0 ? _selected.Warning() + "\n" : "") +
-                   "키 이름을 눌러 지정합니다. !는 충돌 가능성 또는 미지정 안내입니다. 다른 모드의 키는 확인하지 않습니다.";
+                   Tr("키 이름을 눌러 지정합니다. !는 충돌 가능성 또는 미지정 안내입니다. 다른 모드의 키는 확인하지 않습니다.");
         }
 
         /// <summary>한 줄. 이름표와 좌우 화살표, 그리고 지금 고른 값.</summary>

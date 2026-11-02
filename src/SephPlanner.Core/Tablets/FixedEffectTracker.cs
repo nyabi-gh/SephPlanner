@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using SephPlanner.Core.Model;
+using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Core.Tablets
 {
@@ -28,6 +29,8 @@ namespace SephPlanner.Core.Tablets
         private string _sources = "";
         private string _arrangement = "";
         private int _strikes;
+        private string _reason = "";
+        private bool _shiftsWithArrangement;
 
         public IReadOnlyList<FixedEffectCell> Layer =>
             _layer ?? (IReadOnlyList<FixedEffectCell>)Array.Empty<FixedEffectCell>();
@@ -38,8 +41,21 @@ namespace SephPlanner.Core.Tablets
         /// <summary>배치를 따라 변해서 고정 효과로 볼 수 없는 상태인가.</summary>
         public bool Contradicted { get; private set; }
 
-        /// <summary>층을 쓸 수 없을 때의 이유. 정상이면 빈 문자열이다.</summary>
-        public string Reason { get; private set; } = "";
+        /// <summary>
+        /// 층을 쓸 수 없을 때의 이유. 정상이면 빈 문자열이다. 배치를 따라 바뀐다는 판정은 다음 관측까지
+        /// 남으므로 읽을 때 문장을 짓는다 - 그사이 언어가 바뀌어도 따라가게.
+        /// </summary>
+        public string Reason
+        {
+            get => _shiftsWithArrangement
+                ? Tr("석판이 그대로인데 아이템 배치를 따라 칸 효과가 바뀝니다. 고정 효과로 설명할 수 없어 시뮬레이터가 실제와 다릅니다.")
+                : _reason;
+            private set
+            {
+                _reason = value;
+                _shiftsWithArrangement = false;
+            }
+        }
 
         public bool ConfirmedAcrossArrangements { get; private set; }
 
@@ -133,8 +149,7 @@ namespace SephPlanner.Core.Tablets
             Contradicted = true;
             Trustworthy = false;
             ConfirmedAcrossArrangements = false;
-            Reason = "석판이 그대로인데 아이템 배치를 따라 칸 효과가 바뀝니다. " +
-                     "고정 효과로 설명할 수 없어 시뮬레이터가 실제와 다릅니다.";
+            _shiftsWithArrangement = true;
         }
 
         private void Adopt(List<FixedEffectCell> cells, string sources, string arrangement, bool keepStrikes = false)

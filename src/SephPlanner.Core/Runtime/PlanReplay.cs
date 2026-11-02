@@ -64,7 +64,21 @@ namespace SephPlanner.Core.Runtime
         public List<PlanTarget>? PreviousTargets { get; set; }
         public ReplayResult? Expected { get; set; }
 
+        /// <summary>
+        /// 계획을 지은 화면 언어(<c>en-US</c> 등). 경고·설명 문장이 기준 결과에 들어 있고 언어가 계획 지문에도
+        /// 들어가므로 같은 언어로 다시 풀어야 한다. 한국어이거나 다국어 전의 자료면 없다.
+        /// </summary>
+        public string? Language { get; set; }
+
         public Plan Rebuild(bool allowModelChange = false)
+        {
+            Text.Language language = Text.Language.Korean;
+            if (Language != null && !Text.Localization.TryParse(Language, out language))
+                throw new InvalidDataException("알 수 없는 화면 언어입니다: " + Language);
+            using (Text.Localization.Use(language)) return RebuildIn(allowModelChange);
+        }
+
+        private Plan RebuildIn(bool allowModelChange)
         {
             var legacy = Version == 1 && CatalogVersion == 15;
             if (!legacy && (Version != CurrentVersion || !SupportedCatalogVersions.Contains(CatalogVersion)))

@@ -3,6 +3,7 @@ using SephPlanner.Core.Runtime;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Plugin.Ui
 {
@@ -36,7 +37,7 @@ namespace SephPlanner.Plugin.Ui
             _later = later;
         }
 
-        protected override string Title => "SephPlanner 업데이트";
+        protected override string Title => Tr("SephPlanner 업데이트");
         protected override float WidthRatio => 34f;
         protected override GameObject DefaultFocus =>
             _stage == Stage.Offer ? _acceptButton?.gameObject : _closeButton?.gameObject;
@@ -62,16 +63,16 @@ namespace SephPlanner.Plugin.Ui
             _offerRow = Widgets.Rect("Offer", content);
             Widgets.Row(_offerRow, S(0.5f));
             _acceptButton = Widgets.Clickable("Accept", _offerRow, Skin, S(0.85f), NativeSkin.Mint, Accept);
-            _acceptButton.text = "업데이트";
+            _acceptButton.text = Tr("업데이트");
             Widgets.Fixed(_acceptButton.rectTransform, S(1.8f), S(13f));
             var later = Widgets.Clickable("Later", _offerRow, Skin, S(0.85f), NativeSkin.Text, Later);
-            later.text = "나중에";
+            later.text = Tr("나중에");
             Widgets.Fixed(later.rectTransform, S(1.8f), S(13f));
 
             _closeRow = Widgets.Rect("Close", content);
             Widgets.Row(_closeRow, S(0.5f));
             _closeButton = Widgets.Clickable("Confirm", _closeRow, Skin, S(0.85f), NativeSkin.Mint, Close);
-            _closeButton.text = "확인";
+            _closeButton.text = Tr("확인");
             Widgets.Fixed(_closeButton.rectTransform, S(1.8f), S(13f));
         }
 
@@ -84,26 +85,24 @@ namespace SephPlanner.Plugin.Ui
             switch (_stage)
             {
                 case Stage.Offer:
-                    _body.text = "새 버전 " + latest + " 이 있습니다. 지금 버전은 " + UpdateClient.Format(_current) + " 입니다.\n\n" +
-                        "업데이트를 누르면 SephPlanner 배포 페이지에서 새 버전을 받아 설치합니다. " +
-                        "저장한 설정과 빌드 지정은 유지됩니다.\n\n" +
-                        "새 버전은 게임을 다시 시작한 뒤부터 적용됩니다. 무엇이 바뀌었는지는 " +
-                        "github.com/nyabi-gh/SephPlanner/releases 에 있습니다.";
-                    SetHint("ESC: 나중에");
+                    _body.text = Tr("새 버전 {0} 이 있습니다. 지금 버전은 {1} 입니다.", latest, UpdateClient.Format(_current)) + "\n\n" +
+                        Tr("업데이트를 누르면 SephPlanner 배포 페이지에서 새 버전을 받아 설치합니다. 저장한 설정과 빌드 지정은 유지됩니다.") + "\n\n" +
+                        Tr("새 버전은 게임을 다시 시작한 뒤부터 적용됩니다. 무엇이 바뀌었는지는 github.com/nyabi-gh/SephPlanner/releases 에 있습니다.");
+                    SetHint(Tr("ESC: 나중에"));
                     break;
                 case Stage.Working:
-                    _body.text = latest + " 을 받는 중입니다. 게임을 계속할 수 있고, 끝나면 다시 알립니다.";
-                    SetHint("ESC 로 닫아도 계속 받습니다");
+                    _body.text = Tr("{0} 을 받는 중입니다. 게임을 계속할 수 있고, 끝나면 다시 알립니다.", latest);
+                    SetHint(Tr("ESC 로 닫아도 계속 받습니다"));
                     break;
                 case Stage.Done:
-                    _body.text = latest + " 을 설치했습니다.\n\n" +
-                        "게임을 다시 시작하면 새 버전이 적용됩니다. 그때까지는 지금 버전이 계속 돕니다.";
-                    SetHint("ESC 로 닫기");
+                    _body.text = Tr("{0} 을 설치했습니다.", latest) + "\n\n" +
+                        Tr("게임을 다시 시작하면 새 버전이 적용됩니다. 그때까지는 지금 버전이 계속 돕니다.");
+                    SetHint(Tr("ESC 로 닫기"));
                     break;
                 default:
-                    _body.text = "업데이트하지 못했습니다.\n\n" + _message + "\n\n" +
-                        "지금 버전은 그대로입니다. github.com/nyabi-gh/SephPlanner/releases 에서 직접 받을 수 있습니다.";
-                    SetHint("ESC 로 닫기");
+                    _body.text = Tr("업데이트하지 못했습니다.") + "\n\n" + _message + "\n\n" +
+                        Tr("지금 버전은 그대로입니다. github.com/nyabi-gh/SephPlanner/releases 에서 직접 받을 수 있습니다.");
+                    SetHint(Tr("ESC 로 닫기"));
                     break;
             }
             Widgets.FitHeight(_body, _bodySize, S(WidthRatio - 2f));

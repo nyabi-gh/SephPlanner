@@ -4,6 +4,7 @@ using System.Threading;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Tablets;
+using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Core.Solver
 {
@@ -385,7 +386,7 @@ namespace SephPlanner.Core.Solver
         private static string Name(TabletSlot slot) =>
             !string.IsNullOrEmpty(slot.InstanceName)
                 ? slot.InstanceName!
-                : Naming.Of(slot.Definition.Names, slot.Definition.Id, "석판");
+                : Naming.Of(slot.Definition.Names, slot.Definition.Id, Tr("석판"));
 
         /// <summary>
         /// 재료 둘을 뺀 문제. 현재 배치 정보도 함께 빼야, 이제 없는 석판의 자리를 지키려 들지 않는다.

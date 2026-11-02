@@ -4,6 +4,7 @@ using System.Threading;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Tablets;
+using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Core.Solver
 {
@@ -127,7 +128,7 @@ namespace SephPlanner.Core.Solver
                 advice.Add(new EnchantAdvice
                 {
                     InstanceId = charm.InstanceId,
-                    Name = Naming.Of(charm.Definition.Names, charm.Definition.Id, "아티팩트"),
+                    Name = Naming.Of(charm.Definition.Names, charm.Definition.Id, Tr("아티팩트")),
                     Position = problem.CurrentCharms.TryGetValue(charm.InstanceId, out var cell) ? cell
                         : baseline.CharmPositions.TryGetValue(charm.InstanceId, out var placed) ? placed
                         : default,
@@ -138,7 +139,7 @@ namespace SephPlanner.Core.Solver
                     Activated = trial.Charms
                         .Where(c => baseline.InactiveCharms.Contains(c.InstanceId) &&
                                     !solved.InactiveCharms.Contains(c.InstanceId))
-                        .Select(c => Naming.Of(c.Definition.Names, c.Definition.Id, "아티팩트"))
+                        .Select(c => Naming.Of(c.Definition.Names, c.Definition.Id, Tr("아티팩트")))
                         .ToList(),
                 });
             }

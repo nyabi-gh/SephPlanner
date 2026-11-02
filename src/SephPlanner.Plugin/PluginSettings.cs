@@ -5,6 +5,7 @@ using BepInEx.Configuration;
 using SephPlanner.Core.Runtime;
 using SephPlanner.Plugin.Ui;
 using UnityEngine;
+using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Plugin
 {
@@ -82,6 +83,8 @@ namespace SephPlanner.Plugin
         public static string AutomaticDiagnosticKey => AutomaticDiagnosticPolicy.ConsentKey(new Uri(DiagnosticUploadClient.DefaultEndpoint));
         public bool AutomaticDiagnosticAllowed => AutomaticDiagnosticConsent.Value == AutomaticDiagnosticKey;
         public ConfigEntry<bool> UpdateCheck { get; }
+        public ConfigEntry<string> Language { get; }
+        public const string AutoLanguage = "Auto";
         private readonly Action _reviewDiagnostics;
 
         public bool DiagnosticUploadAllowed => DiagnosticConsent.Value ==
@@ -186,6 +189,10 @@ namespace SephPlanner.Plugin
                 "NativePanel", "Recommendations", true,
                 "무엇을 집을지에 대한 후보 추천을 계산할지. 끄면 가리는 것이 아니라 계산 자체를 " +
                 "건너뛴다. 점수와 배치 제안은 그대로 남는다.");
+
+            Language = config.Bind(
+                "NativePanel", "Language", AutoLanguage,
+                "화면 언어. Auto 면 게임 언어를 따른다. ko-KR, en-US, ja-JP, zh-CN, zh-TW 로 고정할 수 있다.");
 
             HighPerformance = config.Bind(
                 "NativePanel", "HighPerformance", false,
@@ -317,55 +324,74 @@ namespace SephPlanner.Plugin
         {
             return _rows ??= new List<OptionRow>
             {
-                Switch("플래너 화면 표시", Panel),
+                Switch(Tr("플래너 화면 표시"), Panel),
                 new OptionRow
                 {
-                    Label = "화면 기준 위치",
-                    Choices = new[] { "왼쪽 위", "오른쪽 위", "왼쪽 아래", "오른쪽 아래" },
+                    Label = Tr("언어"),
+                    Choices = LanguageChoices(),
+                    Read = () => Core.Text.Localization.TryParse(Language.Value, out var fixedLanguage) ? (int)fixedLanguage + 1 : 0,
+                    Write = i => Language.Value = i == 0 ? AutoLanguage : Core.Text.Localization.Code((Core.Text.Language)(i - 1)),
+                },
+                new OptionRow
+                {
+                    Label = Tr("화면 기준 위치"),
+                    Choices = new[] { Tr("왼쪽 위"), Tr("오른쪽 위"), Tr("왼쪽 아래"), Tr("오른쪽 아래") },
                     Read = () => (int)Corner.Value,
                     Write = i => ChangeCorner((PanelCorner)i),
                 },
-                Steps("크기", Scale, ScaleSteps, new[] { "80%", "90%", "100%", "115%", "130%", "150%" }),
-                Steps("폭", Width, WidthSteps,
-                    new[] { "아주 좁게", "좁게", "보통", "넓게", "아주 넓게" }),
-                Steps("불투명도", Opacity, OpacitySteps, new[] { "55%", "70%", "85%", "100%" }),
-                Switch("획득·합성·인챈트·제거 추천", Recommendations),
-                Switch("고사양 모드(여러 코어로 계산)", HighPerformance),
-                Switch("새 판에서 지난 판 지정 정리", ForgetOnNewRun),
-                Steps("주변 아이템 탐색 범위", OfferRadius, RadiusSteps,
-                    new[] { "좁게", "보통", "넓게", "아주 넓게" }),
-                Switch("멀티 자동 배치", MultiplayerAutoPlace),
+                Steps(Tr("크기"), Scale, ScaleSteps, new[] { "80%", "90%", "100%", "115%", "130%", "150%" }),
+                Steps(Tr("폭"), Width, WidthSteps,
+                    new[] { Tr("아주 좁게"), Tr("좁게"), Tr("보통"), Tr("넓게"), Tr("아주 넓게") }),
+                Steps(Tr("불투명도"), Opacity, OpacitySteps, new[] { "55%", "70%", "85%", "100%" }),
+                Switch(Tr("획득·합성·인챈트·제거 추천"), Recommendations),
+                Switch(Tr("고사양 모드(여러 코어로 계산)"), HighPerformance),
+                Switch(Tr("새 판에서 지난 판 지정 정리"), ForgetOnNewRun),
+                Steps(Tr("주변 아이템 탐색 범위"), OfferRadius, RadiusSteps,
+                    new[] { Tr("좁게"), Tr("보통"), Tr("넓게"), Tr("아주 넓게") }),
+                Switch(Tr("멀티 자동 배치"), MultiplayerAutoPlace),
                 new OptionRow
                 {
-                    Label = "진단 서버 전송",
-                    Choices = new[] { "꺼짐", "켜짐" },
+                    Label = Tr("진단 서버 전송"),
+                    Choices = new[] { Tr("꺼짐"), Tr("켜짐") },
                     Read = () => DiagnosticUploadAllowed ? 1 : 0,
                     Write = i => { if (i == 0) SetDiagnosticConsent(false); else _reviewDiagnostics(); },
                 },
                 new OptionRow
                 {
-                    Label = "오류 진단 자동 전송",
-                    Choices = new[] { "꺼짐", "켜짐" },
+                    Label = Tr("오류 진단 자동 전송"),
+                    Choices = new[] { Tr("꺼짐"), Tr("켜짐") },
                     Read = () => AutomaticDiagnosticAllowed ? 1 : 0,
                     Write = i => { if (i == 0) SetAutomaticDiagnosticConsent(false); else _reviewAutomaticDiagnostics(); },
                 },
-                Switch("시작할 때 업데이트 확인", UpdateCheck),
-                Steps("가방 확인 간격", PollInterval, PollSteps,
-                    new[] { "0.15초", "0.25초", "0.5초", "1초" }),
-                Switch("패드 View 버튼으로 창 열기", PadWindow),
-                Key("추천 화면 접기/펼치기", ExpandKey),
-                Key("자동 배치", AutoPlaceKey),
-                Key("후보 미리보기", PreviewKey),
-                Key("빌드 설정 창", BuildKey),
-                Key("고른 아이템 강화칸 우선 올리기", PinUpKey),
-                Key("고른 아이템 강화칸 우선 내리기", PinDownKey),
-                Key("불투명도 바꾸기", OpacityKey),
-                Key("플래너 화면 이동", MoveKey),
-                Key("화면 숨기기/보이기", HideKey),
-                Key("설정 창", SettingsKey),
-                Key("아이템 데이터 다시 읽기", DumpKey),
-                Key("문제 진단 저장·전송", InventoryDumpKey),
+                Switch(Tr("시작할 때 업데이트 확인"), UpdateCheck),
+                Steps(Tr("가방 확인 간격"), PollInterval, PollSteps,
+                    new[] { Tr("{0}초", "0.15"), Tr("{0}초", "0.25"), Tr("{0}초", "0.5"), Tr("{0}초", "1") }),
+                Switch(Tr("패드 View 버튼으로 창 열기"), PadWindow),
+                Key(Tr("추천 화면 접기/펼치기"), ExpandKey),
+                Key(Tr("자동 배치"), AutoPlaceKey),
+                Key(Tr("후보 미리보기"), PreviewKey),
+                Key(Tr("빌드 설정 창"), BuildKey),
+                Key(Tr("고른 아이템 강화칸 우선 올리기"), PinUpKey),
+                Key(Tr("고른 아이템 강화칸 우선 내리기"), PinDownKey),
+                Key(Tr("불투명도 바꾸기"), OpacityKey),
+                Key(Tr("플래너 화면 이동"), MoveKey),
+                Key(Tr("화면 숨기기/보이기"), HideKey),
+                Key(Tr("설정 창"), SettingsKey),
+                Key(Tr("아이템 데이터 다시 읽기"), DumpKey),
+                Key(Tr("문제 진단 저장·전송"), InventoryDumpKey),
             };
+        }
+
+        /// <summary>언어가 바뀌면 줄 이름을 새 언어로 다시 짓게 한다.</summary>
+        public void ForgetRows() => _rows = null;
+
+        private static string[] LanguageChoices()
+        {
+            var languages = (Core.Text.Language[])Enum.GetValues(typeof(Core.Text.Language));
+            var choices = new string[languages.Length + 1];
+            choices[0] = Tr("게임 언어 따라가기");
+            foreach (var language in languages) choices[(int)language + 1] = Core.Text.Localization.NativeName(language);
+            return choices;
         }
 
         private void ChangeCorner(PanelCorner corner)
@@ -422,7 +448,7 @@ namespace SephPlanner.Plugin
         private static OptionRow Switch(string label, ConfigEntry<bool> entry) => new OptionRow
         {
             Label = label,
-            Choices = new[] { "꺼짐", "켜짐" },
+            Choices = new[] { Tr("꺼짐"), Tr("켜짐") },
             Read = () => entry.Value ? 1 : 0,
             Write = i => entry.Value = i == 1,
         };
@@ -451,16 +477,16 @@ namespace SephPlanner.Plugin
             var value = entry.Value;
             if (value.MainKey == KeyCode.None)
                 return entry == SettingsKey
-                    ? "설정 창 단축키가 해제됐습니다. 닫기 전에 다시 지정하거나 BepInEx 설정 파일에서 복원하세요."
+                    ? Tr("설정 창 단축키가 해제됐습니다. 닫기 전에 다시 지정하거나 BepInEx 설정 파일에서 복원하세요.")
                     : "";
             var warnings = new List<string>();
             if (GameKeys.Contains(value.MainKey) || value.Modifiers.Any(GameKeys.Contains))
-                warnings.Add("게임 기본 조작과 겹칠 수 있습니다. 조합키도 게임 입력을 막지 않습니다.");
+                warnings.Add(Tr("게임 기본 조작과 겹칠 수 있습니다. 조합키도 게임 입력을 막지 않습니다."));
             var duplicates = Rows().Where(row => row.Shortcut != null &&
                 row.ShortcutEntry != entry && row.Shortcut().Equals(value))
                 .Select(row => row.Label).ToArray();
             if (duplicates.Length > 0)
-                warnings.Add("같은 단축키: " + string.Join(", ", duplicates) + ". 함께 실행될 수 있습니다.");
+                warnings.Add(Tr("같은 단축키: {0}. 함께 실행될 수 있습니다.", string.Join(", ", duplicates)));
             return string.Join("\n", warnings);
         }
 
@@ -515,7 +541,7 @@ namespace SephPlanner.Plugin
 
         public static string Describe(KeyboardShortcut shortcut)
         {
-            if (shortcut.MainKey == KeyCode.None) return "미지정";
+            if (shortcut.MainKey == KeyCode.None) return Tr("미지정");
             var text = "";
             foreach (var modifier in shortcut.Modifiers) text += Short(modifier) + "+";
             return text + Short(shortcut.MainKey);
@@ -525,12 +551,12 @@ namespace SephPlanner.Plugin
         {
             switch (key)
             {
-                case KeyCode.LeftControl: return "왼Ctrl";
-                case KeyCode.RightControl: return "오른Ctrl";
-                case KeyCode.LeftAlt: return "왼Alt";
-                case KeyCode.RightAlt: return "오른Alt";
-                case KeyCode.LeftShift: return "왼Shift";
-                case KeyCode.RightShift: return "오른Shift";
+                case KeyCode.LeftControl: return Tr("왼Ctrl");
+                case KeyCode.RightControl: return Tr("오른Ctrl");
+                case KeyCode.LeftAlt: return Tr("왼Alt");
+                case KeyCode.RightAlt: return Tr("오른Alt");
+                case KeyCode.LeftShift: return Tr("왼Shift");
+                case KeyCode.RightShift: return Tr("오른Shift");
                 case KeyCode.Return: return "Enter";
                 default: return key.ToString();
             }

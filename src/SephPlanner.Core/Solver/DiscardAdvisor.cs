@@ -4,6 +4,7 @@ using System.Threading;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Tablets;
+using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Core.Solver
 {
@@ -94,7 +95,7 @@ namespace SephPlanner.Core.Solver
                 {
                     var charm = trial.Charms.First(c => c.InstanceId == candidate.InstanceId);
                     if (charm.IsFiller || charm.Held || charm.Retained || charm.Definition.CannotDiscard) continue;
-                    name = Naming.Of(charm.Definition.Names, charm.Definition.Id, "아티팩트");
+                    name = Naming.Of(charm.Definition.Names, charm.Definition.Id, Tr("아티팩트"));
                     trial.Charms.Remove(charm);
                     trial.CurrentCharms.Remove(candidate.InstanceId);
                     trial.PlannedCharms.Remove(candidate.InstanceId);
@@ -147,7 +148,7 @@ namespace SephPlanner.Core.Solver
                     ReducesComboCount = before.Any(p => Count(after, p.Key) < p.Value),
                     Activated = trial.Charms.Where(c => baseline.InactiveCharms.Contains(c.InstanceId) &&
                                                        !solved.InactiveCharms.Contains(c.InstanceId))
-                        .Select(c => Naming.Of(c.Definition.Names, c.Definition.Id, "아티팩트")).ToList(),
+                        .Select(c => Naming.Of(c.Definition.Names, c.Definition.Id, Tr("아티팩트"))).ToList(),
                 });
             }
             return advice.OrderByDescending(a => a.RankedGain).ThenBy(a => a.InstanceId).Take(3).ToList();

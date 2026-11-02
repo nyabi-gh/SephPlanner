@@ -6,6 +6,7 @@ using SephPlanner.Core.Charms;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Tablets;
+using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Core.Solver
 {
@@ -440,7 +441,7 @@ namespace SephPlanner.Core.Solver
                         Kind = kind,
                         Name = Naming.Of(
                             charm.Definition.Names, charm.Definition.Id,
-                            charm.IsFiller ? "아이템" : "아티팩트"),
+                            charm.IsFiller ? Tr("아이템") : Tr("아티팩트")),
                     },
                 };
             }
@@ -465,7 +466,7 @@ namespace SephPlanner.Core.Solver
                         InstanceId = tablet.InstanceId,
                         DefinitionId = tablet.Definition.EntityId,
                         Kind = "tablet",
-                        Name = Naming.Of(tablet.Definition.Names, tablet.Definition.Id, "석판"),
+                        Name = Naming.Of(tablet.Definition.Names, tablet.Definition.Id, Tr("석판")),
                     },
                 };
             }

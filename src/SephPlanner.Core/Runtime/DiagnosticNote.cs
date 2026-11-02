@@ -2,20 +2,29 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Core.Runtime
 {
     /// <summary>증상 분류 하나. 타이핑 없이 누르기만 해도 제보가 갈리도록 둔다.</summary>
     public sealed class DiagnosticCategory
     {
-        public DiagnosticCategory(string id, string label)
+        private readonly Func<string> _label;
+
+        public DiagnosticCategory(string id, string reportLabel, Func<string> label)
         {
             Id = id;
-            Label = label;
+            ReportLabel = reportLabel;
+            _label = label;
         }
 
         public string Id { get; }
-        public string Label { get; }
+
+        /// <summary>화면에 보이는 이름. 지금 언어를 따른다.</summary>
+        public string Label => _label();
+
+        /// <summary>제보에 실려 서버가 읽는 이름. 화면 언어와 상관없이 한국어로 둔다.</summary>
+        public string ReportLabel { get; }
     }
 
     /// <summary>
@@ -37,11 +46,11 @@ namespace SephPlanner.Core.Runtime
 
         public static readonly IReadOnlyList<DiagnosticCategory> Categories = new[]
         {
-            new DiagnosticCategory("placement", "배치가 이상함"),
-            new DiagnosticCategory("score", "점수·추천이 이상함"),
-            new DiagnosticCategory("autoplace", "자동 배치 실패"),
-            new DiagnosticCategory("display", "화면 표시"),
-            new DiagnosticCategory("other", "기타"),
+            new DiagnosticCategory("placement", "배치가 이상함", () => Tr("배치가 이상함")),
+            new DiagnosticCategory("score", "점수·추천이 이상함", () => Tr("점수·추천이 이상함")),
+            new DiagnosticCategory("autoplace", "자동 배치 실패", () => Tr("자동 배치 실패")),
+            new DiagnosticCategory("display", "화면 표시", () => Tr("화면 표시")),
+            new DiagnosticCategory("other", "기타", () => Tr("기타")),
         };
 
         private DiagnosticNote(string category, string text)
@@ -57,14 +66,14 @@ namespace SephPlanner.Core.Runtime
 
         public bool IsEmpty => Category.Length == 0 && Text.Length == 0;
 
-        /// <summary>고른 분류의 사람이 읽는 이름. 모르는 식별자면 빈 문자열이다.</summary>
+        /// <summary>고른 분류의 사람이 읽는 이름(<see cref="DiagnosticCategory.ReportLabel"/>). 모르는 식별자면 빈 문자열이다.</summary>
         public string CategoryLabel => LabelOf(Category);
 
         public static string LabelOf(string? id)
         {
             if (string.IsNullOrEmpty(id)) return "";
             foreach (var category in Categories)
-                if (string.Equals(category.Id, id, StringComparison.Ordinal)) return category.Label;
+                if (string.Equals(category.Id, id, StringComparison.Ordinal)) return category.ReportLabel;
             return "";
         }
 

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Tablets;
+using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Core.Runtime
 {
@@ -21,7 +22,7 @@ namespace SephPlanner.Core.Runtime
             string? livePlacementFingerprint = null, string? weaponId = null)
         {
             if (command.Targets is null || command.Targets.Count == 0)
-                return "적용할 배치가 없습니다.";
+                return Tr("적용할 배치가 없습니다.");
             if (command.ExpectedWidth != width || command.ExpectedHeight != height ||
                 command.ExpectedStorage != storage)
                 return Changed();
@@ -36,7 +37,7 @@ namespace SephPlanner.Core.Runtime
             foreach (var item in liveItems)
             {
                 if (!liveById.TryAdd(item.InstanceId, item))
-                    return "인벤토리 상태를 고유하게 식별할 수 없어 자동 배치를 중단합니다.";
+                    return Tr("인벤토리 상태를 고유하게 식별할 수 없어 자동 배치를 중단합니다.");
             }
 
             if (liveById.Count != command.Targets.Count)
@@ -48,11 +49,11 @@ namespace SephPlanner.Core.Runtime
             foreach (var target in command.Targets)
             {
                 if (!targetIds.Add(target.InstanceId))
-                    return "같은 아이템이 자동 배치 계획에 두 번 들어 있습니다.";
+                    return Tr("같은 아이템이 자동 배치 계획에 두 번 들어 있습니다.");
                 if (!destinations.Add(target.To))
-                    return $"목표 칸 {target.To}이 겹쳐 자동 배치를 중단합니다.";
+                    return Tr("목표 칸 {0}이 겹쳐 자동 배치를 중단합니다.", target.To);
                 if (!grid.Contains(target.To))
-                    return $"목표 칸 {target.To}이 격자 밖이라 자동 배치를 중단합니다.";
+                    return Tr("목표 칸 {0}이 격자 밖이라 자동 배치를 중단합니다.", target.To);
                 if (!liveById.TryGetValue(target.InstanceId, out var live))
                     return Changed();
                 if (live.Position != target.From || live.IsTablet != target.IsTablet)
@@ -61,15 +62,15 @@ namespace SephPlanner.Core.Runtime
                 if (live.Rotation != target.FromRotation)
                     return Changed();
                 if (target.Rotation < 0 || target.Rotation > 3)
-                    return "석판 회전값이 올바르지 않아 자동 배치를 중단합니다.";
+                    return Tr("석판 회전값이 올바르지 않아 자동 배치를 중단합니다.");
                 if (live.Rotation != target.Rotation && !live.CanRotate)
-                    return $"회전할 수 없는 석판(인스턴스 {target.InstanceId})이 있어 자동 배치를 중단합니다.";
+                    return Tr("회전할 수 없는 석판(인스턴스 {0})이 있어 자동 배치를 중단합니다.", target.InstanceId);
             }
 
             return null;
         }
 
         private static string Changed() =>
-            "배치 계산 이후 인벤토리가 바뀌어 자동 배치를 중단합니다. 잠시 뒤 다시 시도하세요.";
+            Tr("배치 계산 이후 인벤토리가 바뀌어 자동 배치를 중단합니다. 잠시 뒤 다시 시도하세요.");
     }
 }

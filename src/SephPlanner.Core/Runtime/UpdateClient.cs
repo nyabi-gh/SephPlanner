@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Core.Runtime
 {
@@ -74,23 +75,23 @@ namespace SephPlanner.Core.Runtime
                 if (IsRedirect(response.StatusCode))
                 {
                     if (hop == MaximumRedirects || response.Headers.Location == null)
-                        throw new HttpRequestException("배포 파일 주소를 따라가지 못했습니다.");
+                        throw new HttpRequestException(Tr("배포 파일 주소를 따라가지 못했습니다."));
                     location = new Uri(location, response.Headers.Location);
                     if (location.Scheme != Uri.UriSchemeHttps || location.UserInfo.Length != 0)
-                        throw new HttpRequestException("배포 파일이 안전하지 않은 주소로 넘어갔습니다.");
+                        throw new HttpRequestException(Tr("배포 파일이 안전하지 않은 주소로 넘어갔습니다."));
                     continue;
                 }
                 if (response.StatusCode != HttpStatusCode.OK)
-                    throw new HttpRequestException("배포 파일을 받지 못했습니다. HTTP " + (int)response.StatusCode);
+                    throw new HttpRequestException(Tr("배포 파일을 받지 못했습니다. HTTP {0}", (int)response.StatusCode));
                 var length = response.Content.Headers.ContentLength;
-                if (length > MaximumAssetBytes) throw new InvalidDataException("배포 파일이 너무 큽니다.");
+                if (length > MaximumAssetBytes) throw new InvalidDataException(Tr("배포 파일이 너무 큽니다."));
                 using var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
                 using var output = new MemoryStream(length.HasValue ? (int)length.Value : 0);
                 var buffer = new byte[16 * 1024];
                 int read;
                 while ((read = await stream.ReadAsync(buffer.AsMemory(), cancellation).ConfigureAwait(false)) != 0)
                 {
-                    if (output.Length + read > MaximumAssetBytes) throw new InvalidDataException("배포 파일이 너무 큽니다.");
+                    if (output.Length + read > MaximumAssetBytes) throw new InvalidDataException(Tr("배포 파일이 너무 큽니다."));
                     output.Write(buffer, 0, read);
                 }
                 return output.ToArray();

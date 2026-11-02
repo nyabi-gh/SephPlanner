@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
+using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Core.Planning
 {
@@ -51,19 +52,19 @@ namespace SephPlanner.Core.Planning
             var trimmed = (code ?? "").Trim();
             if (trimmed.Length == 0)
             {
-                error = "프리셋 코드를 붙여넣으세요.";
+                error = Tr("프리셋 코드를 붙여넣으세요.");
                 return false;
             }
             if (!trimmed.StartsWith(Prefix, StringComparison.Ordinal))
             {
-                error = "프리셋 코드가 아닙니다. 게임에서 복사한 코드를 그대로 붙여넣으세요.";
+                error = Tr("프리셋 코드가 아닙니다. 게임에서 복사한 코드를 그대로 붙여넣으세요.");
                 return false;
             }
 
             var plain = Decode(trimmed.Substring(Prefix.Length).Trim());
             if (plain.Length == 0)
             {
-                error = "프리셋 코드가 깨졌습니다. 코드 전체가 복사됐는지 확인하세요.";
+                error = Tr("프리셋 코드가 깨졌습니다. 코드 전체가 복사됐는지 확인하세요.");
                 return false;
             }
 
@@ -80,7 +81,7 @@ namespace SephPlanner.Core.Planning
             var lines = plain.Split(LineSeparators, StringSplitOptions.RemoveEmptyEntries);
             if (lines.Length == 0 || lines[0].Trim() != Magic)
             {
-                error = "프리셋 코드의 형식이 다릅니다. 게임 버전이 다를 수 있습니다.";
+                error = Tr("프리셋 코드의 형식이 다릅니다. 게임 버전이 다를 수 있습니다.");
                 return false;
             }
 
@@ -93,7 +94,7 @@ namespace SephPlanner.Core.Planning
                 if (colon > 0) fields[line.Substring(0, colon)] = line.Substring(colon + 1);
             }
 
-            error = "프리셋 코드를 읽지 못했습니다. 게임 버전이 다를 수 있습니다.";
+            error = Tr("프리셋 코드를 읽지 못했습니다. 게임 버전이 다를 수 있습니다.");
 
             // 게임이 반드시 써 넣는 줄들이다. 없으면 프리셋 코드가 아니거나 잘린 것이다.
             if (!fields.TryGetValue("W", out var weapon) || !int.TryParse(weapon, out var weaponId)) return false;

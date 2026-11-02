@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
+using SephPlanner.Core.Text;
 
 namespace SephPlanner.Core.Runtime
 {
@@ -196,7 +197,10 @@ namespace SephPlanner.Core.Runtime
         }
 
         public static string PlanningContext(PlanPreferences preferences, string catalogGeneration) =>
-            PlanningContext(preferences, catalogGeneration, FingerprintFormat.Canonical);
+            PlanningContext(preferences, catalogGeneration, Localization.Current);
+
+        public static string PlanningContext(PlanPreferences preferences, string catalogGeneration, Language language) =>
+            PlanningContext(preferences, catalogGeneration, FingerprintFormat.Canonical, language);
 
         internal static bool MatchesLegacyReplay(GameSnapshot snapshot, PlanPreferences preferences, string generation, string fingerprint)
         {
@@ -208,10 +212,14 @@ namespace SephPlanner.Core.Runtime
             return false;
         }
 
-        internal static string PlanningContext(PlanPreferences preferences, string catalogGeneration, FingerprintFormat format)
+        internal static string PlanningContext(
+            PlanPreferences preferences, string catalogGeneration, FingerprintFormat format, Language language = Language.Korean)
         {
             var builder = new StringBuilder();
             Add(builder, "catalog", catalogGeneration);
+            // 계획은 설명 문장까지 지어 둔다. 언어가 바뀌면 같은 판이라도 다시 풀어야 한다. 한국어일 때는
+            // 줄이 없어야 다국어 전의 재현 자료가 그대로 맞는다.
+            if (language != Language.Korean) Add(builder, "language", Localization.Code(language));
             foreach (var category in preferences.PriorityCategories.OrderBy(value => value, StringComparer.Ordinal))
                 Add(builder, "priority", category);
             foreach (var pin in preferences.PinnedCharms.OrderBy(pair => pair.Key))

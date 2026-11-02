@@ -5,6 +5,7 @@ using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Tablets;
 using UnityEngine;
+using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Plugin
 {
@@ -162,7 +163,7 @@ namespace SephPlanner.Plugin
             state.All = ComboEngravings.Combine(state.Cells, state.Engraved);
             if (view.Severed > 0)
             {
-                state.Pending = $"석판·각인 참조 {view.Severed}개를 읽지 못했습니다. 방에 재접속하면 다시 읽습니다.";
+                state.Pending = Tr("석판·각인 참조 {0}개를 읽지 못했습니다. 방에 재접속하면 다시 읽습니다.", view.Severed);
                 return state;
             }
             if (stale)
