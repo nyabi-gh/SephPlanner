@@ -27,6 +27,7 @@ public class ApplyPlanRoutineTests
         public bool Alive { get; set; } = true;
         public bool WritesLandImmediately { get; set; } = true;
         public bool IsMultiplayerSession { get; set; }
+        public GridSpec Grid { get; set; } = new(Width, Height, Storage);
         public string? StateError { get; set; }
         Phrase? IInventoryPort.StateError => StateError == null ? null : Phrase.Verbatim(StateError);
 
@@ -956,6 +957,33 @@ public class ApplyPlanRoutineTests
 
         Assert.Equal(10, inventory.Cells[At(1, 0)]);
         Assert.StartsWith("자동 배치 완료 - 이동 1건, 회전 0건. 적용 뒤 레벨이 예상과 다른 칸 1개((1,0) 계산 3 != 게임 1)", routine.Result.Korean);
+    }
+
+    /// <summary>
+    /// 예상 레벨은 계획 때의 격자로 계산한 것이다. 적용하는 사이 칸이 열려 레벨이 달라진 것을
+    /// "계산에 없는 효과" 로 알리고 진단까지 보내면 안 된다(제보 4472ad97, 참가자 56 → 57칸).
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ASlotOpeningWhileApplyingIsNotReportedAsAnUnknownEffect(bool guest)
+    {
+        var (inventory, clock) = guest ? Guest() : Host();
+        inventory.Cells[At(0, 0)] = 10;
+        inventory.Levels[At(1, 0)] = 0;
+        inventory.AfterSwap = _ => inventory.Grid = new GridSpec(Width, Height, Storage + 1);
+        var command = Command(Charm(10, At(0, 0), At(1, 0)));
+        command.ExpectedCellLevels[At(1, 0)] = 1;
+
+        var routine = Routine(command, inventory, clock);
+        Drive(routine, inventory, clock);
+
+        Assert.Equal(10, inventory.Cells[At(1, 0)]);
+        Assert.Equal(
+            "자동 배치 완료 - 이동 1건, 회전 0건. 적용하는 동안 가방의 칸 수가 바뀌어 바뀐 가방으로 다시 계산합니다.",
+            routine.Result.Korean);
+        Assert.Null(routine.DiagnosticError);
+        Assert.False(routine.Settled);
     }
 
     [Fact]

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using SephPlanner.Core.Model;
+using SephPlanner.Core.Tablets;
 using SephPlanner.Core.Text;
 
 namespace SephPlanner.Core.Runtime
@@ -27,6 +28,11 @@ namespace SephPlanner.Core.Runtime
 
         /// <summary>서버의 아이템과 효과 객체 연결이 깨졌다면 이유. 참가자의 동기화 중간 상태는 검사하지 않는다.</summary>
         Phrase? StateError { get; }
+
+        /// <summary>
+        /// 지금 가방의 격자. 참가자의 적용은 여러 초 걸려 그 사이 레벨업 등으로 칸이 열릴 수 있다.
+        /// </summary>
+        GridSpec Grid { get; }
 
         /// <summary>그 칸에 지금 있는 인스턴스. 비어 있으면 0.</summary>
         int InstanceAt(GridPos cell);

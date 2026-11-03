@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Mirror;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Runtime;
+using SephPlanner.Core.Tablets;
 using SephPlanner.Core.Text;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -272,6 +273,7 @@ namespace SephPlanner.Plugin
             public bool Alive => _inventory != null;
             public bool WritesLandImmediately => NetworkServer.active;
             public bool IsMultiplayerSession => GameReader.IsMultiplayerSession();
+            public GridSpec Grid => new GridSpec(_inventory.Width, _inventory.Height, _inventory.CurrentInventoryStorage);
 
             public Phrase StateError
             {

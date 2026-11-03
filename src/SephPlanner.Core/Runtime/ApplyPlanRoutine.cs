@@ -153,6 +153,17 @@ namespace SephPlanner.Core.Runtime
                 yield break;
             }
 
+            // 예상 레벨은 계획 때의 격자로 계산했다. 그 사이 칸이 열리면 같은 배치라도 레벨이 달라지므로
+            // 견주지 않는다 - 계산에 없는 효과로 알리면 틀린 말이다(제보 4472ad97).
+            if (GridChanged())
+            {
+                Result = Join(
+                    new Phrase("자동 배치 완료 - 이동 {0}건, 회전 {1}건. {2}", moves.Count, rotations.Count,
+                        new Phrase("적용하는 동안 가방의 칸 수가 바뀌어 바뀐 가방으로 다시 계산합니다.")),
+                    Collapsed());
+                yield break;
+            }
+
             // 레벨은 서버가 다시 계산해 따로 동기화한다. 참가자 세션에서는 마지막 걸음이 반영된
             // 뒤에도 잠시 옛 값이 남아 있으므로, 어긋났다고 알리기 전에 그만큼 기다린다.
             Progress = Tr("자동 배치 - 레벨 확인 중");
@@ -366,6 +377,24 @@ namespace SephPlanner.Core.Runtime
             {
                 DiagnosticError ??= Phrase.Verbatim(ex.ToString());
                 return new Phrase("적용 뒤 레벨을 확인하지 못했습니다({0})", Phrase.Of(ex));
+            }
+        }
+
+        /// <summary>가방의 격자가 계획 때와 다른가. 읽지 못하면 모르는 것이라 레벨 대조에 맡긴다.</summary>
+        private bool GridChanged()
+        {
+            if (!_port.Alive) return false;
+
+            try
+            {
+                var grid = _port.Grid;
+                return grid.Width != _command.ExpectedWidth || grid.Height != _command.ExpectedHeight ||
+                       grid.Storage != _command.ExpectedStorage;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticError ??= Phrase.Verbatim(ex.ToString());
+                return false;
             }
         }
 

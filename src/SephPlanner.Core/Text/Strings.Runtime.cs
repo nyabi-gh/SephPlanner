@@ -20,6 +20,7 @@ namespace SephPlanner.Core.Text
             new Entry("자동 배치 - 레벨 확인 중", "Auto-place - checking levels", "自動配置 - レベル確認中", "自动布局 - 正在确认等级", "自動佈局 - 正在確認等級"),
             new Entry("자동 배치 완료 - 이동 {0}건, 회전 {1}건", "Auto-place done - {0} moves, {1} rotations", "自動配置完了 - 移動{0}件、回転{1}件", "自动布局完成 - 移动{0}次，旋转{1}次", "自動佈局完成 - 移動{0}次，旋轉{1}次"),
             new Entry("자동 배치 완료 - 이동 {0}건, 회전 {1}건. {2}", "Auto-place done - {0} moves, {1} rotations. {2}", "自動配置完了 - 移動{0}件、回転{1}件。{2}", "自动布局完成 - 移动{0}次，旋转{1}次。{2}", "自動佈局完成 - 移動{0}次，旋轉{1}次。{2}"),
+            new Entry("적용하는 동안 가방의 칸 수가 바뀌어 바뀐 가방으로 다시 계산합니다.", "The number of inventory slots changed while applying, so the layout is recalculated for the new inventory.", "適用中にバッグの枠数が変わったため、変わったバッグで再計算します。", "应用期间背包的格子数发生变化，将按变化后的背包重新计算。", "套用期間背包的格子數發生變化，將依變化後的背包重新計算。"),
             new Entry("인벤토리가 사라져 자동 배치 결과를 확인하지 못했습니다.", "The inventory disappeared, so the auto-place result could not be checked.", "バッグが消えたため、自動配置の結果を確認できませんでした。", "背包已消失，无法确认自动布局的结果。", "背包已消失，無法確認自動佈局的結果。"),
             new Entry("적용 중 인벤토리가 바뀌어 목표 배치와 다릅니다. 현재 배치를 확인하세요.", "The inventory changed while applying and no longer matches the target layout. Check the current layout.", "適用中にバッグが変わり、目標の配置と異なります。現在の配置を確認してください。", "应用期间背包发生变化，与目标布局不同。请检查当前布局。", "套用期間背包發生變化，與目標配置不同。請檢查目前配置。"),
             new Entry("석판의 최종 각도가 목표와 다릅니다. 현재 배치를 확인하세요.", "A tablet's final angle differs from the target. Check the current layout.", "石版の最終的な向きが目標と異なります。現在の配置を確認してください。", "石板的最终角度与目标不同。请检查当前布局。", "石板的最終角度與目標不同。請檢查目前配置。"),
