@@ -36,6 +36,14 @@ namespace SephPlanner.Plugin.Workshop
             if (!_options.Save()) Log.Warning("게임 옵션 파일에 SephPlanner 설정을 저장하지 못했습니다.");
         }
 
+        public void Commit()
+        {
+            if (!_options.IsAvailable)
+                throw new InvalidOperationException("게임 옵션 저장소가 아직 준비되지 않아 SephPlanner 설정을 저장하지 못했습니다.");
+            if (!_options.Save())
+                throw new InvalidOperationException("게임 옵션 파일에 SephPlanner 설정을 저장하지 못했습니다.");
+        }
+
         private Setting<T> Bind<T>(string section, string key, T defaultValue, Func<T, T> normalize)
         {
             var storageKey = section + "." + key;

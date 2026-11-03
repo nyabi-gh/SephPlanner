@@ -16,7 +16,13 @@ namespace SephPlanner.Plugin.Host
         /// <summary>범위 밖의 값은 읽을 때도 쓸 때도 범위 안으로 자른다.</summary>
         Setting<float> Bind(string section, string key, float defaultValue, string description, float min, float max);
 
+        /// <summary>적을 수 있으면 적는다. 못 적으면 저장소가 경고를 남기고, 값은 이번 실행에만 남는다.</summary>
         void Save();
+
+        /// <summary>
+        /// 적고, 못 적으면 예외. 동의 철회처럼 다음 실행까지 남지 않으면 안 되는 값은 실패를 사람에게 알려야 한다.
+        /// </summary>
+        void Commit();
     }
 
     internal static class SettingRange

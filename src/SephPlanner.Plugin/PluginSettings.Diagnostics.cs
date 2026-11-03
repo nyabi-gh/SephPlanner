@@ -68,7 +68,7 @@ namespace SephPlanner.Plugin
             {
                 AutomaticDiagnosticConsent.Value = allowed ? AutomaticDiagnosticKey : "";
                 AutomaticDiagnosticChoice.Value = AutomaticDiagnosticKey;
-                _config.Save();
+                _config.Commit();
             }
             catch
             {
@@ -85,7 +85,7 @@ namespace SephPlanner.Plugin
             {
                 DiagnosticConsent.Value = allowed ? DiagnosticUploadClient.ConsentKey(new Uri(DiagnosticUploadClient.DefaultEndpoint)) : "";
                 DiagnosticChoiceMade.Value = true;
-                _config.Save();
+                _config.Commit();
             }
             catch
             {

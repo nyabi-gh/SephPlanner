@@ -32,6 +32,8 @@ namespace SephPlanner.Plugin.BepInExHost
 
         public void Save() => _config.Save();
 
+        public void Commit() => _config.Save();
+
         private static Setting<T> Wrap<T>(ConfigEntry<T> entry, T defaultValue, Func<T, T> normalize)
         {
             var setting = new Setting<T>(entry.Definition.Key, defaultValue, entry.Value, normalize, value => entry.Value = value);
