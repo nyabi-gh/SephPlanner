@@ -195,10 +195,11 @@ namespace SephPlanner.Plugin
 
                 // 번호가 없거나 겹치는 아이템은 칸에서 만든 번호로 가리킨다(ItemIdentity). 계획도
                 // 같은 번호를 쓰므로, 게임 번호 그대로 두면 목표를 못 찾거나 겹친 둘을 여러 칸짜리
-                // 아이템 하나로 보고 자동 배치가 거절된다.
+                // 아이템 하나로 보고 자동 배치가 거절된다. 읽기(GameReader)처럼 원점으로 만들어야
+                // 여러 칸짜리가 칸마다 다른 번호로 갈라져 아래 가드를 빠져나가지 않는다.
                 var inGrid = grid.Contains(pair.Key.x, pair.Key.y);
-                var identity = inGrid
-                    ? ItemIdentity.Of(instance.InstanceID, grid, pair.Key.x, pair.Key.y,
+                var identity = grid.Contains(instance.XIdx, instance.YIdx)
+                    ? ItemIdentity.Of(instance.InstanceID, grid, instance.XIdx, instance.YIdx,
                         shared.Contains(instance.InstanceID))
                     : instance.InstanceID;
 
