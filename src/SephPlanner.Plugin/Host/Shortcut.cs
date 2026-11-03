@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.Controls;
 
 namespace SephPlanner.Plugin.Host
 {
@@ -32,20 +31,7 @@ namespace SephPlanner.Plugin.Host
 
         public IReadOnlyList<KeyCode> Modifiers => _modifiers ?? Array.Empty<KeyCode>();
 
-        public bool IsDown()
-        {
-            if (MainKey == KeyCode.None || !KeyInput.Pressed(MainKey)) return false;
-            var modifiers = Modifiers;
-            foreach (var modifier in modifiers)
-            {
-                if (!KeyInput.Held(modifier)) return false;
-            }
-            foreach (var key in KeyInput.Keys)
-            {
-                if (key != MainKey && KeyInput.Held(key) && !modifiers.Contains(key)) return false;
-            }
-            return true;
-        }
+        public bool IsDown() => KeyInput.IsDown(this);
 
         public string Serialize() =>
             MainKey == KeyCode.None ? "" : string.Join(" + ", new[] { MainKey }.Concat(Modifiers).Select(key => key.ToString()));
@@ -94,17 +80,24 @@ namespace SephPlanner.Plugin.Host
     {
         private static readonly Dictionary<KeyCode, Key> Map = BuildMap();
 
-        public static readonly KeyCode[] Keys = Map.Keys.ToArray();
+        private static readonly Key[] PhysicalKeys = Map.Values.Distinct().ToArray();
 
-        public static bool Held(KeyCode code) => Control(code)?.isPressed == true;
+        /// <summary>
+        /// 물리 키마다 이름 하나. 별칭이 함께 잡히면 단축키 지정이 "RightAlt + AltGr + K" 처럼 같은 키를 두 번 적는다.
+        /// </summary>
+        public static readonly KeyCode[] Keys = Map.GroupBy(pair => pair.Value).Select(group => group.Min(pair => pair.Key)).ToArray();
 
-        public static bool Pressed(KeyCode code) => Control(code)?.wasPressedThisFrame == true;
+        public static bool Held(KeyCode code) => Map.TryGetValue(code, out var key) && Held(key);
 
-        private static KeyControl Control(KeyCode code)
-        {
-            var keyboard = Keyboard.current;
-            return keyboard != null && Map.TryGetValue(code, out var key) ? keyboard[key] : null;
-        }
+        public static bool Pressed(KeyCode code) => Map.TryGetValue(code, out var key) && Pressed(key);
+
+        public static bool IsDown(Shortcut shortcut) =>
+            shortcut.MainKey != KeyCode.None &&
+            ShortcutMatch.IsDown(shortcut.MainKey, shortcut.Modifiers, Map, PhysicalKeys, Pressed, Held);
+
+        private static bool Held(Key key) => Keyboard.current?[key].isPressed == true;
+
+        private static bool Pressed(Key key) => Keyboard.current?[key].wasPressedThisFrame == true;
 
         private static Dictionary<KeyCode, Key> BuildMap()
         {

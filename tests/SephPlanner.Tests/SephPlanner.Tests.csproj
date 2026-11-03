@@ -33,6 +33,7 @@
     <Compile Include="..\..\src\SephPlanner.Plugin\FrameCost.cs" Link="Plugin\FrameCost.cs" />
     <Compile Include="..\..\src\SephPlanner.Plugin\GameBinding.cs" Link="Plugin\GameBinding.cs" />
     <Compile Include="..\..\src\SephPlanner.Plugin\Host\Setting.cs" Link="Plugin\Host\Setting.cs" />
+    <Compile Include="..\..\src\SephPlanner.Plugin\Host\ShortcutMatch.cs" Link="Plugin\Host\ShortcutMatch.cs" />
     <Compile Include="..\..\src\SephPlanner.DataTool\Prediction\*.cs" Link="Prediction\%(Filename)%(Extension)" />
     <Compile Include="..\..\src\SephPlanner.DataTool\PlanReproduce.cs" Link="DataTool\PlanReproduce.cs" />
     <Compile Include="..\..\src\SephPlanner.DataTool\CommandLine.cs" Link="DataTool\CommandLine.cs" />
