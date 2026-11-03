@@ -207,6 +207,13 @@ ItemEntity:         id, aName, aFlavorText, categories, cost, rarity, icon, type
 여러 칸을 차지하는 아이템은 `inventoryMatrix`의 여러 칸에 같은 인스턴스가 들어 있으므로
 `InstanceID`로 중복을 제거해야 한다.
 
+**서로 다른 아이템이 같은 `InstanceID` 를 쓸 수 있다**(1.1.1, 자동 제보 `3f51b7fd`·`4dd465fb`·`5be39302`). 칸마다
+`XIdx`·`YIdx` 가 제 칸을 가리키는 별개의 아이템이고, 석판이면 `StoneTablet` 도 둘이라 게임은 둘 다 적용한다. 해골의
+시작 석판 저주(12000, 질의 `CHECKERBOARD2 1` / `CHECKERBOARD -1`)가 새 판 직후 `(0,0)`·`(1,0)` 에 이렇게 둘 있었다.
+후보 경로는 `PlayerSpawner.RestartNewGame` → `GridInventory.RestockStartingItem` 으로, 시작 아이템 목록을 원래 번호
+그대로 다시 넣는다(옛 것이 왜 남았는지는 미확인). 그래서 중복 제거는 번호가 아니라 **원점이 같은지**로 해야 한다.
+번호로 가리킬 수 없는 그런 아이템은 칸 번호를 주고 못 옮기게 한다(`ItemIdentity`).
+
 ### 로컬 플레이어 접근 경로
 
 ```
