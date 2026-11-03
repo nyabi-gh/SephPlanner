@@ -77,7 +77,8 @@ scripts/check.ps1
 dotnet build src/SephPlanner.Workshop -c Release -p:PackWorkshop=true -p:DeployToWorkshopLocal=true
 ```
 
-- 패키지는 `metadata.json`, `bin/SephPlanner.Plugin.dll`·`bin/SephPlanner.Core.dll`, 있으면 `thumbnail.png` 다. 원본은
+- 패키지는 `metadata.json`, `bin/SephPlanner.Plugin.dll`·`bin/SephPlanner.Core.dll`, `thumbnail.png` 다. 썸네일이 없거나
+  1,000,000바이트 이상이면 게임이 올리기를 거절한다(`WorkshopUploadPreparer`). 원본은
   `src/SephPlanner.Workshop/package/` 에 있고 `metadata.json` 의 `version` 은 `check.ps1` 이 `Directory.Build.props` 와 대조한다.
   멀티 로비가 이 값으로 모드 판을 견주므로 내용을 바꾸면 반드시 올린다.
 - `modId` 는 `nyabi.sephplanner` 다. 공개한 뒤에는 바꾸지 않는다 - 다른 모드가 되고 모드 옵션에 저장된 설정도 끊긴다.
@@ -95,6 +96,9 @@ dotnet build src/SephPlanner.Workshop -c Release -p:PackWorkshop=true -p:DeployT
 고르고 "창작마당에 올리기" 를 누르면 올라가고 DLL 이 들었으므로 검수에 저절로 접수된다. 그 뒤 게임이
 `WorkshopLocal/sephplanner/` 에 만드는 `uploadticket.json` 이 창작마당 글 번호를 들고 있다 - 지우면 다음에 올릴 때 새 글이
 생긴다(위 배치 명령은 이 파일을 지우지 않는다). 처음에는 "목록에 없음" 으로 올라가므로 직접 구독해 돌려 본 뒤 공개로 바꾼다.
+게임은 미리보기 한 장만 올린다(`SetItemPreview`). 스크린샷 같은 추가 이미지는 Steam 글 페이지에서 넣는다. 창작마당 창은
+열 때와 게임 창으로 돌아올 때 `WorkshopLocal` 을 다시 읽고 올릴 파일은 누르는 순간 읽으므로, 다시 지은 뒤 게임을 껐다 켤
+필요는 없다.
 
 게임 안에서 F10을 누르면 그 순간의 상태가 `%LOCALAPPDATA%\SephPlanner\inventory-snapshot.json`
 으로 남는다. 그 스냅샷으로 우리 레벨 계산이 게임 값과 맞는지 게임 없이 다시 볼 수 있다. 어긋나는
