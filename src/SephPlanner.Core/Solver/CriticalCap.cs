@@ -66,8 +66,8 @@ namespace SephPlanner.Core.Solver
                 if (PlacementSolver.Reason(charm, cell, result, problem.Grid, occupancy) != CharmInactiveReason.None) continue;
 
                 var level = Math.Min(result.EffectiveLevel(cell, charm.Enchant), charm.Definition.MaxLevel);
-                direct += Amount(charm.Definition, Critical, level, problem.Tablets.Count);
-                magic += Amount(charm.Definition, MagicCritical, level, problem.Tablets.Count);
+                direct += Amount(charm.Definition, Critical, level, problem.StoneTabletCount);
+                magic += Amount(charm.Definition, MagicCritical, level, problem.StoneTabletCount);
                 execution |= charm.Definition.Behavior == Scythe;
             }
 

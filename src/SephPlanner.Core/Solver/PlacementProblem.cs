@@ -186,6 +186,21 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         public Dictionary<int, int> PinnedTablets { get; set; } = new Dictionary<int, int>();
 
+        /// <summary>가방의 석판 수. 게임(<c>CurrentStoneTabletsCount</c>)처럼 옮길 수 없는 석판도 센다.</summary>
+        internal int StoneTabletCount => Tablets.Count + PinnedTablets.Count;
+
+        /// <summary>
+        /// 가방에 없는 것을 시험 삼아 넣을 때 쓸 번호. 칸에서 만든 음수 번호(<see cref="Runtime.ItemIdentity"/>)와
+        /// 부딪히지 않게 지금 쓰는 가장 작은 번호보다 아래에서 고른다.
+        /// </summary>
+        internal int UnusedInstanceId()
+        {
+            var lowest = 0;
+            foreach (var charm in Charms) lowest = Math.Min(lowest, charm.InstanceId);
+            foreach (var tablet in Tablets) lowest = Math.Min(lowest, tablet.InstanceId);
+            return lowest - 1;
+        }
+
         /// <summary>고정 각인이 절대 좌표에 박아 둔 칸 효과. 역시 주어진 조건이다.</summary>
         public List<FixedEffectCell> FixedEffects { get; set; } = new List<FixedEffectCell>();
 

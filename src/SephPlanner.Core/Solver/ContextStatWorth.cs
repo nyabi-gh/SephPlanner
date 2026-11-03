@@ -45,7 +45,7 @@ namespace SephPlanner.Core.Solver
         private static int Count(PlacementProblem problem, CharmSlot charm, GridPos cell, ContextStatBonus bonus,
             IReadOnlyDictionary<GridPos, CharmSlot>? neighbors, bool estimate)
         {
-            if (bonus.Source == StatCountSource.StoneTablets) return problem.Tablets.Count;
+            if (bonus.Source == StatCountSource.StoneTablets) return problem.StoneTabletCount;
             if (bonus.Source == StatCountSource.RowCategory)
                 return charm.Definition.LineCategories.Count > 0 &&
                        (estimate || PositionalWorth.LineCategory(charm.Definition, cell) == bonus.Category) ? 1 : 0;

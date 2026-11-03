@@ -140,6 +140,12 @@ public class PlanBuilderTests
             Assert.True(plan.Best.AppliedTablets[id]);
         }
         Assert.DoesNotContain(plan.Best.CharmPositions[10], new[] { new GridPos(0, 0), new GridPos(1, 0) });
+
+        // 석판 수에 비례하는 능력치는 게임처럼 두 장을 다 센다. 상점·합성 조언이 시험 삼아 넣는 것은
+        // 칸 번호 -1·-2 와 부딪히지 않는 번호를 받는다.
+        var problem = plan.Work!.Problem;
+        Assert.Equal(2, problem.StoneTabletCount);
+        Assert.True(problem.UnusedInstanceId() < -2);
     }
 
     [Fact]

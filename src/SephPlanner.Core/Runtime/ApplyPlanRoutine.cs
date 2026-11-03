@@ -766,7 +766,8 @@ namespace SephPlanner.Core.Runtime
             {
                 foreach (var target in _command.Targets)
                 {
-                    if (!target.IsTablet) continue;
+                    // 못 옮기는 석판은 칸에서 만든 번호라 게임에서 찾을 수 없고, 목표 각도도 지금 각도다.
+                    if (!target.IsTablet || target.Immovable) continue;
 
                     if (!_port.Alive ||
                         !_port.TryFindTablet(target.InstanceId, out var cell, out var rotation, out var rotatable))

@@ -247,6 +247,27 @@ public class ApplyPlanRoutineTests
     }
 
     /// <summary>
+    /// 같은 게임 번호를 쓰는 석판 둘은 칸 번호로 가리키므로 회전 단계에서 번호로 찾으면 못 찾는다.
+    /// 제자리·제 각도가 목표이니 건너뛰고 나머지 이동을 마쳐야 한다.
+    /// </summary>
+    [Fact]
+    public void AnImmovableTabletIsNotLookedUpForRotation()
+    {
+        var (inventory, clock) = Host();
+        inventory.Cells[At(0, 0)] = 10;
+        inventory.Unnumbered.Add(At(2, 1));
+
+        var pinned = Tablet(-9, At(2, 1), At(2, 1), 0, 0);
+        pinned.Immovable = true;
+        var routine = Routine(Command(pinned, Charm(10, At(0, 0), At(1, 0))), inventory, clock);
+        Drive(routine, inventory, clock);
+
+        Assert.Equal(10, inventory.InstanceAt(At(1, 0)));
+        Assert.True(routine.Settled);
+        AssertContains("자동 배치 완료", routine.Result.Korean);
+    }
+
+    /// <summary>
     /// 번호 없는 칸은 <c>InstanceAt</c> 이 0 을 돌려주어 빈 칸처럼 보인다. 거기로 밀어 넣으면
     /// 게임 안에서 무슨 일이 나는지 모르므로 옮기기 전에 멈춘다.
     /// </summary>

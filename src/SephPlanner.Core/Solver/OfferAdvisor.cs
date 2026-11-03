@@ -180,7 +180,7 @@ namespace SephPlanner.Core.Solver
             var baseScore = layouts.Baseline(problem, faster).Score;
 
             var advice = new List<OfferAdvice>();
-            var nextInstanceId = -1;
+            var nextInstanceId = problem.UnusedInstanceId();
 
             foreach (var candidate in candidates)
             {

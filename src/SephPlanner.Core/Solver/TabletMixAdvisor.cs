@@ -259,7 +259,7 @@ namespace SephPlanner.Core.Solver
                     var mixedSlot = new TabletSlot
                     {
                         Definition = mixedDefinition,
-                        InstanceId = -1,
+                        InstanceId = trial.UnusedInstanceId(),
                         InstanceQuery = mixed.Query,
                         InstanceConditionQuery = mixed.ConditionQuery.Length > 0 ? mixed.ConditionQuery : null,
                         Rotatable = mixed.Rotatable,
