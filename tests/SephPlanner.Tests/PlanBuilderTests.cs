@@ -94,6 +94,54 @@ public class PlanBuilderTests
         Assert.Equal(PlanVerificationStatus.Passed, plan.Verification.Status);
     }
 
+    /// <summary>
+    /// 해골로 새 판을 시작하면 저주가 같은 게임 번호로 둘 들어온다(제보 4dd465fb·5be39302). 둘 다 효과를
+    /// 내므로 체커보드가 서로 지워 두 석판 칸에만 1 이 남는다. 하나만 세면 나머지가 "원본 없는 고정 효과"
+    /// 로 보이고, 번호로 가리킬 수 없으니 둘 다 제자리에 둔다.
+    /// </summary>
+    [Fact]
+    public void TabletsSharingAGameNumberBothCountAndStayPut()
+    {
+        const int curse = 12000;
+        var catalog = new Catalog(
+            new[] { new TabletDefinition { Id = "Curse", EntityId = curse, Query = "CHECKERBOARD2 1\nCHECKERBOARD -1" } },
+            new[] { new CharmDefinition { Id = "C", EntityId = CharmEntity, MaxLevel = 5 } });
+
+        var inventory = new InventoryState { Width = 6, Height = 7, Storage = 6 };
+        foreach (var x in new[] { 0, 1 })
+        {
+            inventory.Tablets.Add(new PlacedTablet
+            {
+                DefinitionId = curse,
+                InstanceId = -(x + 1),
+                Position = new GridPos(x, 0),
+                IsApplied = true,
+                Immovable = true,
+            });
+        }
+        inventory.Items.Add(new PlacedItem
+        {
+            DefinitionId = CharmEntity,
+            InstanceId = 10,
+            Position = new GridPos(3, 0),
+            IsActive = true,
+        });
+        for (var x = 0; x < 6; x++) inventory.LevelMatrix[x + ",0"] = x < 2 ? 1 : 0;
+
+        var plan = PlanBuilder.Build(new GameSnapshot { Inventory = inventory, Run = new RunState() }, catalog)!;
+
+        Assert.Equal(PlanVerificationStatus.Passed, plan.Verification.Status);
+        foreach (var id in new[] { -1, -2 })
+        {
+            var target = plan.Targets.Single(value => value.InstanceId == id);
+            Assert.True(target.IsTablet);
+            Assert.True(target.Immovable);
+            Assert.Equal(target.From, target.To);
+            Assert.True(plan.Best.AppliedTablets[id]);
+        }
+        Assert.DoesNotContain(plan.Best.CharmPositions[10], new[] { new GridPos(0, 0), new GridPos(1, 0) });
+    }
+
     [Fact]
     public void TheApplyCommandCarriesTheLevelsItExpectsAfterwards()
     {

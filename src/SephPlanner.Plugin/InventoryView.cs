@@ -51,7 +51,8 @@ namespace SephPlanner.Plugin
                     view.Enchants[position] = GameReader.EnchantOf(instance.InstanceID);
             }
 
-            var seen = new HashSet<int>();
+            // 같은 번호의 석판이 둘일 수 있다(ItemIdentity). 게임은 둘 다 적용하므로 객체로 가린다.
+            var seen = new HashSet<StoneTablet>();
             var sources = new List<string>();
             foreach (var pair in inv.stoneTablets) view.Add(inv, pair.Value, seen, sources);
             foreach (var engraving in inv.engravings) view.Add(inv, engraving, seen, sources);
@@ -76,14 +77,14 @@ namespace SephPlanner.Plugin
             return value;
         }
 
-        private void Add(GridInventory inv, StoneTablet tablet, HashSet<int> seen, List<string> sources)
+        private void Add(GridInventory inv, StoneTablet tablet, HashSet<StoneTablet> seen, List<string> sources)
         {
             if (tablet == null)
             {
                 Severed++;
                 return;
             }
-            if (!seen.Add(tablet.instanceID)) return;
+            if (!seen.Add(tablet)) return;
 
             Tablets.Add(tablet);
             if (!AppliedRangeIsCurrent(inv, tablet)) Stale.Add(tablet);

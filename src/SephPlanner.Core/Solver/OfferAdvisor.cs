@@ -416,6 +416,9 @@ namespace SephPlanner.Core.Solver
             foreach (var charm in problem.Charms.OrderBy(value => value.InstanceId))
             {
                 if (charm.Retained || charm.Definition.CannotDiscard) continue;
+
+                // 효과를 내는 석판이 칸을 막으려고 세운 채움이다. 채움만 덜면 석판은 남은 채 칸만 빈다.
+                if (problem.PinnedTablets.ContainsKey(charm.InstanceId)) continue;
                 var trial = Clone(problem);
                 trial.Charms.RemoveAll(value => value.InstanceId == charm.InstanceId);
                 trial.CurrentCharms.Remove(charm.InstanceId);
@@ -535,6 +538,7 @@ namespace SephPlanner.Core.Solver
                 Charms = new List<CharmSlot>(problem.Charms),
                 Tablets = new List<TabletSlot>(problem.Tablets),
                 FixedTablets = problem.FixedTablets,
+                PinnedTablets = problem.PinnedTablets,
                 FixedEffects = problem.FixedEffects,
                 ComboEngraving = problem.ComboEngraving,
                 ComboCounts = problem.ComboCounts,

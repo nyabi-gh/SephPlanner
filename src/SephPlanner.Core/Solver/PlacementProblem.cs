@@ -179,6 +179,13 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         public List<TabletPlacement> FixedTablets { get; set; } = new List<TabletPlacement>();
 
+        /// <summary>
+        /// 옮길 수 없는 석판(<see cref="Runtime.PlacedTablet.Immovable"/>)의 번호와 <see cref="FixedTablets"/>
+        /// 안의 순번. 효과는 거기서 내고, 칸은 같은 번호의 못 옮기는 채움(<see cref="Charms"/>)이 막는다 -
+        /// 채움은 석판처럼 "아티팩트가 아닌 아이템" 으로 칸을 차지하므로 조건 판정도 같다.
+        /// </summary>
+        public Dictionary<int, int> PinnedTablets { get; set; } = new Dictionary<int, int>();
+
         /// <summary>고정 각인이 절대 좌표에 박아 둔 칸 효과. 역시 주어진 조건이다.</summary>
         public List<FixedEffectCell> FixedEffects { get; set; } = new List<FixedEffectCell>();
 

@@ -2379,6 +2379,16 @@ namespace SephPlanner.Core.Solver
                     new TabletSpot(layout[i].Position, layout[i].Rotation);
             }
 
+            // 시뮬레이터에는 옮길 석판 뒤에 고정 석판이 이어 붙는다(WithFixed).
+            foreach (var pair in problem.PinnedTablets)
+            {
+                var index = layout.Count + pair.Value;
+                if (index >= result.Applied.Length) continue;
+                var pinned = problem.FixedTablets[pair.Value];
+                arrangement.AppliedTablets[pair.Key] = result.Applied[index];
+                arrangement.TabletPositions[pair.Key] = new TabletSpot(pinned.Position, pinned.Rotation);
+            }
+
             // 하얀 종이 같은 이웃 의존 가치를 최종 배치 기준으로 다시 매긴다.
             var neighbors = CharmsByCell(problem, positions);
 

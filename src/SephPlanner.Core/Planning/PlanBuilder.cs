@@ -258,8 +258,15 @@ namespace SephPlanner.Core.Planning
                 .ToList();
 
             var layout = new List<TabletPlacement>();
+            var pinnedTablets = new List<PlacedTablet>();
             foreach (var tablet in orderedTablets)
             {
+                if (tablet.Immovable)
+                {
+                    pinnedTablets.Add(tablet);
+                    continue;
+                }
+
                 var definition = catalog.Tablet(tablet.DefinitionId) ?? new TabletDefinition();
                 var slot = new TabletSlot
                 {
@@ -340,11 +347,37 @@ namespace SephPlanner.Core.Planning
                 problem.CurrentCharms[item.InstanceId] = item.Position;
             }
 
+            foreach (var tablet in pinnedTablets)
+            {
+                var definition = catalog.Tablet(tablet.DefinitionId) ?? new TabletDefinition();
+                problem.PinnedTablets[tablet.InstanceId] = problem.FixedTablets.Count;
+                problem.FixedTablets.Add(new TabletPlacement
+                {
+                    Definition = definition,
+                    Position = tablet.Position,
+                    Rotation = tablet.Rotation,
+                    InstanceQuery = tablet.Query,
+                    InstanceConditionQuery = tablet.ConditionQuery,
+                    InstanceName = tablet.Name,
+                });
+                problem.Charms.Add(new CharmSlot
+                {
+                    Definition = new CharmDefinition(),
+                    InstanceId = tablet.InstanceId,
+                    IsFiller = true,
+                    Immovable = true,
+                });
+                positions[tablet.InstanceId] = tablet.Position;
+                problem.CurrentCharms[tablet.InstanceId] = tablet.Position;
+            }
+
             if (problem.Charms.All(charm => charm.IsFiller))
             {
                 // 격자가 빈 것과, 물건은 있는데 우리가 하나도 못 알아본 것은 사람이 할 일이 다르다.
                 // 뒤엣것은 대개 카탈로그가 낡아서이므로 다시 덤프하라고 일러야 한다.
-                blocker = problem.Charms.Count > 0 ? PlanBlocker.UnknownItems : PlanBlocker.NoCharms;
+                blocker = problem.Charms.Any(charm => !problem.PinnedTablets.ContainsKey(charm.InstanceId))
+                    ? PlanBlocker.UnknownItems
+                    : PlanBlocker.NoCharms;
                 return null;
             }
 
@@ -570,12 +603,16 @@ namespace SephPlanner.Core.Planning
             foreach (var charm in problem.Charms)
             {
                 if (!best.CharmPositions.TryGetValue(charm.InstanceId, out var position)) continue;
+                var pinned = problem.PinnedTablets.TryGetValue(charm.InstanceId, out var fixedIndex);
                 targets.Add(new PlanTarget
                 {
                     InstanceId = charm.InstanceId,
                     From = problem.CurrentCharms[charm.InstanceId],
                     To = position,
                     Immovable = charm.Immovable,
+                    IsTablet = pinned,
+                    FromRotation = pinned ? problem.FixedTablets[fixedIndex].Rotation : 0,
+                    Rotation = pinned ? problem.FixedTablets[fixedIndex].Rotation : 0,
                 });
             }
             return targets;

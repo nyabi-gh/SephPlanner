@@ -14,14 +14,14 @@ public class ItemIdentityTests
     [Fact]
     public void GameNumbersPassThrough()
     {
-        Assert.Equal(12345, ItemIdentity.Of(12345, Grid, 3, 4));
+        Assert.Equal(12345, ItemIdentity.Of(12345, Grid, 3, 4, shared: false));
     }
 
     [Fact]
     public void UnnumberedItemsTakeANegativeNumberFromTheirCell()
     {
-        Assert.Equal(-(Grid.ToIndex(0, 0) + 1), ItemIdentity.Of(0, Grid, 0, 0));
-        Assert.Equal(-(Grid.ToIndex(5, 6) + 1), ItemIdentity.Of(0, Grid, 5, 6));
+        Assert.Equal(-(Grid.ToIndex(0, 0) + 1), ItemIdentity.Of(0, Grid, 0, 0, shared: false));
+        Assert.Equal(-(Grid.ToIndex(5, 6) + 1), ItemIdentity.Of(0, Grid, 5, 6, shared: false));
     }
 
     [Fact]
@@ -31,9 +31,19 @@ public class ItemIdentityTests
         for (var y = 0; y < Grid.Height; y++)
             for (var x = 0; x < Grid.Width; x++)
             {
-                var identity = ItemIdentity.Of(0, Grid, x, y);
+                var identity = ItemIdentity.Of(0, Grid, x, y, shared: false);
                 Assert.True(identity < 0, $"({x},{y}) -> {identity}");
                 Assert.True(seen.Add(identity), $"({x},{y}) 가 다른 칸과 같은 번호 {identity}");
             }
+    }
+
+    [Fact]
+    public void SharedNumbersTakeTheirCellInstead()
+    {
+        Assert.Equal(-(Grid.ToIndex(0, 0) + 1), ItemIdentity.Of(1845484121, Grid, 0, 0, shared: true));
+        Assert.Equal(-(Grid.ToIndex(1, 0) + 1), ItemIdentity.Of(1845484121, Grid, 1, 0, shared: true));
+        Assert.False(ItemIdentity.Addressable(1845484121, shared: true));
+        Assert.False(ItemIdentity.Addressable(0, shared: false));
+        Assert.True(ItemIdentity.Addressable(1845484121, shared: false));
     }
 }

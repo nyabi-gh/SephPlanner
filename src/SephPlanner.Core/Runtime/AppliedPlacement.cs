@@ -99,6 +99,7 @@ namespace SephPlanner.Core.Runtime
                     ObservedCategories = item.ObservedCategories,
                     EffectiveLevel = now.EffectiveLevel,
                     IsActive = now.IsActive,
+                    Immovable = item.Immovable,
                     Arrived = item.Arrived && target.To == item.Position,
                 });
             }
@@ -119,6 +120,7 @@ namespace SephPlanner.Core.Runtime
                     ConditionQuery = tablet.ConditionQuery,
                     Name = tablet.Name,
                     IsApplied = now.IsApplied,
+                    Immovable = tablet.Immovable,
                 });
             }
 

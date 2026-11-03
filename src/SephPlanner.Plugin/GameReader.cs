@@ -302,6 +302,7 @@ namespace SephPlanner.Plugin
             };
 
             var grid = GridOf(inv);
+            var shared = SharedInstances(inv);
             var seenItems = new HashSet<int>();
             var sided = new HashSet<int>();
             foreach (var pair in inv.inventoryMatrix)
@@ -315,7 +316,8 @@ namespace SephPlanner.Plugin
                 // 진단이 필요할 때는 F10 덤프가 딕셔너리를 있는 그대로 보여준다.
                 if (!grid.Contains(instance.XIdx, instance.YIdx)) continue;
 
-                var identity = ItemIdentity.Of(instance.InstanceID, grid, instance.XIdx, instance.YIdx);
+                var isShared = shared.Contains(instance.InstanceID);
+                var identity = ItemIdentity.Of(instance.InstanceID, grid, instance.XIdx, instance.YIdx, isShared);
                 if (!seenItems.Add(identity)) continue;
                 if (instance.Charm != null && ScalesPosition.FollowsPriority(instance.Charm.GetType().Name))
                     sided.Add(identity);
@@ -324,7 +326,7 @@ namespace SephPlanner.Plugin
                 {
                     DefinitionId = instance.EntityID,
                     InstanceId = identity,
-                    Immovable = instance.InstanceID == 0,
+                    Immovable = !ItemIdentity.Addressable(instance.InstanceID, isShared),
                     ObservedCategories = ReportsCategories(instance.Charm)
                         ? new List<string>(instance.Charm.GetItemCategory()) : null,
                     Position = new GridPos(instance.XIdx, instance.YIdx),
@@ -341,13 +343,17 @@ namespace SephPlanner.Plugin
             }
 
             var layer = FixedEffectLayer.Get(inv);
-            var seenTablets = new HashSet<int>();
+            var seenTablets = new HashSet<StoneTablet>();
             foreach (var pair in inv.stoneTablets)
             {
                 var tablet = pair.Value;
-                if (tablet == null || !seenTablets.Add(tablet.instanceID)) continue;
+                if (tablet == null || !seenTablets.Add(tablet)) continue;
 
-                state.Tablets.Add(Describe(tablet, layer.View));
+                var described = Describe(tablet, layer.View);
+                var isShared = shared.Contains(tablet.instanceID);
+                described.InstanceId = ItemIdentity.Of(tablet.instanceID, grid, tablet.xIdx, tablet.yIdx, isShared);
+                described.Immovable = !ItemIdentity.Addressable(tablet.instanceID, isShared);
+                state.Tablets.Add(described);
             }
 
             foreach (var engraving in inv.engravings)
@@ -434,6 +440,27 @@ namespace SephPlanner.Plugin
             ConditionQuery = tablet.isCustomTablet ? tablet.GetConditionQuery(tablet.instanceID) : null,
             Name = DungeonManager.GetItemName(tablet.instanceID, null),
         };
+
+        /// <summary>
+        /// 격자 안에서 서로 다른 아이템이 함께 쓰는 게임 번호(<see cref="ItemIdentity"/>). 여러 칸에 걸친
+        /// 아이템 하나는 칸마다 같은 원점을 가리키므로 여기 들지 않는다 - 그것은 적용기가 따로 거절한다.
+        /// </summary>
+        internal static HashSet<int> SharedInstances(GridInventory inv)
+        {
+            var grid = GridOf(inv);
+            var origins = new Dictionary<int, GridPos>();
+            var shared = new HashSet<int>();
+            foreach (var pair in inv.inventoryMatrix)
+            {
+                var instance = pair.Value;
+                if (instance == null || instance.InstanceID == 0 || !grid.Contains(pair.Key.x, pair.Key.y)) continue;
+
+                var origin = new GridPos(instance.XIdx, instance.YIdx);
+                if (!origins.TryGetValue(instance.InstanceID, out var known)) origins[instance.InstanceID] = origin;
+                else if (known != origin) shared.Add(instance.InstanceID);
+            }
+            return shared;
+        }
 
         /// <summary>
         /// 살아 있는 인벤토리를 솔버가 쓰는 격자 규격으로. 칸 안팎을 가리는 판정이 이것 하나로

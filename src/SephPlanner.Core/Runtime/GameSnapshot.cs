@@ -260,6 +260,12 @@ namespace SephPlanner.Core.Runtime
         public bool AppliedRangeStale { get; set; }
 
         /// <summary>
+        /// 옮길 수 없는 석판. 게임 번호로 이 석판 하나를 가리킬 수 없을 때다(<see cref="ItemIdentity"/>).
+        /// 효과와 칸은 그대로 세고 지금 자리에 못 박는다.
+        /// </summary>
+        public bool Immovable { get; set; }
+
+        /// <summary>
         /// 이 인스턴스를 지금 돌릴 수 있는지. 저주는 돌릴 수 있던 석판을 잠그고, 석판 합성은
         /// 반대로 정의상 돌릴 수 없는 합성 석판을 돌릴 수 있게 풀기 때문에 정의값과 별개다
         /// (<c>DungeonManager.IsTabletRotatable</c>). 비어 있으면 정의값을 쓴다 — 참을 기본값으로

@@ -185,6 +185,7 @@ namespace SephPlanner.Plugin
             // 칸 수는 격자 안팎을 가리지 않고 센다. 열린 격자 경계에 걸친 아이템을 격자 안 칸만으로
             // 세면 한 칸짜리로 보여 가드를 빠져나가고, 한 칸짜리 맞바꿈이 그 아이템을 찢는다.
             var grid = GameReader.GridOf(inventory);
+            var shared = GameReader.SharedInstances(inventory);
             var cellCounts = new Dictionary<int, int>();
             var touchesGrid = new HashSet<int>();
             foreach (var pair in inventory.inventoryMatrix)
@@ -192,11 +193,13 @@ namespace SephPlanner.Plugin
                 var instance = pair.Value;
                 if (instance == null) continue;
 
-                // 번호 없는 아이템은 칸에서 만든 번호로 가리킨다(ItemIdentity). 계획도 같은
-                // 번호를 쓰므로, 여기서 0 그대로 두면 목표를 못 찾아 자동 배치가 거절된다.
+                // 번호가 없거나 겹치는 아이템은 칸에서 만든 번호로 가리킨다(ItemIdentity). 계획도
+                // 같은 번호를 쓰므로, 게임 번호 그대로 두면 목표를 못 찾거나 겹친 둘을 여러 칸짜리
+                // 아이템 하나로 보고 자동 배치가 거절된다.
                 var inGrid = grid.Contains(pair.Key.x, pair.Key.y);
                 var identity = inGrid
-                    ? ItemIdentity.Of(instance.InstanceID, grid, pair.Key.x, pair.Key.y)
+                    ? ItemIdentity.Of(instance.InstanceID, grid, pair.Key.x, pair.Key.y,
+                        shared.Contains(instance.InstanceID))
                     : instance.InstanceID;
 
                 cellCounts[identity] = cellCounts.TryGetValue(identity, out var count) ? count + 1 : 1;
@@ -218,7 +221,9 @@ namespace SephPlanner.Plugin
             foreach (var pair in inventory.stoneTablets)
             {
                 var tablet = pair.Value;
-                if (tablet != null) tablets[tablet.instanceID] = tablet;
+                if (tablet != null)
+                    tablets[ItemIdentity.Of(tablet.instanceID, grid, tablet.xIdx, tablet.yIdx,
+                        shared.Contains(tablet.instanceID))] = tablet;
             }
 
             var liveItems = new List<LivePlanItem>();
