@@ -5,6 +5,7 @@
 ### Added
 
 - 스팀 창작마당에서 구독해 설치할 수 있습니다. 처음 켜면 BepInEx 판에서 쓰던 설정을 가져옵니다. 오류 진단 전송은 이 판에서 보낼 내용을 보여 주고 다시 동의를 묻습니다.
+- BepInEx 판을 쓰던 분은 게임 폴더의 `BepInEx/plugins` 에서 `SephPlanner.Core.dll` 과 `SephPlanner.Plugin.dll` 을 지워야 창작마당 판이 켜집니다. 둘 다 깔려 있으면 BepInEx 판만 켜집니다.
 
 ### Changed
 
