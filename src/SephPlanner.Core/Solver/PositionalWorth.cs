@@ -127,12 +127,12 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         public static double ComboWorth(
             PlacementProblem problem, CharmSlot charm, GridPos cell,
-            IReadOnlyDictionary<GridPos, CharmSlot>? neighbors)
+            Dictionary<GridPos, CharmSlot>? neighbors)
             => ComboWorth(problem, charm, cell, neighbors, default);
 
         internal static double ComboWorth(
             PlacementProblem problem, CharmSlot charm, GridPos cell,
-            IReadOnlyDictionary<GridPos, CharmSlot>? neighbors, in CharmActivity activity)
+            Dictionary<GridPos, CharmSlot>? neighbors, in CharmActivity activity)
         {
             if (problem.Combos is null || !ComboCounting.IsPositional(charm.Definition)) return 0;
 

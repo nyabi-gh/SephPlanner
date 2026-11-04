@@ -10,7 +10,7 @@ namespace SephPlanner.Core.Solver
     {
         internal static double Value(PlacementProblem problem, CharmSlot charm, int level,
             SimulationResult? result = null, GridOccupancy? occupancy = null,
-            IReadOnlyDictionary<GridPos, CharmSlot>? neighbors = null)
+            Dictionary<GridPos, CharmSlot>? neighbors = null)
         {
             var value = charm.Worth.WeightedAt(level, charm.Weight);
             if (charm.Worth.Source == CharmWorthSource.Curated) return value;
@@ -26,9 +26,10 @@ namespace SephPlanner.Core.Solver
             return value;
         }
 
+        // 이웃을 구체 형으로 받는다 - 인터페이스로 돌면 아티팩트마다 열거자를 상자에 담는다.
         internal static double Weight(PlacementProblem problem, string status, double ownWeight,
             SimulationResult? result, GridOccupancy? occupancy,
-            IReadOnlyDictionary<GridPos, CharmSlot>? neighbors)
+            Dictionary<GridPos, CharmSlot>? neighbors)
         {
             var weight = ownWeight;
             if (ownWeight < 1 || status != "MAGIC_CRITICAL" && status != "MP_REGEN") return weight;

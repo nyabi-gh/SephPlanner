@@ -127,12 +127,13 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         public static int CountFor(
             PlacementProblem problem, CharmSlot charm, string category,
-            IReadOnlyDictionary<GridPos, CharmSlot>? neighbors)
+            Dictionary<GridPos, CharmSlot>? neighbors)
             => CountFor(problem, charm, category, neighbors, default);
 
+        // 구체 형으로 받는다 - 배정 비용 행렬의 칸마다 불려, 인터페이스로 돌면 그때마다 열거자를 상자에 담는다.
         internal static int CountFor(
             PlacementProblem problem, CharmSlot charm, string category,
-            IReadOnlyDictionary<GridPos, CharmSlot>? neighbors, in CharmActivity activity)
+            Dictionary<GridPos, CharmSlot>? neighbors, in CharmActivity activity)
         {
             BaseCounts(problem).TryGetValue(category, out var count);
             if (neighbors is null) return count;

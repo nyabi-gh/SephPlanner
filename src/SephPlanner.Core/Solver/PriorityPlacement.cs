@@ -108,7 +108,7 @@ namespace SephPlanner.Core.Solver
             => PlacementQuality.From(left).CompareTo(PlacementQuality.From(right));
 
         internal static void Describe(
-            PlacementProblem problem, Arrangement arrangement, IReadOnlyDictionary<GridPos, CharmSlot> neighbors)
+            PlacementProblem problem, Arrangement arrangement, Dictionary<GridPos, CharmSlot> neighbors)
         {
             if (problem.PriorityCategories.Count == 0) return;
             var categories = new List<string>();
@@ -130,7 +130,7 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         internal static bool Contribute(
             PlacementProblem problem, CharmSlot charm, bool placed, GridPos cell,
-            IReadOnlyDictionary<GridPos, CharmSlot> neighbors, List<string> categories, ref double progress)
+            Dictionary<GridPos, CharmSlot> neighbors, List<string> categories, ref double progress)
         {
             categories.Clear();
             if (placed) ComboCounting.PositionalCategories(charm, cell, neighbors, categories);

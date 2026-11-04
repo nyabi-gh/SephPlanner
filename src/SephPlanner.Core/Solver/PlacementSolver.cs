@@ -2006,6 +2006,16 @@ namespace SephPlanner.Core.Solver
         private static int Waste(CharmSlot charm, GridPos cell, SimulationResult result) =>
             charm.IsFiller || charm.IsDormant ? 0 : Math.Max(0, result.EffectiveLevel(cell, charm.Enchant) - charm.WorthLevelCap);
 
+        // List.Exists(set.Contains) 는 부를 때마다 대리자를 짓는다. 배정 비용 행렬의 칸마다 불린다.
+        private static bool ContainsAny(HashSet<string> set, List<string> items)
+        {
+            foreach (var item in items)
+            {
+                if (set.Contains(item)) return true;
+            }
+            return false;
+        }
+
         private static Dictionary<GridPos, CharmSlot> CharmsByCell(
             PlacementProblem problem, Dictionary<int, GridPos> positions)
         {
@@ -2073,7 +2083,7 @@ namespace SephPlanner.Core.Solver
                     {
                         comboCategories.Clear();
                         ComboCounting.PositionalCategories(charm, cell, comboNeighbors, comboCategories);
-                        if (comboCategories.Exists(problem.PriorityCategories.Contains)) priority -= unit;
+                        if (ContainsAny(problem.PriorityCategories, comboCategories)) priority -= unit;
                     }
                     if (Preserve(charm) && usable) priority--;
                     var row = charmsAreRows ? charmIndex : cellIndex;

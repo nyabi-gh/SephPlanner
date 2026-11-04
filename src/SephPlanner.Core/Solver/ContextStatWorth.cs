@@ -9,7 +9,7 @@ namespace SephPlanner.Core.Solver
     internal static class ContextStatWorth
     {
         internal static double Value(PlacementProblem problem, CharmSlot charm, GridPos cell, int level,
-            IReadOnlyDictionary<GridPos, CharmSlot>? neighbors, bool estimate = false,
+            Dictionary<GridPos, CharmSlot>? neighbors, bool estimate = false,
             SimulationResult? result = null, GridOccupancy? occupancy = null)
         {
             if (charm.Worth.Source == CharmWorthSource.Curated) return charm.Worth.WeightedAt(level, charm.Weight);
