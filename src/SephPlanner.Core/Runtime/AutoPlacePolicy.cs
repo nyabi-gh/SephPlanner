@@ -1,5 +1,6 @@
 ﻿using SephPlanner.Core.Planning;
 using SephPlanner.Core.Solver;
+using SephPlanner.Core.Text;
 using static SephPlanner.Core.Text.Localization;
 
 namespace SephPlanner.Core.Runtime
@@ -14,6 +15,9 @@ namespace SephPlanner.Core.Runtime
         public string CurrentPlacementFingerprint { get; set; } = "";
         public bool IsMultiplayer { get; set; }
         public bool AllowMultiplayer { get; set; }
+
+        /// <summary>설정 창 단축키 이름. 멀티 거절 사유가 켜는 곳을 말할 때 쓴다.</summary>
+        public string SettingsKey { get; set; } = "";
 
         /// <summary>네트워크 세션이 살아 있는가. 호스트든 참가자든 상관없다 - 쓰기가 나갈 곳이 있는지다.</summary>
         public bool SessionActive { get; set; }
@@ -45,6 +49,10 @@ namespace SephPlanner.Core.Runtime
 
     public static class AutoPlacePolicy
     {
+        /// <summary>멀티 세션의 거절 사유. 이 정책과 적용기의 사전 검증이 같은 말을 쓴다.</summary>
+        public static Phrase MultiplayerLocked(string settingsKey) =>
+            new Phrase("멀티플레이 세션에서는 자동 배치를 실행하지 않습니다. 함께하는 사람의 동의를 받은 뒤 설정({0})의 ‘멀티 자동 배치’에서 켤 수 있습니다.", settingsKey);
+
         public static AutoPlaceDecision Evaluate(AutoPlaceContext context)
         {
             if (context.Applying) return AutoPlaceDecision.Deny(Tr("자동 배치가 아직 진행 중입니다."));
@@ -98,7 +106,7 @@ namespace SephPlanner.Core.Runtime
             // CmdSwap, 회전은 CmdDoClickAction 으로 게임 자신이 클라이언트에게 열어 둔 길이 있다
             // (docs/RESEARCH.md 의 "멀티플레이").
             if (context.IsMultiplayer && !context.AllowMultiplayer)
-                return AutoPlaceDecision.Deny(Tr("멀티플레이 세션에서는 자동 배치를 실행하지 않습니다."));
+                return AutoPlaceDecision.Deny(MultiplayerLocked(context.SettingsKey).ToString());
             if (!context.SessionActive)
                 return AutoPlaceDecision.Deny(Tr("네트워크 세션이 없어 자동 배치를 실행할 수 없습니다."));
 

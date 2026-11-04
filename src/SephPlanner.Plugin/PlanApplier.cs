@@ -63,7 +63,8 @@ namespace SephPlanner.Plugin
         /// 계획이므로, 부르는 쪽이 그것으로 다음 재계산을 건너뛴다.
         /// </param>
         public static IEnumerator Apply(
-            ApplyPlanCommand command, bool allowMultiplayer, Action<Phrase, bool> report, Action<string> diagnostic = null)
+            ApplyPlanCommand command, bool allowMultiplayer, string settingsKey, Action<Phrase, bool> report,
+            Action<string> diagnostic = null)
         {
             if (RecoveryRequired)
             {
@@ -80,7 +81,7 @@ namespace SephPlanner.Plugin
             GridInventory inventory = null;
             try
             {
-                var setup = Prepare(command, allowMultiplayer);
+                var setup = Prepare(command, allowMultiplayer, settingsKey);
                 if (setup.Failure != null)
                 {
                     if (setup.DiagnosticError != null) diagnostic?.Invoke(setup.DiagnosticError);
@@ -128,7 +129,7 @@ namespace SephPlanner.Plugin
         /// 쓰기 전에 물러설 이유를 전부 본다. 여기서 실패하면 아무것도 바꾸지 않은 상태다.
         /// 프레임을 넘기지 않으므로 예외도 여기서 잡는다 - 코루틴 본문에서는 잡을 수 없다.
         /// </summary>
-        private static Preparation Prepare(ApplyPlanCommand command, bool allowMultiplayer)
+        private static Preparation Prepare(ApplyPlanCommand command, bool allowMultiplayer, string settingsKey)
         {
             try
             {
@@ -142,7 +143,7 @@ namespace SephPlanner.Plugin
                     return Denied(new Phrase("계획이 어떤 게임 상태에서 나온 것인지 확인할 수 없어 자동 배치를 실행하지 않습니다."));
 
                 if (GameReader.IsMultiplayerSession() && !allowMultiplayer)
-                    return Denied(new Phrase("멀티플레이 세션에서는 자동 배치를 실행하지 않습니다. 설정에서 열 수 있습니다."));
+                    return Denied(AutoPlacePolicy.MultiplayerLocked(settingsKey));
 
                 // 호스트면 서버 로컬에서 끝나고, 참가자면 Command 로 서버에 간다. 둘 다 아니면
                 // 쓰기가 나갈 곳이 없다.

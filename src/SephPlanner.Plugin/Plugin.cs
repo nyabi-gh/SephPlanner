@@ -1250,7 +1250,7 @@ namespace SephPlanner.Plugin
 
                 var plan = state.Latest;
                 StartCoroutine(PlanApplier.Apply(
-                    plan.CreateApplyCommand(), _settings.MultiplayerAutoPlace.Value,
+                    plan.CreateApplyCommand(), _settings.MultiplayerAutoPlace.Value, Describe(_settings.SettingsKey),
                     (result, settled) => AutoPlaceFinished(result, settled ? plan : null),
                     detail => QueueAutomaticDiagnostic("자동 배치 적용", detail)));
             }
@@ -1322,6 +1322,7 @@ namespace SephPlanner.Plugin
                 CurrentPlacementFingerprint = placementFingerprint,
                 IsMultiplayer = snapshot != null && snapshot.IsMultiplayer,
                 AllowMultiplayer = _settings.MultiplayerAutoPlace.Value,
+                SettingsKey = Describe(_settings.SettingsKey),
                 SessionActive = NetworkServer.active || NetworkClient.active,
                 Applying = PlanApplier.InProgress,
                 RecoveryRequired = PlanApplier.RecoveryRequired,

@@ -137,11 +137,13 @@ public class AutoPlacePolicyTests
     {
         var context = Context();
         context.IsMultiplayer = true;
+        context.SettingsKey = "Ctrl + F3";
 
         var decision = AutoPlacePolicy.Evaluate(context);
 
         Assert.False(decision.Allowed);
         Assert.Contains("멀티플레이", decision.Reason);
+        Assert.Contains("설정(Ctrl + F3)의 ‘멀티 자동 배치’", decision.Reason);
     }
 
     /// <summary>
