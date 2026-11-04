@@ -14,19 +14,33 @@
 
 ## 下載
 
-| 平台 | 需求 | 下載 |
-| --- | --- | --- |
-| **Windows** | Steam 版《塞菲莉亞》 | [最新版本](https://github.com/nyabi-gh/SephPlanner/releases/latest)中的 `SephPlanner-v<版本>.zip` |
-| **macOS** | Steam 版《塞菲莉亞》 | [最新版本](https://github.com/nyabi-gh/SephPlanner/releases/latest)中的 `SephPlanner-macos-v<版本>.zip` |
+下載來源依遊戲分支而不同。
 
-請下載上方的 ZIP，而不是 `Source code`。ZIP 內已附 BepInEx，不必另外下載。
+| 遊戲 | 下載 |
+| --- | --- |
+| **1.1 測試版**（`workshop-beta` 分支） | 在 [Steam 工作坊](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)訂閱 |
+| **預設分支**，Windows | [最新版本](https://github.com/nyabi-gh/SephPlanner/releases/latest)中的 `SephPlanner-v<版本>.zip` |
+| **預設分支**，macOS | [最新版本](https://github.com/nyabi-gh/SephPlanner/releases/latest)中的 `SephPlanner-macos-v<版本>.zip` |
 
-SephPlanner 會自動更新。有新版本時，啟動遊戲就會通知你，按下 `更新` 後重新啟動遊戲即可套用。
+ZIP 是內含 BepInEx 的版本，在 1.1 測試版也能執行。請下載上方的 ZIP，而不是 `Source code`。
 
 > [!NOTE]
-> 這是與 TEAM HORAY 無關的非官方工具。使用模組須自行承擔風險，重要的存檔請事先備份。
+> 這是由個人製作、與 TEAM HORAY 無關的模組。使用模組須自行承擔風險，重要的存檔請事先備份。
 
 ## 安裝
+
+### 工作坊（遊戲 1.1 測試版）
+
+1. 在 Steam 對《塞菲莉亞》按右鍵 → **內容 → 遊戲版本與測試版**，選擇 `workshop-beta`。
+2. 在 [工作坊頁面](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)按下**訂閱**。
+3. 啟動遊戲，在標題畫面的工作坊視窗確認 SephPlanner 已啟用。
+4. 開始探險後，畫面上就會出現 SephPlanner。
+
+更新會由 Steam 自動下載。
+
+**如果你之前使用 BepInEx 版（ZIP）**，必須刪除遊戲資料夾 `BepInEx/plugins` 中的 `SephPlanner.Plugin.dll` 與 `SephPlanner.Core.dll`，工作坊版才會啟用。若不刪除，只會執行 BepInEx 版。原本的設定會在第一次啟動工作坊版時匯入。
+
+### ZIP（BepInEx 版）
 
 **Windows**
 
@@ -46,18 +60,20 @@ SephPlanner 會自動更新。有新版本時，啟動遊戲就會通知你，�
 3. 在 Steam 開啟《塞菲莉亞》的 **內容 → 一般 → 啟動選項**，輸入 `"<遊戲資料夾>/run_bepinex.sh" %command%`。
 4. 啟動遊戲。詳細說明請見 [macOS 安裝說明](docs/INSTALL-macos.txt)（韓文）。
 
+ZIP 版會自動更新。有新版本時，啟動遊戲就會通知你，按下 `更新` 後重新啟動遊戲即可套用。
+
 如果你已經因為其他模組而在使用 BepInEx，只要把 ZIP 中 `BepInEx/plugins` 裡的兩個 DLL（`SephPlanner.Plugin.dll`、`SephPlanner.Core.dll`）放到遊戲資料夾的相同位置即可。手動更新時也是覆蓋這兩個檔案。
 
 ## 使用方式
 
-1. **開始探險。** 畫面會顯示目前背包分數與建議配置的分數，會變動的位置以金色外框標示。
-2. **確認內容。** 將游標移到格子上，就能看到效果與推薦理由。
-3. **按下 `F8`。** 套用建議配置。若想自己移動，照著移動提示由上往下操作即可。
+1. **開始探險。** 畫面角落會顯示目前背包分數與建議佈局的分數。
+2. **按 `F7` 展開。** 會變動的位置以金色外框標示，將游標移到格子上就能看到效果與推薦理由。開啟寶箱、商店、賽菲萊特、組合器或附魔視窗時會自動展開。
+3. **按下 `F8`。** 套用建議佈局。若想自己移動，照著移動提示由上往下操作即可。
 
-也會推薦在寶箱、商店與賽菲萊特中該選什麼，以及要合成、附魔哪些石板。按 `F1` 可以預覽放入尚未取得的候選物品後的配置。
+也會推薦在寶箱、商店與賽菲萊特中該選什麼、要合成哪些石板，以及要附魔在哪裡。按 `F1` 可以預覽放入尚未取得的候選物品後的佈局。
 
 > [!IMPORTANT]
-> 分數是用來比較配置的自訂評估值，並非遊戲的官方數值。請一併考量固有效果與你想要的玩法。
+> 分數是用來比較佈局的自訂評估值，並非遊戲的官方數值。請一併考量固有效果與你想要的玩法。
 
 指定構築、各物品規則等內容請見 [詳細使用說明](docs/USAGE.md)（韓文）。
 
@@ -72,7 +88,7 @@ SephPlanner 會自動更新。有新版本時，啟動遊戲就會通知你，�
 | `F5` | 面板不透明度 |
 | `F6` | 移動面板 |
 | `F7` | 收合/展開面板 |
-| `F8` | 套用建議配置 |
+| `F8` | 套用建議佈局 |
 | `F9` | 重新讀取物品資料 |
 | `F10` | 儲存狀態以回報錯誤 |
 
@@ -80,11 +96,13 @@ SephPlanner 會自動更新。有新版本時，啟動遊戲就會通知你，�
 
 ## 多人遊戲
 
-多人遊戲中，自動配置預設為關閉。請先取得一起遊玩的玩家同意，再到 `F3` 的 `多人遊戲自動佈局` 開啟。如果出現伺服器同步警告，請重新進入房間後再使用。
+SephPlanner 只會作用在你自己的畫面上，所以一起遊玩的玩家不需要安裝。
+
+多人遊戲中，自動佈局預設為關閉。請先取得一起遊玩的玩家同意，再到 `F3` 的 `多人遊戲自動佈局` 開啟。如果出現伺服器同步警告，請重新進入房間後再使用。
 
 ## 常見問題
 
-**看不到面板。** 請確認是否已開始探險、是否用 `F4` 隱藏了面板，以及兩個 DLL 是否位於 `BepInEx/plugins`。
+**看不到面板。** 請確認是否已開始探險、是否用 `F4` 隱藏了面板，以及 `F3` 的 `顯示規劃面板` 是否已開啟。如果是工作坊版，請檢查標題畫面的工作坊視窗中是否已啟用，以及 `BepInEx/plugins` 是否還留有 SephPlanner 的 DLL。如果是 ZIP 版，請檢查兩個 DLL 是否位於 `BepInEx/plugins`。
 
 **遊戲更新後辨識異常。** 按 `F9` 重新讀取物品資料。
 
@@ -92,17 +110,17 @@ SephPlanner 會自動更新。有新版本時，啟動遊戲就會通知你，�
 
 **看不到推薦。** 請確認 `F3` 的 `獲得·合成·附魔·移除推薦` 是否已開啟。
 
-**快速鍵沒有反應。** 請在 `F3` 的`快速鍵`分頁確認是否與其他按鍵衝突。
+**快速鍵沒有反應。** 按住其他按鍵時，快速鍵不會有反應。請不要邊走邊按，先放開移動鍵再按。也請在 `F3` 的`快速鍵`分頁確認是否與其他按鍵衝突。關閉 `顯示規劃面板` 後，`F1`、`F4`~`F8` 也會停止運作。
 
-**還是無法解決。** 在問題發生的狀態下按 `F10`，並附上畫面顯示的**回報編號**，透過 [Issues](https://github.com/nyabi-gh/SephPlanner/issues) 或 [nyabi@tb.pro](mailto:nyabi@tb.pro) 告訴我們。儲存的診斷檔案含有遊戲資料，請勿上傳到公開的 Issues。（[回報說明](docs/USAGE.md#제보에-필요한-정보)（韓文））
+**還是無法解決。** 在問題發生的狀態下按 `F10`，並附上畫面顯示的**回報編號**，透過 [Issues](https://github.com/nyabi-gh/SephPlanner/issues)、工作坊頁面的留言或 [nyabi@tb.pro](mailto:nyabi@tb.pro) 告訴我們。儲存的診斷檔案含有遊戲資料，請勿上傳到公開的 Issues。（[回報說明](docs/USAGE.md#제보에-필요한-정보)（韓文））
 
-**想要移除。** 關閉遊戲，刪除 `BepInEx/plugins` 中的 `SephPlanner.Plugin.dll` 與 `SephPlanner.Core.dll`。若連設定也要刪除，請一併刪除 `BepInEx/config/dev.nyabi.sephplanner.bridge.cfg` 與 `%LOCALAPPDATA%\SephPlanner` 資料夾。如果還有使用其他模組，請保留 BepInEx。
+**想要移除。** 工作坊版請在工作坊頁面取消訂閱。ZIP 版請關閉遊戲，刪除 `BepInEx/plugins` 中的 `SephPlanner.Plugin.dll` 與 `SephPlanner.Core.dll`。若連設定也要刪除，請一併刪除 `%LOCALAPPDATA%\SephPlanner` 資料夾與 `BepInEx/config/dev.nyabi.sephplanner.bridge.cfg`。如果還有使用其他模組，請保留 BepInEx。
 
 ## 授權
 
 SephPlanner 採用 [MIT 授權](LICENSE)，可自由使用、修改與散布。
 
-依照開發商的模組政策，本專案以非營利方式經營，沒有廣告、贊助或訂閱。分享時請提供 [發布頁面連結](https://github.com/nyabi-gh/SephPlanner/releases/latest)，而不是檔案本身。
+依照開發商的模組政策，本專案以非營利方式經營，沒有廣告、贊助或訂閱。分享時請提供 [發布頁面](https://github.com/nyabi-gh/SephPlanner/releases/latest)或[工作坊頁面](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)的連結，而不是檔案本身。
 
 ## 參與開發
 

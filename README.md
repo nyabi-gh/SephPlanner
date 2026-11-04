@@ -14,19 +14,33 @@
 
 ## 다운로드
 
-| 플랫폼 | 요구 사항 | 다운로드 |
-| --- | --- | --- |
-| **Windows** | Steam판 세피리아 | [최신 릴리스](https://github.com/nyabi-gh/SephPlanner/releases/latest)의 `SephPlanner-v버전.zip` |
-| **macOS** | Steam판 세피리아 | [최신 릴리스](https://github.com/nyabi-gh/SephPlanner/releases/latest)의 `SephPlanner-macos-v버전.zip` |
+게임 브랜치에 따라 받는 곳이 다릅니다.
 
-`Source code`가 아니라 위 ZIP을 받습니다. ZIP에 BepInEx가 들어 있어 따로 받을 것은 없습니다.
+| 게임 | 다운로드 |
+| --- | --- |
+| **1.1 베타** (`workshop-beta` 브랜치) | [Steam 창작마당](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)에서 구독 |
+| **기본 브랜치**, Windows | [최신 릴리스](https://github.com/nyabi-gh/SephPlanner/releases/latest)의 `SephPlanner-v버전.zip` |
+| **기본 브랜치**, macOS | [최신 릴리스](https://github.com/nyabi-gh/SephPlanner/releases/latest)의 `SephPlanner-macos-v버전.zip` |
 
-SephPlanner는 스스로 업데이트합니다. 새 버전이 나오면 게임을 켤 때 알려 주고, `업데이트`를 누른 뒤 게임을 다시 시작하면 적용됩니다.
+ZIP은 BepInEx가 들어 있는 판으로, 1.1 베타에서도 돌아갑니다. `Source code`가 아니라 위 ZIP을 받습니다.
 
 > [!NOTE]
-> TEAM HORAY와 관계없는 비공식 도구입니다. 모드 사용은 본인 책임이며, 중요한 세이브는 미리 백업해 두세요.
+> TEAM HORAY와 관계없는 개인이 만든 모드입니다. 모드 사용은 본인 책임이며, 중요한 세이브는 미리 백업해 두세요.
 
 ## 설치
+
+### 창작마당 (게임 1.1 베타)
+
+1. Steam에서 세피리아 우클릭 → **속성 → 게임 버전 및 베타**에서 `workshop-beta`를 고릅니다.
+2. [창작마당 글](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)에서 **구독**을 누릅니다.
+3. 게임을 켜고 타이틀의 창작마당 창에서 SephPlanner가 켜져 있는지 확인합니다.
+4. 탐험에 들어가면 화면에 SephPlanner가 나타납니다.
+
+업데이트는 Steam이 알아서 받습니다.
+
+**BepInEx 판(ZIP)을 쓰던 분은** 게임 폴더의 `BepInEx/plugins`에서 `SephPlanner.Plugin.dll`과 `SephPlanner.Core.dll`을 지워야 창작마당 판이 켜집니다. 그대로 두면 BepInEx 판만 실행됩니다. 쓰던 설정은 창작마당 판을 처음 켤 때 가져옵니다.
+
+### ZIP (BepInEx 판)
 
 **Windows**
 
@@ -46,15 +60,17 @@ SephPlanner는 스스로 업데이트합니다. 새 버전이 나오면 게임�
 3. Steam에서 세피리아 **속성 → 일반 → 시작 옵션**에 `"<게임 폴더>/run_bepinex.sh" %command%`를 입력합니다.
 4. 게임을 실행합니다. 자세한 내용은 [macOS 설치 안내](docs/INSTALL-macos.txt)에 있습니다.
 
+ZIP 판은 스스로 업데이트합니다. 새 버전이 나오면 게임을 켤 때 알려 주고, `업데이트`를 누른 뒤 게임을 다시 시작하면 적용됩니다.
+
 이미 다른 모드로 BepInEx를 쓰고 있다면 ZIP의 `BepInEx/plugins` 안 DLL 두 개(`SephPlanner.Plugin.dll`, `SephPlanner.Core.dll`)만 게임 폴더의 같은 위치에 넣으면 됩니다. 직접 업데이트할 때도 이 두 파일을 덮어씁니다.
 
 ## 사용 방법
 
-1. **탐험에 들어갑니다.** 현재 가방 점수와 제안 배치 점수가 표시되고, 바뀌는 자리는 금색 테두리로 표시됩니다.
-2. **확인합니다.** 칸에 커서를 올리면 효과와 추천 이유를 볼 수 있습니다.
+1. **탐험에 들어갑니다.** 화면 구석에 현재 가방 점수와 제안 배치 점수가 뜹니다.
+2. **`F7`로 펼칩니다.** 바뀌는 자리가 금색 테두리로 표시되고, 칸에 커서를 올리면 효과와 추천 이유가 나옵니다. 상자·상점·세피라이트·합성기·인챈트 창을 열면 저절로 펼쳐집니다.
 3. **`F8`을 누릅니다.** 제안 배치가 적용됩니다. 직접 옮기고 싶다면 이동 안내를 위에서부터 따라 하면 됩니다.
 
-상자·상점·세피라이트에서 무엇을 고를지, 어떤 석판을 합성하고 인챈트할지도 추천합니다. `F1`로 아직 얻지 않은 후보를 넣었을 때의 배치를 미리 볼 수 있습니다.
+상자·상점·세피라이트에서 무엇을 고를지, 어떤 석판을 합성하고 어디에 인챈트할지도 추천합니다. `F1`로 아직 얻지 않은 후보를 넣었을 때의 배치를 미리 볼 수 있습니다.
 
 > [!IMPORTANT]
 > 점수는 배치 비교용 자체 평가값이며 게임의 공식 수치가 아닙니다. 고유 효과나 원하는 플레이 방식도 함께 고려해 주세요.
@@ -80,11 +96,13 @@ SephPlanner는 스스로 업데이트합니다. 새 버전이 나오면 게임�
 
 ## 멀티플레이
 
+SephPlanner는 내 화면에만 적용되므로 함께하는 사람은 설치하지 않아도 됩니다.
+
 멀티플레이에서 자동 배치는 기본적으로 꺼져 있습니다. 함께하는 사람들의 동의를 받은 뒤 `F3`의 `멀티 자동 배치`에서 켜세요. 서버 반영 경고가 뜨면 방에 다시 접속한 뒤 사용합니다.
 
 ## 자주 묻는 질문
 
-**패널이 안 보여요.** 탐험에 들어갔는지, `F4`로 숨기지 않았는지, DLL 두 개가 `BepInEx/plugins`에 있는지 확인합니다.
+**패널이 안 보여요.** 탐험에 들어갔는지, `F4`로 숨기지 않았는지, `F3`의 `플래너 화면 표시`가 켜져 있는지 확인합니다. 창작마당 판이라면 타이틀의 창작마당 창에서 켜져 있는지, `BepInEx/plugins`에 SephPlanner DLL이 남아 있지 않은지 봅니다. ZIP 판이라면 DLL 두 개가 `BepInEx/plugins`에 있는지 봅니다.
 
 **게임 패치 후 인식이 이상해요.** `F9`로 아이템 데이터를 다시 읽습니다.
 
@@ -92,17 +110,17 @@ SephPlanner는 스스로 업데이트합니다. 새 버전이 나오면 게임�
 
 **추천이 안 보여요.** `F3`의 `획득·합성·인챈트·제거 추천`이 켜져 있는지 확인합니다.
 
-**단축키가 안 먹혀요.** `F3` 단축키 탭에서 다른 키와 겹치지 않는지 확인합니다.
+**단축키가 안 먹혀요.** 다른 키를 누르고 있으면 단축키가 듣지 않습니다. 걸으면서 누르지 말고 이동 키에서 손을 뗀 뒤 누르세요. `F3` 단축키 탭에서 다른 키와 겹치지 않는지도 확인합니다. `플래너 화면 표시`를 끄면 `F1`·`F4`~`F8`도 멈춥니다.
 
-**그래도 해결되지 않아요.** 문제가 생긴 상태에서 `F10`을 누르고, 화면에 나온 **제보 번호**와 함께 [Issues](https://github.com/nyabi-gh/SephPlanner/issues)나 [nyabi@tb.pro](mailto:nyabi@tb.pro)로 알려 주세요. 저장된 진단 파일에는 게임 데이터가 들어 있으니 공개 Issues에 올리지 마세요. ([제보 안내](docs/USAGE.md#제보에-필요한-정보))
+**그래도 해결되지 않아요.** 문제가 생긴 상태에서 `F10`을 누르고, 화면에 나온 **제보 번호**와 함께 [Issues](https://github.com/nyabi-gh/SephPlanner/issues)나 창작마당 글의 댓글, [nyabi@tb.pro](mailto:nyabi@tb.pro)로 알려 주세요. 저장된 진단 파일에는 게임 데이터가 들어 있으니 공개 Issues에 올리지 마세요. ([제보 안내](docs/USAGE.md#제보에-필요한-정보))
 
-**지우고 싶어요.** 게임을 끄고 `BepInEx/plugins`에서 `SephPlanner.Plugin.dll`과 `SephPlanner.Core.dll`을 지웁니다. 설정까지 지우려면 `BepInEx/config/dev.nyabi.sephplanner.bridge.cfg`와 `%LOCALAPPDATA%\SephPlanner` 폴더도 삭제합니다. 다른 모드를 쓰고 있다면 BepInEx는 그대로 두세요.
+**지우고 싶어요.** 창작마당 판은 창작마당 글에서 구독을 취소합니다. ZIP 판은 게임을 끄고 `BepInEx/plugins`에서 `SephPlanner.Plugin.dll`과 `SephPlanner.Core.dll`을 지웁니다. 설정까지 지우려면 `%LOCALAPPDATA%\SephPlanner` 폴더와 `BepInEx/config/dev.nyabi.sephplanner.bridge.cfg`도 삭제합니다. 다른 모드를 쓰고 있다면 BepInEx는 그대로 두세요.
 
 ## 라이선스
 
 SephPlanner는 [MIT 라이선스](LICENSE)로 자유롭게 쓰고 고치고 배포할 수 있습니다.
 
-개발사의 모드 정책에 따라 광고·후원·구독 없이 비영리로 운영합니다. 공유할 때는 파일 대신 [릴리스 링크](https://github.com/nyabi-gh/SephPlanner/releases/latest)를 전해 주세요.
+개발사의 모드 정책에 따라 광고·후원·구독 없이 비영리로 운영합니다. 공유할 때는 파일 대신 [릴리스](https://github.com/nyabi-gh/SephPlanner/releases/latest)나 [창작마당 글](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875) 링크를 전해 주세요.
 
 ## 개발 참여
 
