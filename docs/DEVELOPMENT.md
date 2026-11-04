@@ -2,6 +2,8 @@
 
 사용자용 문서는 저장소 대문의 [README](../README.md)와 [자세한 사용법](USAGE.md)에 있다.
 여기에는 저장소를 받아 고치고 배포하는 데 필요한 것과, 화면을 그렇게 만든 이유를 둔다.
+어느 문서가 무엇을 맡는지는 [현재 상태](STATUS.md)의 "문서 지도" 에 있다. 문서를 새로 만들기 전에 거기 들어갈 자리가
+있는지 먼저 본다.
 
 ## 구조
 
@@ -16,58 +18,56 @@ SephPlanner.Workshop  창작마당 판. Plugin 소스를 BepInExHost 없이 링�
                       모드 옵션 저장소를 더한다. 게임 1.1.x 로만 빌드된다
 SephPlanner.DataTool  게임 없이 도는 CLI. 텍스트 추출, 스냅샷 대조, 콤보·아티팩트 값어치 측정
 SephPlanner.Diagnostics  F10 진단을 받는 수집 서버(ASP.NET Core). docs/DIAGNOSTIC-UPLOAD.md
-SephPlanner.Tests     Core 단위 테스트. 게임 없이 돈다
+SephPlanner.Tests     (tests/) 단위 테스트. Core·진단 서버를 참조하고 플러그인·DataTool 의 일부 파일을 링크한다.
+                      게임 없이 돈다
 SephPlanner.Plugin.Net  (tests/) Net/ 과 BepInExHost/Net 을 배포와 같은 netstandard2.1 로 지어 시험에 넘긴다
 ```
 
-**진단 전송은 두 판에, 게임 안 업데이트는 BepInEx 판에만 있다.** 창작마당 규칙 5 는 보내는 것을 이용자에게 알리면 게임
-관련 정보의 전송을 허용하고, 실행 중 DLL 을 바꾸는 모드는 로드되지 않는다(docs/LEGAL.md 의 "창작마당 모드 규칙"). 네트워크
-코드는 따로 어셈블리로 빼지 않는다 - 0.5.1 까지의 게임 안 업데이트는 ZIP 에서 DLL 둘(`SephPlanner.Plugin.dll`·
-`SephPlanner.Core.dll`)만 꺼내므로, BepInEx 판에 셋째 DLL 이 생기면 옛 판에서 업데이트한 사람의 플러그인이 뜨지 않는다.
-플러그인 본체는 `partial` 클래스이고, 업데이트 자리는 몸체 없는 `partial void` 라 창작마당 판에서는 부르는 자리째 빠진다.
-창작마당 판은 BepInEx 판의 진단 전송 동의를 가져오지 않는다(`BepInExConfigImport`) - 이 판에서 보낼 항목을 보고 다시 고른다.
+**진단 전송은 두 판에, 게임 안 업데이트는 BepInEx 판에만 있다.** 창작마당 규칙 5 는 무엇을 보내는지 이용자에게 알리면 게임
+관련 정보의 전송을 허용하고, 실행 중 DLL 을 바꾸는 모드는 로드되지 않는다(docs/LEGAL.md 의 "창작마당 모드 규칙").
+
+- 네트워크 코드를 따로 어셈블리로 빼지 않는다. 0.5.1 까지의 게임 안 업데이트는 ZIP 에서 DLL 둘(`SephPlanner.Plugin.dll`·
+  `SephPlanner.Core.dll`)만 꺼내므로, BepInEx 판에 셋째 DLL 이 생기면 옛 판에서 업데이트한 사람의 플러그인이 뜨지 않는다.
+- 플러그인 본체는 `partial` 클래스다. 업데이트 자리는 몸체 없는 `partial void` 라 창작마당 판에서는 부르는 자리째 빠진다.
 
 ## 빌드
 
-게임이 설치돼 있어야 한다. 기본 경로가 아니면 환경변수로 알려준다.
+게임 어셈블리를 참조하므로 게임이 설치돼 있어야 한다. 경로는 `Directory.Build.props` 가 정한다. 기본값은 Windows 가
+`D:\SteamLibrary\steamapps\common\Sephiria`, macOS 가 `~/Library/Application Support/Steam/steamapps/common/Sephiria` 다.
+다른 곳에 설치했으면 `SEPHIRIA_DIR` 에 게임 폴더를 준다(macOS 는 `Sephiria.app` 의 상위 폴더).
 
 ```powershell
-$env:SEPHIRIA_DIR = "D:\SteamLibrary\steamapps\common\Sephiria"
+$env:SEPHIRIA_DIR = "C:\Program Files (x86)\Steam\steamapps\common\Sephiria"
 dotnet build
 ```
 
-macOS에서는 기본 Steam 경로의 `Sephiria.app/Contents/Resources/Data/Managed`를 참조한다.
-다른 라이브러리에 설치했다면 `SEPHIRIA_DIR`에 `Sephiria.app`의 상위 게임 폴더를 지정한다.
-macOS용 BepInEx와 Doorstop 로더는 `scripts/build-macos-loader.sh`로 빌드하며,
-결과는 `artifacts/macos-loader/`에 놓인다. Xcode 명령줄 도구와 .NET SDK가 필요하다.
-
-**1.0.33 과 1.1.0 을 함께 지원하는 동안** 플러그인은 두 판 어셈블리 모두로 빌드돼야 한다. 설치본 밖에 다른 판의
-`Sephiria_Data/Managed` 사본을 두고 `SEPHIRIA_DIR` 만 바꿔 `scripts/check.ps1` 을 두 번 돈다. 한 판에만 있는 클래스는
-컴파일 시점에 참조하지 않는다([게임 내부 조사](RESEARCH.md)의 "침은 1.1.0 에서 나침반이 됐다").
-
-일반 빌드는 게임 폴더를 변경하지 않는다. 빌드 결과를 설치된 게임에 복사하려면 명시적으로 배치한다.
+일반 빌드는 게임 폴더를 바꾸지 않는다. 설치된 게임의 `BepInEx/plugins` 에 넣으려면 따로 배치한다. 배치한 DLL 이 방금
+빌드한 것과 다르면(게임이 켜져 있어 덮어쓰지 못했으면) 멈춘다.
 
 ```powershell
 scripts/deploy-plugin.ps1
 ```
 
-테스트는 게임 없이 돈다.
-
-```powershell
-dotnet test
-```
-
-밀기 전에는 이것 하나면 된다. 포맷·테스트에 더해 **플러그인 빌드까지** 세운다.
+밀기 전에는 이것 하나면 된다. 판 번호 대조·포맷·테스트에 더해 **플러그인 빌드까지** 세운다. 테스트만 돌릴 때는
+`dotnet test` 다.
 
 ```powershell
 scripts/check.ps1
 ```
 
-마지막 항목이 따로 필요한 이유가 있다. CI 는 `SephPlanner.Core`, 진단 도구와 테스트를 검사한다. 플러그인은
-게임 어셈블리를 참조하는데 그것을 저장소나 CI 에 둘 수 없기 때문이다(docs/LEGAL.md). 그래서
-**플러그인만 깨지는 변경은 CI 를 초록으로 통과한다.** 릴리스 스크립트가 결국 잡아내지만, 그때는
-이미 배포를 자르는 중이다. 게임이 1.1.x 면 `check.ps1` 이 창작마당 판도 세운다. 1.0.33 사본으로 돌리면 그 판에 모드 API 가
-없어 건너뛰고 그렇다고 출력한다. 창작마당 판은 그래서 솔루션에 넣지 않았다.
+**플러그인만 깨지는 변경은 CI 를 초록으로 통과한다.** CI(`.github/workflows/ci.yml`)는 Core·진단 서버·DataTool·테스트의
+포맷과 테스트, DataTool 빌드만 본다. 플러그인은 게임 어셈블리를 참조하는데 그것을 저장소나 CI 에 둘 수 없다(docs/LEGAL.md).
+릴리스 스크립트가 결국 잡아내지만 그때는 이미 배포를 자르는 중이다.
+
+게임이 1.1.x 면 `check.ps1` 이 창작마당 판도 세운다. 1.0.33 으로 돌리면 모드 API 가 없어 건너뛰고 그렇다고 출력한다.
+창작마당 판을 솔루션에 넣지 않은 것도 같은 까닭이다 - 넣으면 1.0.33 에서 솔루션 포맷 검사가 깨진다.
+
+**1.0.33 과 1.1.x 를 함께 지원하는 동안** 플러그인은 두 판 어셈블리 모두로 빌드돼야 한다. 설치본 밖에 다른 판의
+`Sephiria_Data/Managed` 사본을 두고 `SEPHIRIA_DIR` 만 바꿔 `scripts/check.ps1` 을 두 번 돈다. 한 판에만 있는 클래스는
+컴파일 시점에 참조하지 않는다([게임 내부 조사](RESEARCH.md)의 "침은 1.1.0 에서 나침반이 됐다").
+
+macOS용 BepInEx와 Doorstop 로더는 `scripts/build-macos-loader.sh`로 빌드하며, 결과는 `artifacts/macos-loader/`에 놓인다.
+Xcode 명령줄 도구와 .NET SDK가 필요하다.
 
 ### 창작마당 판
 
@@ -80,7 +80,8 @@ dotnet build src/SephPlanner.Workshop -c Release -p:PackWorkshop=true -p:DeployT
 - 패키지는 `metadata.json`, `bin/SephPlanner.Plugin.dll`·`bin/SephPlanner.Core.dll`, `thumbnail.png` 다. 썸네일이 없거나
   1,000,000바이트 이상이면 게임이 올리기를 거절한다(`WorkshopUploadPreparer`). 원본은
   `src/SephPlanner.Workshop/package/` 에 있고 `metadata.json` 의 `version` 은 `check.ps1` 이 `Directory.Build.props` 와 대조한다.
-  멀티 로비가 이 값으로 모드 판을 견주므로 내용을 바꾸면 반드시 올린다.
+  게임은 이 값을 창작마당 글의 변경 사항(`v` + 버전)으로 올리므로 내용을 바꾸면 반드시 올린다. 우리 모드는 `local_only` 라
+  멀티 로비의 모드 판 비교에서는 빠진다([게임 내부 조사](RESEARCH.md)의 "공식 모드 API").
 - `modId` 는 `nyabi.sephplanner` 다. 공개한 뒤에는 바꾸지 않는다 - 다른 모드가 되고 모드 옵션에 저장된 설정도 끊긴다.
 - 어셈블리 이름은 BepInEx 판과 같은 `SephPlanner.Plugin` 이다. BepInEx 판이 깔린 게임에서는 BepInEx 가 먼저 싣고, 게임의
   모드 로더는 같은 이름이 이미 있으면 창작마당 판을 보류한다. 그래서 **로컬 시험은 BepInEx 를 끄고 한다** - 게임 폴더의
@@ -90,112 +91,95 @@ dotnet build src/SephPlanner.Workshop -c Release -p:PackWorkshop=true -p:DeployT
   `[WorkshopModManager]`(계획)·`[WorkshopModRuntime]`(활성화) 다.
 - `WorkshopLocal` 의 모드가 로드된 게임은 멀티가 막힌다. 멀티는 창작마당에 올려 구독한 사본으로 본다.
 - 설정은 게임의 `DeviceOptions.xml` 에 `ModOptions:nyabi.sephplanner:섹션.열쇠` 로 들어간다. 아직 값이 없는 설정은 첫 실행에
-  BepInEx 설정 파일(`BepInEx/config/dev.nyabi.sephplanner.bridge.cfg`)에서 가져온다.
+  BepInEx 설정 파일(`BepInEx/config/dev.nyabi.sephplanner.bridge.cfg`)에서 가져온다(`BepInExConfigImport`). 진단 전송
+  동의만은 가져오지 않는다 - 이 판에서 보낼 항목을 보고 다시 고른다.
 
-올리기는 게임 안에서만 된다. 타이틀의 창작마당 창은 `WorkshopLocal/` 의 모드를 "내 모드" 로 보여 주는데, 거기서 이 모드를
-고르고 "창작마당에 올리기" 를 누르면 올라가고 DLL 이 들었으므로 검수에 저절로 접수된다. 그 뒤 게임이
-`WorkshopLocal/sephplanner/` 에 만드는 `uploadticket.json` 이 창작마당 글 번호를 들고 있다 - 지우면 다음에 올릴 때 새 글이
-생긴다(위 배치 명령은 이 파일을 지우지 않는다). 처음에는 "목록에 없음" 으로 올라가므로 직접 구독해 돌려 본 뒤 공개로 바꾼다.
-**올릴 때마다 게임이 글의 제목·설명·태그를 `metadata.json` 으로 다시 쓴다** - Steam 글 페이지에서 고친 설명은 다음에 올리면
-사라진다(설명은 `info.description` 의 `default` → `en-US` 하나만 들어간다). 공개 여부는 갱신해도 그대로다.
-게임은 미리보기 한 장만 올린다(`SetItemPreview`). 스크린샷 같은 추가 이미지는 Steam 글 페이지에서 넣는다. 창작마당 창은
-열 때와 게임 창으로 돌아올 때 `WorkshopLocal` 을 다시 읽고 올릴 파일은 누르는 순간 읽으므로, 다시 지은 뒤 게임을 껐다 켤
-필요는 없다.
+**올리기는 게임 안에서만 된다.**
 
-게임 안에서 F10을 누르면 그 순간의 상태가 `%LOCALAPPDATA%\SephPlanner\inventory-snapshot.json`
-으로 남는다. 그 스냅샷으로 우리 레벨 계산이 게임 값과 맞는지 게임 없이 다시 볼 수 있다. 어긋나는
-칸이 있으면 아직 읽지 않는 효과(각인, 세트 효과, 배치 보너스)가 걸려 있다는 뜻이다. 제보를 받을
-때 이 파일로 레벨을 대조할 수 있다. 당시 설정과 카탈로그까지 필요한 계획 재현에는 아래 재현 자료를 쓴다.
+- 타이틀의 창작마당 창이 `WorkshopLocal/` 의 모드를 "내 모드" 로 보여 준다. 이 모드를 고르고 "창작마당에 올리기" 를 누르면
+  올라가고, DLL 이 들었으므로 검수에 저절로 접수된다.
+- 창작마당 창은 열 때와 게임 창으로 돌아올 때 `WorkshopLocal` 을 다시 읽고 올릴 파일은 누르는 순간 읽는다. 다시 지은 뒤
+  게임을 껐다 켤 필요는 없다.
+- 그 뒤 게임이 `WorkshopLocal/sephplanner/` 에 만드는 `uploadticket.json` 이 창작마당 글 번호를 들고 있다. 지우면 다음에
+  올릴 때 새 글이 생긴다(위 배치 명령은 이 파일을 지우지 않는다).
+- 처음에는 "목록에 없음" 으로 올라가므로 직접 구독해 돌려 본 뒤 공개로 바꾼다. 공개 여부는 갱신해도 그대로다.
+- **올릴 때마다 게임이 글의 제목·설명·태그를 `metadata.json` 으로 다시 쓴다.** Steam 글 페이지에서 고친 설명은 다음에
+  올리면 사라진다. 설명은 `info.description` 에서 `default` → `en-US` → 첫 항목 순으로 하나만 들어간다([게임 내부
+  조사](RESEARCH.md)의 "공식 모드 API").
+- 게임은 미리보기 한 장만 올린다(`SetItemPreview`). 스크린샷 같은 추가 이미지는 Steam 글 페이지에서 넣는다.
 
-F10은 마지막으로 게시된 계획의 입력·빌드 설정·직전 목표·당시 카탈로그를
-같은 데이터 폴더의 `reproductions/<시각>-<식별자>.replay`에 함께 저장한다.
-계산 중이라면 마지막 게시 계획이므로 F10 순간의 새 스냅샷과 다를 수 있다.
-아직 게시된 계획이 없으면 재현 자료는 만들지 않고 안내한다.
+## 진단 도구
 
-**진단 전송을 켰으면 F10이 메모 창을 먼저 연다.** 자료만으로는 무엇이 이상했는지 알 수 없기
-때문이다. 증상을 골라 한 번 누르고 끝내도 되고 직접 적어도 된다. **`Enter` 가 보내기, `ESC` 가
-취소다** - 취소해도 수집한 자료는 이 PC에 그대로 남고 서버로만 가지 않는다. 비워 둔 채 보내는
-것이 곧 메모 없이 보내기다. 적은 그대로 가며 우리가 가리지 않으므로 아이디나 비밀번호 같은
-것은 적지 않는다. 아직 전송에 동의하지 않았다면 동의를 먼저 묻고 그다음에 메모를 받으며,
-로컬에만 저장하는 상태에서는 아예 묻지 않는다.
+`SephPlanner.DataTool` 은 게임 없이 돈다. 한 번에 명령 하나만 받고, 전체 목록은 `--help` 가 보여 준다.
 
 ```powershell
-dotnet run --project src/SephPlanner.DataTool -c Release -- --reproduce "<파일.replay>"
-# 계산 코드를 바꾼 뒤 같은 입력으로 비교할 때
-dotnet run --project src/SephPlanner.DataTool -c Release -- --reproduce "<파일.replay>" --allow-model-change
+dotnet run --project src/SephPlanner.DataTool -c Release -- --help
 ```
 
-재현은 파일에 포함된 카탈로그만 사용하며 파일 손상·지원하지 않는 형식·빠진 설정은 실패로 알린다.
-계산 빌드가 다르면 명시적인 비교 옵션이 필요하다. 종료 코드는 일치 0, 입력·실행 실패 1, 결과 차이 2다.
-게임 데이터가 포함된 로컬 진단 자료이므로 저장소·릴리스·공개 제보에 첨부하지 않는다.
-자세한 비교 범위는 [계획 재현](REPRODUCTION.md), 현재 개발 상태는 [현재 상태](STATUS.md)에 있다.
+| 명령 | 하는 것 |
+|---|---|
+| 인자 없음(또는 게임 폴더) | 게임의 `StreamingAssets/Localization` 에서 석판·아티팩트 이름과 설명을 뽑아 `data/generated/text.json` 에 둔다 |
+| `--check <스냅샷.json>` | F10 스냅샷으로 우리 레벨 계산이 게임 값과 맞는지 본다 |
+| `--churn <스냅샷.json> [횟수]` | 같은 스냅샷으로 `F8` 을 연달아 누르는 것을 흉내 낸다 |
+| `--reproduce <파일.replay>` | F10 재현 자료로 그때의 계획을 다시 푼다. [계획 재현](REPRODUCTION.md) |
+| `--measure` | 콤보 한 단계가 아티팩트 레벨 몇 개 값어치인지 잰다 |
+| `--values` | 아티팩트마다 값어치가 어디까지 측정됐는지 보고, 손으로 채울 초안을 뽑는다 |
 
-```powershell
-dotnet run --project src/SephPlanner.DataTool -- --check %LOCALAPPDATA%\SephPlanner\inventory-snapshot.json
-```
-
-같은 스냅샷으로 `F8` 을 연달아 누르는 것을 흉내 낸다. 계획대로 옮기고, 게임이 다시 셀 레벨과
-콤보 개수를 우리 셈으로 채운 뒤 다시 푼다. 적용한 뒤에도 계획이 또 바뀌면 그 이유가 여기서
-드러난다 - 실제로 침 둘이 두 콤보 사이를 오가며 `F8` 마다 6~7수를 내던 판을 이것으로 잡았다.
-
-```powershell
-dotnet run --project src/SephPlanner.DataTool -- --churn %LOCALAPPDATA%\SephPlanner\inventory-snapshot.json
-```
-
-콤보 한 단계가 아티팩트 레벨 몇 개 값어치인지 잰다. `Worth`의 상수를 짐작으로 두지 않기 위한
-것이며, 게임을 한 번 켜서 카탈로그를 다시 덤프한 뒤에 돌아간다(방법은 docs/RESEARCH.md 참고).
-
-```powershell
-dotnet run --project src/SephPlanner.DataTool -- --measure
-```
-
-아티팩트 하나하나의 값어치가 어디까지 측정됐는지 보고, 아직 레어도 어림값에 기대고 있는 것들을
-손으로 채울 초안으로 뽑는다. 채우는 법은 [data/values/README.md](../data/values/README.md) 참고.
-
-**레벨이 올라도 값어치가 내려가는 아티팩트도 함께 적는다.** 그런 구간이 있으면 낮은 레벨 칸이
-정답이 되어 "왜 이걸 낮은 자리에 두느냐"는 제보가 온다. 원인이 된 능력치와 그 수치 변화까지
-적으므로 환산율을 어디서 다시 재야 하는지가 바로 나온다.
-
-```powershell
-dotnet run --project src/SephPlanner.DataTool -- --values
-```
-
-데이터 추출:
-
-```powershell
-dotnet run --project src/SephPlanner.DataTool
-# -> data/generated/text.json  (석판 68종, 아티팩트 257종, 15개 언어)
-```
-
-`data/generated/`는 각자 PC에서 생성되며 저장소에 커밋하지 않는다. 이유는 [LEGAL.md](LEGAL.md) 참고.
+- **F10 자료.** F10 은 누른 순간의 관측값을 `%LOCALAPPDATA%\SephPlanner\inventory-snapshot.json` 에, 마지막으로 게시된
+  계획의 입력·설정·카탈로그를 `reproductions\` 의 `.replay` 에 남긴다. 둘은 같은 순간의 자료가 아니다([계획
+  재현](REPRODUCTION.md)). 진단 전송을 켰으면 메모 창을 거쳐 서버로도 보낸다([진단 전송](DIAGNOSTIC-UPLOAD.md)).
+  게임 데이터가 든 로컬 진단 자료이므로 저장소·릴리스·공개 제보에 첨부하지 않는다.
+- **`--check`.** 어긋나는 칸이 있으면 아직 모델 밖인 효과가 걸려 있다는 뜻이다. 무엇이 모델에 들었는지는 [현재
+  상태](STATUS.md)의 "구현 범위".
+- **`--churn`.** 계획대로 옮기고, 게임이 다시 셀 레벨과 콤보 개수를 우리 셈으로 채운 뒤 다시 푼다. 적용한 뒤에도 계획이
+  또 바뀌면 그 이유가 여기서 드러난다(침 둘이 두 콤보 사이를 오가며 `F8` 마다 6~7수를 내던 판을 이것으로 잡았다).
+- **`--measure`.** `Worth` 의 상수를 짐작으로 두지 않기 위한 것이다. 게임을 한 번 켜서 카탈로그를 다시 덤프한 뒤에
+  돈다(방법은 docs/RESEARCH.md).
+- **`--values`.** 아직 레어도 어림값에 기대는 아티팩트를 초안으로 뽑는다. 채우는 법은
+  [data/values/README.md](../data/values/README.md). **레벨이 올라도 값어치가 내려가는 아티팩트도 함께 적는다.** 그런
+  구간이 있으면 낮은 레벨 칸이 정답이 되어 "왜 이걸 낮은 자리에 두느냐" 는 제보가 온다. 원인이 된 능력치와 그 수치
+  변화까지 적으므로 환산율을 어디서 다시 재야 하는지가 바로 나온다.
+- **텍스트 추출.** `data/generated/` 는 각자 PC에서 생성되며 저장소에 커밋하지 않는다. 이유는 [LEGAL.md](LEGAL.md).
 
 ## 배포
 
-```powershell
-scripts/make-release.ps1
-# -> artifacts/SephPlanner-v{버전}.zip
-# macOS에서 실행하면 artifacts/SephPlanner-macos-v{버전}.zip
-```
+GitHub 릴리스(BepInEx 판 zip 둘)와 창작마당(위 "창작마당 판")은 따로 올린다. GitHub 릴리스는 이 순서다.
 
-배포물에는 플러그인 DLL 두 개와 플랫폼에 맞는 BepInEx, 설치 안내와 라이선스가 들어간다.
-macOS 배포물은 `build-macos-loader.sh`가 고정한 BepInEx·Doorstop·plthook 소스와
-`scripts/patches/macos-plthook.patch`를 사용한다. 릴리스 전에 포맷, 테스트, 빌드를 검증하고
-커밋과 파일 해시가 적힌 `manifest.json`을 만든다. 게임 파일은 넣지 않는다.
+1. **판 번호를 다섯 곳에 적는다.** `Directory.Build.props` 의 `Version`, `BepInExHost/BepInExEntry.cs` 의 `[BepInPlugin]`,
+   `src/SephPlanner.Workshop/package/metadata.json` 의 `version`, STATUS 의 `**이번 판: {버전}.**`, CHANGELOG 의
+   `## {버전}` 절. 하나라도 어긋나면 `check.ps1` 이 멈춘다.
+2. 커밋하고 **태그 `v{버전}` 을 먼저 단다.** manifest 에 적히는 커밋이 곧 태그가 가리켜야 할 커밋이라, 나중에 달면 zip 을
+   만든 커밋과 태그가 갈라져 어느 소스에서 나온 zip 인지 되짚을 수 없다. `make-release.ps1` 은 작업 트리가 깨끗하지 않거나
+   HEAD 에 태그가 없으면 멈춘다.
+3. Windows 와 Mac 에서 각각 `make-release.ps1` 을 돌린다. `check.ps1` 을 먼저 돌고 zip 과 릴리스 본문을 짓는다.
 
-**한 릴리스에 두 ZIP을 모두 올린 뒤 공개한다.** Windows와 Mac에서 각각 `make-release.ps1`을 돌려
-같은 드래프트에 올린다 - 먼저 도는 쪽이 `gh release create --draft`, 나중 쪽이 `gh release upload`
-(스크립트가 끝에 두 명령을 출력한다). 공개는 `scripts/publish-release.ps1`로 한다. 드래프트에 두 ZIP이
-다 있을 때만 `--draft=false`로 바꾸고, 하나라도 빠지면 거절한다. 업데이트 확인은 `releases/latest`의 태그만 보고 창을 띄우므로, macOS ZIP이
-빠진 채 공개하면 Mac 사용자의 `업데이트`가 404로 실패한다.
+   ```powershell
+   scripts/make-release.ps1
+   # -> artifacts/SephPlanner-v{버전}.zip (macOS 에서는 artifacts/SephPlanner-macos-v{버전}.zip)
+   # -> artifacts/release-notes-v{버전}.md
+   ```
 
-zip은 이 저장소의 Releases 에 올린다. 변경 기록은 CHANGELOG.md 가 정본이고, 릴리스 본문은
-`make-release.ps1`이 그 절을 그대로 뽑아 `artifacts/release-notes-v{버전}.md`로 내준다 - 손으로
-옮겨 적지 않는다. 두 벌이 되면 한쪽만 고친 채 나가기 때문이다. 커뮤니티 글에는 Releases 링크를
-걸고 zip을 직접 첨부하지 않는다 - 첨부하면 옛 버전이 돌아다닌다.
+4. **두 ZIP 을 한 드래프트에 올린다.** 먼저 도는 쪽이 `gh release create --draft`, 나중 쪽이 `gh release upload` 다
+   (스크립트가 끝에 두 명령을 출력한다).
+5. `scripts/publish-release.ps1` 로 공개한다. 드래프트에 두 ZIP 이 다 있을 때만 `--draft=false` 로 바꾸고 하나라도 빠지면
+   거절한다. 업데이트 확인은 `releases/latest` 의 태그만 보고 창을 띄우므로, macOS ZIP 이 빠진 채 공개하면 Mac 사용자의
+   `업데이트` 가 404 로 실패한다.
 
-**릴리스 제목은 `SephPlanner {버전}`, 태그는 `v{버전}`이다.** 드래프트도 같은 제목을 쓴다.
-예를 들어 제목은 `SephPlanner 0.4.5`, 태그는 `v0.4.5`다. 만들기 전에 최근 릴리스의 제목과
-본문 형식을 확인하고, 사용자가 수정한 드래프트는 현재 내용을 읽은 뒤 필요한 부분만 갱신한다.
+지킬 것.
+
+- **배포물에는 게임 파일을 넣지 않는다.** 플러그인 DLL 두 개, 플랫폼에 맞는 BepInEx, 설치 안내, 라이선스와 커밋·파일
+  해시가 적힌 `manifest.json` 이 들어간다. macOS 배포물은 `build-macos-loader.sh` 가 고정한 BepInEx·Doorstop·plthook
+  소스와 `scripts/patches/macos-plthook.patch` 를 쓴다.
+- **릴리스 본문은 손으로 옮겨 적지 않는다.** 변경 기록은 CHANGELOG.md 가 정본이고 `make-release.ps1` 이 그 절을 그대로
+  뽑는다. 두 벌이 되면 한쪽만 고친 채 나가기 때문이다.
+- **릴리스 제목은 `SephPlanner {버전}`, 태그는 `v{버전}`이다**(예: `SephPlanner 0.4.5`, `v0.4.5`). 드래프트도 같은 제목을
+  쓴다. 만들기 전에 최근 릴리스의 제목과 본문 형식을 확인하고, 사용자가 수정한 드래프트는 현재 내용을 읽은 뒤 필요한
+  부분만 갱신한다.
+- **zip 의 이름과 `manifest.json` 은 게임 안 업데이트가 읽는다.** 플러그인은 `releases/latest` 가 가리키는 태그
+  `v{버전}` 에서 운영체제에 맞는 ZIP 을 받고, 안의 `manifest.json` 으로 버전과 DLL 둘의 SHA-256 을 대조한다
+  (`UpdateClient`·`UpdatePackage`). 자산 이름·zip 안 경로·manifest 의 `version`/`files` 모양을 바꾸면 이미 깔린 판의
+  업데이트가 끊긴다. 시험 버전은 `Pre-release` 로 올려야 안정판 사용자에게 안내되지 않는다.
+- 커뮤니티 글에는 Releases 링크를 걸고 zip 을 직접 첨부하지 않는다. 첨부하면 옛 버전이 돌아다닌다.
 
 **소스와 배포본이 한 저장소에 있다**(`nyabi-gh/SephPlanner`, 공개). 2026-09-13 에 합쳤고 옛
 소스 저장소는 `SephPlanner-archive` 로 이름을 바꿔 잠갔다(옛 주소 `SephPlanner-Release` 는 리다이렉트된다).
@@ -205,42 +189,30 @@ zip은 이 저장소의 Releases 에 올린다. 변경 기록은 CHANGELOG.md �
   않는다** - 릴리스 자산이 그 태그에 붙어 있다. `v0.3.9` 부터는 갈라지지 않는다.
 - 합칠 때 커밋 메시지의 트레일러를 지우느라 히스토리를 한 번 다시 썼다. 그래서 공개된 옛 릴리스 노트와 zip
   manifest 의 커밋 번호는 이 저장소에서 찾을 수 없다.
-- 진단 서버 배치 문서(`deploy/diagnostics`)는 공인 주소와 서버 구성을 담고 있어 저장소에 넣지 않는다. 배포 담당자
-  디스크에 있고 `.gitignore` 가 `deploy/` 를 덮는다.
-
-**zip 의 이름과 `manifest.json` 은 게임 안 업데이트가 읽는다.** 플러그인은 `releases/latest` 가
-가리키는 태그 `v{버전}` 에서 운영체제에 맞는 ZIP을 받고, 안의 `manifest.json` 으로 버전과
-DLL 둘의 SHA-256 을 대조한다(`UpdateClient`·`UpdatePackage`). 자산 이름·zip 안 경로·manifest
-의 `version`/`files` 모양을 바꾸면 이미 깔린 판의 업데이트가 끊긴다. 시험 버전은 `Pre-release`
-로 올려야 안정판 사용자에게 안내되지 않는다.
-
-**태그를 먼저 달고 zip을 만든다.** manifest에 적히는 커밋이 곧 태그가 가리켜야 할 커밋이라,
-나중에 달면 zip을 만든 커밋과 태그가 갈라져 어느 소스에서 나온 zip인지 되짚을 수 없다.
-`make-release.ps1`이 HEAD에 `v{버전}` 태그가 없으면 멈추고, `[BepInPlugin]`의 버전과
-CHANGELOG의 해당 절도 함께 확인한다.
+- 진단 서버의 배포 파일은 저장소 밖에 있다([진단 전송](DIAGNOSTIC-UPLOAD.md)).
 
 ## 게임이 패치되면
 
-카탈로그는 게임 버전·어셈블리가 바뀌면 스스로 다시 짓는다. 그 밖에 다시 보는 것.
+카탈로그는 게임 버전·어셈블리가 바뀌면 스스로 다시 짓는다. 그 밖에 다시 보는 것이다. 어느 판까지 대조했는지는
+[현재 상태](STATUS.md)의 "게임 버전" 에 있다.
 
 1. 카탈로그의 질의 검증(`query-verification.txt`)이 불일치 0 인지, 플러그인이 새 어셈블리로 경고 없이 빌드되는지.
 2. **쓰기 경로 셋이 그대로인지.** `GridInventory.Swap` → `LocalSwap`/`CmdSwap`, `DoClickAction` →
    `LocalDoClickAction`/`CmdDoClickAction`, `StoneTablet.Networkrotation`. 우리가 부르는 것은 이 셋뿐이다. 개발사가
    "동기화 구현이 최적화 중이라 바뀔 수 있다" 고 했으므로(LEGAL "받은 답변") 참가자 경로는 실기로도 다시 본다.
-3. 아티팩트 번호가 밀리지 않았는지(양쪽에 있는 것의 식별자가 같은지). 1.0.31 에서는 중복 등록이던 플리트비체의
-   물방울이 1261 → 1248 로 정리된 것 하나뿐이었다.
+3. 아티팩트 번호가 밀리지 않았는지(양쪽에 있는 것의 식별자가 같은지).
 4. 새 아티팩트·능력치 종류가 환산율을 받는지(`DataTool --values`), 새 조건 토큰이 없는지(모르는 조건은 `None` 으로
    읽혀 조용히 통과한다).
-5. 1.0.32·1.0.33 은 이 대조를 하지 않았다. 1.1.0 베타는 2026-10-30 에 대조했고, 같은 날 1.0.33 디컴파일로 침 규칙을
-   다시 확인했다([게임 내부 조사](RESEARCH.md) 머리).
-6. **배포된 DLL 도 새 어셈블리에 대 본다.** 소스가 빌드된다고 깔린 판이 도는 것은 아니다 - 선택 인자 추가나 필드↔속성
-   변경은 소스로는 빌드되지만 옛 DLL 은 런타임에 `MissingMethodException` 을 낸다. 1.1.0 때는 마지막 릴리스 zip 의
-   `SephPlanner.Plugin.dll` 이 참조하는 게임 타입·멤버를 Mono.Cecil 로 새 `Managed` 에서 `Resolve()` 해 깨진 것을 골랐다.
-   두 판을 함께 지원하는 동안은 두 설치본으로 빌드한 DLL 을 두 판 `Managed` 에 모두 대 본다. 1.1.0 `Managed` 의
-   Lib.Harmony 2.4.3 에는 BepInEx 판이 쓰는 `Harmony.Patch`(인자 여섯)가 없어 걸리지만, 실행 때는 BepInEx 의 HarmonyX 를
-   쓰므로 깨진 것이 아니다 - BepInEx 가 깔린 1.1.1 의 `Player.log` 는 `동봉 Harmony 2.9.0.0`(HarmonyX)을 찍는다(2026-11-02).
-   `UnpatchSelf` 는 두 Harmony 에 다 있는 멤버로 바꿨다. 창작마당 판은 게임의 2.4.3 으로 짓는다.
-   `GameBinding`·진단·Harmony 대상처럼 문자열로 잡는 멤버는 이 검사에 안 걸리므로 디컴파일에서 이름을 따로 찾는다.
+5. **배포된 DLL 도 새 어셈블리에 대 본다.** 소스가 빌드된다고 깔린 판이 도는 것은 아니다 - 선택 인자 추가나 필드↔속성
+   변경은 소스로는 빌드되지만 옛 DLL 은 런타임에 `MissingMethodException` 을 낸다.
+   - 마지막 릴리스 zip 의 `SephPlanner.Plugin.dll` 이 참조하는 게임 타입·멤버를 Mono.Cecil 로 새 `Managed` 에서
+     `Resolve()` 해 깨진 것을 고른다(1.1.0 때 이렇게 했다). 두 판을 함께 지원하는 동안은 두 설치본으로 빌드한 DLL 을 두 판
+     `Managed` 에 모두 대 본다.
+   - 1.1.x `Managed` 의 Lib.Harmony 2.4.3 에는 BepInEx 판이 쓰는 `Harmony.Patch`(인자 여섯)가 없어 걸리지만 깨진 것이
+     아니다. 실행 때는 BepInEx 의 HarmonyX 를 쓴다 - BepInEx 가 깔린 1.1.1 의 `Player.log` 는 `동봉 Harmony 2.9.0.0`
+     (HarmonyX)을 찍는다(2026-11-02). 창작마당 판은 게임의 2.4.3 으로 짓고, 두 Harmony 에 다 있는 멤버만 쓴다([게임 내부
+     조사](RESEARCH.md)의 "공식 모드 API").
+   - `GameBinding`·진단·Harmony 대상처럼 문자열로 잡는 멤버는 이 검사에 안 걸리므로 디컴파일에서 이름을 따로 찾는다.
 
 ## 화면 설계
 
@@ -260,15 +232,12 @@ CHANGELOG의 해당 절도 함께 확인한다.
 
 읽는 방식이 달라서 둘로 나눴다.
 
-- **접힘.** 플레이 중에는 화면을 거의 가리지 않는다. 현재 점수와 탐색한 배치 점수, 그리고 지금
-  옮길 것 하나만 보여준다.
+- **접힘.** 플레이 중에는 화면을 거의 가리지 않는다. **정말 한 줄만 남는다** - 현재 점수와 탐색한 배치 점수, 그리고
+  지금 옮길 것 하나뿐이고 폭도 제한된다. 단축키 안내는 화면이 처음 뜰 때와 키를 누른 뒤 잠깐만 보인다. 게임 화면을
+  가리지 않는 것이 접는 이유이므로 접힌 상태에 무엇을 더 남기지 않는다.
 - **펼침.** 상자나 상점이 열리거나 세피라이트를 여는 순간 저절로 펼쳐지고, 닫히면 되돌아간다.
   격자에 칸마다 놓일 아이템과 레벨이 나오고, 무엇을 어디로 옮길지와 지금 집을 수 있는 후보가
   줄 세워진다. 직접 접거나 펼친 상태는 상자·상점이 다시 열리거나 닫힐 때까지 유지된다.
-
-**접으면 정말 한 줄만 남는다.** 점수와 지금 옮길 것 하나뿐이고, 폭도 제한되며,
-단축키 안내도 사라진다. 안내는 화면이 처음 뜰 때와 키를 누른 뒤 잠깐만 보인다. 게임 화면을
-가리지 않는 것이 접는 이유이므로 접힌 상태에 무엇을 더 남기지 않는다.
 
 예외는 경고다. 점수를 믿을 수 없거나 멀티 세션이라는 것처럼 **모르고 넘어가면 안 되는 것**은
 접혀 있어도 뜨고, 접힌 폭에 맞춰 여러 줄로 접힌다. 자동 배치가 도는 동안 뜨는 진행 표시도
@@ -294,7 +263,7 @@ CHANGELOG의 해당 절도 함께 확인한다.
 
 게임 자체의 설정 창에 탭으로 붙이는 길은 만들어 보고 접었다. 그 창이 탭 다섯 개에 딱 맞게 짜여
 있어 우리 탭이 들어갈 자리가 없고, 선택 표시가 탭 그림마다 박혀 있어 버튼을 옮기면 게임 탭들이
-어긋난다. 잰 값은 [RESEARCH.md](RESEARCH.md) 에 남겼다.
+어긋난다. 잰 값은 [RESEARCH.md](RESEARCH.md) 의 "게임 설정 창에 탭으로 붙이는 길은 접었다".
 
 ## 번역
 
@@ -321,15 +290,7 @@ CHANGELOG의 해당 절도 함께 확인한다.
 
 ## 원칙
 
-- **쓰기는 자동 배치 하나뿐이다.** 그 밖에는 게임 상태를 읽기만 한다. 멀티에서는 기본으로
-  잠기고, 설정에서 여는 옵션이 있다(켜면 방을 연 쪽과 참가한 쪽 모두에서 동작한다).
-  싱글 자동 배치는 개발사에게 허락받았다. 근거와 경위는
-  [LEGAL.md](LEGAL.md) 참고.
+- **쓰기는 자동 배치 하나뿐이다.** 그 밖에는 게임 상태를 읽기만 한다. 멀티에서는 기본으로 잠기고, 설정에서 켜면 방을 연
+  쪽과 참가한 쪽 모두에서 동작한다. 싱글 자동 배치는 개발사에게 허락받았다. 근거는 [LEGAL.md](LEGAL.md).
 - **게임 저작물을 배포하지 않는다.** 데이터는 각자 PC의 게임 설치본에서 생성한다.
-- **비영리.**
-
-## 문서
-
-어느 문서가 무엇을 맡는지는 [현재 상태](STATUS.md)의 "문서 지도" 에 있다. 문서를 새로 만들기 전에 거기 들어갈
-자리가 있는지 먼저 본다. 날짜가 붙은 조사 보고서는 따로 두지 않는다 - 결론은 해당 문서의 절에, 경위는 커밋
-메시지에 남긴다. [LICENSE](../LICENSE) 는 MIT 이고, 우리가 비영리인 것은 운영 방침이지 라이선스 조건이 아니다.
+- **비영리.** 운영 방침이지 라이선스 조건은 아니다. [LICENSE](../LICENSE) 는 MIT 다.

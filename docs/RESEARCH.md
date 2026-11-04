@@ -1,15 +1,19 @@
 ﻿# 게임 내부 구조 조사
 
-디컴파일(`ilspycmd`)과 에셋으로 확인한 게임 규칙이다. 무엇이 구현됐고 무엇을 실기에서 못 봤는지는
-[현재 상태](STATUS.md)에 있다. 절에 붙은 날짜는 그 사실을 확인한 날이다.
+디컴파일(`ilspycmd`)과 에셋으로 확인한 게임 규칙과 그것을 읽는 법이다. 솔버 정책은 [배치 평가](PLACEMENT-OBJECTIVE.md),
+성능은 [성능](PERFORMANCE.md)에 있다. 무엇이 구현됐고 무엇을 실기에서 못 봤는지는 [현재 상태](STATUS.md)에 있다.
+절에 붙은 날짜는 그 사실을 확인한 날이다. 게임 업데이트로 플러그인이 깨지면 여기부터 다시 확인한다.
 
-세피리아 1.0(App 2436940) 기준. 게임 업데이트로 내부 구조가 바뀔 수 있으니 플러그인이 깨지면
-여기부터 다시 확인한다.
+세피리아(App 2436940)의 두 판을 지원한다. 기본 브랜치 1.0.33 과 `workshop-beta` 브랜치 1.1.x 다. 판 표시가 없는
+규칙은 1.0.x 에서 확인한 것이다. 판별 어셈블리 지문과 어느 판까지 대조했는지는 [현재 상태](STATUS.md)의 "게임 버전"
+에 있다.
 
-**1.1.0 베타(2026-10-29 `workshop-beta` 브랜치)를 2026-10-30 에 대조했다.** 1.0.33 디컴파일 없이 이 문서와
-견줬고, 달라진 자리에 `1.1.0` 을 적었다. 침 규칙은 같은 날 1.0.33 디컴파일로 다시 확인했다. 바뀐 것은 침(→ 나침반), 레벨 계산의 재계산 반복, 배치 보너스 합치기,
-개인 합성기, 창작마당 모드 시스템이다. 질의 문법·활성 조건 10종·쓰기 경로·인챈트·선택지 감지는 그대로다. 새 석판
-생장(`BOTTOM PLACED` 조건에 `TOP 1`)·반향(`DOWN 1`, `DOWNDOWN 3`)과 회전 가능이 된 분배는 기존 문법 안이다.
+**1.1.0 베타(2026-10-29)를 2026-10-30 에 대조했다.** 1.0.33 디컴파일 없이 이 문서와 견줬고, 달라진 자리에
+`1.1.0` 을 적었다. 침 규칙은 같은 날 1.0.33 디컴파일로 다시 확인했다.
+
+- 바뀐 것: 침(→ 나침반), 레벨 계산의 재계산 반복, 배치 보너스 합치기, 개인 합성기, 창작마당 모드 시스템.
+- 그대로인 것: 질의 문법, 활성 조건 10종, 쓰기 경로, 인챈트, 선택지 감지.
+- 새 석판 생장(`BOTTOM PLACED` 조건에 `TOP 1`)·반향(`DOWN 1`, `DOWNDOWN 3`)과 회전 가능이 된 분배는 기존 문법 안이다.
 
 ## 런타임
 
@@ -20,6 +24,13 @@
 - `Assembly-CSharp.dll`에 타입 약 4,000개.
 - 엔진은 Unity 6000.3.21f1 이다(1.0.33·1.1.0 같음 - 1.1.0 업데이트가 `UnityPlayer.dll` 을 바꾸지 않았다).
   1.1.0 은 `Managed/0Harmony.dll`(Lib.Harmony 2.4.3)을 함께 싣는다(아래 "공식 모드 API").
+
+## 조사에 쓴 도구
+
+```
+dotnet tool install --global ilspycmd
+ilspycmd -t GridInventory "<게임경로>/Sephiria_Data/Managed/Assembly-CSharp.dll"
+```
 
 ## 핵심 타입
 
@@ -41,10 +52,7 @@ public readonly SyncDictionary<ItemPosition, Charm_Basic>        charms;
 public readonly SyncDictionary<ItemPosition, StoneTablet>        stoneTablets;
 ```
 
-**격자가 최대 6x7 = 42칸**이어도 아이템과 회전의 조합은 많다. 현재는 제한된 빔 탐색과
-배정·교환 개선을 사용하며 전체 배치의 완전 탐색이나 전역 최적을 보장하지 않는다.
-
-`levelMatrix`가 Mirror `SyncDictionary`라는 것도 중요하다. 게임이 이미 계산해 둔 최종 레벨이
+`levelMatrix` 는 Mirror `SyncDictionary` 다. 게임이 이미 계산해 둔 최종 레벨이
 클라이언트에 동기화돼 있으므로, **현재 상태를 읽을 때는 레벨 계산을 재구현할 필요가 없다.**
 재구현이 필요한 것은 "이 아이템을 저기 놓으면 어떻게 되는가"라는 가상 배치를 평가할 때뿐이고,
 그때도 `levelMatrix`를 정답지로 삼아 우리 시뮬레이터를 검증할 수 있다.
@@ -56,22 +64,18 @@ public readonly SyncDictionary<ItemPosition, StoneTablet>        stoneTablets;
 `GridInventory.Swap` 도 이 줄을 알고 있어서, 포션이 아닌 것을 y>=100 으로 넣으려 하면 거부한다
 (반대로 포션을 격자로 꺼내는 것은 막지 않는다).
 
-그래서 딕셔너리를 그냥 훑으면 **포션이 격자 아이템으로 섞여 든다.** 배치 쪽은 원래부터 격자
-밖 좌표를 걸러 냈지만 스냅샷의 아이템 목록에는 그대로 들어 있어 "가방에 아이템 몇 개" 같은
-셈이 조용히 어긋날 자리였다. 지금은 `GameReader`가 읽을 때 걸러 내고, 진단이 필요할 때는
-F10 덤프가 딕셔너리를 있는 그대로 보여준다(덤프 머리에 `Potion=`, `SubBag=` 개수도 함께 적힌다).
+그래서 딕셔너리를 그냥 훑으면 **포션이 격자 아이템으로 섞여 든다.** `GameReader` 가 읽을 때 걸러 내고,
+F10 덤프는 딕셔너리를 있는 그대로 보여 준다(덤프 머리에 `Potion=`, `SubBag=` 개수도 적힌다).
 
-이 판정은 `GridSpec.Contains` 하나다. 한동안 같은 뜻의 함수가 네 벌(계획·적용 전 검사·적용기·
-읽기) 있었고 그중 읽기 쪽만 아직 잠긴 칸(`CurrentInventoryStorage` 밖)을 보지 않았다. 넷이
-갈리면 솔버와 자동 배치가 서로 다른 격자를 보게 되므로 한 벌로 모았다.
+격자 안인지는 `GridSpec.Contains` 한 곳에서 판정한다. 격자 밖 좌표와 잠긴 칸(`CurrentInventoryStorage` 밖)을
+함께 거른다. 판정이 여러 벌로 갈리면 솔버와 자동 배치가 서로 다른 격자를 본다.
 
 **보조 가방**(`numberOfSubBagStorage`)은 아예 다른 딕셔너리(`subBagMatrix`, 키가 `sbyte`)라
 `inventoryMatrix` 에 나타나지 않는다. 격자와 오가는 길은 `ServerSwapSubBagAndInventory` 뿐이다.
 
-포션칸도 보조 가방도 석판 효과가 닿지 않으므로 배치·점수에는 관여하지 않는다. 다만 **선택지
-쪽에서는 한 번 걸린다** - 상점에 놓인 포션은 후보로 읽히는데, 아티팩트도 석판도 아니라
-평가 대상에서 빠진다. 그 탈락을 후보 상한보다 먼저 처리하지 않으면 "선택지가 많아 몇 개는
-평가하지 못했습니다"가 포션 때문에 뜬다.
+포션칸도 보조 가방도 석판 효과가 닿지 않으므로 배치·점수에는 관여하지 않는다. 다만 **선택지 쪽에서는 한 번
+걸린다.** 상점에 놓인 포션은 후보로 읽히지만 아티팩트도 석판도 아니라 평가에서 빠진다. 그 탈락을 후보 상한보다
+먼저 처리하지 않으면 "선택지가 많아 몇 개는 평가하지 못했습니다" 가 포션 때문에 뜬다.
 
 ### `StoneTablet`
 
@@ -132,16 +136,14 @@ F10 덤프가 딕셔너리를 있는 그대로 보여준다(덤프 머리에 `Po
 
 여기서 따라오는 것들:
 
-- 질의가 **여러 줄**이다. 게임 `ParseQuery`는 `
-`으로 잘라 줄마다 처리하고 우리
+- 질의가 **여러 줄**이다. 게임 `ParseQuery`는 `\n`으로 잘라 줄마다 처리하고 우리
   `TabletQuery.Parse`도 같으므로 그대로 통한다.
 - 합성 시점의 회전이 **토큰 이름으로 미리 구워진다**(`GetRotatedKeyword`). 나오는 토큰은 전부
   기존 28+19종 안이라 새 토큰이 생기지 않는다.
 - `DungeonManager.IsTabletRotatable(instanceID, 기본값)`은 오버라이드가 있으면 그것을 그대로
   돌려준다. 즉 **인스턴스 값이 정의 기본값을 이미 흡수한 최종 답이다.** 정의값을 다시 AND 하면
-  합성 석판(정의상 거짓)은 영원히 회전 후보에서 빠진다 — 실제로 그 버그가 있었고
-  `PlacementSolver`에서 정의값을 떼어 고쳤다. 아직 집지 않은 후보 석판은 인스턴스가 없으므로
-  그쪽만 정의값을 쓴다(`OfferAdvisor`).
+  합성 석판(정의상 거짓)은 영원히 회전 후보에서 빠진다. 그래서 `PlacementSolver` 는 인스턴스 값만 쓰고,
+  인스턴스가 없는 아직 집지 않은 후보 석판만 정의값을 쓴다(`OfferAdvisor`).
 - 이름이 없으면 화면에서 합성 석판끼리 구분되지 않는다. 아이콘도 2101 하나를 공유한다.
   그래서 스냅샷에 `PlacedTablet.Name`을 실어 `DungeonManager.GetItemName`의 값을 그대로 쓴다.
   게임 화면에 이미 보이는 이름이라 숨은 정보에 해당하지 않는다.
@@ -166,21 +168,21 @@ F10 덤프가 딕셔너리를 있는 그대로 보여준다(덤프 머리에 `Po
 읽을 때 돌리는 것(`Parse`의 rotation 인자)과 결과가 같아야 한다. **a 만큼 구운 질의를 b 로 읽은
 것이 원본을 a+b 로 읽은 것과 같다**는 성질을 `TabletMixAdvisorTests`가 회전 16조합으로 고정한다.
 
-**회전은 합성 창 안에서 정해진다(2026-09-23 게임 1.0.33 디컴파일).** 가방의 석판을 누르면
-`AddItemToMix` 가 그 석판의 가방 속 회전을 창의 시작 각도로 넘기고, 창에서 우클릭(또는 회전 키)
-할 때마다 `rotation + 1` 이 된다. 돌릴 수 없는 석판은 `UI_ItemIcon.UpdateIcon` 이 회전을 0 으로
-되돌리므로 **가방에서 어떻게 놓였든 0 으로 합쳐진다** - 예전 모델은 가방 각도로 합쳐진다고 가정했고
-근거가 없었다. 그래서 화면은 절대 각도가 아니라 **창에서 누를 횟수**를 말한다.
+**회전은 합성 창 안에서 정해진다**(2026-09-23·09-27, 게임 1.0.33 디컴파일).
 
-**창의 두 칸은 저마다 인스턴스 하나와 회전 하나를 든다(2026-09-27 다시 확인).** `AddItemToMix` 는 빈
-첫 칸(`itemIcon1`)부터 채우고, 이미 든 석판을 다시 누르면 뺀다. 우클릭은 누른 칸의 `rotation` 만 올린다.
-합성은 `MixTablet(칸1 인스턴스, 칸1 회전, 칸2 인스턴스, 칸2 회전)` 이고 결과 질의는 두 줄을 이어 붙일 뿐이라
-어느 칸에 들었는지는 결과를 바꾸지 않는다. 그래서 0.4.20 부터 줄마다 **실제 재료 둘**(같은 종류 중 덜 돌려도
-되는 것)을 격자에서 ①·② 로 짚고, 돌릴 것을 ① 로 불러 "① 을 먼저 넣고 우클릭 N번, 그 뒤 ②" 라고 말한다.
-창에 석판이 하나뿐일 때 돌리므로 같은 석판 둘이어도 어느 쪽인지 헷갈리지 않는다 - 예전의 "모양이 되게"
-안내는 어느 것을 넣을지 짚을 수 없어서였다. 한쪽만 돌릴 수 있으면 `MixTablet` 이 합치기 전에 확인 창
-(`mixProcRestrictToRotateString`)을 띄운다. 보조 가방(`UI_SubBagIcon`)의 석판은 회전 0 으로 들어가지만
-추천 재료는 가방 석판뿐이라 해당하지 않는다. 같은 석판 둘로 만든 같은 합성은 한 줄로 합친다.
+- 가방의 석판을 누르면 `AddItemToMix` 가 그 석판의 가방 속 회전을 창의 시작 각도로 넘긴다. 빈 첫 칸(`itemIcon1`)부터
+  채우고, 이미 든 석판을 다시 누르면 뺀다.
+- 창의 두 칸은 저마다 인스턴스 하나와 회전 하나를 든다. 우클릭(또는 회전 키)은 누른 칸의 `rotation` 만 1 올린다.
+- 돌릴 수 없는 석판은 `UI_ItemIcon.UpdateIcon` 이 회전을 0 으로 되돌리므로 **가방에서 어떻게 놓였든 0 으로
+  합쳐진다.**
+- 합성은 `MixTablet(칸1 인스턴스, 칸1 회전, 칸2 인스턴스, 칸2 회전)` 이고 결과 질의는 두 줄을 이어 붙일 뿐이라,
+  어느 칸에 들었는지는 결과를 바꾸지 않는다.
+- 한쪽만 돌릴 수 있으면 `MixTablet` 이 합치기 전에 확인 창(`mixProcRestrictToRotateString`)을 띄운다.
+- 보조 가방(`UI_SubBagIcon`)의 석판은 회전 0 으로 들어간다. 추천 재료는 가방 석판뿐이라 해당하지 않는다.
+
+그래서 화면은 절대 각도가 아니라 **창에서 누를 횟수**를 말한다. 줄마다 실제 재료 둘(같은 종류 중 덜 돌려도 되는
+것)을 격자에서 ①·② 로 짚고, 돌릴 것을 ① 로 불러 "① 을 먼저 넣고 우클릭 N번, 그 뒤 ②" 라고 말한다. 창에 석판이
+하나뿐일 때 돌리므로 같은 석판 둘이어도 어느 쪽인지 헷갈리지 않는다. 같은 석판 둘로 만든 같은 합성은 한 줄로 합친다.
 
 탐색 범위는 작다. 쌍이 n(n-1)/2 이고 회전 조합은 넷을 넘지 않는다 - 둘 다 돌릴 수 있으면 결과도
 돌릴 수 있어 절대 회전이 아니라 사이 각도만 결과를 가르므로, 한쪽을 고정해도 나올 모양은 다 나온다.
@@ -188,10 +190,10 @@ F10 덤프가 딕셔너리를 있는 그대로 보여준다(덤프 머리에 `Po
 합성 NPC 는 `TabletMix.HandleInteractive` 에서 `UI_TabletMixPanel.Open(this)` 을 부른다. 상점 재고 창과 다른 창이라
 HUD 의 자동 펼침도 그 창의 `IsOpened` 를 따로 본다.
 
-**1.1.0 에는 개인 합성기가 있다.** `TabletMix_Personal` 은 소유자가 아니면 상호작용·몸체·충돌을 끄고 미니맵에도 올리지
-않는다(`TabletMix_Shared` 는 함께 쓴다). 그래서 `GameReader.ReadMixer` 는 내 것이 아닌(`isOwned` 거짓) 개인 합성기를
-건너뛴다 - 네트워크 객체로는 우리 쪽에도 있어 거르지 않으면 쓸 수 없는 합성기로 추천을 준비한다. 재료는 가방 밖 일반 각인·보조 가방에서도 찾고(`FindMixableTabletByInstanceID`), 같은
-인스턴스 둘은 거절한다.
+**1.1.0 에는 개인 합성기가 있다.** `TabletMix_Personal` 은 소유자가 아니면 상호작용·몸체·충돌을 끄고 미니맵에도
+올리지 않는다(`TabletMix_Shared` 는 함께 쓴다). 네트워크 객체로는 우리 쪽에도 있으므로 `GameReader.ReadMixer` 는 내
+것이 아닌(`isOwned` 거짓) 개인 합성기를 건너뛴다. 거르지 않으면 쓸 수 없는 합성기로 추천을 준비한다. 1.1.0 합성은
+재료를 가방 밖 일반 각인·보조 가방에서도 찾고(`FindMixableTabletByInstanceID`), 같은 인스턴스 둘은 거절한다.
 
 합성기는 거리를 보지 않고 읽는다. 미니맵에 뜨는 고정물(`minimapElementName`)이라 층에 있다는
 사실 자체가 이미 보이는 정보이고, 무엇을 합칠지는 합성기 앞에 서기 전에 정해 두는 편이 쓸모
@@ -236,9 +238,8 @@ public void Swap(sbyte xLeft, sbyte yLeft, sbyte xRight, sbyte yRight)
 
 수동 드래그가 타는 그 경로다 - `UI_CharacterStatusPanel` 이 집은 칸과 누른 칸을 그대로 `Swap` 에
 넘기며 **목표 칸이 비었는지 보지 않는다**(로그도 "Icon Swapped"라고 찍는다). 서버(=싱글 호스트)면
-`LocalSwap`을 바로 부르고, 클라이언트면
-`CmdSwap`(Mirror Command, `requiresAuthority: true`)으로 서버에 보낸다. `LocalSwap`은
-`inventoryMatrix`/`charms`/`stoneTablets` 세 딕셔너리를 함께 갱신하고, 빈 칸과의 맞바꿈도
+`LocalSwap`을 바로 부르고, 클라이언트면 `CmdSwap`(Mirror Command, `requiresAuthority: true`)으로 서버에
+보낸다. `LocalSwap`은 `inventoryMatrix`/`charms`/`stoneTablets` 세 딕셔너리를 함께 갱신하고, 빈 칸과의 맞바꿈도
 그대로 처리하므로 "이동"과 "맞바꿈"을 구분할 필요가 없다. 임시 저장(손에 들기)을 거치는
 `CmdMoveToTempStorage`/`CmdTempStorageToInventory` 경로도 있지만, 중간에 끊기면 아이템이 손에
 남으므로 쓰지 않는다.
@@ -260,21 +261,26 @@ public void Swap(sbyte xLeft, sbyte yLeft, sbyte xRight, sbyte yRight)
 `ReleasePermission` 을 불러 바깥 스코프의 권한을 먼저 푼다. 중첩이 조용히 깨지는 것이 아니라
 바깥의 재계산 시점을 앗아가는 모양이다.
 
-**`ReleasePermission` 은 `charm.Item` 을 널 검사 없이 읽는다(1.0.33, 2026-09-16).** 레벨 행렬을
-다시 만드는 첫 루프가 `(bool)charm` 으로 charm 만 보고 `charm.Item.InstanceID` 를 그대로 읽는다.
-그 루프는 뒤따르는 `try` 블록 **밖**이라(그 `try` 는 `OnPreSetEffectRefreshed` 만 감싼다) 여기서
-터지면 레벨 행렬 재계산이 통째로 멈추고 칸 레벨이 0 인 채 남는다. 그리고 `Charm_Basic.Item` 은
-저장된 참조가 아니라 `Inventory.FindItem(xIdx, yIdx)` **계산 프로퍼티**다 - 그러니 "`Item` 이
-끊겼다" 는 **`charms` 의 charm 이 가리키는 칸에 `inventoryMatrix` 항목이 없다**, 곧 두 사전이
-어긋났다는 뜻이다. 제보 `5915982c` 가 그 상태였다(원인은 아직 모른다 - [현재 상태](STATUS.md)).
-`LocalSwap`이 한 메서드에서 두 사전을 갱신해도 원자적이지는 않다. `inventoryMatrix` 변경이
-동기 UI 콜백을 호출하므로 그 콜백에서 예외가 나면 뒤따르는 `charms`·좌표 갱신을 건너뛴다.
-`LocalSwap` 은 아이템 사전을 먼저 바꾸고 효과 사전과 좌표를 뒤에 바꾸며, Mirror 는 사전 변경 알림을 동기로
-부른다. `UI_CharacterStatusPanel.OnItemUpdated` 는 바뀐 칸이 선택돼 있으면 `OnItemSelected` 를 부르고, 활성
-모래시계의 연결 표시가 옛 좌표의 `Item` 을 읽다 터진다(제보 `d464e92d`, 디컴파일한 `LocalSwap` 과 대역으로 재현).
-그래서 호스트·싱글의 동기 교환 동안은 같은 가방의 선택을 풀었다가 교환이 끝난 뒤 같은 칸을 다시 선택한다. 참가자
-명령은 서버에서 나중에 돌므로 해당하지 않는다. 적용기는 효과 사전 키·객체 좌표·소유 가방·아이템 참조를 양방향으로
-대조해 끊긴 연결이 있으면 더 쓰지 않는다. `[끊긴 charms 항목]`은 사전 키와 `charm.xIdx/yIdx`를 나란히 적는다.
+**참가자로 접속한 세션에서는 `Networkrotation` 을 쓸 수 없다.** SyncVar 라 클라이언트에서 써 봐야
+서버 값이 덮는다. 대신 우클릭이 타는 길이 있다:
+
+```
+GridInventory.DoClickAction(ItemPosition)             // 서버면 Local, 아니면 Cmd
+  → [Command, requiresAuthority: true] CmdDoClickAction(ItemPosition)
+  → [Server] LocalDoClickAction → using (new Permission(this)) { item.DoClickAction() }
+  → NewItemOwnInstance.DoClickAction() → StoneTablet.Rotate()      // 한 번에 90도
+```
+
+- `Rotate()`는 `rotation`을 1 올리고 4에서 0으로 돌린다(잠긴 석판이면 아무것도 하지 않는다). 각도를 직접 줄 수
+  없으므로 필요한 횟수만큼 누른다.
+- 세는 것은 `TabletRotation.PressesFrom` 이고 Core 에 두고 시험한다. **방향을 뒤집어 세면 누를 때마다 어긋난 채로
+  굳는다**(같은 일을 하는 커뮤니티 도구가 겪은 드리프트).
+- 그 칸에 아티팩트가 있으면 `DoClickAction`은 아무것도 하지 않는다(`Charm != null` 이면 회전으로 가지 않는다).
+
+회전은 인스턴스 단위로 잠길 수 있다(`DungeonManager.IsTabletRotatable(instanceID, isRotatable)`).
+스냅샷의 `PlacedTablet.IsRotatable`이 인스턴스별 잠금을 실어 보내고 솔버가 이를 존중한다
+(잠긴 석판은 지금 각도 그대로만 쓴다). 적용기는 계산 이후 잠겼을 가능성에 대비해 이동 전과
+회전 직전에 다시 확인하고, 그 사이 잠겼다면 이미 옮긴 항목을 되돌린 뒤 적용을 중단한다.
 
 **각도만 쓰면 화면이 따라오지 않는다(2026-09-11).** 게임의 `StoneTablet.Rotate` 는 두 가지를 한다.
 
@@ -286,15 +292,16 @@ NetworkInventory.SendMessageTabletRotated(this, rotation);
 둘째가 `RpcSendMessageTabletRotated`(ClientRpc, includeOwner) → `OnTabletRotatedClientside` →
 `UI_CharacterStatusPanel.HandleTabletRotated` → `OnItemSelected` 로 이어지고, 거기서 석판의 범위
 테두리(`stoneTabletFrame.SetActivePlaced`)를 다시 그린다. `Networkrotation` 은 SyncVar 라 값 자체는
-퍼지지만 **테두리는 이 알림을 받아야 갱신된다.** 우리가 첫째만 하던 동안 옛 각도의 테두리가 남았고
-가방을 다시 열어야 사라졌다. 참가자 경로는 `DoClickAction` → `Rotate` 라 처음부터 해당이 없었다.
+퍼지지만 **테두리는 이 알림을 받아야 갱신된다.** 호스트에서 각도만 쓰면 옛 각도의 테두리가 가방을 다시 열 때까지
+남는다. 참가자 경로는 `Rotate` 를 타므로 해당이 없다.
 
 **그 알림은 커서가 올라간 석판에만 보낸다(2026-09-11 실기).** `OnItemSelected` 는 테두리만 다시
-그리는 것이 아니라 석판 툴팁(`UI_StoneTabletTooltip.Open`)까지 연다. 툴팁 위치는 커서가 아니라
-`TooltipsParent` 의 위치로 잡히고(`UI_BaseTooltip.SetPositionToTarget`), 닫히는 것은 아이콘의
-`Showing` 이 내려갈 때뿐이다(`LateUpdate`). 그래서 **가방을 닫은 채 `F8` 을 누르자 석판 설명이
-화면 오른쪽 툴팁 자리에 혼자 떠서 가방을 열었다 닫을 때까지 남았다.** `HandleTabletRotated` 의
-구독은 패널 열기·닫기가 아니라 `Connect`/`Disconnect` 에 묶여 있어 가방을 닫아도 살아 있다.
+그리는 것이 아니라 석판 툴팁(`UI_StoneTabletTooltip.Open`)까지 연다.
+
+- 툴팁 위치는 커서가 아니라 `TooltipsParent` 의 위치로 잡히고(`UI_BaseTooltip.SetPositionToTarget`), 닫히는 것은
+  아이콘의 `Showing` 이 내려갈 때뿐이다(`LateUpdate`).
+- `HandleTabletRotated` 의 구독은 패널 열기·닫기가 아니라 `Connect`/`Disconnect` 에 묶여 있어 가방을 닫아도 살아 있다.
+- 그래서 **가방을 닫은 채 `F8` 로 알림을 보내면 석판 설명이 툴팁 자리에 혼자 떠서 가방을 열었다 닫을 때까지 남는다.**
 
 게임에서 `OnItemSelected` 를 부르는 다른 자리는 전부
 `EventSystem.current.currentSelectedGameObject == icon.gameObject` 를 먼저 보는데
@@ -304,14 +311,15 @@ NetworkInventory.SendMessageTabletRotated(this, rotation);
 다른 아이템을 보고 있을 때 보내면 그쪽 테두리와 툴팁을 빼앗는다.
 
 **참가자 쪽은 받는 자리에서 막는다(2026-09-27, 제보 `7ff22719`).** 참가자 회전은 서버의 `Rotate` 가
-알림을 보내므로 가방을 닫은 채 `F8` 을 누르면 같은 툴팁이 떠서 남았다. 보내는 쪽은 서버라 손댈 수
+알림을 보내므로 가방을 닫은 채 `F8` 을 누르면 같은 툴팁이 떠서 남는다. 보내는 쪽은 서버라 손댈 수
 없지만 `HandleTabletRotated` 는 받는 PC 에서 돈다. 그래서 HarmonyX prefix(`TabletRotationTooltipGuard`)가
-패널이 닫혀 있으면(`UIBase.IsOpened` = `gameObject.activeSelf`) 그 함수를 건너뛴다. 플러그인의 첫
-Harmony 패치다. 선택된 칸으로 가르지 않은 까닭은 게임이 **들어 올린 석판**을 돌릴 때도
-(`UI_NewItemPicker(_Controller).CurrentPickedUp` → `DoClickAction`) 같은 알림을 타는데, 그때 선택은
-그 석판이 아닐 수 있어서다. 게임의 회전 경로는 전부 패널의 입력 처리 안에 있으므로 패널이 닫혀 있을 때
-게임이 원하는 알림은 없다. 가방을 연 채 다른 아이템에 커서를 둔 참가자 자동 배치는 여전히 그쪽 툴팁을
-빼앗을 수 있다.
+패널이 닫혀 있으면(`UIBase.IsOpened` = `gameObject.activeSelf`) 그 함수를 건너뛴다.
+
+- 선택된 칸으로 가르지 않는다. 게임이 **들어 올린 석판**을 돌릴 때도
+  (`UI_NewItemPicker(_Controller).CurrentPickedUp` → `DoClickAction`) 같은 알림을 타는데, 그때 선택은 그 석판이
+  아닐 수 있다.
+- 게임의 회전 경로는 전부 패널의 입력 처리 안에 있으므로 패널이 닫혀 있을 때 게임이 원하는 알림은 없다.
+- 가방을 연 채 다른 아이템에 커서를 둔 참가자 자동 배치는 여전히 그쪽 툴팁을 빼앗을 수 있다.
 
 **이동 뒤에도 게임은 화면을 다시 잡는다.** 드래그로 옮기는 자리는 `Swap` 다음에
 `OnItemSelected(icon, -1)` 을 부르는데, 그 첫 동작이 모든 `stoneTabletFrame` 과 `dependencyFrame`
@@ -319,26 +327,25 @@ Harmony 패치다. 선택된 칸으로 가르지 않은 까닭은 게임이 **�
 상태를 우리가 운전해야 해서 아직 손대지 않았다. 부르게 된다면 위 툴팁과 같은 게이트가 함께
 필요하다 - 같은 `OnItemSelected` 이므로 커서 없이 부르면 같은 툴팁이 뜬다.
 
-**참가자로 접속한 세션에서는 `Networkrotation` 을 쓸 수 없다.** SyncVar 라 클라이언트에서 써 봐야
-서버 값이 덮는다. 대신 우클릭이 타는 길이 있다:
+**`ReleasePermission` 은 `charm.Item` 을 널 검사 없이 읽는다(1.0.33, 2026-09-16).**
 
-```
-GridInventory.DoClickAction(ItemPosition)             // 서버면 Local, 아니면 Cmd
-  → [Command, requiresAuthority: true] CmdDoClickAction(ItemPosition)
-  → [Server] LocalDoClickAction → using (new Permission(this)) { item.DoClickAction() }
-  → NewItemOwnInstance.DoClickAction() → StoneTablet.Rotate()      // 한 번에 90도
-```
+- 레벨 행렬을 다시 만드는 첫 루프가 `(bool)charm` 으로 charm 만 보고 `charm.Item.InstanceID` 를 그대로 읽는다. 그
+  루프는 뒤따르는 `try` 블록 **밖**이라(그 `try` 는 `OnPreSetEffectRefreshed` 만 감싼다) 여기서 터지면 레벨 행렬
+  재계산이 통째로 멈추고 칸 레벨이 0 인 채 남는다.
+- `Charm_Basic.Item` 은 저장된 참조가 아니라 `Inventory.FindItem(xIdx, yIdx)` **계산 프로퍼티**다. 그러니 "`Item` 이
+  끊겼다" 는 `charms` 의 charm 이 가리키는 칸에 `inventoryMatrix` 항목이 없다는 뜻, 곧 두 사전이 어긋났다는 뜻이다.
+- 제보 `5915982c` 가 그 상태였다(원인은 아직 모른다 - [현재 상태](STATUS.md)). 덤프의 `[끊긴 charms 항목]`은 사전
+  키와 `charm.xIdx/yIdx`를 나란히 적는다.
 
-`Rotate()`는 `rotation`을 1 올리고 4에서 0으로 돌린다(잠긴 석판이면 아무것도 하지 않는다). 각도를
-직접 줄 수 없으므로 필요한 횟수만큼 누른다. 세는 것은 `TabletRotation.PressesFrom` 이고 Core 에
-두고 시험한다 - **방향을 뒤집어 세면 누를 때마다 어긋난 채로 굳는다**(같은 일을 하는 커뮤니티
-도구가 겪은 드리프트). 그 칸에 아티팩트가 있으면 `DoClickAction`은 아무것도 하지 않는다
-(`Charm != null` 이면 회전으로 가지 않는다).
+**`LocalSwap` 은 원자적이지 않다.** 아이템 사전을 먼저 바꾸고 효과 사전과 좌표를 뒤에 바꾸는데, Mirror 는 사전
+변경 알림을 동기로 부른다. 그 UI 콜백에서 예외가 나면 뒤따르는 `charms`·좌표 갱신을 건너뛴다.
+`UI_CharacterStatusPanel.OnItemUpdated` 는 바뀐 칸이 선택돼 있으면 `OnItemSelected` 를 부르고, 활성 모래시계의
+연결 표시가 옛 좌표의 `Item` 을 읽다 터진다(제보 `d464e92d`, 디컴파일한 `LocalSwap` 과 대역으로 재현). 그래서
+적용기는 이렇게 한다.
 
-회전은 인스턴스 단위로 잠길 수 있다(`DungeonManager.IsTabletRotatable(instanceID, isRotatable)`).
-스냅샷의 `PlacedTablet.IsRotatable`이 인스턴스별 잠금을 실어 보내고 솔버가 이를 존중한다
-(잠긴 석판은 지금 각도 그대로만 쓴다). 적용기는 계산 이후 잠겼을 가능성에 대비해 이동 전과
-회전 직전에 다시 확인하고, 그 사이 잠겼다면 이미 옮긴 항목을 되돌린 뒤 적용을 중단한다.
+- 호스트·싱글의 동기 교환 동안은 같은 가방의 선택을 풀었다가 교환이 끝난 뒤 같은 칸을 다시 선택한다. 참가자
+  명령은 서버에서 나중에 돌므로 해당하지 않는다.
+- 효과 사전 키·객체 좌표·소유 가방·아이템 참조를 양방향으로 대조해 끊긴 연결이 있으면 더 쓰지 않는다.
 
 ### 게임 내장 자동 정리
 
@@ -363,59 +370,65 @@ GridInventory.DoClickAction(ItemPosition)             // 서버면 Local, 아니
 게임이 모드를 공식적으로 상정하고 있다는 근거다.
 
 **1.1.0 에서 창작마당 모드가 들어왔다.** `WorkshopModManager` 가 `HorayModBase` 모드를 싣고 로비에 `Mods`/`HostMods` 를
-적는다. BepInEx 쪽에 닿는 것은 `ModEnvironment` 하나다 - 이름이 `MelonLoader`·`BepInEx`·`UnityModManager`·`SPMod` 로
+적는다. `OnAllDatabasesReady` 는 여전히 `GameDataLoader.Awake` 끝에서 나가고, 그 앞에 창작마당 모드 활성화가 들어갔다.
+
+**BepInEx 쪽에 닿는 것은 `ModEnvironment` 하나다.** 이름이 `MelonLoader`·`BepInEx`·`UnityModManager`·`SPMod` 로
 시작하는 어셈블리를 보면 `IsModded` 를 세우고 분석 이벤트와 Cloud Diagnostics 예외 업로드를 끈다. 막는 것은 없다.
 같은 클래스가 `AfterAssembliesLoaded` 에 `Assembly.Load("0Harmony")` 로 동봉 Lib.Harmony 2.4.3 을 부르는데, BepInEx
-프리로더가 HarmonyX 를 먼저 올려 두므로 이름으로 찾으면 그쪽이 돌아온다. **1.1.1 에서 확인했다(2026-11-02 Windows)** -
+프리로더가 HarmonyX 를 먼저 올려 두므로 이름으로 찾으면 그쪽이 돌아온다. 1.1.1 에서 확인했다(2026-11-02 Windows).
 BepInEx 가 깔린 채로는 `Player.log` 에 `[ModEnvironment] 동봉 Harmony 2.9.0.0 로드됨`(HarmonyX), 끄면 `2.4.3.0` 이 찍힌다.
-그래서 창작마당 판은 Lib.Harmony 2.4.3 에 맞춰 짓되 HarmonyX 에서도 도는 멤버만 쓴다 - 인자 다섯의 `Patch` 는 둘 다에
-있고, `UnpatchSelf` 는 HarmonyX 에만 있어 `GetPatchedMethods` 와 `Unpatch(메서드, 종류, 주인)` 으로 푼다.
-`OnAllDatabasesReady` 는 여전히 `GameDataLoader.Awake` 끝에서 나가고, 그 앞에 창작마당 모드 활성화가 들어갔다.
 
-**창작마당 DLL 모드의 형식은 공식 가이드에서 읽었다(2026-11-02, [team-horay/sephiria_modding](https://github.com/team-horay/sephiria_modding)
-`be58e1e`). 같은 날 1.1.1(`workshop-beta`, 어셈블리 SHA-256 `383a0d5e…`) 디컴파일로 대조해 아래와 같았다.**
+**창작마당 DLL 모드의 형식**은 공식 가이드([team-horay/sephiria_modding](https://github.com/team-horay/sephiria_modding)
+`be58e1e`, 2026-11-02)에서 읽고, 같은 날 1.1.1(`workshop-beta`, 어셈블리 SHA-256 `383a0d5e…`) 디컴파일로 대조했다.
 
-- 활성화는 `GameDataLoader.Awake` → `WorkshopModRuntime.ActivateFromManager` → `WorkshopDllActivator.Activate` 다.
-  `GameDataLoader` 는 타이틀로 나가면 부서지고 월드에 들어갈 때 다시 서지만, 활성화기는 이미 켠 모드를 `AlreadyActive` 로
-  넘기고 인스턴스를 다시 만들지 않는다. 그래서 `OnModLoaded` 는 프로세스당 한 번, 데이터베이스 이벤트는 입장마다 온다.
-  창작마당 모드에 `UnloadMod` 를 부르는 곳은 없다(부르는 곳은 옛 `AddOnLoader` 뿐).
-- 라이브러리(`libraries`)는 같은 이름이 이미 로드돼 있으면 그것을 다시 쓰고 경고만 남긴다. 주 모듈(`dll`)은 같은 이름이
-  다른 위치에서 로드돼 있으면 "어셈블리 이름 충돌" 로 실행을 보류한다(`TryLoadAssembly`). 그 판단은 이름만 본다.
-- 검수 해시는 패키지 안의 `*.dll` 만 본다(`ModGuardWorkshop.HashFolder`, 경로·크기·SHA-256). 다른 파일은 해시에 들지 않는다.
-- `local_only` 는 로비 비교에서 빠진다(`WorkshopLobbyMods.CountsForLobby`). `WorkshopLocal` 패키지가 하나라도 켜져 있으면
-  설치 범위와 무관하게 `HasLoadedLocal` 로 멀티가 막힌다.
-- `ModOptions` 는 `OptionsBinding.Instance.DeviceOptions`(게임의 `DeviceOptions.xml`)에 `ModOptions:<modId>:<열쇠>` 로 둔다.
-  `SaveData` 가 `XmlSerializer` 로 값의 형식을 함께 적어 bool·float·int·string 이 형식 그대로 돌아온다. `Set*` 은 메모리만
-  바꾸고 `Save()` 가 파일에 쓴다.
-- **구식 `Input` 은 꺼져 있다.** 부르면 "switched active Input handling to Input System package" 라는
-  `InvalidOperationException` 이 난다(창작마당 판 실기, `Player.log`). 게임 코드에 구식 호출(Miniscript 편집기)이 남아 있지만
-  켜져 있다는 근거가 아니다 - 이것만 보고 켜져 있다고 판단했다가 실기에서 틀렸다. BepInEx 의 `UnityInput` 은 구식을 한 번
-  불러 보고 이 예외가 나면 새 입력 시스템을 고르므로, BepInEx 판 단축키도 1.1.x 에서는 새 입력 시스템으로 읽혀 왔다.
-
-- 진입점은 `WorkshopModBase`(`HorayModBase` 상속, MonoBehaviour 아님)다. `OnModLoaded` 에서 이벤트를 한 번 구독하고
+- **패키지.** 루트의 `metadata.json` 하나로 정의한다. `mod.modules` 의 `dll` 모듈은 `entryClass` 를 반드시 적는다.
+  보조 DLL(우리 Core)은 `libraries` 에 적어야 참조 해석에 쓰인다.
+- **진입점.** `WorkshopModBase`(`HorayModBase` 상속, MonoBehaviour 아님)다. `OnModLoaded` 에서 이벤트를 한 번 구독하고
   `OnModUnloaded` 에서 푼다. `Context.PackageRoot`·`ResolvePath` 로 모드 폴더를 찾고, `Context.Options` 가 기기별 설정과
   게임 옵션 화면 항목을 준다.
-- 패키지는 루트의 `metadata.json` 하나로 정의한다. `mod.modules` 의 `dll` 모듈은 `entryClass` 를 반드시 적는다. 보조 DLL
-  (우리 Core)은 `libraries` 에 적어야 참조 해석에 쓰인다. 같은 어셈블리 이름이 이미 로드돼 있으면 게임이 그 모드의 실행을
-  보류한다.
-- **DLL 모드는 타이틀이 아니라 월드에 들어갈 때 켜진다.** 순서는 `GameDataLoader` 시작 → DLL 로드와 `OnModLoaded` →
-  데이터베이스 이벤트 → `OnAllDatabasesReady` 다.
-- Harmony 는 게임에 든 Lib.Harmony 2.4.3 만 쓴다. 모드에 넣은 `0Harmony.dll` 은 무시된다. BepInEx·MelonLoader 는 지원하지
-  않는다. 두 Harmony 에 함께 있는 멤버만 쓰는 이유는 위 단락.
-- `multiplayer.installation` 은 `local_only`(내 화면만, 로비 비교에서 빠짐)·`host_only`·`everyone` 이다. `WorkshopLocal/`
-  의 로컬 모드가 로드된 게임에서는 멀티가 막힌다.
-- DLL 이 든 모드는 게임의 "창작마당에 올리기" 로 올려야 검수에 접수된다. 접수·승인 상태여야 남의 게임에서 돌고, DLL 을
-  바꾸면 다시 접수된다. 실행 중 DLL 목록이 바뀌면 "인가받지 않은 dll" 로 로드가 막힌다. 압축 20MB 이하이고, 모드 폴더의
-  `uploadticket.json` 이 창작마당 글 번호를 들고 있으므로 지우지 않는다.
-- **올릴 때마다 글의 제목·설명·태그를 `metadata.json` 으로 다시 쓴다**(`WorkshopUploader.ConfigureUpdate`, 같은 1.1.1 어셈블리,
-  2026-11-04). 새 글이든 갱신이든 `SetItemTitle`·`SetItemDescription`·`SetItemTags` 를 부른다. 설명은 `info.description` 이
-  언어별이면 `default` → `en-US` → 첫 항목 하나만 쓴다(`WorkshopLocalizedText`). 설명·태그가 비어 있으면 그것만 건드리지 않는다.
-  `SetItemUpdateLanguage` 는 부르지 않아 글에는 한 언어만 들어간다. 목록에 없음(`Unlisted`)은 새 글일 때만 걸므로 공개한 글은
-  갱신해도 공개로 남는다. 변경 사항(change note)은 `v` + `mod.version` 이다.
+- **DLL 모드는 타이틀이 아니라 월드에 들어갈 때 켜진다.** 경로는 `GameDataLoader.Awake` →
+  `WorkshopModRuntime.ActivateFromManager` → `WorkshopDllActivator.Activate` 이고, 순서는 DLL 로드와 `OnModLoaded` →
+  데이터베이스 이벤트 → `OnAllDatabasesReady` 다. `GameDataLoader` 는 타이틀로 나가면 부서지고 월드에 들어갈 때 다시
+  서지만, 활성화기는 이미 켠 모드를 `AlreadyActive` 로 넘기고 인스턴스를 다시 만들지 않는다. 그래서 `OnModLoaded` 는
+  프로세스당 한 번, 데이터베이스 이벤트는 입장마다 온다. 창작마당 모드에 `UnloadMod` 를 부르는 곳은 없다(부르는 곳은
+  옛 `AddOnLoader` 뿐).
+- **어셈블리 이름이 겹칠 때.** 라이브러리(`libraries`)는 같은 이름이 이미 로드돼 있으면 그것을 다시 쓰고 경고만
+  남긴다. 주 모듈(`dll`)은 같은 이름이 다른 위치에서 로드돼 있으면 "어셈블리 이름 충돌" 로 실행을 보류한다
+  (`TryLoadAssembly`). 그 판단은 이름만 본다.
+- **Harmony.** 게임에 든 Lib.Harmony 2.4.3 만 쓰고, 모드에 넣은 `0Harmony.dll` 은 무시된다. BepInEx·MelonLoader 는
+  지원하지 않는다. BepInEx 가 깔린 게임에서는 위처럼 HarmonyX 가 대신 돌아오므로, 창작마당 판은 2.4.3 에 맞춰 짓되
+  HarmonyX 에서도 도는 멤버만 쓴다. 인자 다섯의 `Patch` 는 둘 다에 있고, `UnpatchSelf` 는 HarmonyX 에만 있어
+  `GetPatchedMethods` 와 `Unpatch(메서드, 종류, 주인)` 으로 푼다.
+- **멀티.** `multiplayer.installation` 은 `local_only`(내 화면만)·`host_only`·`everyone` 이다. `local_only` 는 로비
+  비교에서 빠진다(`WorkshopLobbyMods.CountsForLobby`). `WorkshopLocal` 패키지가 하나라도 켜져 있으면 설치 범위와 무관하게
+  `HasLoadedLocal` 로 멀티가 막힌다.
+- **구독한 모드가 저절로 켜지지는 않는다**(1.1.1, 2026-11-04). 게임은 켠 모드 목록(`WorkshopEnabledMods`, `DeviceOptions` 의
+  `WorkshopEnabledMods`)을 처음 한 번 그때 구독돼 있던 모드로 채우고(`WorkshopEnabledModsMigrated`), 그 뒤로는 `WorkshopLocal`
+  모드만 늘 켠다. 그 뒤에 구독한 모드는 타이틀의 창작마당 창(`UI_SteamWorkshopPanel` → `WorkshopModManager.SetModEnabled`)에서
+  켜야 실린다. 멀티 중에는 바꿀 수 없다. 화면으로는 아직 보지 않았다.
+- **설정.** `ModOptions` 는 `OptionsBinding.Instance.DeviceOptions`(게임의 `DeviceOptions.xml`)에
+  `ModOptions:<modId>:<열쇠>` 로 둔다. `SaveData` 가 `XmlSerializer` 로 값의 형식을 함께 적어 bool·float·int·string 이
+  형식 그대로 돌아온다. `Set*` 은 메모리만 바꾸고 `Save()` 가 파일에 쓴다.
+- **구식 `Input` 은 꺼져 있다.** 부르면 "switched active Input handling to Input System package" 라는
+  `InvalidOperationException` 이 난다(창작마당 판 실기, `Player.log`). 게임 코드에 구식 호출(Miniscript 편집기)이 남아
+  있어도 켜져 있다는 근거가 아니다. BepInEx 의 `UnityInput` 은 구식을 한 번 불러 보고 이 예외가 나면 새 입력 시스템을
+  고르므로, BepInEx 판 단축키도 1.1.x 에서는 새 입력 시스템으로 읽혀 왔다.
+- **검수.** DLL 이 든 모드는 게임의 "창작마당에 올리기" 로 올려야 검수에 접수된다. 접수·승인 상태여야 남의 게임에서
+  돌고, DLL 을 바꾸면 다시 접수된다. 검수 해시는 패키지 안의 `*.dll` 만 본다(`ModGuardWorkshop.HashFolder`,
+  경로·크기·SHA-256). 다른 파일은 해시에 들지 않는다. 실행 중 DLL 목록이 바뀌면 "인가받지 않은 dll" 로 로드가 막힌다.
+  압축 20MB 이하이고, 모드 폴더의 `uploadticket.json` 이 창작마당 글 번호를 들고 있으므로 지우지 않는다.
+- **올릴 때마다 글의 제목·설명·태그를 `metadata.json` 으로 다시 쓴다**(`WorkshopUploader.ConfigureUpdate`, 같은
+  1.1.1 어셈블리, 2026-11-04).
+  - 새 글이든 갱신이든 `SetItemTitle`·`SetItemDescription`·`SetItemTags` 를 부른다. 설명·태그가 비어 있으면 그것만
+    건드리지 않는다.
+  - 설명은 `info.description` 이 언어별이면 `default` → `en-US` → 첫 항목 하나만 쓴다(`WorkshopLocalizedText`).
+    `SetItemUpdateLanguage` 는 부르지 않아 글에는 한 언어만 들어간다.
+  - 목록에 없음(`Unlisted`)은 새 글일 때만 걸므로 공개한 글은 갱신해도 공개로 남는다.
+  - 변경 사항(change note)은 `v` + `mod.version` 이다.
 
 **기본 브랜치 macOS 빌드(2026-11-02, `Application.version` 1.0.33, 어셈블리 SHA-256 `3e4624af…`)에도 모드 로더가 있다.**
 `AddOnLoader` 가 `<게임 폴더>/AddOns/*/` 의 DLL 에서 `HorayModBase` 를 싣고(가이드는 이것을 구버전 기능이라 부른다),
-`SteamWorkshopLoader` 는 구독 항목을 내려받지만 `LocalizationManager.LoadLanguageFromWorkshop` 이 그 폴더의
+`SteamWorkshopLoader` 는 구독 항목을 다운로드하지만 `LocalizationManager.LoadLanguageFromWorkshop` 이 그 폴더의
 `Localization/*.json` 만 읽는다. 창작마당에서 DLL 을 싣는 길은 이 빌드에 없다. `ModEnvironment` 의 이름 목록에는 `0Harmony`
 가 들어 있다.
 
@@ -425,21 +438,24 @@ BepInEx 가 깔린 채로는 `Player.log` 에 `[ModEnvironment] 동봉 Harmony 2
 보낸다. 같은 세션을 두 번 알리지 않게 게임이 `sessionSerial` 로 막는다. `isSaved` 는
 `CurrentRun` 의 `FloorCount > 0`, 즉 저장된 판을 이어 할 때 참이다. 세션은 로비에서 시작해
 사망하면 `RestartGame` 으로 새로 선다. 플러그인은 거짓일 때 가방이 읽힐 때까지 기다렸다가
-가방에 없는 아이템의 직접 지정을 지운다. 실기 확인은 아직이다.
+가방에 없는 아이템의 직접 지정을 지운다.
 
 **카탈로그는 `OnAllDatabasesReady` 뒤에 짓는다(2026-09-23, 게임 1.0.33 macOS).** 이 이벤트는
-`GameDataLoader.Awake` 가 데이터베이스를 모두 `Initialize` 한 직후 한 번만 부른다. 실측에서
-`GameDataLoader` 는 타이틀이 아니라 세이브에 들어갈 때 떴다 - 플러그인 `Awake` 는 0.34초(frame 0),
-이벤트는 세이브 진입 때(30~43초)였다. 그래서 예전처럼 첫 프레임에 짓기 시작하면 타이틀에서
-`콤보 'ACADEMY'의 발동 단계를 수집하지 못했습니다` 로 30초 동안 58번 지었다 버렸고, 이벤트를 기다리면
-한 번에 지어졌다(질의 검증 35616건 불일치 0). Windows 에서는 재지 않았다. 다만 Windows 제보 `3e262106`
-(2026-10-04)에서 덤프가 아닌 인게임 짓기가 신호를 기다리지 않아 527번 실패했으니 같은 시점 문제다.
+`GameDataLoader.Awake` 가 데이터베이스를 모두 `Initialize` 한 직후 한 번만 부른다. `GameDataLoader` 는 타이틀이
+아니라 세이브에 들어갈 때 뜬다. 실측에서 플러그인 `Awake` 는 0.34초(frame 0), 이벤트는 세이브 진입 때(30~43초)였다.
+
+- 그 전에 지으면 `콤보 'ACADEMY'의 발동 단계를 수집하지 못했습니다` 로 실패한다. 첫 프레임부터 짓던 판은 macOS
+  타이틀에서 30초 동안 58번 지었다 버렸다.
+- 이벤트를 기다리면 한 번에 지어진다(질의 검증 35616건 불일치 0).
+- Windows 에서는 재지 않았다. 다만 Windows 제보 `3e262106`(2026-10-04)에서 덤프가 아닌 인게임 짓기가 신호를
+  기다리지 않아 527번 실패했으니 같은 시점 문제다.
 
 ### 멀티플레이는 기본으로 잠그고, 켜면 호스트와 참가자 양쪽에서 돈다
 
 싱글은 호스트 모드라 위 경로가 전부 서버 로컬에서 끝난다. 멀티 세션은 기본으로 적용을 거부하고,
 설정(`MultiplayerAutoPlace`, 기본 꺼짐)으로만 연다. 판정은 `AutoPlacePolicy`(화면 안내와 F8)와
-`PlanApplier`(쓰기 직전, 적용 도중 접속이 늘어난 경우까지) 두 겹이다.
+`PlanApplier`(쓰기 직전, 적용 도중 접속이 늘어난 경우까지) 두 겹이다. 개발사 답변은 멀티 자동 배치를 금지한 것이
+아니라 안전상의 권고다(`docs/LEGAL.md` "받은 답변").
 
 **참가자로 접속한 세션에서도 돈다.** 게임이 클라이언트에게 열어 둔 길이 이동과 회전 모두 있다.
 
@@ -451,35 +467,26 @@ BepInEx 가 깔린 채로는 `Player.log` 에 `[ModEnvironment] 동봉 Harmony 2
   보내면 서버도 그 순서로 본다.
 
 다만 **왕복이라 부른 즉시 반영되지 않는다.** `Swap` 을 부른 프레임에는 아직 아무것도 바뀌지 않았고,
-서버가 처리해 SyncDictionary 로 돌려줄 때까지 옛 상태가 보인다. 그래서 적용기는 코루틴이고
-걸음마다 반영을 기다린다(3초 한계, 밀려난 쪽까지 제자리에 와야 한 걸음이 끝난 것으로 본다).
-호스트에서는 첫 확인이 곧바로 참이라 예전처럼 한 프레임에 끝난다.
+서버가 처리해 SyncDictionary 로 돌려줄 때까지 옛 상태가 보인다. 확인하지 않고 쏘기만 하면 `LocalSwap` 이 조용히
+거부한 걸음까지 완료로 보고하고, 도중에 막히면 솔버가 평가한 적 없는 반쯤 배치가 남는다. 그래서 적용기는 이렇게 한다.
 
-걸음 순서·저널·되돌리기·시간 상한은 Core 의 `ApplyPlanRoutine` 에 있고, 게임 타입은
-`IInventoryPort`(칸 읽기, 맞바꾸기, 석판 찾기, 우클릭, 호스트 회전, 레벨·격자 읽기) 뒤에 있어
-`ApplyPlanRoutineTests` 가 가짜 격자로 돌린다. Plugin 의 `PlanApplier` 에 남은 것은 쓰기 전
-사전 검증과 그 포트의 구현이다. 한 국면(앞으로 가기·되돌리기)의 30초 예산은 **걸음을 보내기
-전에** 본다 - 이미 보낸 걸음의 3초 창을 중간에 자르면 확인이 안 된 채로 저널에 못 올라간 걸음이
-뒤늦게 반영되어 되돌리기가 그것을 놓친다(가짜 격자 테스트가 잡았다). 그래서 한 국면은 길어야
-30초에 걸음 하나의 창을 더한 만큼이다.
+- 코루틴으로 돌며 걸음마다 반영을 기다린다(3초 한계, 밀려난 쪽까지 제자리에 와야 한 걸음이 끝난 것으로 본다).
+  호스트에서는 첫 확인이 곧바로 참이라 한 프레임에 끝난다.
+- 한 국면(앞으로 가기·되돌리기)의 30초 예산은 **걸음을 보내기 전에** 본다. 이미 보낸 걸음의 3초 창을 중간에 자르면
+  확인이 안 된 채로 저널에 못 올라간 걸음이 뒤늦게 반영되어 되돌리기가 그것을 놓친다. 그래서 한 국면은 길어야
+  30초에 걸음 하나의 창을 더한 만큼이다.
+- 3초보다 늦게 도착하는 명령은 서버의 거부 응답이 아니다. 미확정 쓰기가 있으면 보상 이동·회전을 보내지 않고 F8을
+  잠근다. 코루틴이 중단돼도 그 인벤토리 참조를 들고 있다가, 재접속으로 기존 인벤토리가 파괴돼야 잠금을 푼다.
+- 확정된 이동의 되돌리기는 두 칸의 인스턴스가 아직 예상과 같은 경우에만 한다. 각 회전은 정확히 한 단계가 관측돼야
+  하고, 완료 전 대상 전체의 위치·회전을 다시 검사한다.
+- 다 놓은 뒤에는 칸 레벨을 계획의 예상과 견준다. 예상은 계획 때의 격자로 계산한 것이라, 적용하는 사이 레벨업 등으로
+  칸이 열리면 견주지 않고 바뀐 가방으로 다시 계산한다. 제보 `4472ad97`(참가자)은 적용 도중 56 → 57칸이 되어 (2,8) 이
+  1 → 0 이 된 것을 "계산에 없는 효과" 로 알리고 자동 진단까지 보냈다.
 
-다 놓은 뒤에는 칸 레벨을 계획의 예상과 견준다. 예상은 계획 때의 격자로 계산한 것이라, 적용하는
-사이 레벨업 등으로 칸이 열리면 같은 배치에서도 레벨이 달라진다. 그때는 견주지 않고 바뀐 가방으로
-다시 계산하게 둔다. 제보 `4472ad97`(참가자)은 적용 도중 56 → 57칸이 되어 (2,8) 이 1 → 0 이 된 것을
-"계산에 없는 효과" 로 알리고 자동 진단까지 보냈다. 최종 배치는 계획과 같았고, 57칸 스냅샷은
-시뮬레이터와 칸마다 맞았다.
+걸음 순서·저널·되돌리기·시간 상한은 Core 의 `ApplyPlanRoutine` 에 있고, `ApplyPlanRoutineTests` 가 `IInventoryPort`
+뒤의 가짜 격자로 돌린다.
 
-2026-09-05에는 3초보다 늦게 도착하는 명령도 가짜 포트로 재현했다. 제한 시간을 넘긴 것은
-서버의 거부 응답이 아니므로, 미확정 쓰기가 있으면 보상 이동·회전을 보내지 않고 F8을 잠근다.
-Plugin은 코루틴 중단에도 그 인벤토리 참조를 유지하며, 재접속으로 기존 인벤토리가 파괴돼야
-잠금이 해제된다. 확정된 이동의 되돌리기는 두 칸의 인스턴스가 아직 예상과 같은 경우에만 실행한다.
-각 회전은 정확히 한 단계가 관측돼야 하고, 완료 전 대상 전체의 위치·회전을 다시 검사한다.
-
-확인하지 않고 쏘기만 하면 `LocalSwap` 이 조용히 거부한 걸음까지 완료로 보고하고, 도중에 막히면 솔버가 평가한
-적 없는 반쯤 배치가 남는다. 확인과 되돌리기가 그것을 막는다.
-
-참가자는 고정 각인을 읽을 수 없어 결과에서 되뺀다(아래 "고정 각인은 서버에만 있다"). 개발사 답변은 멀티 자동
-배치를 금지한 것이 아니라 안전상의 권고다(`docs/LEGAL.md` "받은 답변").
+참가자는 고정 각인을 읽을 수 없어 결과에서 되뺀다(아래 "고정 각인은 서버에만 있다").
 
 ## 아티팩트 효과 설명
 
@@ -504,8 +511,8 @@ showAllLevel, ignoreAvatarStatus)`이다. 파생 클래스가 `BuildKeywords`로
 결과에는 `<color=…>`, `<sprite=…>`, `<indent=…>` 같은 TextMeshPro 서식이 남으므로
 `SephPlanner.Core`의 `RichText.Strip`으로 걷어낸 뒤 저장한다. HUD 색은 `NativeSkin`이 정한다.
 
-덤프에 항목이 늘어나는 변경이라 `PlannerData.CatalogVersion`을 두었다. 덤프는 첫 실행에 한 번만
-만들어지므로, 번호가 없으면 예전 덤프를 가진 사람은 새 항목이 영영 빈 채로 남는다.
+덤프에 항목을 늘리면 `PlannerData.CatalogVersion` 을 올린다. 카탈로그는 다시 지을 까닭이 없으면 있던 것을 쓰므로,
+번호를 올리지 않으면 예전 덤프를 가진 사람은 새 항목이 빈 채로 남는다.
 
 ## 텍스트 데이터
 
@@ -524,13 +531,6 @@ showAllLevel, ignoreAvatarStatus)`이다. 파생 클래스가 `BuildKeywords`로
 
 주의: `Item_{Id}_Name` 만으로 아티팩트를 거르면 소모품까지 딸려온다. `Charm_` 접두 키로 id 집합을
 먼저 확정한 뒤 교차하는 방식을 쓴다.
-
-## 조사에 쓴 도구
-
-```
-dotnet tool install --global ilspycmd
-ilspycmd -t GridInventory "<게임경로>/Sephiria_Data/Managed/Assembly-CSharp.dll"
-```
 
 ## 석판 질의 DSL
 
@@ -597,6 +597,17 @@ ilspycmd -t GridInventory "<게임경로>/Sephiria_Data/Managed/Assembly-CSharp.
   - (1.1.0) `GridInventory.globalActiveValue <= 0` 이고 그 칸에 `disableMatrix` 항목이 없음. 바닐라에 `GlobalDisable`
     을 부르는 곳은 없다 - 창작마당 모드가 부르면 우리 활성 판정이 틀린다
 
+자체 조건은 `CharmActivateCriteria` 파생 10종이다. `TopInInventory`, `BottomInInventory`,
+`SideEnd`, `Inside`, `Outlined`는 위치만 보고, `BothSideCharm`, `BothSidesAreEmpty`,
+`NeighborsAreFull`, `Near8MagicBook`은 이웃 칸의 내용을 본다. `FullHP`만 배치와 무관한
+전투 중 상태라 배치 탐색에서는 만족한 것으로 둔다. 나머지 9종은 Core 의 `CharmCriteria` 구현이 게임 `GetCriteria` 와
+같다. 모르는 조건 이름은 `None` 으로 읽히므로, 게임이 새 조건을 더하면 정상 지원으로 오인할 수 있다.
+
+주의: 이 판정들의 게임 구현에는 격자 폭이 항상 6이라는 전제의 **하드코딩이 섞여 있다.**
+`SideEnd`는 `x == 0 || x == 5`, `BottomInInventory`/`Outlined`는 `storage - 6`,
+`Inside`는 `+ 7` 을 그대로 쓴다. Core 의 `CharmCriteria`는 이를 "고치지" 않고 그대로
+옮겼다 — 정리하면 게임과 어긋난다. 각 클래스의 `GetCriteria` 디컴파일로 확인했다.
+
 ### 상한 위로 올려도 이웃이 대신 세어 주지는 않는다
 
 제보로 온 질문이다 — "주변 8칸 아티팩트의 레벨당 피해를 올려 주는 것과 짝지으면, 상한 위로
@@ -615,16 +626,6 @@ num += allDamageBonusByLevel.SafeRandomAccess(CurrentLevelToIdx()) * (float)num2
 
 사용자가 "그래도 그 칸에 두고 싶다"고 할 때 쓰는 것은 값어치가 아니라 선호다 - ★ 와
 목표 레벨(`PlanPreferences.LevelCaps`)이 그 자리다.
-
-자체 조건은 `CharmActivateCriteria` 파생 10종이다. `TopInInventory`, `BottomInInventory`,
-`SideEnd`, `Inside`, `Outlined`는 위치만 보고, `BothSideCharm`, `BothSidesAreEmpty`,
-`NeighborsAreFull`, `Near8MagicBook`은 이웃 칸의 내용을 본다. `FullHP`만 배치와 무관한
-전투 중 상태라 배치 탐색에서는 만족한 것으로 둔다.
-
-주의: 이 판정들의 게임 구현에는 격자 폭이 항상 6이라는 전제의 **하드코딩이 섞여 있다.**
-`SideEnd`는 `x == 0 || x == 5`, `BottomInInventory`/`Outlined`는 `storage - 6`,
-`Inside`는 `+ 7` 을 그대로 쓴다. Core 의 `CharmCriteria`는 이를 "고치지" 않고 그대로
-옮겼다 — 정리하면 게임과 어긋난다. 각 클래스의 `GetCriteria` 디컴파일로 확인했다.
 
 ## 레벨이 정해지는 순서
 
@@ -651,23 +652,23 @@ num += allDamageBonusByLevel.SafeRandomAccess(CurrentLevelToIdx()) * (float)num2
 능력치라 레벨과 무관하다.
 
 **친타마니 칸 보너스**(`dungeonTempLevels`). `Charm_Chintamani` 는 치명상을 받으면 회복·무적 처리 뒤 자기 좌표에
-`AddDungeonTempLevel(..., addLevel)`(프리팹 값, 클래스 기본 3)을 부르고 `ForceRemoveItem` 으로 사라진다. 값은
-`levelMatrix` 와 `dungeonTempLevels`(SyncDictionary, 참가자도 읽는다)에 칸 단위로 남아 **옮긴 아이템을 따라가지
-않는다.** 호스트와 참가자 모두 이 표를 읽어 되빼기 전에 빼고(`FixedEffectLayer`), 고정 효과 칸으로 다시 더한다.
-시뮬레이터는 각인과 함께 더한 뒤 배수를 곱한다. 빠뜨리면 빈 칸 하나의 +3 만으로 검증이 실패해 자동 배치가 잠긴다.
-참가자가 이것을 되뺀 값에 두면, 발동하는 순간 아이템이 빠지는 것과 층이 바뀌는 것이 함께 보여 추적기가 "배치를
-따라 바뀐다" 로 센다 - 친타마니 둘이 11초 간격으로 발동해 두 번 만에 모순이 됐다(0.4.26 참가자 제보 `9fac8a07`).
-`ClearDungeonTempLevels` 는 `RestartGame` 이 부른다.
+`AddDungeonTempLevel(..., addLevel)`(프리팹 값, 클래스 기본 3)을 부르고 `ForceRemoveItem` 으로 사라진다.
+
+- 값은 `levelMatrix` 와 `dungeonTempLevels`(SyncDictionary, 참가자도 읽는다)에 칸 단위로 남아 **옮긴 아이템을
+  따라가지 않는다.** `ClearDungeonTempLevels` 는 `RestartGame` 이 부른다.
+- 호스트와 참가자 모두 이 표를 읽어 되빼기 전에 빼고(`FixedEffectLayer`), 고정 효과 칸으로 다시 더한다. 시뮬레이터는
+  각인과 함께 더한 뒤 배수를 곱한다. 빠뜨리면 빈 칸 하나의 +3 만으로 검증이 실패해 자동 배치가 잠긴다.
+- 참가자가 이것을 되뺀 값에 두면, 발동하는 순간 아이템이 빠지는 것과 층이 바뀌는 것이 함께 보여 추적기가 "배치를
+  따라 바뀐다" 로 센다. 친타마니 둘이 11초 간격으로 발동해 두 번 만에 모순이 됐다(0.4.26 참가자 제보 `9fac8a07`).
 
 인챈트는 그대로 읽어 스냅샷에 싣는다. `globalItemStatTable`이 `SyncDictionary`라 클라이언트에도
 값이 있다 - 게임의 `UI_CharmTooltip`·`UI_ShopPanel`·`UI_SephiriteRewardPanel`도 참가자 자리에서
-같은 표를 읽는다. 예전에는 게임이 보고한 레벨에서 석판 몫을 빼서 역산했는데, 4단계의 배수가 걸린 칸에서는
-나눗셈이 떨어지지 않아 근사값이 됐다.
+같은 표를 읽는다. 게임이 보고한 레벨에서 석판 몫을 빼서 역산하지 않는다. 4단계의 배수가 걸린 칸에서는 나눗셈이
+떨어지지 않아 근사값이 된다.
 
 레벨에 관해서는 어긋나는지를 **항상 확인한다.** 게임이 계산해 둔 `levelMatrix`가 정답지다.
 
-- 플러그인의 `SimulationVerifier`가 아티팩트 칸마다 대조해 어긋나면 BepInEx 로그에 남긴다.
-  (석판의 `IsApplied`와 질의 해석 범위만 보던 것에서 최종 레벨까지 넓혔다)
+- 플러그인의 `SimulationVerifier`가 아티팩트 칸마다 최종 레벨까지 대조해 어긋나면 BepInEx 로그에 남긴다.
 - HUD는 어긋난 칸이 있을 때만 "점수가 실제와 다를 수 있다"고 알린다. 무엇이 원인인지는
   알 수 없으므로 추측해서 미리 경고하지 않는다.
 - `dotnet run --project src/SephPlanner.DataTool -- --check <스냅샷.json>` 으로 게임 없이도 본다.
@@ -736,80 +737,78 @@ fixedMultiplyLevel)를 들고 있고, 배수는 석판과 같은 `multiplyLevelM
 만드는 길은 셋이다.
 
 - **신비(MYSTIC) 콤보.** `ComboEffect_Mystic`이 임계값마다 석판 12002(`O MUL/2`)를 심는다. 커뮤니티의 다른
-  자동배치 모드가 "신비 콤보 ×2 미반영" 버그를 겪은 원인이 이것이다.
-  **이 각인은 배치를 따라 생기고 사라진다.** `ReleasePermission` 이 가방에 쓸 때마다
-  `SearchSetEffectInInventory` 로 콤보를 전부 껐다 켜고, 꺼질 때 `OnDisableEffect` 가 각인을 지우며
-  켜질 때 그 순간의 신비 수로 다시 심는다. 단계는 코드 기본값(2/5, 1칸/3칸)이 아니라 **프리팹 값
-  - 2 에 1칸, 4 에 2칸 더**다(카탈로그의 콤보 설명 "무작위 1칸"/"무작위 2칸"과 같다). 칸은
-  `mysticPositions[i]`(판마다 `UnitAvatar.RandomID` 로 정해지는 SyncList, 참가자도 읽는다)의 앞에서부터
-  쓴다. 모든 아티팩트가 활성 여부와 무관하게 세어지므로(`charms` 는 가방의 아티팩트 전부) 하얀 종이·침·
-  열쇠의 자리가 신비 수를 바꾸면 각인 수도 바뀐다. 게임도 이 각인만은 `createdByExternalSystem`
-  으로 표시해 판을 저장할 때 빼고 적는다(`PlayerSpawner`).
-
-  그래서 이 몫은 고정 층에서 떼어 **배치마다 그 배치의 신비 수로 다시 푼다**(`ComboEngravingRule`,
-  `PlacementProblem.EffectsFor`). 수는 게임 수에서 지금 자리를 우리 방식으로 센 것을 빼고 그 배치를
-  센 것을 더한다 - 지금 배치에서는 게임 수와 정확히 같다. 호스트는 원본에서 `createdByExternalSystem`
-  을 빼고, 참가자는 되뺀 층에서 지금 수의 몫을 뺀 뒤 추적기에 넘긴다. 0.4.17 제보 `ca26eeb4` 는 신비
-  4개일 때의 ×2 세 칸을 고정 효과로 받은 계획이 하얀 종이를 옮겨 신비를 3개로 떨어뜨렸고, 사라진 두
-  칸에 둔 아티팩트가 정확히 어긋난 두 칸이었다.
-
-  신비가 문턱에서 하는 일은 이 칸을 심는 것뿐이라, 칸이 점수에 들어간 뒤로는 일반 콤보 가치
-  (`OfComboStep` 의 문턱 값)가 같은 이득의 어림값이 되어 두 번 세어졌다. 그래서 규칙이 있으면
-  신비에는 일반 콤보 가치를 주지 않는다(`PlacementProblem.ScoresComboItself`) - 종이·침·열쇠의 자리
-  가치, 후보의 콤보 보너스, 그리고 버리기 조언이 콤보 단계 변화를 막는 판단에서. 다가가기 가치도
-  함께 빠진다. F2 콤보 우선은 사용자의 선택이라 그대로다. 규칙이 없는 옛 자료는 예전처럼 푼다.
+  자동배치 모드가 "신비 콤보 ×2 미반영" 버그를 겪은 원인이 이것이다. 단계는 코드 기본값(2/5, 1칸/3칸)이 아니라
+  **프리팹 값 - 2 에 1칸, 4 에 2칸 더**다(카탈로그의 콤보 설명 "무작위 1칸"/"무작위 2칸"과 같다). 칸은
+  `mysticPositions[i]`(판마다 `UnitAvatar.RandomID` 로 정해지는 SyncList, 참가자도 읽는다)의 앞에서부터 쓴다.
 - **가방의 석판 각인.** `tabletEngravingCount > 0`이면 `UI_CharacterStatusPanel.OnItemLongClicked`가
   석판을 길게 눌렀을 때 `CmdCreateFixedEngravingFromInventory(tablet)`을 보낸다. 서버는 효과를
   구운 뒤 **`ForceRemoveItem`으로 석판을 가방에서 지운다.**
 - **보상 석판 각인.** 같은 자리에서 세피라이트 보상의 석판을 `CmdCreateFixedEngravingFromExternalItem`
   으로 바로 각인한다. **그 석판은 가방에 들어오지도 않는다.**
 
+**신비 각인은 배치를 따라 생기고 사라진다.** `ReleasePermission` 이 가방에 쓸 때마다 `SearchSetEffectInInventory` 로
+콤보를 전부 껐다 켜고, 꺼질 때 `OnDisableEffect` 가 각인을 지우며 켜질 때 그 순간의 신비 수로 다시 심는다. 모든
+아티팩트가 활성 여부와 무관하게 세어지므로(`charms` 는 가방의 아티팩트 전부) 하얀 종이·침·열쇠의 자리가 신비 수를
+바꾸면 각인 수도 바뀐다. 게임도 이 각인만은 `createdByExternalSystem` 으로 표시해 판을 저장할 때 빼고
+적는다(`PlayerSpawner`).
+
+- 그래서 이 몫은 고정 층에서 떼어 **배치마다 그 배치의 신비 수로 다시 푼다**(`ComboEngravingRule`,
+  `PlacementProblem.EffectsFor`). 수는 게임 수에서 지금 자리를 우리 방식으로 센 것을 빼고 그 배치를 센 것을
+  더한다. 지금 배치에서는 게임 수와 정확히 같다.
+- 호스트는 원본에서 `createdByExternalSystem` 을 빼고, 참가자는 되뺀 층에서 지금 수의 몫을 뺀 뒤 추적기에 넘긴다.
+- 제보 `ca26eeb4`(0.4.17)는 신비 4개일 때의 ×2 세 칸을 고정 효과로 받은 계획이 하얀 종이를 옮겨 신비를 3개로
+  떨어뜨렸고, 사라진 두 칸에 둔 아티팩트가 정확히 어긋난 두 칸이었다.
+- 신비가 문턱에서 하는 일은 이 칸을 심는 것뿐이라, 일반 콤보 가치(`OfComboStep` 의 문턱 값)까지 주면 같은 이득을
+  두 번 센다. 그래서 규칙이 있으면 신비에는 일반 콤보 가치를 주지 않는다(`PlacementProblem.ScoresComboItself`).
+  종이·침·열쇠의 자리 가치, 후보의 콤보 보너스, 버리기 조언이 콤보 단계 변화를 막는 판단, 다가가기 가치가 모두
+  그렇다. F2 콤보 우선은 사용자의 선택이라 그대로다. 규칙이 없는 옛 자료는 예전처럼 푼다.
+
 `fixedEngravingsOnServer`는 `GridInventory`의 `InitSyncObject` 목록에 없고 SyncVar도 Rpc도 없다.
 `FixedEngraving`은 NetworkBehaviour 도 아니다. 그래서 **참가자는 세 길을 모두 볼 수 없으며**,
 각인된 석판은 가방에서도 사라지므로 되짚을 단서도 남지 않는다.
 
 그래서 참가자 자리에서는 원인을 읽는 대신 **결과에서 되뺀다**(`FixedEffectResidual`). 게임의 네
-행렬에서 보이는 석판·각인과 인챈트로 설명되는 몫을 빼고 남는 것을 고정 효과 층으로 쓴다. 배수는
-마지막에 곱해지므로 먼저 나누며, 나누어떨어지지 않으면 트랜잭션 도중이라 그 관측을 버린다.
-우리가 만든 비활성·제한 해제·배수가 게임보다 많으면 고정 효과로 덮지 않고 어긋남으로 알린다.
+행렬에서 보이는 석판·각인과 인챈트로 설명되는 몫을 빼고 남는 것을 고정 효과 층으로 쓴다.
+
+- 배수는 마지막에 곱해지므로 먼저 나누며, 나누어떨어지지 않으면 트랜잭션 도중이라 그 관측을 버린다.
+- 우리가 만든 비활성·제한 해제·배수가 게임보다 많으면 고정 효과로 덮지 않고 어긋남으로 알린다.
+- 제보 `c44e9d2e`(2026-09-22)가 이 경로다. 참가자 세션에서 석판 13개가 모두 각인돼 가방에서 사라졌고
+  `levelMatrix`에는 레벨이 남아 7칸이 어긋났다. 되뺀 층을 넣으면 그 자료의 어긋난 칸이 0이 된다.
 
 되뺀 값은 정의상 행렬과 맞으므로 진짜 고정 효과인지는 **성질로 가른다**(`FixedEffectTracker`).
-석판이 그대로인 채 아이템 배치만 달라졌는데 값이 달라지면 고정 효과가 아니라 시뮬레이터의
-오차다. 한 번은 보상 석판 각인과 구별되지 않아 연속 두 번부터 알린다. 두 번은 **확정된 층에서
-서로 다른 값으로** 두 번 벗어난 것이다 - 한 번 튄 뒤 확정된 층으로 돌아오면 셈을 되돌리고, 벗어난
-값이 아이템을 옮긴 뒤에도 그대로면 새 층으로 확정한다. 예전에는 튄 값을 기준으로 삼아 돌아오는
-것까지 세어, 한 번 튄 것이 어긋남으로 올라갔다(0.4.16 참가자 자동 제보 `5642c7be`). 셈이 오르고
-내릴 때마다 전후 층을 플러그인 로그에 한 줄 남기므로, 다음 제보에서는 무엇이 튀었는지 보인다.
+석판이 그대로인 채 아이템 배치만 달라졌는데 값이 달라지면 고정 효과가 아니라 시뮬레이터의 오차다.
 
-호스트는 원본 목록을 그대로 쓰고, 같은 순간의 되뺀 값과 대조해 되빼기
-자체를 검증한다. **원본 목록이 행렬의 전부는 아니다.** 행렬은 증분식이라(`GetPermission` 이 빼고
-`ReleasePermission` 이 다시 더한다) 그 사이에 뺄 값의 출처가 사라지면 더해 둔 몫이 칸에 남는다. 인챈트는
-`DungeonManager.globalItemStatTable` 에서 읽는데, 이 표가 비면 인챈트를 빼지 못해 그 칸에 영구히 남는다.
-합성 석판 질의(`customTabletQuery`)도 같은 매니저에 있어, 비면 게임도 빈 질의로 적용해 효과가 사라진다.
-바닐라에서 둘을 함께 비우는 곳은 `HorayNetworkManager.RestartGame`(`ForceRemoveAll` →
-`globalItemStatTable.Clear` → `LoadDungeon`)이다. 0.4.20 제보 `34a32e60`(호스트, QoL 모드, 0.4.21 에서 고침)은 계획과 F10 사이
-69초에 가방이 8×8 → 10×7 로 바뀌고 두 표가 비었다. 되뺀 세 칸이 계획 시점 인챈트 +1·+2·+3 과 정확히 같다.
-QoL 1.12.6 의 코드는 `levelMatrix`·인챈트 표·가방 폭을 건드리지 않는다. 대신 `RestartGameCoroutine` 이
-`ForceRemoveAll` 의 예외를 잡고 넘어간다 - `ForceRemoveAll` 은 `Permission` 안에서 아이템을 하나씩 지우므로,
-도중에 예외가 나면 `Dispose` 가 남은 아이템의 인챈트를 아직 찬 표로 다시 더하고, 그 뒤 표만 비워진다. 0.4.26
-제보 `6d50beb6`(호스트, QoL)이 이 모양이다 - 아이템 65 중 50, 석판 26 중 13 이 같은 인스턴스로 남고 인챈트 +1 넷이
-0 이 됐으며, 다음 판의 빈 가방까지 같은 칸에 +1 이 남았다(`levelMatrix` 열쇠는 지워지는 곳이 없다). 어느 아이템이
-예외를 냈는지는 `Player.log` 가 있어야 안다.
-0.6.0 제보 `478fa937`(2026-11-03, 호스트, 게임 1.1.1 QoL, 6×9)이 같은 모양이고, 이번에는 플러그인 로그에 게임
-예외가 함께 남았다. `ForceRemoveAll` → `ForceRemoveItem` → `GridInventory.HandleInventoryMatrixChanged` →
-`UI_CharacterStatusPanel.OnItemUpdated` 의 `IndexOutOfRangeException` 이고, 0.2초 뒤 `고정 효과 원본 불일치` 가
-올라왔다. 아이템 42 중 38, 석판 8 중 6 이 같은 인스턴스로 남고 인챈트는 모두 0 이 됐는데, 되뺀 아홉 칸이 직전
-계획 스냅샷의 인챈트(+2~+9)와 칸·값까지 같다. 무엇이 범위를 벗어났는지는 디컴파일로 확인하지 않았다.
+- 한 번은 보상 석판 각인과 구별되지 않아 연속 두 번부터 알린다. 두 번은 **확정된 층에서 서로 다른 값으로** 두 번
+  벗어난 것이다. 한 번 튄 뒤 확정된 층으로 돌아오면 셈을 되돌리고, 벗어난 값이 아이템을 옮긴 뒤에도 그대로면 새
+  층으로 확정한다. 튄 값을 기준으로 삼으면 돌아오는 것까지 세어 한 번 튄 것이 어긋남으로 올라간다(참가자 자동 제보
+  `5642c7be`, 0.4.16).
+- 셈이 오르고 내릴 때마다 전후 층을 플러그인 로그에 한 줄 남긴다. 다음 제보에서 무엇이 튀었는지 보인다.
+
+**호스트는 원본 목록을 그대로 쓰고, 같은 순간의 되뺀 값과 대조해 되빼기 자체를 검증한다.** 다만 **원본 목록이 행렬의
+전부는 아니다.** 행렬은 증분식이라(`GetPermission` 이 빼고 `ReleasePermission` 이 다시 더한다) 그 사이에 뺄 값의
+출처가 사라지면 더해 둔 몫이 칸에 남는다.
+
+- 인챈트는 `DungeonManager.globalItemStatTable` 에서 읽는데, 이 표가 비면 인챈트를 빼지 못해 그 칸에 영구히 남는다.
+- 합성 석판 질의(`customTabletQuery`)도 같은 매니저에 있어, 비면 게임도 빈 질의로 적용해 효과가 사라진다.
+- 바닐라에서 둘을 함께 비우는 곳은 `HorayNetworkManager.RestartGame`(`ForceRemoveAll` →
+  `globalItemStatTable.Clear` → `LoadDungeon`)이다.
+- 게임의 `RestartGameCoroutine` 은 `ForceRemoveAll` 의 예외를 잡고 넘어간다. `ForceRemoveAll` 은 `Permission` 안에서
+  아이템을 하나씩 지우므로, 도중에 예외가 나면 `Dispose` 가 남은 아이템의 인챈트를 아직 찬 표로 다시 더하고, 그 뒤
+  표만 비워진다. `levelMatrix` 열쇠는 지워지는 곳이 없어 다음 판의 빈 가방까지 같은 칸에 남는다.
+
+이 모양의 제보는 셋이고 모두 호스트·QoL 모드다. QoL 1.12.6 의 코드는 `levelMatrix`·인챈트 표·가방 폭을 건드리지 않는다.
+
+| 제보 | 판 | 관측 |
+|---|---|---|
+| `34a32e60` | 0.4.20 (0.4.21 에서 고침) | 계획과 F10 사이 69초에 가방이 8×8 → 10×7 로 바뀌고 두 표가 비었다. 되뺀 세 칸이 계획 시점 인챈트 +1·+2·+3 과 정확히 같다 |
+| `6d50beb6` | 0.4.26 | 아이템 65 중 50, 석판 26 중 13 이 같은 인스턴스로 남고 인챈트 +1 넷이 0 이 됐으며, 다음 판의 빈 가방까지 같은 칸에 +1 이 남았다. 어느 아이템이 예외를 냈는지는 `Player.log` 가 있어야 안다 |
+| `478fa937` | 0.6.0, 게임 1.1.1, 6×9 (2026-11-03) | 플러그인 로그에 게임 예외가 함께 남았다. `ForceRemoveAll` → `ForceRemoveItem` → `GridInventory.HandleInventoryMatrixChanged` → `UI_CharacterStatusPanel.OnItemUpdated` 의 `IndexOutOfRangeException` 이고, 0.2초 뒤 `고정 효과 원본 불일치` 가 올라왔다. 아이템 42 중 38, 석판 8 중 6 이 같은 인스턴스로 남고 인챈트는 모두 0 이 됐는데, 되뺀 아홉 칸이 직전 계획 스냅샷의 인챈트(+2~+9)와 칸·값까지 같다. 무엇이 범위를 벗어났는지는 디컴파일로 확인하지 않았다 |
+
 그래서 **원본과 다르면 알리고(자동 진단 `고정 효과 원본 불일치`) 참가자처럼 되뺀 값을 추적기로 가려 쓴다.**
 남은 몫은 게임이 실제로 쓰는 레벨이라 막는 것보다 그대로 받는 것이 게임과 맞고, 막으면 그 판 끝까지 풀리지
-않는다. 빈 질의의 합성 석판은 계획 경고로 알린다(`PlanBuilder.EmptyMixedTablets`). 2026-09-05에 넣었던 신비 전용 복원(`MysticEngravings`)은 이 경로가 대신하므로
-지웠다가, 신비 각인이 배치를 따라 바뀐다는 것이 드러나 규칙으로 다시 들였다(위).
+않는다. 빈 질의의 합성 석판은 계획 경고로 알린다(`PlanBuilder.EmptyMixedTablets`).
 
-2026-09-22 제보 `c44e9d2e`가 이 경로다. 참가자 세션에서 석판 13개가 모두 각인돼 가방에서
-사라졌고 `levelMatrix`에는 레벨이 남아 7칸이 어긋났다. 되뺀 층을 넣으면 그 자료의 어긋난 칸이
-0이 된다. 실기 확인은 아직이다.
-
-### 배치 보너스는 레벨과 무관했다
+### 배치 보너스는 레벨을 바꾸지 않는다
 
 배치 보너스(`SearchArrangementBonusInInventory`)는 `ReleasePermission` 에서 곱셈 뒤에 호출되지만
 **`levelMatrix` 를 건드리지 않는다.** 실체는:
@@ -844,153 +843,137 @@ QoL 1.12.6 의 코드는 `levelMatrix`·인챈트 표·가방 폭을 건드리�
 
 ### 이웃 의존 아티팩트
 
-- **이웃 의존 아티팩트.** 효과의 세기가 자기 레벨이 아니라 다른 칸의 내용에 달린 아티팩트들이다.
-  디컴파일 전수 검색으로 `Inventory.FindItem`을 부르는 아티팩트 클래스를 세어 보니 12종쯤 된다:
-  `Charm_NearLevelDamage`(조화의 수정 - 이웃 8칸 유효 레벨 합에 비례), `Charm_UpCharmDamage`,
-  `Charm_AutoMagic`, `Charm_ReduceMPCost`(레이에 별조각),
-  `Charm_RightSpellCooldownHelper`(빛나는 모래시계),
-  `Charm_NearMagicBullet`, `Charm_PlanetModule`, `Charm_WoodenBox`,
-  `Charm_MagicCoolDownBonusByTag`, `Charm_BoltMagicMultiShot`, `Charm_CompanionChaos`.
-  (`Charm_UpCharmDamage` 가 북향의 금빛침이다.) 각자 로직이 달라 일괄 모델이 없고, 레벨 행렬에는 영향이 없어 불일치
-  경고로도 안 잡힌다 (전투 스탯으로만 새므로). 배치 점수가 이들의 자리 가치를 과소평가하는
-  문제이며, 아직 모델에 없는 것은 사용자가 강화 우선 지정(`F2` 빌드 창)으로 보정한다.
-  빛나는 모래시계는 이후 방향 의존 마법 강화로 반영했다. `Charm_RightSpellCooldownHelper.SearchMagic`은
-  바로 오른쪽의 `Charm_Magic`에 프리팹의 `cooldownRecoveryByLevel`을 더한다. `Charm_Magic.OnUpdate`는
-  마법이 활성일 때만 재충전하며, 기본 쿨다운을 `(100 + 전체 회복 속도 + 추가 회복 속도)/100`으로 나눈다.
-  카탈로그에는 프리팹의 표와 방향을 저장한다. 대상이 실제로 사용 가능할 때만 강화 가치를 평가하며,
-  다른 버프·마나·시전 빈도가 없는 기본 속도를 환산의 추정 기준으로 삼는다. 사용 유지는 이 연결까지
-  확인하되 게임의 자체 활성 여부와는 분리한다.
-  **앞서 12종 중 다섯을 넣었고**(하얀 종이, 조화의 수정, 북향의 침, 거대한 망원경, 헌신의 휘장),
-  목록에 없던 캘세더니 열쇠(`Charm_3Elemental_ByRow`)도 같은 부류라 함께 넣었다.
+효과의 세기가 자기 레벨이 아니라 다른 칸의 내용에 달린 아티팩트들이다. 디컴파일 전수 검색으로
+`Inventory.FindItem`을 부르는 아티팩트 클래스를 세어 보니 12종쯤 된다: `Charm_NearLevelDamage`(조화의 수정),
+`Charm_UpCharmDamage`(북향의 금빛 침), `Charm_AutoMagic`, `Charm_ReduceMPCost`(레이에 별조각),
+`Charm_RightSpellCooldownHelper`(빛나는 모래시계), `Charm_NearMagicBullet`, `Charm_PlanetModule`(거대한 망원경),
+`Charm_WoodenBox`(다용도 벨트), `Charm_MagicCoolDownBonusByTag`, `Charm_BoltMagicMultiShot`(이각수 관),
+`Charm_CompanionChaos`(헌신의 휘장).
 
-  이 부류의 첫 사례로 **하얀 종이(`Charm_WhitePaper`)는 모델에 넣었다.** 좌우 이웃의 아티팩트가
-  공유하는 카테고리를 자기 것으로 물려받아 콤보 개수에 +1을 보태는 아이템이다(둘 다 가진
-  카테고리만, `match=2`). 카탈로그가 컴포넌트 클래스 이름(`Behavior`)을 실어 주고, 솔버의
-  배정 고정점 루프가 직전 반복의 배치를 이웃 지도로 넘겨 "같은 카테고리 쌍 사이에 낀
-  하얀 종이"에 콤보 한 걸음 가치(`Worth.OfComboStep`)를 더한다. 최종 점수(Describe)에도 같은
-  값이 들어간다. 근사가 하나 남는다: 이웃은 직전 반복 기준이라 쌍을 종이 주위로 재구성하는
-  탐색까지는 못 하고(끼울 자리가 이미 있으면 찾아간다). 콤보 개수에 종이 자신의 기여가 섞이는
-  것은 아래 "콤보를 세는 규칙" 의 방법으로 뺀다.
+- 각자 로직이 달라 일괄 모델이 없다.
+- 레벨 행렬에는 영향이 없어(전투 능력치로만 샌다) 불일치 경고로도 안 잡힌다.
+- 모델에 없는 것은 배치 점수가 자리 가치를 과소평가한다. 사용자가 강화 우선 지정(`F2` 빌드 창)으로 보정한다.
 
-  **조화의 수정(`Charm_NearLevelDamage`)도 모델에 넣었다.** 게임 로직은 단순하다:
+목록에 없던 캘세더니 열쇠(`Charm_3Elemental_ByRow`)도 같은 부류다. 무엇을 모델에 넣었는지는 [현재 상태](STATUS.md)의
+구현 범위 표에, 아직 밖인 것의 규칙은 아래 "아직 모델 밖인 효과" 에 있다.
 
-  ```
-  보너스 = floor( allDamageBonusByLevel[내 레벨] × Σ 이웃 8칸 min(그 아티팩트 레벨, 그 상한) )
-  ```
+**빛나는 모래시계**(`Charm_RightSpellCooldownHelper`). `SearchMagic`은 바로 오른쪽의 `Charm_Magic`에 프리팹의
+`cooldownRecoveryByLevel`을 더한다. `Charm_Magic.OnUpdate`는 마법이 활성일 때만 재충전하며, 기본 쿨다운을
+`(100 + 전체 회복 속도 + 추가 회복 속도)/100`으로 나눈다. 우리가 어떻게 값을 매기는지는
+[배치 평가](PLACEMENT-OBJECTIVE.md)의 "방향에 따른 마법 강화".
 
-  이웃 여덟 칸(대각 포함)에 아티팩트가 있을 때만 세고, 상한만 씌울 뿐 아래로는 자르지 않아
-  음수 레벨 이웃은 오히려 깎는다. 레벨별 배수 표(`allDamageBonusByLevel`, 예: `0,1,1,2`)는
-  카탈로그 덤프가 `NeighborLevelBonus`로 실어 준다. 자기 레벨로 색인한다
-  (`LevelToIdx` = clamp(level, 0, maxLevel)).
+**하얀 종이**(`Charm_WhitePaper`). 좌우 이웃의 아티팩트가 공유하는 카테고리를 자기 것으로 물려받아 콤보 개수에 +1을
+보탠다(둘 다 가진 카테고리만, `match=2`).
 
-  결과는 전체 피해 보너스라 우리 점수(레벨) 단위가 아니다. `Worth.DamageBonus`가 그 환산값이고
-  아래 "콤보 가중치" 절의 `--measure`로 **0.26 으로 실측했다**(`Worth.cs`). 다만 **자리 선택은
+- 카탈로그가 컴포넌트 클래스 이름(`Behavior`)을 실어 주고, 솔버의 배정 고정점 루프가 직전 반복의 배치를 이웃 지도로
+  넘겨 "같은 카테고리 쌍 사이에 낀 하얀 종이"에 콤보 한 걸음 가치(`Worth.OfComboStep`)를 더한다. 최종 점수
+  (Describe)에도 같은 값이 들어간다.
+- 근사가 하나 남는다. 이웃은 직전 반복 기준이라 쌍을 종이 주위로 재구성하는 탐색까지는 못 한다(끼울 자리가 이미
+  있으면 찾아간다).
+- 콤보 개수에 종이 자신의 기여가 섞이는 것은 아래 "출발 개수에서 자기 몫을 뺀다" 의 방법으로 뺀다.
+
+**조화의 수정**(`Charm_NearLevelDamage`). 게임 로직은 단순하다:
+
+```
+보너스 = floor( allDamageBonusByLevel[내 레벨] × Σ 이웃 8칸 min(그 아티팩트 레벨, 그 상한) )
+```
+
+- 이웃 여덟 칸(대각 포함)에 아티팩트가 있을 때만 세고, 상한만 씌울 뿐 아래로는 자르지 않아 음수 레벨 이웃은 오히려
+  깎는다.
+- 레벨별 배수 표(`allDamageBonusByLevel`, 예: `0,1,1,2`)는 카탈로그 덤프가 `NeighborLevelBonus`로 실어 준다. 자기
+  레벨로 색인한다(`LevelToIdx` = clamp(level, 0, maxLevel)).
+- 결과는 전체 피해 보너스라 우리 점수(레벨) 단위가 아니다. `Worth.DamageBonus`가 그 환산값이고 `WorthScale` 이
+  카탈로그를 지을 때 잰다(1.0.31 에서 0.26, 아래 "조화의 수정 환산값도 이 표에서 나온다"). 다만 **자리 선택은
   환산값과 무관하게 옳다.** 배수가 양수이기만 하면 이웃 레벨 합이 큰 칸을 고른다.
+- 이웃 지도는 직전 반복의 배정이라 이 아티팩트 자신이 서 있던 칸이 이웃으로 잡힌다. 그대로 세면 자기를 세는 것이고
+  건너뛰면 빈 칸으로 치는데, 배정은 자리 맞바꾸기이므로 **지금 목표 칸에 있는 아티팩트가 그 자리를 채우는 것으로
+  갈음한다.** 이 처리가 없으면 이웃이 하나 모자라게 세어져 가운데 칸의 우위가 사라진다(고정 테스트
+  `NeighborValueTests`). 하얀 종이 쪽은 좌우 둘 다 조건이라 같은 상황에서 값이 0 이 되고 말아, 아직 같은 처리를
+  넣지 않았다.
 
-  하얀 종이와 같은 근사가 걸리되 한 가지가 다르다. 이웃 지도는 직전 반복의 배정이라, 이 아티팩트
-  자신이 서 있던 칸이 이웃으로 잡힌다. 그대로 세면 자기를 세는 것이고 건너뛰면 빈 칸으로 치는데,
-  배정은 자리 맞바꾸기이므로 **지금 목표 칸에 있는 아티팩트가 그 자리를 채우는 것으로 갈음한다.**
-  이 처리가 없으면 이웃이 하나 모자라게 세어져 가운데 칸의 우위가 사라진다(고정 테스트
-  `NeighborValueTests`가 그 경우를 잡는다). 하얀 종이 쪽은 좌우 둘 다 조건이라 같은 상황에서
-  값이 0 이 되고 말아, 아직 같은 처리를 넣지 않았다.
+**자리만 보고 대상을 정하는 넷**(`PositionalWorth`, 고정 테스트 `PositionalWorthTests`). 다른 플래너가 "대상 지정"
+버튼으로 사람에게 묻는 것들인데, **게임은 자리만 보고 정한다.** 그래서 물어볼 것이 없고 솔버가 좋은 자리를 찾으면
+된다. 예외로 침과 모래시계에는 `강화 대상` 지정을 둔다. 우리 점수가 그 대상들을 갈라내지 못하기 때문이다
+([배치 평가](PLACEMENT-OBJECTIVE.md)의 "지정한 강화 대상"). 망원경과 열쇠는 이웃 개수와 행이 정하므로 점수가 답을
+낸다. 망원경은 행성이 받는 이득도 배정에 넣는다(같은 문서의 "탐색과 최적성").
 
-  **넷을 더 넣었다**(`PositionalWorth`, 고정 테스트 `PositionalWorthTests`). 넷 다 공통점이
-  있다 — 다른 플래너가 "대상 지정" 버튼으로 사람에게 묻는 것들인데, **게임은 자리만 보고 정한다.**
-  그래서 물어볼 것이 없고 솔버가 알아서 좋은 자리를 찾으면 된다.
+| 아티팩트 | 게임 클래스 | 게임이 보는 것 |
+|---|---|---|
+| 북향의 금빛/파란 침 | `Charm_UpCharmDamage`(1.1.0 은 `Charm_CompassDamageUp`, 아래 "침은 1.1.0 에서 나침반이 됐다") | `(x+xOffset, y+yOffset)` 칸 하나. 기본은 바로 위 |
+| 거대한 망원경 | `Charm_PlanetModule` | 이웃 여덟 칸에서 `Entity.categories` 에 `PLANET` 이 있고 **Charm 이 `Charm_SummonGreenBat`(하위 포함)** 인 것 |
+| 헌신의 휘장 | `Charm_CompanionChaos` | 같은 행 전체(`0..Width-1`)의 `ICompanionCharm` |
+| 캘세더니 열쇠 | `Charm_3Elemental_ByRow` | 자기 행 하나. `lineCategory[YIdx % 개수]` |
 
-  다만 "솔버가 알아서" 는 우리 점수가 대상들을 갈라낼 수 있다는 전제이고, 침과 모래시계에서는 그렇지
-  못하다 — 마법서 26종은 값어치가 전부 레어도 어림값이고, 침이 주는 것은 대상의 피해량에 대한 백분율인데
-  그 피해량이 모델에 없다. 그래서 이 둘에만 `강화 대상` 지정을 둔다([배치 평가](PLACEMENT-OBJECTIVE.md)).
-  망원경과 열쇠는 이웃 개수와 행이 정하므로 점수가 답을 낸다. 망원경은 행성이 받는 이득도 배정에 넣는다
-  (같은 문서의 "탐색과 최적성").
+**침.** `OnRequestCharmDamageBonus`는 대상을 못 찾으면 **0**을 돌려주므로, 대상 없이 선 침은 자리만 차지하고 아무
+일도 하지 않는다.
 
-  | 아티팩트 | 게임 클래스 | 게임이 보는 것 |
-  |---|---|---|
-  | 북향의 금빛/파란 침 | `Charm_UpCharmDamage`(1.1.0 은 `Charm_CompassDamageUp`, 아래 "침은 1.1.0 에서 나침반이 됐다") | `(x+xOffset, y+yOffset)` 칸 하나. 기본은 바로 위 |
-  | 거대한 망원경 | `Charm_PlanetModule` | 이웃 여덟 칸에서 `Entity.categories` 에 `PLANET` 이 있고 **Charm 이 `Charm_SummonGreenBat`(하위 포함)** 인 것 |
-  | 헌신의 휘장 | `Charm_CompanionChaos` | 같은 행 전체(`0..Width-1`)의 `ICompanionCharm` |
-  | 캘세더니 열쇠 | `Charm_3Elemental_ByRow` | 자기 행 하나. `lineCategory[YIdx % 개수]` |
+- 대상 자격은 `IsDependencyValid`가 정한다 — `IAttackableCharm`이거나 다른 침이다.
+- 침 위에 침이 있으면 `SearchCategory`가 각 침의 오프셋을 따라 계속 올라가 침이 아닌 아티팩트에서 멈추고, **사슬의
+  침 전부가 그 아티팩트를 인정할 때만** 물려받는다. 우리도 같은 걸음을 걷는다.
+- 크기는 두 표(`damageBonusByLevel`, `dependencyDamageBonusByLevel`)의 **비율**로만 쓰므로 단위를 옮길 필요가 없다.
+  레어도 조건(`maxRarity`)까지 맞는 대상 위에 선 침이 그만큼 더 값어치가 있다.
 
-  침이 특히 그렇다. `OnRequestCharmDamageBonus`는 대상을 못 찾으면 **0**을 돌려주므로, 대상 없이
-  선 침은 자리만 차지하고 아무 일도 하지 않는다. 대상 자격은 `IsDependencyValid`가 정한다 —
-  `IAttackableCharm`이거나 다른 침이다. 침 위에 침이 있으면 `SearchCategory`가 각 침의 오프셋을
-  따라 계속 올라가 침이 아닌 아티팩트에서 멈추고, **사슬의 침 전부가 그 아티팩트를 인정할 때만**
-  물려받는다. 우리도 같은 걸음을 걷는다. 크기는 두 표(`damageBonusByLevel`,
-  `dependencyDamageBonusByLevel`)의 **비율**로만 쓰므로 단위를 옮길 필요가 없다 - 레어도 조건
-  (`maxRarity`)까지 맞는 대상 위에 선 침이 그만큼 더 값어치가 있다.
+**콤보를 세는 규칙에 여기서 예외가 생긴다.** 아래 "콤보" 절의 개수 판정은 배치·레벨·활성 여부와 무관하고 평범한
+아티팩트에서는 맞지만, 침과 캘세더니 열쇠는 `GetItemCategory()`를 덮어써 **자리에 따라 다른 카테고리를
+내보인다** — 침은 대상에게 물려받은 것을, 열쇠는 `lineCategory[행 % 개수]`를. `SearchSetEffectInInventory`가 읽는
+것이 그 값이므로, 이 둘에 한해서는 콤보 개수가 배치에 달려 있다. 그래서 배치 점수에 콤보 한 걸음
+(`Worth.OfComboStep`)이 들어간다.
 
-  **콤보를 세는 규칙에 여기서 예외가 생긴다.** 위의 "개수 판정" 항목은 배치·레벨·활성 여부와
-  무관하다고 적었고 평범한 아티팩트에서는 맞지만, 침과 캘세더니 열쇠는 `GetItemCategory()`를
-  덮어써 **자리에 따라 다른 카테고리를 내보인다** — 침은 대상에게 물려받은 것을,
-  열쇠는 `lineCategory[행 % 개수]`를. `SearchSetEffectInInventory`가 읽는 것이 그 값이므로,
-  이 둘에 한해서는 콤보 개수가 배치에 달려 있다. 그래서 배치 점수에 콤보 한 걸음
-  (`Worth.OfComboStep`)이 들어간다.
+**출발 개수에서 자기 몫을 뺀다.** 스냅샷의 콤보 개수는 게임이 센 것이라 침·열쇠·종이가 지금 자리에서 보태는 몫이
+이미 들어 있다. 그대로 "하나 더" 를 재면 자리를 옮길 때마다 개수가 바뀌어 두 배치 사이를 영원히 오간다(0.2.0,
+`F8` 마다 6~7수). `ComboCounting` 이 게임 개수에서 자리 의존 아티팩트들의 지금 자리 몫을 뺀 바탕 개수를 만들고,
+평가하는 배치에서 **다른** 자리 의존 아티팩트가 보태는 몫만 더한다. `--churn` 이 이 흔들림을 잡는다.
 
-  **그 걸음의 출발 개수에서 자기 몫을 빼야 한다.** 스냅샷의 콤보 개수는 게임이 센 것이라 침·열쇠·종이가
-  지금 자리에서 보태는 몫이 이미 들어 있다. 그대로 "하나 더" 를 재면 자리를 옮길 때마다 개수가 바뀌어 두
-  배치 사이를 영원히 오간다(0.2.0, `F8` 마다 6~7수). `ComboCounting` 이 게임 개수에서 자리 의존 아티팩트들의
-  지금 자리 몫을 뺀 바탕 개수를 만들고, 평가하는 배치에서 **다른** 자리 의존 아티팩트가 보태는 몫만 더한다.
-  `--churn` 이 이 흔들림을 잡는다.
+**휘장은 크기를 재지 못했다.** 혼돈 모드(`SetChaoticMode`)는 능력치가 아니라 소환물의 동작을 바꾸는 것이라 정적
+데이터에 수치가 없다. 방향(모아 두는 쪽이 낫다)만 확실하므로 `PositionalWorth.EnhanceStep`을 **그 아티팩트의 레벨
+한 칸**으로 두었다. 콤보 한 단계의 절반에 못 미쳐 잰 값을 뒤집지 못하는 크기이고, 재고 나면 그 상수 하나만 고치면
+된다([백로그](ROADMAP.md)의 솔버 절).
 
-  휘장은 크기를 재지 못했다. 혼돈 모드(`SetChaoticMode`)는 능력치가 아니라 소환물의 동작을
-  바꾸는 것이라 정적 데이터에 수치가 없다. 방향(모아 두는 쪽이 낫다)만 확실하므로
-  `PositionalWorth.EnhanceStep`을 **그 아티팩트의 레벨 한 칸**으로 두었다 - 콤보 한 단계의
-  절반에 못 미쳐 잰 값을 뒤집지 못하는 크기다. `ComboProgress`와 같은 성격의 값이며, 재고 나면
-  그 상수 하나만 고치면 된다. **망원경은 아래처럼 재게 됐으므로 이 값은 이제 휘장의 것이다.**
+**망원경은 대상 판정이 카테고리 하나가 아니다(2026-09-16).** `SearchPlanet` 은 이웃 칸의 `Entity.categories` 에
+`PLANET` 이 있는지 본 뒤 **그 칸의 `Charm` 이 `Charm_SummonGreenBat` 인지 한 번 더 본다.** 둘 다 맞아야
+`SetEnhancement(true)` 가 걸린다. 카탈로그의 `PLANET` 열하나 가운데 넷 - 거대 망원경 자신, 혜성
+(`Charm_PlanetComet`), 악보 '은하'(`Charm_StatusInstance`), 붉은행성 관찰일지(`Charm_FlamePlanet`) - 이 그 타입이
+아니라 거대화 대상이 아니다.
 
-  **망원경은 대상 판정이 카테고리 하나가 아니다(2026-09-16).** `SearchPlanet` 은 이웃 칸의
-  `Entity.categories` 에 `PLANET` 이 있는지 본 뒤 **그 칸의 `Charm` 이 `Charm_SummonGreenBat`
-  인지 한 번 더 본다.** 둘 다 맞아야 `SetEnhancement(true)` 가 걸린다. 카탈로그의 `PLANET`
-  열하나 가운데 넷 - 거대 망원경 자신, 혜성(`Charm_PlanetComet`), 악보 '은하'
-  (`Charm_StatusInstance`), 붉은행성 관찰일지(`Charm_FlamePlanet`) - 이 그 타입이 아니라 거대화
-  대상이 아니다.
+**그 판정은 `is` 다 - 하위 클래스도 대상이다.** 1.0.33 에 `Charm_SummonRedPlanet : Charm_SummonGreenBat` 이 있다.
+그래서 **타입 이름 문자열로 견주면 진짜 행성을 떨어뜨린다.** 판정은 게임 타입을 아는 덤프에서 `is` 로 하고
+(`CharmDefinition.IsSummonPlanet`, 카탈로그 23), 솔버는 그 값을 읽는다. 이름 비교는 그 항목이 없는 옛 자료에서만
+물러설 자리로 남겼다.
 
-  **그 판정은 `is` 다 - 하위 클래스도 대상이다.** 1.0.33 에 `Charm_SummonRedPlanet :
-  Charm_SummonGreenBat` 이 있다. 그래서 **타입 이름 문자열로 견주면 진짜 행성을 떨어뜨린다** -
-  카테고리만 보던 것의 정반대 실수다. 판정은 게임 타입을 아는 덤프에서 `is` 로 하고
-  (`CharmDefinition.IsSummonPlanet`, 카탈로그 23), 솔버는 그 값을 읽는다. 이름 비교는 그 항목이
-  없는 옛 자료에서만 물러설 자리로 남겼다.
+**거대화의 크기(2026-09-16).** 거대화가 피해량을 얼마나 올리는지는 `GreenBat`이 쏘는 자리에 있다.
 
-  **거대화의 크기는 잰다(2026-09-16).** 거대화가 피해량을 얼마나 올리는지는 `GreenBat`이 쏘는
-  자리에 있다.
+```
+if (isEnhanced) { num += num * 0.5f; ... }
+```
 
-  ```
-  if (isEnhanced) { num += num * 0.5f; ... }
-  ```
+`num`은 그 시점의 **최종 피해량**이다 - `damageByLevel[지금 레벨]`에 화상 틱 몫과 `PLANETDAMAGE`%까지 이미 반영된
+값이라, 거대화는 기본값이 아니라 **지금 피해량에 곱으로 맨 마지막에** 걸린다. `Charm_SummonGreenBat.damageByLevel`이
+공개 필드라 레벨별 피해량 표도 그대로 읽을 수 있다(카탈로그 23). 거대화 한 번을 그 표의 레벨 한 칸으로 나누면
+**레벨 0에서 1.25~2.5칸, 상한 레벨에서 3.75~6칸**이다.
 
-  `num`은 그 시점의 **최종 피해량**이다 - `damageByLevel[지금 레벨]`에 화상 틱 몫과
-  `PLANETDAMAGE`%까지 이미 반영된 값이라, 거대화는 기본값이 아니라 **지금 피해량에 곱으로 맨
-  마지막에** 걸린다. `Charm_SummonGreenBat.damageByLevel`이 공개 필드라 레벨별 피해량 표도 그대로
-  읽을 수 있다(카탈로그 23). 거대화 한 번을 그 표의 레벨 한 칸으로 나누면 **레벨 0에서
-  1.25~2.5칸, 상한 레벨에서 3.75~6칸**이다.
+| 행성 | 피해량(레벨 0→상한) | 거대화 = 레벨 몇 칸 (0 → 상한) |
+|---|---|---|
+| 푸른 | 10→30 (5) | 1.25 → 3.75 |
+| 잿빛 | 15→40 (5) | 1.50 → 4.00 |
+| 노란 | 20→60 (6) | 1.50 → 4.50 |
+| 붉은 | 26→60 (6) | 2.29 → 5.29 |
+| 하늘색 | 30→60 (5) | 2.50 → 5.00 |
+| 하얀 | 30→72 (7) | 2.50 → 6.00 |
+| 암흑 | 50→90 (4) | 2.50 → 4.50 |
 
-  | 행성 | 피해량(레벨 0→상한) | 거대화 = 레벨 몇 칸 (0 → 상한) |
-  |---|---|---|
-  | 푸른 | 10→30 (5) | 1.25 → 3.75 |
-  | 잿빛 | 15→40 (5) | 1.50 → 4.00 |
-  | 노란 | 20→60 (6) | 1.50 → 4.50 |
-  | 붉은 | 26→60 (6) | 2.29 → 5.29 |
-  | 하늘색 | 30→60 (5) | 2.50 → 5.00 |
-  | 하얀 | 30→72 (7) | 2.50 → 6.00 |
-  | 암흑 | 50→90 (4) | 2.50 → 4.50 |
+`PositionalWorth.EnlargeSteps`는 **레벨 0 값**을 쓴다. 이웃의 지금 레벨을 보면 배치가 바뀔 때마다 망원경의 값어치가
+따라 흔들리기 때문이다(판단과 다시 열 조건은 [백로그](ROADMAP.md)의 솔버 절). **단위를 옮기는 것이 아니라
+비율이다.** 침이 두 표의 비율만 쓰는 것과 같은 자리이므로, 행성의 값어치가 레어도 어림값이라는 사실은 양변에서
+약분된다.
 
-  `PositionalWorth.EnlargeSteps`가 **레벨 0 값**을 쓴다. 곱이라 레벨이 오를수록 커지지만, 이웃의
-  지금 레벨을 보면 배치가 바뀔 때마다 망원경의 값어치가 따라 흔들린다 - 침의 `TargetShare`가
-  상한 레벨로 재는 것과 같은 걱정이라 아래로 잡는 쪽을 골랐다. **단위를 옮기는 것이 아니라
-  비율이다.** 침이 두 표의 비율만 쓰는 것과 같은 자리이므로, 행성의 값어치가 레어도 어림값이라는
-  사실은 양변에서 약분된다.
+**거대화는 중첩되지 않는다.** `Charm_SummonGreenBat.isEnhanced`는 int이지만 읽는 쪽이 `IsEnhanced => isEnhanced > 0`
+이고 `GreenBat`으로도 `bool`로 간다 - 카운터는 망원경 하나가 빠질 때 꺼지지 않게 하는 refcount다. 우리는 망원경마다
+값을 매기므로 망원경 둘이 같은 행성을 감싸면 두 번 센다([백로그](ROADMAP.md)의 솔버 절).
 
-  **거대화는 중첩되지 않는다.** `Charm_SummonGreenBat.isEnhanced`는 int이지만 읽는 쪽이
-  `IsEnhanced => isEnhanced > 0`이고 `GreenBat`으로도 `bool`로 간다 - 카운터는 망원경 하나가
-  빠질 때 꺼지지 않게 하는 refcount다. **우리는 망원경마다 값을 매기므로 망원경 둘이 같은 행성을
-  감싸면 두 번 센다.** 배정 비용 행렬에서 "옆 망원경이 이미 먹었다"를 빼려면 싸지 않아 지금은
-  두었다([백로그](ROADMAP.md)의 솔버 절).
-
-  이 넷을 넣으면서 **배정 뒤에 다듬는 단계**(`PlacementSolver.Polish`)가 필요해졌다. 헝가리안의
-  비용이 직전 반복의 이웃을 보고 매겨지는 근사라, 두 아티팩트가 동시에 움직여야 좋아지는 수
-  (침 둘을 한 아티팩트 아래로 쌓기 같은)를 배정기 혼자서는 못 넘는다. 이긴 배치 하나에만
-  자리 맞바꾸기를 몇 번 돌린다 - 후보마다 걸면 풀이 시간이 두 자릿수 배로 뛴다. 실측으로
-  42칸·석판 8·아티팩트 30 판에서 **점수 +2.5, 시간 차이는 측정 잡음 안**이었다.
+**배정 뒤에 다듬는 단계**(`PlacementSolver.Polish`)가 이 부류 때문에 있다. 헝가리안의 비용이 직전 반복의 이웃을
+보고 매겨지는 근사라, 두 아티팩트가 동시에 움직여야 좋아지는 수(침 둘을 한 아티팩트 아래로 쌓기 같은)를 배정기
+혼자서는 못 넘는다. 이긴 배치 하나에만 자리 맞바꾸기를 몇 번 돌린다 - 후보마다 걸면 풀이 시간이 두 자릿수 배로
+뛴다. 실측으로 42칸·석판 8·아티팩트 30 판에서 **점수 +2.5, 시간 차이는 측정 잡음 안**이었다.
 
 ### 침은 1.1.0 에서 나침반이 됐다
 
@@ -1017,10 +1000,11 @@ QoL 1.12.6 의 코드는 `levelMatrix`·인챈트 표·가방 폭을 건드리�
 - **꺼지면 콤보에서 빠진다.** 1.0.33 침은 `OnDisabledEffect` 가 카테고리를 다시 담아 꺼진 채로도 콤보에 들었다.
   나침반은 활성에 달려 있어 `ReleasePermission` 에 재계산 반복이 생겼다(위 "레벨이 정해지는 순서").
 
-0.4.27 이하는 1.1.0 에서 `Charm_UpCharmDamage` 를 찾다 `TypeLoadException` 을 내고 카탈로그를 짓지 못한다 - 화면에는
-"데이터 생성 실패" 만 뜬다. 배포 DLL 의 게임 참조를 Mono.Cecil 로 1.1.0 에 대 보면 깨지는 것은 이 타입과 필드 여섯뿐이다.
+**두 판을 함께 읽는 법.** 한 판에만 있는 타입을 컴파일 시점에 참조하면 다른 판에서 깨진다. 0.4.27 이하는 1.1.0 에서
+`Charm_UpCharmDamage` 를 찾다 `TypeLoadException` 을 내고 카탈로그를 짓지 못한다(화면에는 "데이터 생성 실패" 만 뜬다).
+배포 DLL 의 게임 참조를 Mono.Cecil 로 1.1.0 에 대 보면 깨지는 것은 이 타입과 필드 여섯뿐이다.
 
-**두 판을 함께 읽는 법.** 플러그인은 침 계열 어느 클래스도 컴파일 시점에 참조하지 않는다. `ItemCatalog.Dependency` 가
+그래서 플러그인은 침 계열 어느 클래스도 컴파일 시점에 참조하지 않는다. `ItemCatalog.Dependency` 가
 타입 계층의 이름(`Charm_Compass`, `Charm_UpCharmDamage`)으로 계열을 가리고 공개 필드를 이름으로 읽는다. 나침반의
 `parentOffsets` 는 카탈로그 27 의 `DependencyParents` 로 간다. Core 는 동작 클래스 이름(`Compass.Is`)으로 옛 규칙과 새
 규칙을 가른다. 스냅샷은 나침반의 지금 카테고리(`GetItemCategory()` = `assignedCategory`)를 하얀 종이처럼 실어 오고,
@@ -1079,18 +1063,18 @@ B→A 순이면 둘 다 카테고리를 얻는다. 전환은 인벤토리 갱신
 
 **특수 콤보의 발동 단계는 공통 경로로 모은다.** `ComboEffect_FlameSword`·`Debuff`·`Mystic`·`Alchemy`·`Guardian`·
 `DarkCloud` 는 `OnRequestComboData` 에서 단계를 직접 더한다. 클래스별 숫자를 복사하지 않고
-`ComboEffectBase.RequestComboData(null)` 이 돌려주는 단계를 `addStatByCombo` 와 합친다. 단계는 프리팹 필드에서 오며
-연금술의 둘째 단계는 `activeSecond` 가 켜졌을 때만 나온다. 1.1.0 디컴파일의 `DarkCloud` 는 `bigCloudComboCount` 단계를
-`OnRequestComboData` 에 내지 않아(`GetHighestComboCount` 에만 있다) 이 경로로는 그 문턱을 모른다. 게임 API 안에서 지역화와 단계 수집이 묶여 있어, 안에서
-예외가 나면 완전한 목록을 얻을 수 없으므로 그 갱신을 실패로 처리하고 일부만 게시하지 않는다.
+`ComboEffectBase.RequestComboData(null)` 이 돌려주는 단계를 `addStatByCombo` 와 합친다.
 
-**활성 조건.** `CharmActivateCriteria` 10종 중 배치와 무관한 `FullHP` 를 뺀 9종은 게임 `GetCriteria` 와 차이가 없다. 모르는 조건 이름은 `None` 으로
-읽히므로, 게임이 새 조건을 더하면 정상 지원으로 오인할 수 있다.
+- 단계는 프리팹 필드에서 오며 연금술의 둘째 단계는 `activeSecond` 가 켜졌을 때만 나온다.
+- 1.1.0 디컴파일의 `DarkCloud` 는 `bigCloudComboCount` 단계를 `OnRequestComboData` 에 내지 않아
+  (`GetHighestComboCount` 에만 있다) 이 경로로는 그 문턱을 모른다.
+- 게임 API 안에서 지역화와 단계 수집이 묶여 있어, 안에서 예외가 나면 완전한 목록을 얻을 수 없다. 그래서 그 갱신을
+  실패로 처리하고 일부만 게시하지 않는다.
 
 ## 콤보 가중치
 
-`Worth.ComboThreshold`(2.0)와 `ComboProgress`(0.25)는 근거 없는 설계값이었다. 콤보 쪽으로 추천이
-얼마나 기우는지를 정하는 값이라 짐작으로 둘 수 없어 재는 길을 만들었다.
+`Worth.ComboThreshold` 는 콤보 쪽으로 추천이 얼마나 기우는지를 정한다. 짐작으로 두지 않고, 아티팩트와 콤보가 주는
+능력치를 같은 단위로 옮겨 잰다. `ComboProgress` 는 잰 값이 아니라 그에 대한 비율이다(아래 "콤보" 절).
 
 **다리는 두 쪽이 같은 능력치 체계(`StatusDatabase`)를 쓴다는 점이다.**
 
@@ -1122,19 +1106,19 @@ dotnet run --project src/SephPlanner.DataTool -- --measure
 
 ### 묶음을 나눠 센다 (1.0.31)
 
-능력치마다 떼어 세면 결함이 있다. **표본 아티팩트는 레벨 하나로 능력치를 여러 개 동시에 산다.** 능력치마다
+능력치마다 떼어 세면 안 된다. **표본 아티팩트는 레벨 하나로 능력치를 여러 개 동시에 산다.** 능력치마다
 따로 "레벨 하나가 이걸 얼마 올려 주나"를 재면 같은 레벨을 능력치 수만큼 중복해서 세게 되고,
 묶여 나오는 능력치일수록 환산율이 작게 나와 그 능력치의 단위값이 부풀려진다. 증거는 정의상
-1 이어야 하는 수다 — **능력치만 주는 아티팩트 106종의 레벨당 값어치 중앙값이 1.50 이었다.**
+1 이어야 하는 수다 — 떼어 세면 **능력치만 주는 아티팩트 106종의 레벨당 값어치 중앙값이 1.50 이었다.**
 `MOVE_SPEED`를 주는 11종 중 그것만 주는 것이 1종, `EVASION` 13종 중 1종뿐이다.
 
-고친 방법은 레벨 예산을 능력치들에게 나눠 주는 것이다. 능력치만 주는 아티팩트마다
+그래서 레벨 예산을 능력치들에게 나눠 준다. 능력치만 주는 아티팩트마다
 "레벨 하나 = 값어치 1" 이라는 식을 한 줄씩 세우고, 능력치별 보정을 미지수로 두고 한꺼번에 푼다.
 
 **보정을 자유롭게 두면 안 된다.** 표본 106종으로 능력치 75개를 맞추는데 대부분의 능력치는 한두
 종에만 나온다. 자유롭게 두면 표본이 적은 능력치가 그 아티팩트의 남는 몫을 전부 가져가며 발산한다.
-처음 시도한 반복법(능력치마다 자기 표본의 중앙값만큼 곱하기)이 실제로 그랬다 — 넷이 발산했고
-그중 `FINAL_DAMAGE`는 조화의 수정이 타는 능력치다.
+능력치마다 자기 표본의 중앙값만큼 곱하는 반복법이 그랬다 — 넷이 발산했고 그중 `FINAL_DAMAGE`는 조화의 수정이
+타는 능력치다.
 
 | 능력치 | 떼어 센 값 | 자유롭게 둔 반복법 | 표본 |
 |---|---|---|---|
@@ -1159,13 +1143,13 @@ dotnet run --project src/SephPlanner.DataTool -- --measure
 표준오차 한 칸 규칙은 5 를 고르지만 그쪽은 제보로 들어온 토끼마을 경비병 투구의 비단조를
 못 푼다.
 
-같은 변경에서 **레벨 상한 위의 닿지 못하는 칸에서는 걸음을 세지 않는다.** 게임이 못 올리는
+**레벨 상한 위의 닿지 못하는 칸에서는 걸음을 세지 않는다.** 게임이 못 올리는
 레벨로 환산율을 매기면 아무도 살 수 없는 값이 기준이 된다.
 
 ### 씨앗은 값이 오르는 레벨의 걸음으로 잰다
 
-한 번은 씨앗도 "상한까지의 총 오름폭 ÷ 레벨 수"로 바꿨다. `step > 0` 인 걸음만 담으면 중간에
-안 오르는 레벨이 환산율을 부풀린다고 봤기 때문이다. **그쪽이 더 나빴다.**
+씨앗을 "상한까지의 총 오름폭 ÷ 레벨 수"로 재지 않는다. `step > 0` 인 걸음만 담으면 중간에 안 오르는 레벨이
+환산율을 부풀릴 것 같지만, 오름폭으로 재는 쪽이 더 나쁘다.
 
 거의 안 오르는 능력치에서 환산율이 0 에 가까워지고, 그러면 그 능력치를 **붙박이로 많이 주는**
 아티팩트의 값어치가 터진다. `HP_STEAL` 이 그랬다 - 올려 주는 아티팩트가 도시락 하나뿐인데
@@ -1174,12 +1158,11 @@ dotnet run --project src/SephPlanner.DataTool -- --measure
 아티팩트가 됐고, 제보로 돌아왔다.
 
 붙박이 보너스는 레벨로 사는 것이 아니라 켜 두는 값이다. 그래서 씨앗은 **값이 실제로 오르는
-레벨에서의 걸음 크기**로 되돌렸다. 혈석 귀걸이 27.27 → 4.73, 도시락 7.47 → 1.84.
-대신 아이스 스타가 내려가는 목록으로 돌아온다(한 종 → 두 종). 그쪽이 훨씬 싼 대가다.
+레벨에서의 걸음 크기**다. 혈석 귀걸이 27.27 → 4.73, 도시락 7.47 → 1.84 가 된다. 대가는 아이스 스타가 레벨이 올라도
+값어치가 내려가는 목록에 드는 것(한 종 → 두 종)이고, 훨씬 싸다.
 
-결과는 `MOVE_SPEED` 2 → 9.03, `EVASION` 200 → 446 이고, 레벨이 올라도 값어치가 내려가는
-아티팩트가 **네 종에서 두 종으로** 줄었다. `Worth.ComboThreshold`·`ComboProgress`·
-`DamageBonus` 와 점수 비교 눈금은 이제 `WorthScale` 이 카탈로그를 지을 때 직접 잰다.
+`Worth.ComboThreshold`·`ComboProgress`·`DamageBonus` 와 점수 비교 눈금은 `WorthScale` 이 카탈로그를 지을 때 이
+환산율로 직접 잰다.
 
 카탈로그 짓기에 붙는 비용은 `CharmStatWorth.Apply` 전체가 중앙값 0.78ms 이고 그중 적합이
 0.48ms 다(짓기 한 번이 30ms 안팎).
@@ -1192,11 +1175,10 @@ dotnet run --project src/SephPlanner.DataTool -- --measure
 
 ## 아티팩트 가치
 
-점수는 오랫동안 아티팩트를 **"켜져 있으면 1점, 레벨 하나에 1점"**으로 세고 레어도 배수
-(`Worth.OfRarity`, 1.0~1.7)로만 우열을 갈랐다. 그래서 전투 효과가 센 아티팩트와 밋밋한
-아티팩트가 똑같이 `+2`로 나왔다. 레어도는 근거 없는 대리값이었다.
+아티팩트 사이의 우열을 레어도 배수(`Worth.OfRarity`, 1.0~1.7)로만 가르면 전투 효과가 센 아티팩트와 밋밋한
+아티팩트가 똑같이 `+2`로 나온다. 레어도는 근거 없는 대리값이다(아래 "레어도는 대리값으로서 나빴다").
 
-**콤보 가중치를 재는 데 쓴 다리가 여기에도 그대로 놓였다.** `Charm_StatusInstance.stats[]`가
+**콤보 가중치를 재는 데 쓴 다리가 여기에도 그대로 놓인다.** `Charm_StatusInstance.stats[]`가
 `{ statusID, valuesByLevel[] }`이므로, 능력치별 "레벨 하나당 얼마"(`StatExchange`)를 구해 두면
 아티팩트가 레벨마다 주는 것을 레벨 단위로 옮길 수 있다.
 
@@ -1225,10 +1207,10 @@ StatWorthByLevel`에 실어 둔다. 콤보 가중치와 같은 환산율을 쓰�
 레어도 사이의 차이보다 훨씬 크다 — 전체 범위가 상한 기준 `-1.55 ~ 20.00`인데 레어도 배수가
 설명하는 폭은 1.0~1.45 뿐이다. 일반인 압박 밴드가 웬만한 전설보다 높게 측정된다.
 
-### 잡힌 결함
+### 레벨이 오르면 나빠지는 아티팩트
 
 레벨을 올릴수록 **나빠지는** 아티팩트가 있다(도마뱀 판금 갑옷: 상한 4에서 `2.76 → -1.55`).
-예전 모델은 값이 레벨에 대해 언제나 증가한다고만 알아서 이런 아티팩트를 좋은 칸에 앉혔다.
+값이 레벨에 대해 언제나 증가한다고 보면 이런 아티팩트를 좋은 칸에 앉힌다.
 고정 테스트 `CharmWorthTests.ACharmThatGetsWorseWithLevelsGivesUpTheHighCell`이 그 경우다.
 
 ### 잰 값과 어림값
@@ -1250,7 +1232,7 @@ StatWorthByLevel`에 실어 둔다. 콤보 가중치와 같은 환산율을 쓰�
 전부 그런 능력치에서 얻는다.
 
 **값을 버리지는 않는다.** 그런 아티팩트에서도 레벨 0의 값어치는 실제 비율로 나오고, 레벨당
-값어치는 1.0으로 떨어질 뿐이라 예전 모델과 같아진다 — 나빠지지 않는다. 다만 그 사실을
+값어치는 1.0으로 떨어질 뿐이라 "레벨 하나에 1점" 으로 세는 것과 같아진다 — 나빠지지 않는다. 다만 그 사실을
 `StatWorthConfidence`(0~1)로 남기고 `--values`가 찍는다.
 
 ### 가격은 레어도와 같은 말이었다
@@ -1297,14 +1279,15 @@ StatWorthByLevel`에 실어 둔다. 콤보 가중치와 같은 환산율을 쓰�
 
 레벨만 세면 안 된다. 게임에서 레벨 0인 아티팩트는 멀쩡히 작동하고 레벨은 효과의 세기를 더할
 뿐이기 때문이다. 레벨만 세면 **꺼지는 칸(레벨 음수)과 레벨 0 칸이 똑같이 0점**이 되어, 아티팩트를
-꺼진 채로 두고도 최적이라고 말하게 된다. 실제로 그런 화면이 나온 적이 있다. 그래서 값어치에는
-언제나 레벨과 무관한 몫(`Base`)이 있다.
+꺼진 채로 두고도 최적이라고 말하게 된다. 그래서 값어치에는 언제나 레벨과 무관한 몫(`Base`)이 있다.
 
 아티팩트 사이의 우열은 근거가 좋은 것부터 쓴다 — 손으로 채운 값, 게임에서 잰 값, 마지막이
 레어도다. 사용자가 `F2` 빌드 창에서 강화 우선을 지정하면 그 위에 단계별 배수(2/4/10배)가
-곱해진다. 카테고리(콤보)
-가치는 일반 후보 추천에서 따로 계산하고, 열쇠·종이·침처럼 배치가 카테고리를 바꾸는
+곱해진다. 카테고리(콤보) 가치는 일반 후보 추천에서 따로 계산하고, 열쇠·종이·침처럼 배치가 카테고리를 바꾸는
 효과에는 배치 평가에도 반영한다. F2의 열쇠·종이 콤보 지정은 점수 배수와 별도의 우선순위다.
+
+빔 탐색의 `EstimateModel`도 아티팩트별 가치와 강화 우선을 사용한다. 최종 배치와 모든
+상호작용을 미리 아는 것은 아니므로 후보를 좁히는 근사이며, 남은 후보를 뒤에서 다시 평가한다.
 
 ### 치명타는 100% 에서 끊긴다 (1.0.33)
 
@@ -1320,12 +1303,9 @@ StatWorthByLevel`에 실어 둔다. 콤보 가중치와 같은 환산율을 쓰�
 정밀 콤보의 치명타는 단계마다 **더해진다**. 같은 사람의 두 제보에서 정밀 6개와 10개의 바탕 차가 정확히 10%
 (+10% 한 단계)였다(`27f25bbc`·`698b2f07`, 아티팩트 몫을 뺀 바탕 3,800 / 4,800 → 둘 다 콤보를 빼면 2,000).
 
-빔 탐색의 `EstimateModel`도 아티팩트별 가치와 강화 우선을 사용한다. 최종 배치와 모든
-상호작용을 미리 아는 것은 아니므로 후보를 좁히는 근사이며, 남은 후보를 뒤에서 다시 평가한다.
-
 ## 선택지 감지
 
-두 갈래로 나뉜다. 하나로 될 줄 알았는데 아니었다.
+두 갈래로 나뉜다. 인벤토리를 가진 것과 세피라이트다.
 
 ### 인벤토리를 가진 것
 
@@ -1337,19 +1317,18 @@ StatWorthByLevel`에 실어 둔다. 콤보 가중치와 같은 환산율을 쓰�
 있다는 뜻은 아니다. 그래서 인벤토리마다 "지금 화면에 보이는가"를 따로 판정한다.
 
 - **상자**는 `ItemChest.isOpened`(SyncVar)가 참일 때만. 내용물이 스폰 때부터 동기화되어 있어
-  그대로 읽으면 열기 전에 안이 보인다 — 실제로 열기 전 보상이 추천에 떴다는 제보로 드러났다.
+  그대로 읽으면 열기 전에 안이 보인다.
 - **상점**은 `UI_ShopPanel`이 열려 있고 그 창의 `Shop`(공개 속성)이 가리키는 인벤토리일 때만.
-  전에는 "상점은 진열이 곧 공개"라고 보고 거리만 봤는데 **그 전제가 틀렸다.** 상점 재고는
-  상인의 `CurrentSelling` 인벤토리에 있고 세상에 진열되는 것이 아니라 창 안에서만 그려진다
-  (`Safe.Trade` → `UI_ShopPanel.Open(..., NetworkconnectedMerchant.CurrentSelling, ...)`).
-  가까이 가기만 해도 재고가 떴다는 제보로 드러났고, 열기 전 상자와 같은 문제다.
+  상점 재고는 상인의 `CurrentSelling` 인벤토리에 있고 세상에 진열되는 것이 아니라 창 안에서만 그려진다
+  (`Safe.Trade` → `UI_ShopPanel.Open(..., NetworkconnectedMerchant.CurrentSelling, ...)`). 거리만 보면 가까이
+  가기만 해도 재고가 뜬다. 열기 전 상자와 같은 문제다.
 - **상점의 사파이어 보충 칸은 인벤토리가 아니다**(2026-09-13). 재고와 나란히 그려지지만 다른
   자리에 있다 — `UI_ShopPanel.DoReplenishment`가 사파이어
   (`PlayerLocalDataStorage.GetSapphire`·`sapphireUseInRun`, 런 안의 소지금이 아니라 계정 쪽
   저장소)를 받고 상인의 `UnitAI_NewBasic.replenishments`에 `{ entityID, purchased }`를 채운 뒤
   자기 아이콘 구역에 그린다. **`CurrentSelling`은 건드리지 않는다** — IL 에 그 인벤토리를 만지는
   호출이 없다. 값은 `replenishmentTryCount`의 거듭제곱이라 누를수록 오른다.
-  그래서 `GridInventory`만 훑던 동안에는 보충한 물건이 통째로 후보에서 빠졌다.
+  그래서 `GridInventory`만 훑으면 보충한 물건이 통째로 후보에서 빠진다.
   창의 `ShopCharacter`는 아바타라 보충 목록으로 바로 이어지지 않으므로, 창이 보여 주는
   `Shop` 인벤토리와 `CurrentSelling`이 같은 상인을 등록부에서 찾아 잇는다.
   물건 값은 상점 재고와 같다 — 게임의 `UnitAvatar.BuyReplenishmentFromShop`도 같은
@@ -1372,33 +1351,28 @@ StatWorthByLevel`에 실어 둔다. 콤보 가중치와 같은 환산율을 쓰�
 클라이언트에서 읽을 수 있다.
 
 `Sephirite.Type`에 `TABLET`, `TABLET_BOSS`, `CHARM`이 있는 데서 보이듯 이쪽이 석판의 주 경로다.
-`GridInventory`만 훑던 동안에는 석판 추천이 아예 되지 않았다.
+`GridInventory`만 훑으면 석판 추천이 아예 안 된다.
 
 세피라이트의 판정 기준은 하나다: **보상 창(`UI_SephiriteRewardPanel`)이 열려 있고, 그 창의
 `sephirite` 필드가 가리키는 세피라이트인가.** 모든 세피라이트가 같은 창으로 열리므로 이것이
-"플레이어가 지금 고르는 중"의 정확한 정의다.
+"플레이어가 지금 고르는 중"의 정확한 정의다. 이전 방에 열어 두고 온 세피라이트(생성됨·미획득)가 섞이는 문제도
+이 기준이 함께 막는다.
 
-`isGenerated`로 판정하려던 시도는 두 번 틀렸다.
+`isGenerated`로는 판정하지 못한다.
 
 1. 레벨업 세피라이트는 레벨업 즉시 화면 밖 (-1000,-1000)에 스폰되어
    `LevelController.levelUpQueue`에 쌓이고, 내용이 창을 열기 전에 미리 생성될 수 있다
    (`GenerateItemsForReopen` - 코드에 호출자가 없어 프리팹 이벤트로 묶인 것으로 보인다).
-2. "창이 열려 있으면 큐 맨 앞" 조건으로 고쳤더니, **다른 세피라이트를 여는 순간에도 같은 창이
-   열리므로** 레벨업을 미뤄 둔 채 일반 세피라이트를 열면 레벨업 보상이 함께 새어 나왔다.
-   실제 제보: 창에는 5개가 보이는데 후보에는 리롤로도 안 나온 아이템이 섞여 있었다.
+2. "창이 열려 있으면 큐 맨 앞" 조건도 안 된다. **다른 세피라이트를 여는 순간에도 같은 창이
+   열리므로** 레벨업을 미뤄 둔 채 일반 세피라이트를 열면 레벨업 보상이 함께 새어 나온다.
+   제보에서는 창에 5개가 보이는데 후보에 리롤로도 안 나온 아이템이 섞여 있었다.
 
-이전 방에 열어 두고 온 세피라이트(생성됨·미획득)가 섞이는 문제도 이 기준이 함께 막는다.
+**세피라이트에는 거리를 쓰지 않는다.** 레벨업 세피라이트는 좌표가 플레이어와 같은 기준이 아니어서, 바로 앞에
+있는데도 거리가 1800이 넘게 나온다. 그래서 거리로 거르면 언제나 걸러진다. 창이 보여 주는 세피라이트인지가 더
+정확한 신호다. 비활성 오브젝트도 함께 찾는다. 여는 동안 본체가 꺼져 있을 수 있다.
 
-**세피라이트에는 거리를 쓰지 않는다.** 좌표가 플레이어와 같은 기준이 아니어서, 바로 앞에 있는데도
-거리가 1800이 넘게 나온다. 그래서 거리로 거르면 언제나 걸러진다. 애초에 거리는 "지금 닿을 수 있는가"의
-근사일 뿐이고, 세피라이트는 **`isGenerated`가 참이라는 것 자체가 "플레이어가 열어서 지금 고르는 중"**
-이라는 더 정확한 신호다. 비활성 오브젝트도 함께 찾는다. 여는 동안 본체가 꺼져 있을 수 있다.
-
-이 문제는 플러그인이 스스로 남기는 로그로 잡았다. 상태가 바뀔 때만 한 줄씩 남는다.
-
-```
-세피라이트 [NORMAL d=1818.5 gen=True acq=False n=5 active=True] -> 후보 0개
-```
+플러그인 로그가 상태가 바뀔 때 세피라이트마다 `d=`(거리)·`gen=`·`acq=`·`n=`(보이는 것만)·`active=`·`own=`·`shown=` 을
+한 줄로 남긴다(`OfferReader`).
 
 **멀티에서는 세피라이트가 플레이어마다 하나씩 같은 자리에 겹쳐 스폰된다.**
 `SephiriteSpawner.OnStartServer`가 접속마다 `TrySpawnForConnection`으로 하나씩 소환하고
@@ -1418,12 +1392,9 @@ selectionSeedOffset)`으로 내용을 정한다. **고르기 전에 무엇이 �
 
 ## 특수 경로로 얻은 아이템
 
-기적 보상으로 얻은 아이템이 화면에서 인식되지 않는다는 보고가 있었다. 실제 덤프로 확인한
-결과 **재현되지 않았다.**
-
-덤프에는 이름 키가 `Item_`이 아니라 `Skill_`로 시작하고(`Skill_0006`, `Skill_0020`) `activeType`이
-`Locked`인, 일반 아이템 풀과 다른 경로로 들어온 아티팩트가 있었다. 이들은 전 구간에서 제대로
-다뤄진다.
+기적 보상처럼 일반 아이템 풀과 다른 경로로 들어온 아티팩트는 이름 키가 `Item_`이 아니라 `Skill_`로 시작하고
+(`Skill_0006`, `Skill_0020`) `activeType`이 `Locked`일 수 있다. 이들도 전 구간에서 제대로 다뤄진다("화면에서
+인식되지 않는다" 는 보고는 덤프로 재현되지 않았다).
 
 - `inventoryMatrix`에 `Charm_Basic`을 단 인스턴스로 그대로 들어 있다. `GameReader`는 석판만
   걸러내므로 스냅샷에 담긴다.
@@ -1455,17 +1426,15 @@ selectionSeedOffset)`으로 내용을 정한다. **고르기 전에 무엇이 �
 
   에셋(`resources.assets` 의 카테고리 22개, `sharedassets0.assets` 의 콤보 프리팹)을 직접 읽어
   확인했다. 13개 카테고리의 `setStatus` 가 2~6 단계로 남아 있고, 그중 `addStatByCombo` 와 특수
-  단계에 없는 것 - 12개 콤보의 3·5, 신비의 3·5·6 - 이 효과 없는 단계였다. 그 단계에도 문턱
-  가치(2.18레벨)가 붙어, 2→3·4→5 한 걸음을 "완성"으로 쳐서 다가가기(0.27)보다 1.9레벨 크게 봤다.
-  빌드 창의 진행도 게임 패널과 달랐다(게임 2/4, 우리 2/3). 보관 제보 28건 중 5건의 점수가 달라지고
-  그중 1건(`ca26eeb4`)은 배치가 바뀌었다. 콤보 가치 눈금(`ComboWorthMeasure`)은 `addStatByCombo`
-  만 쟀으므로 오염되지 않았다. 카탈로그 형식 26 부터 `setStatus` 를 단계에 넣지 않는다.
-  **게임에서 새로 지은 카탈로그로는 아직 확인하지 않았다.** 신비 프리팹 값(2 에 1칸, 4 에 2칸,
+  단계에 없는 것 - 12개 콤보의 3·5, 신비의 3·5·6 - 이 효과 없는 단계다. 그 단계를 넣으면 문턱 가치가 붙어
+  2→3·4→5 한 걸음을 "완성"으로 치고, 빌드 창의 진행도 게임 패널과 달라진다(게임 2/4, 우리 2/3). 제보
+  `ca26eeb4` 는 그 때문에 배치가 바뀌었다. 그래서 카탈로그 형식 26 부터 `setStatus` 를 단계에 넣지 않는다. 콤보
+  가치 눈금(`ComboWorthMeasure`)은 `addStatByCombo` 만 재므로 영향이 없다. 신비 프리팹 값(2 에 1칸, 4 에 2칸,
   석판 12002)도 이 에셋에서 확인됐다.
 - 개수 판정은 `GridInventory.SearchSetEffectInInventory`(서버). **배치 위치·레벨·활성 여부와
   무관하게 격자에 있는 아티팩트 전체로 카테고리를 센다.** 그래서 평범한 아티팩트는 자리를 옮겨도
   콤보 수가 그대로다. 자리에 따라 카테고리가 바뀌는 열쇠·종이·침만 예외다(위 "이웃 의존 아티팩트").
-- 자리가 카테고리를 정하는 셋은 꺼질 때도 카테고리를 그대로 두고 능력치만 거둔다. 켈세더니 열쇠는
+- 자리가 카테고리를 정하는 셋은 꺼질 때도 카테고리를 그대로 두고 능력치만 거둔다. 캘세더니 열쇠는
   `OnDisabledEffect` → `SearchCategory(idx, false)` 로 행의 것을, 하얀 종이(`Charm_WhitePaper`)와 침
   (`Charm_UpCharmDamage`)은 `OnDisabledEffect` 가 활성을 묻지 않는 `SearchCategory()` 로 이웃의 것을 다시 담는다.
   그래서 꺼진 채로도 콤보에 든다(1.0.33). 1.1.0 의 나침반은 꺼지면 카테고리가 없다.
@@ -1474,20 +1443,21 @@ selectionSeedOffset)`으로 내용을 정한다. **고르기 전에 무엇이 �
   계산에 섞여 있어, **우리가 다시 세지 않고 이 값을 스냅샷(`ComboCounts`)에 그대로 싣는다.**
 - 1.1.0 의 개수에는 `bonusComboCount`(물약 `PotionEffect_RandomCombo` 가 무작위 카테고리에 더함)도 들어간다. 게임
   수를 싣고 자리 몫만 빼므로 그대로 맞는다.
-- 콤보 능력치 둘. 1.0.33 에도 글자 그대로 있다(`GridInventory.ApplyUnlimitedCombo`, `SearchSetEffectInInventory`, 두 판
-  디컴파일 대조 2026-11-02) - 1.1.0 에서 생긴 것이 아니다. `UNLIMITEDCOMBO` 는 콤보마다 최고 단계(`GetHighestComboCount`)를 넘긴 개수 하나당 그 값을
-  `AllDamageBonus` 에 더하고(`ApplyUnlimitedCombo`), `COMBOBONUSDAMAGE` 는 한 단계라도 발동한 콤보 하나당 그 값을
-  `FINAL_DAMAGE` 로 준다. 둘 다 같은 전체 피해 점수라 스냅샷이 플레이어 값을 싣고(`ComboStatBonus`), 콤보 한 걸음
-  (`PlacementProblem.ComboStep`)이 첫 단계를 채울 때와 최고 단계를 넘길 때 `DamageBonus` 로 옮겨 더한다. 먹구름의
-  큰 구름 단계는 우리 단계 목록에 없어 그 콤보의 최고 단계를 낮게 본다.
+- 콤보 능력치 둘. 1.0.33 에도 글자 그대로 있다(`GridInventory.ApplyUnlimitedCombo`, `SearchSetEffectInInventory`,
+  두 판 디컴파일 대조 2026-11-02) - 1.1.0 에서 생긴 것이 아니다.
+  - `UNLIMITEDCOMBO` 는 콤보마다 최고 단계(`GetHighestComboCount`)를 넘긴 개수 하나당 그 값을 `AllDamageBonus` 에
+    더한다(`ApplyUnlimitedCombo`).
+  - `COMBOBONUSDAMAGE` 는 한 단계라도 발동한 콤보 하나당 그 값을 `FINAL_DAMAGE` 로 준다.
+  - 둘 다 같은 전체 피해 점수라 스냅샷이 플레이어 값을 싣고(`ComboStatBonus`), 콤보 한 걸음
+    (`PlacementProblem.ComboStep`)이 첫 단계를 채울 때와 최고 단계를 넘길 때 `DamageBonus` 로 옮겨 더한다. 먹구름의
+    큰 구름 단계는 우리 단계 목록에 없어 그 콤보의 최고 단계를 낮게 본다.
 
 추천 반영은 `OfferAdvisor`가 한다. 후보 아티팩트의 카테고리마다 "하나 더 모으면" 임계값에
 닿는지 보고, 닿으면 레벨 2에 해당하는 보너스, 다가가기만 하면 소액을 줄 세우기에 더한다.
 배치 점수(증가분)와는 섞지 않고 별도 열("잉걸불 7/8")로 보여준다. 가중치는 위 "콤보 가중치"
-절에서 실측한 `Worth.ComboThreshold`와 `ComboProgress`다. 앞의 것은 잰 값이지만
-뒤의 것은 아니다 — 못 채운 콤보의 값어치는 그 판에서 결국 채우게 되느냐에 달려 있어 정적
-데이터로는 답이 안 나오므로, 비율(1/8)만 예전 그대로 두고 크기만 함께 옮겼다. 추천이 콤보 쪽으로
-이상하게 기울면 그 비율부터 의심한다.
+절의 `Worth.ComboThreshold`와 `ComboProgress`다. 앞의 것은 잰 값이지만 뒤의 것은 아니다 — 못 채운 콤보의 값어치는
+그 판에서 결국 채우게 되느냐에 달려 있어 정적 데이터로는 답이 안 나온다. 그래서 앞의 것에 대한 비율(1/8,
+`WorthScale.ProgressRatio`)로 둔다. 추천이 콤보 쪽으로 이상하게 기울면 그 비율부터 의심한다.
 
 ## 무기 연동 아티팩트
 
@@ -1529,6 +1499,11 @@ public 이다.**
   풀링 부모는 `None/HUD/DynamicHUD/World/AltWorld/GroundWorld` 여섯이다.
 - **게임이 UI 를 감출 때 함께 감춰진다.** `UIManager.Hide()`가 하는 일이 `uiRoots` 각각의
   CanvasGroup 알파를 0 으로 만드는 것이라, 밑에 달려 있으면 딸려간다. 흉내 낼 필요가 없다.
+- **입력을 뺏지 않는 것도 구조가 보장한다.** 컨트롤 스택에는 `UIBase`를 단 것만 `AddControl`로
+  들어가고(`UIManager.Awake`가 Awake 시점의 UIRoot 자식만 훑는다), ESC 처리도 그 스택을 탄다.
+  `UIBase`를 상속하지 않고 그리는 것마다 `raycastTarget`을 끄면 키보드도 마우스도 통과한다.
+- **글꼴은 게임에서 빌린다.** 씬의 `TMP_Text`에서 `font`와 `fontSharedMaterial`을 가져오면
+  외곽선·그림자까지 같아진다. 픽셀 글꼴이라 재질이 다르면 흐릿해져 한눈에 티가 난다.
 
 ### 창이 열리면 감춰지는 것이 아니라 덮인다
 
@@ -1542,7 +1517,7 @@ public 이다.**
 ```
 [UI] InteractableHUD  -2
 [UI] DynamicHUD       -2
-[UI] HUD               0     <- 우리가 달려 있던 곳
+[UI] HUD               0     <- 우리 화면의 부모
 [UI] Panels            2     <- UI_SephiriteRewardPanel, UI_CharacterStatusPanel, UI_ItemIcon
 [UI] System           10     <- 게임 자신의 툴팁·알림 (UI_HUDLogViewer, UI_NewItemPicker 등)
 ```
@@ -1555,23 +1530,19 @@ public 이다.**
 이 진단을 뜨는 것은 `UiDiagnostics` 이고 인벤토리 덤프(F10)의 `[ui]` 절로 나온다. 화면이 안
 보이는 문제가 또 생기면 짐작하지 말고 창을 열어 둔 채 한 번 뜬다.
 
-**화면 내용이 비면 Player.log 부터 본다.** `Update` 안에서 난 예외는 유니티가
-`%USERPROFILE%\AppData\LocalLow\TEAMHORAY\Sephiria\Player.log` 에만 남기고 BepInEx
-LogOutput.log 는 조용하다. 실제로 씬 전환 뒤 죽은 격자 셀을 재사용하는 버그가 매 프레임
-NullReferenceException 을 3만 번 넘게 쌓는 동안(제목 줄만 나오고 격자·목록이 비는 증상)
-우리 로그에는 아무것도 없었다. 지금은 그리기 예외를 잡아 같은 것 한 번씩 우리 로그에도 남긴다.
-- **입력을 뺏지 않는 것도 구조가 보장한다.** 컨트롤 스택에는 `UIBase`를 단 것만 `AddControl`로
-  들어가고(`UIManager.Awake`가 Awake 시점의 UIRoot 자식만 훑는다), ESC 처리도 그 스택을 탄다.
-  `UIBase`를 상속하지 않고 그리는 것마다 `raycastTarget`을 끄면 키보드도 마우스도 통과한다.
-- **글꼴은 게임에서 빌린다.** 씬의 `TMP_Text`에서 `font`와 `fontSharedMaterial`을 가져오면
-  외곽선·그림자까지 같아진다. 픽셀 글꼴이라 재질이 다르면 흐릿해져 한눈에 티가 난다.
+### 화면 내용이 비면 Player.log 부터 본다
+
+`Update` 안에서 난 예외는 유니티가 `%USERPROFILE%\AppData\LocalLow\TEAMHORAY\Sephiria\Player.log` 에만 남기고
+BepInEx LogOutput.log 는 조용하다. 씬 전환 뒤 죽은 격자 셀을 재사용하는 버그가 매 프레임 NullReferenceException 을
+3만 번 넘게 쌓는 동안(제목 줄만 나오고 격자·목록이 비는 증상) 우리 로그에는 아무것도 없었다. 지금은 그리기 예외를
+잡아 같은 것 한 번씩 우리 로그에도 남긴다.
 
 ### 크기를 잴 때 우리 글자를 세면 안 된다
 
 기준 크기는 HUD 글자 크기의 **중앙값**인데, 우리 화면도 그 HUD 아래에 있고 우리 글자는 전부
 기준 크기의 배수(0.65~1.2배)다. 그대로 다시 재면 중앙값이 우리 쪽으로 끌려 내려가고, 그 값으로
-또 만들면 다음 번엔 더 내려간다. **화면을 다시 지을 때마다 조금씩 작아졌다** - 폭을 바꾸면 다시
-짓기 때문에 폭을 몇 번 바꾸는 것만으로 눈에 띄게 줄었다.
+또 만들면 다음 번엔 더 내려간다. 그러면 **화면을 다시 지을 때마다 조금씩 작아진다** - 폭을 바꾸면 다시
+짓기 때문에 폭을 몇 번 바꾸는 것만으로 눈에 띄게 준다.
 
 우리가 만든 것에 표시(`SephPlannerWidget`)를 달고 잴 때 걸러 낸다. 화면을 새로 짓는 순간에는
 지우던 옛 화면이 아직 살아 있어(Destroy 가 프레임 끝에 돈다) 그것까지 함께 세어지므로, 이름이
@@ -1593,7 +1564,7 @@ HUD 캔버스는 픽셀 아트라 크게 확대돼 있다. **화면 픽셀을 �
 되는데, 높이 계산은 이 값에 따라 글꼴 배율을 0.1 또는 1 로 쓴다. 그래서 공통 `Widgets.Label` 이
 `isOrthographic = true` 를 미리 세운다.
 
-### 판때기는 빌리지 않는다
+### 창틀 스프라이트는 빌리지 않는다
 
 어느 스프라이트가 "창틀"인지 게임 데이터만으로는 가릴 방법이 없다. UIRoot 자식 중 9-slice(`sprite.border != 0`)
 `Image` 가운데 제일 큰 것을 고르면 전체 화면짜리 초록 선택 테두리를 물어 온다.
@@ -1604,12 +1575,8 @@ HUD 캔버스는 픽셀 아트라 크게 확대돼 있다. **화면 픽셀을 �
 ### 게임이 Galmuri 를 쓴다
 
 `resources.assets`와 `sharedassets0.assets` 양쪽에서 문자열을 확인했다. HUD는 게임이 로드한
-Galmuri 글꼴을 그대로 참조하므로 폰트 파일을 포함하거나 재배포하지 않는다.
-
-### 에셋 방침과의 관계
-
-씬에 이미 떠 있는 것을 런타임에 참조할 뿐 추출하지도 배포물에 넣지도 않으므로 `docs/LEGAL.md`
-의 "게임 저작물 미배포"를 그대로 지킨다.
+Galmuri 글꼴을 그대로 참조하므로 폰트 파일을 포함하거나 재배포하지 않는다. 씬에 이미 떠 있는 것을 런타임에 참조할
+뿐 추출하지도 배포물에 넣지도 않으므로 `docs/LEGAL.md` 의 "게임 저작물 미배포"를 그대로 지킨다.
 
 ### 게임 단축키
 
@@ -1671,10 +1638,9 @@ KeyCode 는 쓰지 않는다. BepInEx 의 `UnityInput` 은 구식과 새 입력 
 `Selectable` 이라, 스틱으로 옮기고 A 로 누르는 것이 게임의 다른 창과 똑같다. 닫기는 B(취소)다.
 UI의 `Cancel`은 `*/{Cancel}`에 묶이고, `GamepadState`의 `buttonEast`가 그 용도다.
 `UIInputModule.Update`는 이 액션으로 `CloseFromEsc`를 호출한다. start는 `CloseControl`이라
-스택이 없을 때 일시정지 창을 여는 입력이며, 떠 있는 창을 닫는 입력이 아니다. `defaultSelectable`
-에 초점을 줄 곳을 넣어 두는 것까지 이미 있었다. 그래서 패드 지원에서 실제로 없던 것은 **여는
-길** 하나였다. 아직 마우스가 있어야 하는 자리는 셋이다 - 이동 모드(커서 따라가기), 빌드 창의
-우클릭(★·▽·목표 레벨 내리기), HUD 툴팁 호버.
+스택이 없을 때 일시정지 창을 여는 입력이며, 떠 있는 창을 닫는 입력이 아니다. 초점은 `defaultSelectable` 에
+넣어 둔다. 패드에서 따로 만든 것은 위의 여는 길(`View`) 하나다. 아직 마우스가 있어야 하는 자리는 셋이다 - 이동
+모드(커서 따라가기), 빌드 창의 우클릭(★·▽·목표 레벨 내리기), HUD 툴팁 호버.
 
 ### 기본값을 옮겨도 설정 파일이 이긴다
 
@@ -1684,21 +1650,14 @@ UI의 `Cancel`은 `*/{Cancel}`에 묶이고, `GamepadState`의 `buttonEast`가 �
 
 ### 마우스는 새 InputSystem 으로만 읽힌다
 
-1.0.x 에서는 키보드가 구식 `Input` 으로 읽혔다 - BepInEx 단축키가 그 길이었고 F9/F10 이 잘 먹었다. **1.1.1 은 구식을
-아예 꺼 두어** 부르면 `InvalidOperationException` 이 나므로, 지금 단축키는 판에 상관없이 새 입력 시스템으로 읽는다
-(`Host/Shortcut.cs` 의 `KeyInput`, 위 "공식 모드 API"). **그런데 마우스는 죽어 있다.** 게임이 `<Mouse>/position`·`leftButton`·`scroll` 을 새 InputSystem 으로
-바인딩하고 있어서, `Input.mousePosition` 은 커서가 한자리에 멈춰 있는 것처럼 돌려준다.
-이동 모드가 "자리를 저장했다"고만 하고 화면이 따라오지 않던 원인이 이것이었다.
+**1.1.1 은 구식 `Input` 을 아예 꺼 두어** 부르면 `InvalidOperationException` 이 난다. 그래서 단축키는 판에 상관없이
+새 입력 시스템으로 읽는다(`Host/Shortcut.cs` 의 `KeyInput`, 위 "공식 모드 API").
 
-`UnityEngine.InputSystem.Mouse.current.position.ReadValue()` 를 쓰고 구식은 폴백으로 남긴다.
-이동 중에는 커서 좌표를 화면에 그대로 띄워, 같은 증상이 다시 나면 커서를 못 읽는 것인지
+**마우스는 1.0.x 에서도 구식으로 읽히지 않는다.** 게임이 `<Mouse>/position`·`leftButton`·`scroll` 을 새 InputSystem 으로
+바인딩하고 있어서, `Input.mousePosition` 은 커서가 한자리에 멈춰 있는 것처럼 돌려준다. 그러면 이동 모드가 "자리를
+저장했다"고만 하고 화면이 따라오지 않는다. 그래서 `UnityEngine.InputSystem.Mouse.current.position.ReadValue()` 를 쓰고
+구식은 폴백으로 남긴다. 이동 중에는 커서 좌표를 화면에 그대로 띄워, 같은 증상이 다시 나면 커서를 못 읽는 것인지
 자리가 안 먹는 것인지 로그 없이 갈린다.
-
-### 설정은 우리 창에 담는다
-
-설정과 빌드 지정은 우리가 직접 그리는 창(`SettingsWindow`, F2 빌드 창)에 있고 이 창들은 입력을 받는다. 이유는
-[개발 문서](DEVELOPMENT.md)의 "창은 입력을 받는다". 누를 수 있는 것을 만드는 손은 `Widgets.Clickable` 하나뿐이고,
-거기서만 `raycastTarget` 이 켜진다.
 
 ### 게임의 컨트롤 스택에 올린다
 
@@ -1751,7 +1710,9 @@ public 이라 상속만으로 된다. 컴포넌트는 **오브젝트를 꺼 둔 
 
 `raycastTarget`을 끄면 마우스가 통과하는 대신 버튼도 못 만든다. 입력을 하나도 가져가지 않는 것이 게임을 방해하지
 않는다는 보장의 근거이므로, 플레이 중 HUD 에는 버튼을 넣지 않고 단축키(BepInEx 설정의 `NativePanel` 절)와 커서
-위치 판정(툴팁)만 쓴다. 누르거나 입력해야 하는 기능은 F2·F3 창으로 나눴다.
+위치 판정(툴팁)만 쓴다. 누르거나 입력해야 하는 기능은 F2·F3 창(`SettingsWindow`, 빌드 창)으로 나눴고, 이 창들은
+입력을 받는다(이유는 [개발 문서](DEVELOPMENT.md)의 "창은 입력을 받는다"). 누를 수 있는 것을 만드는 손은
+`Widgets.Clickable` 하나뿐이고, 거기서만 `raycastTarget` 이 켜진다.
 
 ## 프리셋 코드 (커스텀 로드아웃 공유)
 
