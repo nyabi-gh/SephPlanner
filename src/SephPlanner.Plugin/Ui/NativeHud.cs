@@ -376,6 +376,7 @@ namespace SephPlanner.Plugin.Ui
             _nextMove.text = "";
             _waiting.text = message;
             Widgets.FitHeight(_waiting, _waitingSize, _compactInner);
+            Widgets.SetActive(_gain, false);
             Widgets.SetActive(_hint, false);
             Widgets.SetActive(_nextMove, false);
             Widgets.SetActive(_waiting, message.Length > 0);
@@ -478,6 +479,7 @@ namespace SephPlanner.Plugin.Ui
 
             Widgets.FitHeight(_score, _scoreSize, inner);
             Widgets.FitHeight(_gain, _gainSize, inner);
+            Widgets.SetActive(_gain, true);
             var warning = Warning(
                 snapshot, plan, frame.MultiplayerAutoPlace, frame.QueryVerified,
                 frame.RuntimeVerification, frame.RuntimeVerificationReason, frame.UnexplainedFixedCells, frame.Stale);
