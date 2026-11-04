@@ -96,6 +96,8 @@ dotnet build src/SephPlanner.Workshop -c Release -p:PackWorkshop=true -p:DeployT
 고르고 "창작마당에 올리기" 를 누르면 올라가고 DLL 이 들었으므로 검수에 저절로 접수된다. 그 뒤 게임이
 `WorkshopLocal/sephplanner/` 에 만드는 `uploadticket.json` 이 창작마당 글 번호를 들고 있다 - 지우면 다음에 올릴 때 새 글이
 생긴다(위 배치 명령은 이 파일을 지우지 않는다). 처음에는 "목록에 없음" 으로 올라가므로 직접 구독해 돌려 본 뒤 공개로 바꾼다.
+**올릴 때마다 게임이 글의 제목·설명·태그를 `metadata.json` 으로 다시 쓴다** - Steam 글 페이지에서 고친 설명은 다음에 올리면
+사라진다(설명은 `info.description` 의 `default` → `en-US` 하나만 들어간다). 공개 여부는 갱신해도 그대로다.
 게임은 미리보기 한 장만 올린다(`SetItemPreview`). 스크린샷 같은 추가 이미지는 Steam 글 페이지에서 넣는다. 창작마당 창은
 열 때와 게임 창으로 돌아올 때 `WorkshopLocal` 을 다시 읽고 올릴 파일은 누르는 순간 읽으므로, 다시 지은 뒤 게임을 껐다 켤
 필요는 없다.

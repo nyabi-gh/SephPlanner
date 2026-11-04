@@ -407,6 +407,11 @@ BepInEx 가 깔린 채로는 `Player.log` 에 `[ModEnvironment] 동봉 Harmony 2
 - DLL 이 든 모드는 게임의 "창작마당에 올리기" 로 올려야 검수에 접수된다. 접수·승인 상태여야 남의 게임에서 돌고, DLL 을
   바꾸면 다시 접수된다. 실행 중 DLL 목록이 바뀌면 "인가받지 않은 dll" 로 로드가 막힌다. 압축 20MB 이하이고, 모드 폴더의
   `uploadticket.json` 이 창작마당 글 번호를 들고 있으므로 지우지 않는다.
+- **올릴 때마다 글의 제목·설명·태그를 `metadata.json` 으로 다시 쓴다**(`WorkshopUploader.ConfigureUpdate`, 같은 1.1.1 어셈블리,
+  2026-11-04). 새 글이든 갱신이든 `SetItemTitle`·`SetItemDescription`·`SetItemTags` 를 부른다. 설명은 `info.description` 이
+  언어별이면 `default` → `en-US` → 첫 항목 하나만 쓴다(`WorkshopLocalizedText`). 설명·태그가 비어 있으면 그것만 건드리지 않는다.
+  `SetItemUpdateLanguage` 는 부르지 않아 글에는 한 언어만 들어간다. 목록에 없음(`Unlisted`)은 새 글일 때만 걸므로 공개한 글은
+  갱신해도 공개로 남는다. 변경 사항(change note)은 `v` + `mod.version` 이다.
 
 **기본 브랜치 macOS 빌드(2026-11-02, `Application.version` 1.0.33, 어셈블리 SHA-256 `3e4624af…`)에도 모드 로더가 있다.**
 `AddOnLoader` 가 `<게임 폴더>/AddOns/*/` 의 DLL 에서 `HorayModBase` 를 싣고(가이드는 이것을 구버전 기능이라 부른다),
