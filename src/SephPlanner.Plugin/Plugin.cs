@@ -424,9 +424,17 @@ namespace SephPlanner.Plugin
                 Directory.CreateDirectory(directory);
                 var original = Path.Combine(directory, CatalogBundleStore.NewGeneration() + ".replay");
                 PlanReplayFile.Write(original, Newtonsoft.Json.JsonConvert.SerializeObject(replay, Newtonsoft.Json.Formatting.Indented));
-                replay.LatestError = _diagnosticLog.Redact(replay.LatestError);
                 var path = Path.Combine(capture.DirectoryPath, "plan.replay");
-                PlanReplayFile.Write(path, Newtonsoft.Json.JsonConvert.SerializeObject(replay, Newtonsoft.Json.Formatting.Indented));
+
+                // 보내는 사본은 오류 문장만 가린다. 가릴 것이 없으면 원본과 같으므로 수 MB 를 메인 스레드에서 다시
+                // 직렬화하지 않는다.
+                var redacted = _diagnosticLog.Redact(replay.LatestError);
+                if (redacted == replay.LatestError) File.Copy(original, path);
+                else
+                {
+                    replay.LatestError = redacted;
+                    PlanReplayFile.Write(path, Newtonsoft.Json.JsonConvert.SerializeObject(replay, Newtonsoft.Json.Formatting.Indented));
+                }
                 return path;
             });
             return capture;
