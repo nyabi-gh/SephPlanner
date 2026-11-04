@@ -161,6 +161,16 @@ public class MoveOrderTests
         Assert.Contains("교환", Assert.Single(plan!.Moves).Detail);
     }
 
+    [Fact]
+    public void InstructionsCountCellsFromOneLikeTheCellNote()
+    {
+        var detail = Assert.Single(PlanBuilder.Build(Swap(storage: 6), Catalog())!.Moves).Detail;
+
+        Assert.Contains("1열 1행", detail);
+        Assert.Contains("3열 1행", detail);
+        Assert.DoesNotContain("(0,0)", detail);
+    }
+
     private const int SpinTablet = 101;
 
     [Fact]
@@ -200,7 +210,7 @@ public class MoveOrderTests
         Assert.NotNull(plan);
         var move = Assert.Single(plan!.Moves);
         Assert.Equal(move.From, move.To);
-        Assert.Contains("회전", move.Detail);
+        Assert.Matches(@"^2열 2행 회전 0° → (90|270)°$", move.Detail);
     }
 
     [Fact]

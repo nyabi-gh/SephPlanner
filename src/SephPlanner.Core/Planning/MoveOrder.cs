@@ -40,8 +40,8 @@ namespace SephPlanner.Core.Planning
                 if (from == item.To) continue;
                 occupied.TryGetValue(item.To, out var displaced);
                 moves.Add(new Move(item.Name, from, item.To, displaced != null
-                    ? Tr("{0} ↔ {1} 교환 ({2})", from, item.To, displaced.Name)
-                    : $"{from} → {item.To}"));
+                    ? Tr("{0} ↔ {1} 교환 ({2})", Cell(from), Cell(item.To), displaced.Name)
+                    : $"{Cell(from)} → {Cell(item.To)}"));
                 occupied.Remove(from);
                 if (displaced != null)
                 {
@@ -56,10 +56,18 @@ namespace SephPlanner.Core.Planning
             {
                 if (item.FromRotation != item.ToRotation)
                     moves.Add(new Move(item.Name, item.To, item.To,
-                        Tr("{0} 회전 {1} → {2}", item.To, item.FromRotation, item.ToRotation)));
+                        Tr("{0} 회전 {1} → {2}", Cell(item.To), Angle(item.FromRotation), Angle(item.ToRotation))));
             }
             complete = true;
             return moves;
         }
+
+        /// <summary>
+        /// 손으로 따라 옮기는 문장이라 칸 쪽지와 같은 1부터 센 열·행으로 적는다. <see cref="GridPos.ToString"/> 은 0부터라
+        /// 로그에만 쓴다.
+        /// </summary>
+        private static string Cell(GridPos position) => Tr("{0}열 {1}행", position.X + 1, position.Y + 1);
+
+        private static string Angle(int rotation) => rotation * 90 + "°";
     }
 }
