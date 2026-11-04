@@ -723,21 +723,26 @@ namespace SephPlanner.Plugin
         }
 
         /// <summary>빌드 창이 목록을 채울 재료. 창은 열려 있는 동안 시간이 멈추므로 그때 한 번 읽는다.</summary>
-        private BuildContext CurrentBuild() => new BuildContext
+        private BuildContext CurrentBuild()
         {
-            Catalog = _runner != null ? CatalogSource.Get() : null,
-            Snapshot = _lastSnapshot,
+            var state = _runner?.State;
+            return new BuildContext
+            {
+                Catalog = _runner != null ? CatalogSource.Get() : null,
+                Snapshot = _lastSnapshot,
 
-            // 최신 계획이 아니라 마지막으로 게시된 계획을 준다. 강화 우선을 누르면 그 지정이
-            // 계획 지문에 들어가 곧바로 다시 풀리는데, 그동안 "최신이 아니다"를 "계획이 없다"로
-            // 읽으면 가방에 있는 아티팩트가 목록에서 사라지고 지정해 둔 것만 "가방에 없음"으로
-            // 남는다. 누른 순간이 재계산과 겹치느냐에 따라 그랬다 말았다 한다.
-            //
-            // 이 창이 계획에서 읽는 것은 가방에 무엇이 있느냐인데, 지정을 바꾼다고 가방이
-            // 바뀌지는 않는다. 그래서 최신성을 요구할 이유가 없다.
-            Plan = _runner?.State?.Latest,
-            Recommendations = _settings.Recommendations.Value,
-        };
+                // 최신 계획이 아니라 마지막으로 게시된 계획을 준다. 강화 우선을 누르면 그 지정이
+                // 계획 지문에 들어가 곧바로 다시 풀리는데, 그동안 "최신이 아니다"를 "계획이 없다"로
+                // 읽으면 가방에 있는 아티팩트가 목록에서 사라지고 지정해 둔 것만 "가방에 없음"으로
+                // 남는다. 누른 순간이 재계산과 겹치느냐에 따라 그랬다 말았다 한다.
+                //
+                // 이 창이 계획에서 읽는 것은 가방에 무엇이 있느냐인데, 지정을 바꾼다고 가방이
+                // 바뀌지는 않는다. 그래서 최신성을 요구할 이유가 없다.
+                Plan = state?.Latest,
+                NoPlanReason = Blocked(state),
+                Recommendations = _settings.Recommendations.Value,
+            };
+        }
 
         /// <summary>
         /// 지금 설정으로 푼다. 후보 추천을 끄면 가리는 것이 아니라 계산 자체를 건너뛴다 -
@@ -815,36 +820,17 @@ namespace SephPlanner.Plugin
                 return;
             }
 
-            // 런 밖이나 죽은 뒤에는 보여 줄 배치가 없다. 직전 런의 점수를 남겨 두면 거짓말이 된다.
-            // "탐험"은 게임 자체가 쓰는 말이다.
-            if (_lastSnapshot?.Inventory == null)
-            {
-                _hud.RenderNotice(Tr("탐험 중이 아닙니다."));
-                return;
-            }
-
-            if (_panelAwaitingRefresh)
-            {
-                _hud.RenderNotice(Tr("최신 게임 상태를 읽는 중입니다."));
-                return;
-            }
-
             var state = _runner?.State;
-            var error = state?.Error;
-            if (error != null)
+            var blocked = Blocked(state);
+            if (blocked != null)
             {
-                _hud.RenderNotice(Tr("계산 실패 - {0}", error));
+                _hud.RenderNotice(blocked);
                 return;
             }
 
             // 다시 푸는 동안에도 직전 계획을 그대로 둔다. 낡은 계획을 적용할 걱정은 없다 -
             // AutoPlacePolicy 가 배치 지문이 어긋나면 이미 자동 배치를 거절한다.
-            var plan = state?.Latest;
-            if (plan == null)
-            {
-                _hud.RenderNotice(Waiting(state));
-                return;
-            }
+            var plan = state.Latest;
             var stale = !state.IsCurrent;
 
             // 조언은 배치 뒤에 붙는다. 그 사이에 조언 칸이 빈 것은 "없다" 가 아니라 "아직" 이다.
@@ -898,6 +884,19 @@ namespace SephPlanner.Plugin
                 Stale = stale,
                 AdviceBusy = adviceBusy,
             });
+        }
+
+        /// <summary>보여 줄 계획이 없는 까닭. 계획이 있으면 null 이다. 화면과 빌드 창이 같은 말을 쓴다.</summary>
+        private string Blocked(PlanRunState state)
+        {
+            // 런 밖이나 죽은 뒤에는 보여 줄 배치가 없다. 직전 런의 점수를 남겨 두면 거짓말이 된다.
+            // "탐험"은 게임 자체가 쓰는 말이다.
+            if (_lastSnapshot?.Inventory == null) return Tr("탐험 중이 아닙니다.");
+            if (_panelAwaitingRefresh) return Tr("최신 게임 상태를 읽는 중입니다.");
+
+            var error = state?.Error;
+            if (error != null) return Tr("계산 실패 - {0}", error);
+            return state?.Latest == null ? Waiting(state) : null;
         }
 
         /// <summary>

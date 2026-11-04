@@ -20,6 +20,10 @@ namespace SephPlanner.Plugin.Ui
         public ICatalog Catalog;
         public GameSnapshot Snapshot;
         public Plan Plan;
+
+        /// <summary><see cref="Plan"/> 이 없는 까닭. HUD 가 그때 띄우는 말과 같다.</summary>
+        public string NoPlanReason;
+
         public bool Recommendations;
     }
 
@@ -330,7 +334,7 @@ namespace SephPlanner.Plugin.Ui
 
             // 빈 목록은 아무 말도 하지 않는다. 왜 비었는지는 여기서만 알 수 있다.
             _note.text = _context.Plan == null
-                ? Tr("탐험 중이 아닙니다.")
+                ? _context.NoPlanReason ?? Tr("탐험 중이 아닙니다.")
                 : _tab == Tab.Combos
                     ? Tr("가방에 콤보가 걸린 아티팩트가 없습니다.")
                     : Tr("가방에 아티팩트가 없습니다.");
