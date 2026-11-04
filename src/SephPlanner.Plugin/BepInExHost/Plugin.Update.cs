@@ -39,7 +39,9 @@ namespace SephPlanner.Plugin
             if (_settings.UpdateCheck.Value) StartUpdateCheck();
         }
 
-        partial void PollUpdates() => Guarded(CheckUpdateProgress, "업데이트 진행");
+        private Action _checkUpdateProgress;
+
+        partial void PollUpdates() => Guarded(_checkUpdateProgress ??= CheckUpdateProgress, "업데이트 진행");
 
         partial void StopUpdates()
         {

@@ -55,10 +55,12 @@ namespace SephPlanner.Plugin
             _settings.ReviewAutomaticDiagnostics = OpenAutomaticDiagnosticConsent;
         }
 
+        private Action _checkDiagnosticUpload, _checkAutomaticDiagnostic;
+
         private void PollDiagnostics()
         {
-            Guarded(CheckDiagnosticUpload, "진단 전송 상태");
-            Guarded(CheckAutomaticDiagnostic, "자동 진단 처리");
+            Guarded(_checkDiagnosticUpload ??= CheckDiagnosticUpload, "진단 전송 상태");
+            Guarded(_checkAutomaticDiagnostic ??= CheckAutomaticDiagnostic, "자동 진단 처리");
         }
 
         private void StopDiagnostics()

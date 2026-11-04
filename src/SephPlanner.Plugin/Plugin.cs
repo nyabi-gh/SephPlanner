@@ -56,6 +56,10 @@ namespace SephPlanner.Plugin
         private string _lastPanelOrigin;
         private string _lastPanelBlocker;
         private readonly Dictionary<string, string> _lastErrors = new Dictionary<string, string>();
+
+        // Guarded 에 메서드를 그대로 넘기면 부를 때마다 대리자를 새로 짓는다. 매 프레임 도는 것만 담아 둔다.
+        private Action _capturePad, _handleInput, _takePlanFailure, _dropStaleWindows, _updateNativePanel;
+
         private string _lastWindowOrigin;
         private string _lastCatalogError = "";
         private string _lastWindowBlocker;
@@ -136,7 +140,7 @@ namespace SephPlanner.Plugin
             _pad.Clear();
         }
 
-        private void CapturePadContext() => Guarded(_pad.Capture, "패드 입력 준비");
+        private void CapturePadContext() => Guarded(_capturePad ??= _pad.Capture, "패드 입력 준비");
 
         private void Update()
         {
@@ -148,14 +152,14 @@ namespace SephPlanner.Plugin
 
             // 단축키·화면 쪽에서 난 예외가 폴링까지 굶기면 안 된다. Update 안의 예외는 유니티가
             // Player.log 에만 쌓고 우리 로그는 조용하므로, 여기서 잡아 같은 것 한 번씩 남긴다.
-            Guarded(HandleInput, "입력 처리");
-            Guarded(TakePlanFailure, "자동 진단 처리");
+            Guarded(_handleInput ??= HandleInput, "입력 처리");
+            Guarded(_takePlanFailure ??= TakePlanFailure, "자동 진단 처리");
             PollDiagnostics();
             PollUpdates();
-            Guarded(DropStaleWindows, "언어 바꾼 창 정리");
+            Guarded(_dropStaleWindows ??= DropStaleWindows, "언어 바꾼 창 정리");
 
             var panelStarted = FrameCost.Now;
-            Guarded(UpdateNativePanel, "화면 갱신");
+            Guarded(_updateNativePanel ??= UpdateNativePanel, "화면 갱신");
             FrameCost.Panel.Add(panelStarted);
 
             ReportFrameCost();
