@@ -212,14 +212,13 @@ GC 는 마킹하는 동안 관리 스레드를 전부 세운다. 이 게임은 �
 `CharmsByCell` 의 집합·사전, `OfferAdvisor.Clone`, 하얀 종이의 카테고리 사전이다. 종이 판의 제보가
 없어 마지막 것은 재지 못해 손대지 않았다.
 
-**`ComboCounting.CountFor` 가 이웃 사전을 인터페이스로 돈다**(검토 2026-11-04). `IReadOnlyDictionary` 로 받아
-`foreach` 하므로 부를 때마다 열거자를 상자에 담는다 - 같은 파일의 `Count` 는 이 함정을 이미 피했다. 부르는 쪽은
-`PositionalWorth.ComboWorth`·`PriorityPlacement.Contribute` 이고 `BuildStatWorth` 에도 같은 모양이 있다. 0.4.26 제보
-`6d50beb6`(92칸, QoL 모드 판)의 제거 시도 하나에서 할당 57MB 중 22MB 가 이 열거자였다. scratch 사본에서 구체 형으로
-돌게 고치면 warm 조언 275 → 168MB, warm 배치 28 → 25MB, `9fac8a07` 의 조언 16 → 13.5MB 이고 시간은 −4% 안팎이다
-(.NET 10). 네 제보의 배치 목표·점수·조언 문자열이 같았지만 그 넷은 화면에 낼 제거·인챈트 조언이 없었으므로,
-고칠 때는 보관 제보 47건의 `--reproduce` 로 다시 확인한다. 같은 자리의 `Exists(problem.PriorityCategories.Contains)`
-도 비용 행렬 칸마다 대리자를 짓는다(할당 표본의 약 3%).
+**콤보 셈의 열거자 상자는 걷었다**(2026-11-04). `ComboCounting.CountFor` 와 `BuildStatWorth.Weight` 가 이웃 사전을
+`IReadOnlyDictionary` 로 받아 `foreach` 하느라 부를 때마다 열거자를 상자에 담았다. 그 길(`PositionalWorth.ComboWorth`·
+`PriorityPlacement.Contribute`·`ContextStatWorth.Value`)을 구체 형으로 바꿔, 침 판에서 `CountFor`·`ComboWorth` 한 번이
+56 → 0 바이트다(.NET 10, 임시 시험). 비용 행렬 칸마다 대리자를 짓던 `Exists(problem.PriorityCategories.Contains)` 도
+걷었다. 검토 때 scratch 사본으로 잰 값은 0.4.26 제보 `6d50beb6`(92칸, QoL 모드 판)의 warm 조언 275 → 168MB, warm 배치
+28 → 25MB, `9fac8a07` 의 조언 16 → 13.5MB, 시간 −4% 안팎이었다(.NET 10). 형식만 바꾼 것이라 추천은 같아야 하고 테스트도
+그대로 통과하지만, **보관 제보 47건의 `--reproduce` 대조는 아직 안 했다** - 재현 자료가 Windows PC 에만 있다.
 
 #### 1c. 제거·인챈트 조언의 후보를 나눠 푼다 (고사양 모드)
 
@@ -381,7 +380,7 @@ MSVC/vcpkg 보다 싸다.
 
 | | 하는 것 | 축 | 위험 | 기대 | 근거 |
 |---|---|---|---|---|---|
-| 1b | 콤보 셈의 열거자 상자 걷기 | GC | 낮음 | 큰 판의 조언 할당 −39% | .NET 측정 |
+| 1b | 콤보 셈의 열거자 상자 걷기 - **했다, 재현 대조 남음** | GC | 낮음 | 큰 판의 조언 할당 −39% | .NET 측정 |
 | 1c | 제거·인챈트 후보를 나눠 풀기(고사양 모드) | 1 | 낮음 | 큰 판의 조언 4.5~6배 | .NET 측정 |
 | **2** | 갈래 견줄 때 다듬지 않기 | 1 | **중간 이상** | 상자 8후보 ≈ 2,000 ms | 추정 |
 | 4 | 빔 탐색 시간 | 1 | 중간 | 미정 | 측정 |
