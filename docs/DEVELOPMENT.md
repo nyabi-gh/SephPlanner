@@ -33,11 +33,11 @@ SephPlanner.Plugin.Net  (tests/) Net/ 과 BepInExHost/Net 을 배포와 같은 n
 ## 빌드
 
 게임 어셈블리를 참조하므로 게임이 설치돼 있어야 한다. 경로는 `Directory.Build.props` 가 정한다. 기본값은 Windows 가
-`D:\SteamLibrary\steamapps\common\Sephiria`, macOS 가 `~/Library/Application Support/Steam/steamapps/common/Sephiria` 다.
+`C:\Program Files (x86)\Steam\steamapps\common\Sephiria`, macOS 가 `~/Library/Application Support/Steam/steamapps/common/Sephiria` 다.
 다른 곳에 설치했으면 `SEPHIRIA_DIR` 에 게임 폴더를 준다(macOS 는 `Sephiria.app` 의 상위 폴더).
 
 ```powershell
-$env:SEPHIRIA_DIR = "C:\Program Files (x86)\Steam\steamapps\common\Sephiria"
+$env:SEPHIRIA_DIR = "D:\SteamLibrary\steamapps\common\Sephiria"
 dotnet build
 ```
 
