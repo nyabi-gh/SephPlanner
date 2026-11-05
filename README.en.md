@@ -66,11 +66,11 @@ If you already use BepInEx for other mods, just put the two DLLs from the ZIP's 
 
 ## How to use
 
-1. **Start a run.** Your current bag score and the suggested layout's score appear in a corner of the screen.
+1. **Start a run.** Your current inventory score and the suggested layout's score appear in a corner of the screen.
 2. **Expand it with `F7`.** Slots that would change are outlined in gold, and hovering over a slot shows its effects and why it is suggested. It expands on its own when you open a chest, shop, Sephirite, combiner or enchant window.
 3. **Press `F8`.** The suggested layout is applied. If you'd rather move things yourself, follow the move instructions from top to bottom.
 
-It also suggests what to pick from chests, shops and Sephirite, which Tablets to mix and where to enchant. Press `F1` to preview the layout with a candidate you haven't obtained yet.
+It also suggests what to pick from chests, shops and Sephirite, which Tablets to combine and where to enchant. Press `F1` to preview the layout with a candidate you haven't obtained yet.
 
 > [!IMPORTANT]
 > The score is SephPlanner's own rating for comparing layouts, not an official in-game number. Please also weigh unique effects and the way you like to play.
@@ -98,7 +98,7 @@ Keys can be changed in `F3`. With a gamepad, press `View` while a game window su
 
 SephPlanner only works on your own screen, so the other players don't need to install it.
 
-In multiplayer, auto-place is off by default. Get the other players' consent first, then turn it on with `Auto-place in multiplayer` in `F3`. If a server sync warning appears, rejoin the room before using it.
+In multiplayer, auto-place is off by default. Get the other players' consent first, then turn it on with `Auto-place in multiplayer` in `F3`. If a server sync warning appears, rejoin the lobby before using it.
 
 ## FAQ
 
@@ -108,7 +108,7 @@ In multiplayer, auto-place is off by default. Get the other players' consent fir
 
 **Calculation takes a long time.** Turn on `High-performance mode (multi-core)` in `F3` to use more CPU cores and calculate faster. The results are the same. If the game stutters, turn it back off.
 
-**I don't see any suggestions.** Check that `Acquire/mix/enchant/remove suggestions` is on in `F3`.
+**I don't see any suggestions.** Check that `Acquire/combine/enchant/remove suggestions` is on in `F3`.
 
 **Hotkeys don't work.** Hotkeys don't respond while you are holding down another key. Don't press them while walking; let go of the movement keys first. Also check the `Shortcuts` tab in `F3` for conflicts with other keys. Turning off `Show planner` also stops `F1` and `F4`–`F8`.
 

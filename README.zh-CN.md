@@ -112,7 +112,7 @@ SephPlanner 只作用于你自己的画面，所以一起游玩的玩家不需�
 
 **快捷键没反应。** 按住其他键时快捷键不会响应。请不要边走边按，先松开移动键再按。也请在 `F3` 的`快捷键`页中确认是否与其他按键冲突。关闭 `显示规划面板` 后，`F1`、`F4`~`F8` 也会停用。
 
-**还是没解决。** 在问题出现时按下 `F10`，并附上画面上显示的**反馈编号**，通过 [Issues](https://github.com/nyabi-gh/SephPlanner/issues)、创意工坊页面的留言或 [nyabi@tb.pro](mailto:nyabi@tb.pro) 告诉我们。保存的诊断文件包含游戏数据，请不要上传到公开的 Issues。（[反馈说明](docs/USAGE.md#제보에-필요한-정보)（韩语））
+**还是没解决。** 在问题出现时按下 `F10`，并附上画面上显示的**报告编号**，通过 [Issues](https://github.com/nyabi-gh/SephPlanner/issues)、创意工坊页面的留言或 [nyabi@tb.pro](mailto:nyabi@tb.pro) 告诉我们。保存的诊断文件包含游戏数据，请不要上传到公开的 Issues。（[反馈说明](docs/USAGE.md#제보에-필요한-정보)（韩语））
 
 **想要卸载。** 创意工坊版请在创意工坊页面取消订阅。ZIP 版请关闭游戏，删除 `BepInEx/plugins` 中的 `SephPlanner.Plugin.dll` 和 `SephPlanner.Core.dll`。如果连设置也要删除，请一并删除 `%LOCALAPPDATA%\SephPlanner` 文件夹和 `BepInEx/config/dev.nyabi.sephplanner.bridge.cfg`。如果还在使用其他模组，请保留 BepInEx。
 
