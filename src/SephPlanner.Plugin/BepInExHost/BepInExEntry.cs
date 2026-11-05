@@ -8,7 +8,7 @@ namespace SephPlanner.Plugin.BepInExHost
     /// 플래너를 이 오브젝트에 그대로 붙인다 - BepInEx 의 관리 오브젝트는 장면이 바뀌어도 남는다. GUID 는 설정 파일 이름이라
     /// 바꾸지 않는다(<see cref="PluginIdentity.Guid"/>).
     /// </summary>
-    [BepInPlugin(PluginIdentity.Guid, "SephPlanner", "0.6.1")]
+    [BepInPlugin(PluginIdentity.Guid, "SephPlanner", "0.6.2")]
     public sealed class BepInExEntry : BaseUnityPlugin
     {
         private void Awake()

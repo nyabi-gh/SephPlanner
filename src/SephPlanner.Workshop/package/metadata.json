@@ -12,7 +12,7 @@
   "mod": {
     "schemaVersion": 1,
     "modId": "nyabi.sephplanner",
-    "version": "0.6.1",
+    "version": "0.6.2",
     "author": "Nyabi",
     "multiplayer": { "installation": "local_only" },
     "modules": [
