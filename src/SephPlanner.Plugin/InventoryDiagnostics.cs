@@ -22,6 +22,13 @@ namespace SephPlanner.Plugin
             return count;
         }
 
+        private static string Cells(System.Collections.Generic.Dictionary<ItemPosition, int> cells)
+        {
+            var sum = 0;
+            foreach (var value in cells.Values) sum += value;
+            return $"{cells.Count}칸(합 {sum})";
+        }
+
         private const string FileName = "inventory-dump.txt";
         private const string SnapshotFileName = "inventory-snapshot.json";
 
@@ -210,6 +217,31 @@ namespace SephPlanner.Plugin
                         $"  ({engraving.xIdx},{engraving.yIdx}) entity={engraving.entityID} " +
                         $"instance={engraving.instanceID} rot={engraving.rotation} " +
                         $"applied={engraving.IsApplied} custom={engraving.isCustomTablet}");
+                }
+            });
+
+            // 원본이 비었는지, 외부 표시라 우리가 걸렀는지를 제보만으로 가르기 위해 둔다(제보 3aaa63bf).
+            Section("fixedEngravingsOnServer", () =>
+            {
+                text.AppendLine();
+                if (!NetworkServer.active)
+                {
+                    text.AppendLine("[fixedEngravingsOnServer] 참가자라 읽을 수 없음");
+                    return;
+                }
+                text.AppendLine($"[fixedEngravingsOnServer] {inv.fixedEngravingsOnServer.Count}개");
+                foreach (var engraving in inv.fixedEngravingsOnServer)
+                {
+                    if (engraving == null)
+                    {
+                        text.AppendLine("  <null>");
+                        continue;
+                    }
+                    text.AppendLine(
+                        $"  entity={engraving.entityID} instance={engraving.instanceID} " +
+                        $"external={engraving.createdByExternalSystem} applied={engraving.IsApplied} " +
+                        $"레벨 {Cells(engraving.fixedLevel)} 배수 {Cells(engraving.fixedMultiplyLevel)} " +
+                        $"비활성 {Cells(engraving.fixedDisable)} 제한 해제 {Cells(engraving.fixedIgnoreCriteria)}");
                 }
             });
 
