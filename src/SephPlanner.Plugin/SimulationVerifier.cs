@@ -16,6 +16,9 @@ namespace SephPlanner.Plugin
 
         /// <summary>그때 원본과 되뺀 값을 적은 한 줄. 알릴 것이 없으면 빈 문자열이다.</summary>
         public string FixedEffectMismatch { get; set; } = "";
+
+        /// <summary><see cref="FixedEffectLayerState.MismatchKey"/>.</summary>
+        public string FixedEffectMismatchKey { get; set; } = "";
     }
 
     /// <summary>
@@ -37,6 +40,7 @@ namespace SephPlanner.Plugin
             var check = Verify(inv, layer);
             check.UnexplainedFixedCells = layer.Unexplained.Count;
             check.FixedEffectMismatch = layer.Mismatch;
+            check.FixedEffectMismatchKey = layer.MismatchKey;
             return check;
         }
 

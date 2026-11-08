@@ -42,6 +42,9 @@ namespace SephPlanner.Plugin
 
         /// <summary><see cref="Unexplained"/> 가 있을 때 원본과 되뺀 값을 적은 한 줄.</summary>
         public string Mismatch { get; set; } = "";
+
+        /// <summary>같은 어긋남인지 가르는 문장(<see cref="FixedEffectResidual.SameCause"/>).</summary>
+        public string MismatchKey { get; set; } = "";
     }
 
     /// <summary>
@@ -157,6 +160,7 @@ namespace SephPlanner.Plugin
                 state.Mismatch = "고정 효과 원본과 게임 행렬에서 되뺀 값이 다릅니다: 원본 " +
                                  FixedEffectResidual.Describe(original) + ", 되뺀 값 " +
                                  FixedEffectResidual.Describe(state.Residual.Cells);
+                state.MismatchKey = FixedEffectResidual.SameCause(original, state.Residual.Cells);
             }
 
             state.Cells = ComboEngravings.Combine(Tracker.Layer, state.Temporary);

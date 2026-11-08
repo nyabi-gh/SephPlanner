@@ -139,18 +139,20 @@ namespace SephPlanner.Plugin
             }
         }
 
-        private void QueueAutomaticDiagnostic(string stage, string detail, PlanFailure failure)
+        /// <param name="sameCause">같은 원인인지 가를 문장. 없으면 <paramref name="detail"/> 로 가른다.</param>
+        private void QueueAutomaticDiagnostic(string stage, string detail, PlanFailure failure, string sameCause = null)
         {
-            try { TryQueueAutomaticDiagnostic(stage, detail, failure); }
+            try { TryQueueAutomaticDiagnostic(stage, detail, failure, sameCause); }
             catch (Exception ex) { Log.Error("자동 진단 예약 실패: " + ex); }
         }
 
-        private void TryQueueAutomaticDiagnostic(string stage, string detail, PlanFailure failure)
+        private void TryQueueAutomaticDiagnostic(string stage, string detail, PlanFailure failure, string sameCause)
         {
             if (!_settings.AutomaticDiagnosticAllowed || _automaticIncident != null ||
                 _diagnosticTask != null || _pendingDiagnostic != null || AnsweringWindowOpen()) return;
             var redacted = _diagnosticLog.Redact(detail);
-            if (!_automaticPolicy.TryAccept(stage + "|" + redacted, _diagnosticThrottle)) return;
+            var key = sameCause == null ? redacted : _diagnosticLog.Redact(sameCause);
+            if (!_automaticPolicy.TryAccept(stage + "|" + key, _diagnosticThrottle)) return;
             _automaticIncident = new
             {
                 Trigger = "automatic",

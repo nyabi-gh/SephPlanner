@@ -2,8 +2,10 @@ using System.IO.Compression;
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
+using SephPlanner.Core.Tablets;
 using SephPlanner.Plugin;
 using SephPlanner.Plugin.Net;
 
@@ -103,6 +105,47 @@ public sealed class DiagnosticTests
         Assert.True(policy.TryAccept(
             "고정 효과 원본 불일치|고정 효과 원본과 게임 행렬에서 되뺀 값이 다릅니다: 원본 (1,1)=레벨 2, 되뺀 값 (5,3)=레벨 1",
             throttle));
+    }
+
+    /// <summary>
+    /// 새 판에 전 칸 제한 해제가 남은 채, 플레이어가 각인할 때마다 원본이 늘어 같은 원인이 세 번
+    /// 올라갔다(제보 8f7c6d82·bbb0ab6a·f52a02e1). 원본에 음수 레벨과 "외 N칸" 이 섞여도 하나다.
+    /// </summary>
+    [Fact]
+    public void AGrowingOriginalWithTheSameLeftoverCountsOnce()
+    {
+        var now = TimeSpan.Zero;
+        var throttle = new DiagnosticUploadThrottle(TimeSpan.FromMinutes(1), () => now);
+        var policy = new AutomaticDiagnosticPolicy();
+        const string stage = "고정 효과 원본 불일치|";
+
+        static List<FixedEffectCell> Engraved(params (int X, int Y, int Level)[] cells) =>
+            cells.Select(c => new FixedEffectCell { Position = new GridPos(c.X, c.Y), Level = c.Level }).ToList();
+        static List<FixedEffectCell> WithLeftover(List<FixedEffectCell> original)
+        {
+            var residual = new List<FixedEffectCell>();
+            for (var y = 0; y < 6; y++)
+                for (var x = 0; x < 6 && residual.Count < 32; x++)
+                {
+                    var level = original.FirstOrDefault(c => c.Position == new GridPos(x, y))?.Level ?? 0;
+                    residual.Add(new FixedEffectCell { Position = new GridPos(x, y), Level = level, IgnoreCriteria = 1 });
+                }
+            return residual;
+        }
+
+        var none = Engraved();
+        var two = Engraved((4, 0, 2), (5, 1, 2));
+        var many = Engraved((4, 0, 2), (5, 1, 2), (5, 2, 5), (1, 2, 2), (3, 2, 3), (4, 2, 2), (5, 4, 1), (3, 0, 2),
+            (0, 4, 1), (0, 3, 2), (0, 5, -1), (1, 4, 1), (2, 4, 1), (1, 3, 1));
+
+        var first = FixedEffectResidual.SameCause(none, WithLeftover(none));
+        Assert.Equal(first, FixedEffectResidual.SameCause(two, WithLeftover(two)));
+        Assert.Equal(first, FixedEffectResidual.SameCause(many, WithLeftover(many)));
+
+        now += TimeSpan.FromMinutes(1);
+        Assert.True(policy.TryAccept(stage + first, throttle));
+        now += TimeSpan.FromMinutes(1);
+        Assert.False(policy.TryAccept(stage + FixedEffectResidual.SameCause(many, WithLeftover(many)), throttle));
     }
 
     [Fact]

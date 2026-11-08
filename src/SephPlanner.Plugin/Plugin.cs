@@ -675,11 +675,12 @@ namespace SephPlanner.Plugin
 
             _unexplainedFixedCells = verification.UnexplainedFixedCells;
             var mismatch = verification.FixedEffectMismatch;
-            if (mismatch.Length > 0 && mismatch != _reportedFixedEffectMismatch)
+            var mismatchKey = verification.FixedEffectMismatchKey;
+            if (mismatch.Length > 0 && mismatchKey != _reportedFixedEffectMismatch)
             {
-                _reportedFixedEffectMismatch = mismatch;
+                _reportedFixedEffectMismatch = mismatchKey;
                 Log.Warning(mismatch);
-                QueueAutomaticDiagnostic("고정 효과 원본 불일치", mismatch);
+                QueueAutomaticDiagnostic("고정 효과 원본 불일치", mismatch, null, mismatchKey);
             }
 
             // 일치할 때 아무것도 남기지 않으면 검증이 돌았는지조차 알 수 없다.

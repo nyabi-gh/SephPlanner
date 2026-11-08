@@ -176,6 +176,14 @@ namespace SephPlanner.Core.Tablets
             sum.IgnoreCriteria += sign * cell.IgnoreCriteria;
         }
 
+        /// <summary>
+        /// 원본과 되뺀 값의 어긋남이 같은 원인인지 가르는 문장. 원본은 판 내내 각인할 때마다
+        /// 늘어나므로 원본과 되뺀 값을 다 적은 문장으로 가르면, 한 원인이 각인마다 새 어긋남이
+        /// 된다(제보 8f7c6d82·bbb0ab6a·f52a02e1). 차이만 적는다.
+        /// </summary>
+        public static string SameCause(IReadOnlyList<FixedEffectCell>? expected, IReadOnlyList<FixedEffectCell>? actual) =>
+            "원본에 없는 칸 " + Describe(Difference(expected, actual));
+
         public static string Describe(IReadOnlyList<FixedEffectCell>? cells, int limit = 12)
         {
             if (cells == null || cells.Count == 0) return "없음";
