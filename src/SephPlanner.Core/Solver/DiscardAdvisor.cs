@@ -71,7 +71,8 @@ namespace SephPlanner.Core.Solver
             var currentCounts = Counts(problem, problem.CurrentCharms);
             var baselineCounts = Counts(problem, baseline.CharmPositions);
             var candidates = problem.Charms.Select(c => (c.InstanceId, Tablet: false))
-                .Concat(problem.Tablets.Select(t => (t.InstanceId, Tablet: true))).OrderBy(c => c.InstanceId);
+                .Concat(problem.Tablets.Where(t => !t.Definition.CannotDiscard).Select(t => (t.InstanceId, Tablet: true)))
+                .OrderBy(c => c.InstanceId);
 
             foreach (var candidate in candidates)
             {

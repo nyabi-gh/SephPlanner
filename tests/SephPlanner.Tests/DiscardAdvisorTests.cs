@@ -63,6 +63,16 @@ public class DiscardAdvisorTests
     }
 
     [Fact]
+    public void ATabletThatCannotBeDiscardedIsNeverSuggested()
+    {
+        var problem = Problem();
+        problem.Tablets[0].Definition.CannotDiscard = true;
+        var baseline = PlacementSolver.Solve(problem);
+
+        Assert.DoesNotContain(DiscardAdvisor.Rank(problem, baseline), a => a.IsTablet);
+    }
+
+    [Fact]
     public void AnArtifactCanBeSuggestedWhenNoActiveComboStepIsLost()
     {
         var problem = Problem(combo: false);

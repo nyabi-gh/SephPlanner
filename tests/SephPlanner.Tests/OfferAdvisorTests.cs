@@ -372,6 +372,21 @@ public class OfferAdvisorTests
     }
 
     [Fact]
+    public void AFullBagDoesNotDisplaceATabletThatCannotBeDiscarded()
+    {
+        var problem = new PlacementProblem { Grid = new GridSpec(6, 7, 1) };
+        problem.Tablets.Add(new TabletSlot
+        {
+            InstanceId = 10,
+            Definition = new TabletDefinition { Id = "curse", CannotDiscard = true },
+        });
+
+        var advice = OfferAdvisor.Rank(problem, new[] { Charm("candidate") }, gold: 0);
+
+        Assert.DoesNotContain(advice, a => a.Displacement?.InstanceId == 10);
+    }
+
+    [Fact]
     public void EqualDisplacementsUseTheLowestInstanceId()
     {
         var problem = new PlacementProblem { Grid = new GridSpec(6, 7, 2) };

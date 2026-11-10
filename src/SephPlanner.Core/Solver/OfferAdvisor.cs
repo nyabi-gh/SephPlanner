@@ -451,6 +451,7 @@ namespace SephPlanner.Core.Solver
 
             foreach (var tablet in problem.Tablets.OrderBy(value => value.InstanceId))
             {
+                if (tablet.Definition.CannotDiscard) continue;
                 var removed = problem.Tablets.FindIndex(value => value.InstanceId == tablet.InstanceId);
                 var trial = Clone(problem);
                 trial.Tablets.RemoveAll(value => value.InstanceId == tablet.InstanceId);
