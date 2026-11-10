@@ -33,7 +33,7 @@ namespace SephPlanner.Core.Solver
             _grown = grid.Storage == problem.Grid.Storage ? null : Regrid(problem, grid);
         }
 
-        /// <summary>더 열릴 칸이 있는가. 가방이 이미 다 열렸으면 앞을 볼 것이 없다.</summary>
+        /// <summary>늘어난 판을 지었는가. 칸 수에 상한이 없어 여는 칸 수가 양수인 한 늘 참이다.</summary>
         public bool Available => _grown is not null;
 
         /// <summary>늘어난 판에서 아무것도 집지 않은 기준 배치. 증가분은 이것과 견줘야 뜻이 있다.</summary>

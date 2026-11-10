@@ -68,14 +68,19 @@ public class GridSpecTests
         Assert.Equal(3, grown.Height);
     }
 
-    /// <summary>다 열린 가방은 자기 자신을 돌려준다. 부르는 쪽은 그것으로 앞볼 것이 없음을 안다.</summary>
+    /// <summary>
+    /// 6x7 을 다 열어도 더 열린다. 게임에 칸 수 상한이 없어(코스튬·기적·레벨업 보상이 연다) 42칸에서 앞보기가 꺼지면
+    /// 안 된다.
+    /// </summary>
     [Fact]
-    public void AFullyOpenGridCannotGrow()
+    public void AFullSixBySevenGridStillGrowsARow()
     {
         var full = GridSpec.WithStorage(GridSpec.DefaultWidth * GridSpec.DefaultHeight);
+        var grown = full.Grown(1);
 
-        Assert.Equal(full.Storage, full.Grown(1).Storage);
-        Assert.Equal(full.Storage, full.Grown(99).Storage);
+        Assert.Equal(43, grown.Storage);
+        Assert.Equal(8, grown.Height);
+        Assert.Equal(49, new GridSpec(6, 8, 48).Grown(1).Storage);
     }
 
     [Fact]

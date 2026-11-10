@@ -48,13 +48,12 @@ namespace SephPlanner.Core.Tablets
         /// 열릴지는 사실이 아니므로 세지 않는다 - 되돌릴 수 없는 선택의 조언이 한 단계만
         /// 내다보는 것은 그 때문이다(docs/PLACEMENT-OBJECTIVE.md).
         ///
-        /// 더 열 칸이 없으면 자기 자신을 돌려준다. 부르는 쪽은 그것으로 "앞을 볼 것이 없다"를 안다.
+        /// 칸 수에는 상한이 없다 - 게임 <c>AddStorage</c> 는 막지 않고 높이를 <c>GetHeight</c>(칸 수 / 너비 올림)로 늘린다.
+        /// 열 칸이 없으면(<paramref name="cells"/> 가 0 이하) 자기 자신을 돌려준다.
         /// </summary>
         public GridSpec Grown(int cells)
         {
-            var rows = Height > DefaultHeight ? Height : DefaultHeight;
             var storage = Storage + (cells > 0 ? cells : 0);
-            if (storage > Width * rows) storage = Width * rows;
             if (storage <= Storage) return this;
 
             var height = (storage + Width - 1) / Width;

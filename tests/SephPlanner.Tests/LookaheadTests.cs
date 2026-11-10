@@ -69,22 +69,16 @@ public class LookaheadTests
         Assert.Equal(1, soon[1].SoonGain!.Value, 3);
     }
 
-    /// <summary>가방이 다 열렸으면 볼 앞이 없다. 그때는 지금 가방의 값이 그대로 답이다.</summary>
+    /// <summary>6x7 을 다 연 가방도 한 칸 앞을 본다. 게임에 칸 수 상한이 없어 다음 칸은 여덟째 줄의 첫 칸이다.</summary>
     [Fact]
-    public void AFullyOpenBagHasNothingToLookAheadTo()
+    public void ASixBySevenBagStillLooksAhead()
     {
         var problem = TwoRowsOpen();
         problem.Grid = GridSpec.WithStorage(GridSpec.DefaultWidth * GridSpec.DefaultHeight);
         var lookahead = new Lookahead(problem);
 
-        Assert.False(lookahead.Available);
-        Assert.Null(lookahead.Baseline(new LayoutCache(), SolverOptions.ForAdvice(default)));
-
-        var advice = OfferAdvisor.Rank(
-            problem, new[] { Tablet("코앞", 400, "IDX 0 1") }, gold: 0, lookahead: lookahead);
-
-        Assert.Null(advice[0].SoonGain);
-        Assert.Equal(advice[0].Gain, advice[0].RankedGain, 9);
+        Assert.True(lookahead.Available);
+        Assert.NotNull(lookahead.Baseline(new LayoutCache(), SolverOptions.ForAdvice(default)));
     }
 
     /// <summary>
