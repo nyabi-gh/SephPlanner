@@ -493,7 +493,9 @@ public class PlanRunnerTests
         runner.MarkApplied(runner.State.Latest!);
 
         runner.Submit(Board(new GridPos(1, 0)), PlanPreferences.None, "catalog");
-        Assert.True(SpinWait.SpinUntil(() => settledCalls.Count == 2, TimeSpan.FromSeconds(5)));
+        // 풀이 콜백은 게시보다 먼저 돈다. 호출 수만 기다리면 게시 전에 IsCurrent 를 읽을 수 있다.
+        Assert.True(SpinWait.SpinUntil(
+            () => settledCalls.Count == 2 && runner.State.IsCurrent, TimeSpan.FromSeconds(5)));
 
         Assert.Equal(new[] { false, true }, settledCalls.ToArray());
         Assert.Equal(2, runner.State.RequestedGeneration);

@@ -190,7 +190,11 @@ internal sealed class DiagnosticTestServer : IAsyncDisposable
             server._app = DiagnosticServer.Build(["--urls", "http://127.0.0.1:0", "--environment", "Production", "--Logging:LogLevel:Default", "Warning"], server.Options);
             await server._app.StartAsync();
             var address = Assert.Single(server._app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses);
-            server.Client = new HttpClient { BaseAddress = new Uri(address), Timeout = TimeSpan.FromSeconds(10) };
+            // Expect: 100-continue 의 기다림은 기본 1초다. 그 안에 서버의 거절이 안 오면 클라이언트가
+            // 본문을 보내기 시작하고, 거절된 큰 본문은 응답 대신 소켓 오류가 된다. 부하가 걸린
+            // CI 에서는 1초를 넘길 수 있으므로 시험의 제한 시간 안에서는 기다리게 한다.
+            var handler = new SocketsHttpHandler { Expect100ContinueTimeout = TimeSpan.FromSeconds(10) };
+            server.Client = new HttpClient(handler) { BaseAddress = new Uri(address), Timeout = TimeSpan.FromSeconds(10) };
             server.Client.DefaultRequestHeaders.Add("X-Forwarded-Proto", "https");
             return server;
         }
@@ -208,8 +212,8 @@ internal sealed class DiagnosticTestServer : IAsyncDisposable
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/reports");
         request.Headers.Add("X-SephPlanner-Report-Id", id.ToString("N"));
         request.Headers.Add("X-SephPlanner-SHA256", hash ?? DiagnosticArchive.Hash(archive));
-        // 서버가 너무 큰 본문을 다 받기 전에 거절하면 macOS 에서는 보내던 연결이 끊겨 응답 대신
-        // 소켓 오류가 난다. 헤더만 먼저 보내고 거절을 본문 앞에서 받는다.
+        // 서버가 너무 큰 본문을 다 받기 전에 거절하면 보내던 연결이 끊겨 응답 대신 소켓 오류가
+        // 난다. 헤더만 먼저 보내고 거절을 본문 앞에서 받는다.
         request.Headers.ExpectContinue = true;
         request.Content = new ByteArrayContent(archive);
         request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/zip");

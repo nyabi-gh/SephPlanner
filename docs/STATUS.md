@@ -180,12 +180,6 @@ F2 콤보 우선은 후보 추천을 꺼도 배치에 영향을 준다. 획득·
   게임은 둘 다 적용한다. 0.6.0 부터 둘 다 읽어 계산하고 칸 번호로 못 박아 "고정 효과 원본 불일치" 와 자동 배치 중단이
   없어졌다([게임 내부 조사](RESEARCH.md)의 `NewItemOwnInstance`). 저주는 새 판 직후라 `RestockStartingItem` 이 후보지만
   옛 것이 왜 남았는지는 못 밝혔고, 2099 는 시작 아이템이 아니라 경위를 모른다.
-- **CI 에서 같은 커밋이 가끔 테스트 하나로 실패한다**(2026-11-03). `v0.6.0` 태그 실행에서 `4949c94` 는
-  `PlanRunnerTests.ABoardThatIsNotTheAppliedPlanIsSolvedAsUsual`(5초 안에 두 번째 풀이가 안 옴), `266a17e` 는
-  `DiagnosticServerTests.WrongHashAndOversizedBodyAreRejected` 로 실패했고 같은 커밋의 `main` 실행은 통과했다. 시간에 기대는
-  테스트로 보이나 원인은 보지 않았다(사용자가 미룸). 단서 하나(검토 2026-11-04, 검증 안 함): `PlanRunner` 는
-  `ThreadPool.QueueUserWorkItem` 으로 돌고, 같은 파일의 다른 테스트들은 빌드 콜백 안에서 `Wait(5초)` 로 풀 스레드를
-  붙잡는다. 테스트가 병렬로 돌 때 풀 스레드가 모자라 5초 대기를 넘길 수 있다. `DiagnosticServerTests` 쪽 단서는 없다.
 - **석판·각인 없이 전 칸에 제한 해제 +1 이 남았다**(자동 제보 `baaeef81`·`fcb59d8d`, 1.0.33 호스트, 2026-11-01;
   `3aaa63bf`, 1.1.1 BepInEx 판 호스트, 2026-11-06). 새 판으로 넘어간 직후 빈 가방에서 `ignoreCriteriaMatrix` 만 32칸 모두
   1 이었다. 이 행렬에 쓰는 것은 석판과 고정 각인뿐이고 둘 다 빼기·더하기가 짝이 맞아(1.0.33·1.1.x 디컴파일) 무엇이 남겼는지
