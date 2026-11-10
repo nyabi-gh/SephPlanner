@@ -56,6 +56,7 @@ namespace SephPlanner.Plugin
         private string _lastPanelOrigin;
         private string _lastPanelBlocker;
         private readonly Dictionary<string, string> _lastErrors = new Dictionary<string, string>();
+        private readonly HashSet<string> _owedDiagnostics = new HashSet<string>();
 
         // Guarded 에 메서드를 그대로 넘기면 부를 때마다 대리자를 새로 짓는다. 매 프레임 도는 것만 담아 둔다.
         private Action _capturePad, _handleInput, _takePlanFailure, _dropStaleWindows, _updateNativePanel;
@@ -216,13 +217,25 @@ namespace SephPlanner.Plugin
             }
             catch (Exception ex)
             {
-                // 같은 예외가 매 프레임 나면 로그만 아니라 자동 진단 큐도 처음 한 번만 거친다.
-                // 큐는 가림 정규식과 모양 비교를 돌므로 프레임마다 부르면 그 값이 매 프레임 든다.
-                if (!NewError(label, ex.GetType().Name + ": " + ex.Message)) return;
-                Log.Error(label + " 실패 - " + ex);
-                if (label != "진단 전송 상태" && label != "자동 진단 처리")
-                    QueueAutomaticDiagnostic(label, ex.ToString());
+                RepeatingError(label, label, ex, label != "진단 전송 상태" && label != "자동 진단 처리");
             }
+        }
+
+        /// <summary>
+        /// 매 프레임 날 수 있는 예외를 로그와 자동 진단 큐에 넘긴다. 같은 예외는 로그에 한 번만 남기고, 큐에도 받거나
+        /// 거절할 때까지만 내민다 - 큐는 가림 정규식과 모양 비교를 돌므로 프레임마다 부르면 그 값이 매 프레임 든다.
+        /// 큐가 잠시 막혀 있던(동의 전, 다른 진단 처리 중, 전송 간격) 예외는 되풀이될 때 다시 내민다. 처음 한 번만
+        /// 내밀면 막힌 그 한 번으로 그 실행 내내 진단이 올라가지 않는다.
+        /// </summary>
+        private void RepeatingError(string label, string stage, Exception ex, bool diagnose)
+        {
+            if (NewError(label, ex.GetType().Name + ": " + ex.Message))
+            {
+                Log.Error(label + " 실패 - " + ex);
+                if (diagnose) _owedDiagnostics.Add(label);
+            }
+            if (_owedDiagnostics.Contains(label) && !QueueAutomaticDiagnostic(stage, ex.ToString()))
+                _owedDiagnostics.Remove(label);
         }
 
         private void HandleInput()
@@ -557,7 +570,7 @@ namespace SephPlanner.Plugin
         /// <summary>플러그인과 Core 의 판이 다른가(게임 안 업데이트가 반쯤 걸림).</summary>
         partial void DetectFilesSplit(ref bool split);
 
-        private void QueueAutomaticDiagnostic(string stage, string detail) => QueueAutomaticDiagnostic(stage, detail, null);
+        private bool QueueAutomaticDiagnostic(string stage, string detail) => QueueAutomaticDiagnostic(stage, detail, null);
 
         /// <summary>물음에 답해야 닫히는 창(진단 동의, 업데이트)이 떠 있는가.</summary>
         private bool AnsweringWindowOpen()
@@ -869,9 +882,7 @@ namespace SephPlanner.Plugin
                 // 반쯤 그려진 화면이 굳지 않게 다음 프레임에 처음부터 다시 그리게 한다.
                 _hud.Invalidate();
 
-                if (!NewError("화면 그리기", ex.GetType().Name + ": " + ex.Message)) return;
-                Log.Error("화면 그리기 실패 - " + ex);
-                QueueAutomaticDiagnostic("화면 그리기 실패 - ", ex.ToString());
+                RepeatingError("화면 그리기", "화면 그리기 실패 - ", ex, true);
             }
         }
 

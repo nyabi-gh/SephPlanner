@@ -50,6 +50,33 @@ public sealed class DiagnosticTests
         Assert.True(throttle.TryStart(out _));
     }
 
+    /// <summary>
+    /// 전송 간격에만 막힌 오류는 나중에 다시 내밀 것으로, 이미 받은 오류는 끝난 것으로 알린다. 매 프레임 나는 예외는
+    /// 이것을 보고 다시 내밀지 정한다 - 막힌 한 번으로 끝내면 그 실행 내내 진단이 올라가지 않았다.
+    /// </summary>
+    [Fact]
+    public void AutomaticReportBlockedOnlyByTheIntervalIsRetriedLater()
+    {
+        var now = TimeSpan.Zero;
+        var throttle = new DiagnosticUploadThrottle(TimeSpan.FromMinutes(1), () => now);
+        var policy = new AutomaticDiagnosticPolicy();
+        Assert.True(throttle.TryStart(out _));
+        Assert.False(throttle.Ready);
+
+        Assert.False(policy.TryAccept("오류", throttle, out var later));
+        Assert.True(later);
+
+        now += TimeSpan.FromMinutes(1);
+        Assert.True(throttle.Ready);
+        Assert.True(policy.TryAccept("오류", throttle, out later));
+        Assert.False(later);
+
+        now += TimeSpan.FromMinutes(1);
+        Assert.False(policy.TryAccept("오류", throttle, out later));
+        Assert.False(later);
+        Assert.True(throttle.Ready);
+    }
+
     [Fact]
     public void AutomaticReportsHaveABoundedSessionBudget()
     {

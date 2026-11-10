@@ -14,10 +14,19 @@ namespace SephPlanner.Plugin.Net
         public static string ConsentKey(Uri endpoint) => DisclosureVersion + "|" + DiagnosticUploadClient.ConsentKey(endpoint);
 
         public static readonly string DefaultConsentKey = ConsentKey(DiagnosticUploadClient.DefaultEndpointUri);
-        public bool TryAccept(string key, DiagnosticUploadThrottle throttle)
+        public bool TryAccept(string key, DiagnosticUploadThrottle throttle) => TryAccept(key, throttle, out _);
+
+        /// <param name="later">전송 간격에만 막혔다. 같은 오류를 나중에 다시 내밀면 받을 수 있다.</param>
+        public bool TryAccept(string key, DiagnosticUploadThrottle throttle, out bool later)
         {
+            later = false;
             var shape = Shape(key);
-            if (_seen.Count >= SessionLimit || _seen.Contains(shape) || !throttle.TryStart(out _)) return false;
+            if (_seen.Count >= SessionLimit || _seen.Contains(shape)) return false;
+            if (!throttle.TryStart(out _))
+            {
+                later = true;
+                return false;
+            }
             return _seen.Add(shape);
         }
 

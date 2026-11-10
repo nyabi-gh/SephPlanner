@@ -25,6 +25,16 @@ namespace SephPlanner.Plugin.Net
             else _elapsed = elapsed;
         }
 
+        /// <summary>지금 <see cref="TryStart"/> 가 받을까. 시작하지는 않는다.</summary>
+        public bool Ready
+        {
+            get
+            {
+                lock (_gate)
+                    return !_lastStarted.HasValue || _elapsed() - _lastStarted.Value >= _interval;
+            }
+        }
+
         public bool TryStart(out TimeSpan remaining)
         {
             lock (_gate)

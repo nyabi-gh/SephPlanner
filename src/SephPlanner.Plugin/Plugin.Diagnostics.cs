@@ -140,19 +140,28 @@ namespace SephPlanner.Plugin
         }
 
         /// <param name="sameCause">같은 원인인지 가를 문장. 없으면 <paramref name="detail"/> 로 가른다.</param>
-        private void QueueAutomaticDiagnostic(string stage, string detail, PlanFailure failure, string sameCause = null)
+        /// <returns>
+        /// 큐가 잠시 막혀(동의 전, 다른 진단 처리 중, 답할 창이 떠 있음, 전송 간격) 받지도 거절하지도 않았다. 같은 오류를
+        /// 나중에 다시 내밀어야 한다.
+        /// </returns>
+        private bool QueueAutomaticDiagnostic(string stage, string detail, PlanFailure failure, string sameCause = null)
         {
-            try { TryQueueAutomaticDiagnostic(stage, detail, failure, sameCause); }
-            catch (Exception ex) { Log.Error("자동 진단 예약 실패: " + ex); }
+            try { return TryQueueAutomaticDiagnostic(stage, detail, failure, sameCause); }
+            catch (Exception ex)
+            {
+                Log.Error("자동 진단 예약 실패: " + ex);
+                return false;
+            }
         }
 
-        private void TryQueueAutomaticDiagnostic(string stage, string detail, PlanFailure failure, string sameCause)
+        private bool TryQueueAutomaticDiagnostic(string stage, string detail, PlanFailure failure, string sameCause)
         {
             if (!_settings.AutomaticDiagnosticAllowed || _automaticIncident != null ||
-                _diagnosticTask != null || _pendingDiagnostic != null || AnsweringWindowOpen()) return;
+                _diagnosticTask != null || _pendingDiagnostic != null || AnsweringWindowOpen() ||
+                !_diagnosticThrottle.Ready) return true;
             var redacted = _diagnosticLog.Redact(detail);
             var key = sameCause == null ? redacted : _diagnosticLog.Redact(sameCause);
-            if (!_automaticPolicy.TryAccept(stage + "|" + key, _diagnosticThrottle)) return;
+            if (!_automaticPolicy.TryAccept(stage + "|" + key, _diagnosticThrottle, out var later)) return later;
             _automaticIncident = new
             {
                 Trigger = "automatic",
@@ -169,6 +178,7 @@ namespace SephPlanner.Plugin
                 },
             };
             _automaticIncidentLog = _diagnosticLog.Snapshot();
+            return false;
         }
 
         private void CheckAutomaticDiagnostic()
