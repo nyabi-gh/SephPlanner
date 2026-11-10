@@ -121,4 +121,24 @@ public class CriticalCapTests
         Assert.Equal(5000 + 1000 - 2000 - 300, critical.Magic);
         Assert.False(critical.Execution);
     }
+
+    /// <summary>
+    /// 칸은 켜져 있어도 게임이 효과를 끈 것(배치 조건·무기 불일치·음수 레벨)은 치명타를 주지 않으므로 바탕에서 빼지 않는다.
+    /// 빼면 바탕이 참값보다 낮아져, 그것을 켜는 배치의 초과를 0 으로 본다.
+    /// </summary>
+    [Fact]
+    public void TheBaseKeepsWhatAnArtifactTheGameTurnedOffDoesNotGive()
+    {
+        var catalog = new Catalog(new List<TabletDefinition>(), new[] { Critical() });
+        var inventory = new InventoryState
+        {
+            Items = { new PlacedItem { DefinitionId = 10, InstanceId = 1, EffectiveLevel = 1, IsActive = true, EffectEnabled = false } },
+        };
+
+        var critical = CriticalCap.Base(inventory, catalog, critical: 9000, weaponCritical: 0, magicCritical: 0, execution: 0);
+        Assert.Equal(9000, critical.Direct);
+
+        inventory.Items[0].EffectEnabled = null;
+        Assert.Equal(9000 - 2000, CriticalCap.Base(inventory, catalog, critical: 9000, weaponCritical: 0, magicCritical: 0, execution: 0).Direct);
+    }
 }

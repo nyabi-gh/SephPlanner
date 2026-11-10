@@ -38,7 +38,7 @@ namespace SephPlanner.Core.Solver
             foreach (var item in inventory.Items)
             {
                 var definition = catalog.Charm(item.DefinitionId);
-                if (definition is null || !item.IsActive) continue;
+                if (definition is null || !(item.EffectEnabled ?? item.IsActive)) continue;
 
                 var level = Math.Min(item.EffectiveLevel, definition.MaxLevel);
                 var own = Amount(definition, Critical, level, inventory.Tablets.Count);

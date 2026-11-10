@@ -205,6 +205,13 @@ namespace SephPlanner.Core.Runtime
         public int EffectiveLevel { get; set; }
         public bool IsActive { get; set; }
 
+        /// <summary>
+        /// 게임이 이 아티팩트의 효과를 지금 켜 두었는가(<c>Charm_Basic.IsEffectEnabled</c>). <see cref="IsActive"/>는
+        /// 비활성 칸만 보지만 게임은 음수 레벨·배치 조건·무기 불일치에서도 효과를 끈다. <c>null</c> 은 이 항목이
+        /// 없던 자료다.
+        /// </summary>
+        public bool? EffectEnabled { get; set; }
+
         /// <summary>인챈트로 붙은 고정 레벨. 자리를 옮겨도 따라다닌다.</summary>
         public int Enchant { get; set; }
 

@@ -99,6 +99,7 @@ namespace SephPlanner.Core.Runtime
                     ObservedCategories = item.ObservedCategories,
                     EffectiveLevel = now.EffectiveLevel,
                     IsActive = now.IsActive,
+                    EffectEnabled = now.EffectEnabled,
                     Immovable = item.Immovable,
                     Arrived = item.Arrived && target.To == item.Position,
                 });

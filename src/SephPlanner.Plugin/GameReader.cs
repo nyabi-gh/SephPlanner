@@ -332,6 +332,7 @@ namespace SephPlanner.Plugin
                     Position = new GridPos(instance.XIdx, instance.YIdx),
                     EffectiveLevel = LookupMatrix(inv.levelMatrix, instance.XIdx, instance.YIdx),
                     IsActive = LookupMatrix(inv.disableMatrix, instance.XIdx, instance.YIdx) <= 0,
+                    EffectEnabled = instance.Charm != null ? instance.Charm.IsEffectEnabled : (bool?)null,
                     IsAttackable = instance.Charm != null
                         ? (bool?)(instance.Charm is IAttackableCharm attackable && attackable.IsAttackableCharm())
                         : null,

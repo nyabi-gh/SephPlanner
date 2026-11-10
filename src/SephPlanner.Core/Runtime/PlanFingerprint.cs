@@ -117,6 +117,10 @@ namespace SephPlanner.Core.Runtime
                 // 이 항목이 없던 재현 자료의 지문과 같도록 참일 때만 더한다.
                 if (item.Arrived) Add(builder, "itemArrived", true);
 
+                // 치명타 바탕만 이 값을 보고, 거기서 칸 활성과 다를 때만 답이 갈린다. 같을 때 빼 두면 이 항목이
+                // 없던 재현 자료의 지문과도 같다.
+                if (item.EffectEnabled is bool enabled && enabled != item.IsActive) Add(builder, "itemEffectEnabled", enabled);
+
                 // 진행도를 그대로 넣으면 가드 한 번마다 계획이 낡는다. 점수가 보는 것과 같은
                 // 칸만 넣어, 값어치가 실제로 달라질 때만 다시 풀게 한다.
                 //
