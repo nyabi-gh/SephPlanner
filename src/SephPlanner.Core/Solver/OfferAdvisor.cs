@@ -292,7 +292,8 @@ namespace SephPlanner.Core.Solver
 
                 if (CrossesUp(combo, current, next)) advice.ComboCompletes = true;
                 if (CrossesDown(combo, current, next)) advice.ComboLoses = true;
-                if (priority || !problem.ScoresComboItself(category)) advice.ComboBonus += change * worth;
+                advice.ComboBonus += worth * (priority ? change
+                    : problem.ComboWorth(combo, next, category) - problem.ComboWorth(combo, current, category));
 
                 var name = Naming.Of(combo.Names, combo.Id, "?");
                 parts.Add($"{name} {next}/{Goal(combo, next, pair.Value)}");
@@ -305,15 +306,9 @@ namespace SephPlanner.Core.Solver
         /// 채점한 것과 같은 눈금으로 재야 한다. 카탈로그가 잰 눈금은 기본값과 다르다
         /// (제보들에서 콤보 2.1768 대 2.59). 최고 단계 너머는 <c>UNLIMITEDCOMBO</c> 가 있을 때만 값이 있다.
         /// </summary>
-        private static double ComboValue(ComboDefinition combo, int count, PlacementProblem problem)
-        {
-            var total = 0.0;
-            var cap = combo.Thresholds.Count == 0 ? 0 : combo.Thresholds.Max();
-            if (problem.ComboBonus is { UnlimitedCombo: > 0 }) cap = count;
-            for (var current = 0; current < Math.Min(count, cap); current++)
-                total += problem.ComboStep(combo, current, out _, out _);
-            return total;
-        }
+        /// <summary>단계 값까지 다 센 값. 우선 콤보는 신비 각인 판에서도 단계를 가산점으로 민다.</summary>
+        private static double ComboValue(ComboDefinition combo, int count, PlacementProblem problem) =>
+            problem.ComboWorth(combo, count, "");
 
         private static bool CrossesUp(ComboDefinition combo, int current, int next) =>
             combo.Thresholds.Any(threshold => current < threshold && next >= threshold);

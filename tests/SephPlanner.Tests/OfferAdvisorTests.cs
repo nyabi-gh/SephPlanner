@@ -1,4 +1,5 @@
 ﻿using SephPlanner.Core.Model;
+using SephPlanner.Core.Runtime;
 using SephPlanner.Core.Solver;
 using SephPlanner.Core.Tablets;
 
@@ -178,6 +179,24 @@ public class OfferAdvisorTests
 
         Assert.True(advice[0].ComboCompletes);
         Assert.Equal(problem.Scale.ComboThreshold, advice[0].ComboBonus, 9);
+    }
+
+    /// <summary>
+    /// 신비 각인 판에서 신비 후보는 단계 값을 칸 점수로 받지만, 콤보 능력치(<c>COMBOBONUSDAMAGE</c>) 몫은 점수에 없다.
+    /// 게임은 신비도 콤보로 세어 그 능력치를 주므로 후보의 콤보 가치에 남는다.
+    /// </summary>
+    [Fact]
+    public void AMysticCandidateKeepsTheComboStatShareOnAMysticBoard()
+    {
+        var problem = BaseProblem();
+        problem.ComboBonus = new ComboStatBonus { ComboBonusDamage = 7 };
+        problem.ComboEngraving = new ComboEngravingRule { Category = "MYSTIC", Query = "O MUL/2" };
+        var counts = new Dictionary<string, int> { ["MYSTIC"] = 0 };
+
+        var advice = OfferAdvisor.Rank(problem, new List<OfferCandidate> { Charm("mystic", "MYSTIC") }, gold: 0, counts,
+            id => new ComboDefinition { Id = id, Thresholds = { 1, 3 } });
+
+        Assert.Equal(7 * problem.Scale.DamageBonus, advice[0].ComboBonus, 9);
     }
 
     [Fact]

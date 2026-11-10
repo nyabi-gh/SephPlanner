@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using SephPlanner.Core.Charms;
 using SephPlanner.Core.Model;
@@ -328,6 +329,24 @@ namespace SephPlanner.Core.Solver
                 completes = true;
             }
             return step;
+        }
+
+        /// <summary>
+        /// 콤보를 <paramref name="count"/> 개까지 모은 값(<see cref="ComboStep"/> 의 합). 신비 각인 판의 신비는 단계 값을
+        /// 칸 점수로 이미 세므로 콤보 능력치 몫만 남긴다 - 게임은 신비도 콤보로 세어 그 능력치를 준다.
+        /// </summary>
+        internal double ComboWorth(ComboDefinition combo, int count, string category)
+        {
+            var total = 0.0;
+            var cap = combo.Thresholds.Count == 0 ? 0 : combo.Thresholds.Max();
+            if (ComboBonus is { UnlimitedCombo: > 0 }) cap = count;
+            var statOnly = ScoresComboItself(category);
+            for (var current = 0; current < Math.Min(count, cap); current++)
+            {
+                total += ComboStep(combo, current, out _, out _);
+                if (statOnly) total -= Scale.OfComboStep(combo, current, out _, out _);
+            }
+            return total;
         }
 
         private CriticalCap.CriticalModel? _criticalModel;

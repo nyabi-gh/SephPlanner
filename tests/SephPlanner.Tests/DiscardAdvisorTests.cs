@@ -1,5 +1,6 @@
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
+using SephPlanner.Core.Runtime;
 using SephPlanner.Core.Solver;
 using SephPlanner.Core.Tablets;
 
@@ -78,6 +79,24 @@ public class DiscardAdvisorTests
         var problem = Problem(combo: false);
         var advice = DiscardAdvisor.Rank(problem, PlacementSolver.Solve(problem));
         Assert.Contains(advice, a => !a.IsTablet && a.ReducesComboCount && a.Activated.Contains("자물쇠"));
+    }
+
+    /// <summary>
+    /// 신비 각인 판의 신비는 단계 값을 칸 점수로 세므로 단계가 내려가도 막지 않는다. 그래도 콤보 능력치
+    /// (<c>COMBOBONUSDAMAGE</c>) 몫은 점수에 없으니, 그 몫을 잃는 제거는 다른 콤보처럼 이득으로 단정하지 않는다.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RemovingAMysticArtifactIsHeldBackOnlyWhenItLosesTheComboStatShare(bool comboBonus)
+    {
+        var problem = Problem();
+        problem.ComboEngraving = new ComboEngravingRule { Category = "TEST", Query = "O MUL/2" };
+        if (comboBonus) problem.ComboBonus = new ComboStatBonus { ComboBonusDamage = 7 };
+
+        var advice = DiscardAdvisor.Rank(problem, PlacementSolver.Solve(problem));
+
+        Assert.Equal(!comboBonus, advice.Any(a => !a.IsTablet));
     }
 
     /// <summary>
