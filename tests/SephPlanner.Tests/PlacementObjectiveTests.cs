@@ -182,8 +182,12 @@ public class PlacementObjectiveTests
     {
         var p = MixedBoard();
         p.Charms.RemoveAt(0);
-        p.CurrentTablets[10] = new TabletSpot(new GridPos(1, 1), 0);
-        p.CurrentCharms[2] = new GridPos(1, 2);
+        // 나쁜 출발점은 직전 제안으로 준다. 지금 자리로 주면 감점 빈칸 정리(7단계)가 이동 비용(6단계)에 져서 석판이
+        // 제자리에 남는다 - 보려는 것은 좁은 빔을 다듬기가 고치는가다.
+        p.CurrentTablets.Clear();
+        p.CurrentCharms.Clear();
+        p.PlannedTablets[10] = new TabletSpot(new GridPos(1, 1), 0);
+        p.PlannedCharms[2] = new GridPos(1, 2);
         var solved = PlacementSolver.Solve(p, new SolverOptions { BeamWidth = 1, ExactCandidates = 1 });
         Assert.Equal(2, solved.Score, 8);
         Assert.Equal(0, solved.UnsafeEmptyCells);

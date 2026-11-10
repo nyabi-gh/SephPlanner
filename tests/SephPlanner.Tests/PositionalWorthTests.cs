@@ -214,7 +214,15 @@ public class PositionalWorthTests
     public void APlanetCanYieldItsLevelCellWhileJoiningATelescope(bool useAdviceOptions)
     {
         var problem = PlanetWithRefill();
-        var before = PlacementSolver.Score(problem, Array.Empty<TabletPlacement>(), problem.CurrentCharms);
+        var start = new Dictionary<int, GridPos>(problem.CurrentCharms);
+        // 두 수로 얻는 +0.25 는 이동 비용에 못 미친다. 보려는 것은 탐색이 그 자리를 찾는가라, 출발 자리는 지금 자리가
+        // 아니라 직전 제안으로만 준다. 못 박힌 망원경은 지금 자리가 있어야 제자리에 남는다.
+        foreach (var charm in problem.Charms.Where(charm => !charm.Immovable))
+        {
+            problem.PlannedCharms[charm.InstanceId] = problem.CurrentCharms[charm.InstanceId];
+            problem.CurrentCharms.Remove(charm.InstanceId);
+        }
+        var before = PlacementSolver.Score(problem, Array.Empty<TabletPlacement>(), start);
         var options = useAdviceOptions ? SolverOptions.ForAdvice(default) : new SolverOptions();
         options.VerifyIncrementalPolish = true;
 

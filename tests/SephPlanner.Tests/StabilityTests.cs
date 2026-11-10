@@ -489,17 +489,15 @@ public class StabilityTests
         Assert.Equal(4, arrangement.Score, 2);
     }
 
+    /// <summary>한 수로 얻는 +0.2 는 이동 비용(0.3)보다 작아 제안하지 않는다(2026-11-10 사용자 결정).</summary>
     [Fact]
-    public void MovementPreferenceDoesNotEraseASmallGameplayGain()
+    public void AGainSmallerThanTheCostOfMovingStaysPut()
     {
         var problem = OneStepProblem(perLevel: 0.2);
 
         var arrangement = PlacementSolver.Solve(problem);
 
-        Assert.Equal(new GridPos(1, 0), arrangement.CharmPositions[10]);
-        var current = PlacementSolver.Score(problem,
-            new[] { problem.Tablets[0].At(new GridPos(0, 0), 0) }, problem.CurrentCharms);
-        Assert.Equal(0.2, arrangement.Score - current.Score, 9);
+        Assert.Equal(new GridPos(4, 0), arrangement.CharmPositions[10]);
     }
 
     [Fact]
@@ -561,8 +559,8 @@ public class StabilityTests
         var plan = PlanBuilder.Build(
             new GameSnapshot { Inventory = inventory, Run = new RunState() }, catalog)!;
 
-        Assert.Single(plan.Moves);
-        Assert.Equal(0.2, plan.Gain, 9);
+        Assert.Empty(plan.Moves);
+        Assert.Equal(0, plan.Gain, 9);
         Assert.Equal(1.0, plan.Current.Score, 9);
     }
 

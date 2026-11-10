@@ -25,12 +25,23 @@ namespace SephPlanner.Core.Solver
             Familiarity = familiarity;
         }
 
+        /// <summary>
+        /// 자리 하나를 옮기는 비용(레벨). 점수는 끝 상태만 세므로, 이것이 없으면 서른 수로 얻는 +1.9 가 한 수로 얻는
+        /// +1.9 보다 조금이라도 높으면 이긴다 - 보관 리플레이에서 38수 +1.92, 36수 +2.86 이 나왔다. 지금 자리에 남는
+        /// 것마다 이만큼을 점수 단계에 더한다(옮기는 수에 비례하는 비용과 같다). 고를 때만 쓰고 보고하는 점수에는
+        /// 넣지 않는다. 값은 잰 최적값이 아니라 보관 리플레이로 고른 추정치다.
+        /// </summary>
+        internal const double MoveCost = 0.3;
+
+        /// <summary>자리 유지 몫(지금 자리 하나에 1, 직전 제안에 <see cref="PlacementSolver.PlanBonus"/>)을 이동 비용으로 바꾼 것.</summary>
+        internal static double KeptWorth(double familiarity) => MoveCost * Math.Floor(familiarity);
+
         internal static double OnScale(double value, double scoreStep) =>
             scoreStep > 0 ? Math.Floor(value / scoreStep) * scoreStep : value;
 
         internal static PlacementQuality From(Arrangement value) => new PlacementQuality(
             value.UnretainedCharms.Count + value.UnapprovedDeactivations.Count + value.WrongSideCharms.Count + value.CombinedCharms.Count, value.UnpreservedCharms.Count, value.UnheldCharms.Count,
-            value.PriorityComboMatches, value.PriorityComboProgress, value.SupportTargetMatches, value.Objective,
+            value.PriorityComboMatches, value.PriorityComboProgress, value.SupportTargetMatches, value.Objective + KeptWorth(value.Preference),
             value.UnsafeEmptyCells, value.WastedLevels, value.Preference, value.ScoreStep);
 
         /// <summary>

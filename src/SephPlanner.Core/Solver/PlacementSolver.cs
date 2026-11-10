@@ -1315,6 +1315,9 @@ namespace SephPlanner.Core.Solver
                 model.Members[group * model.Stride + groups[group].Count++] = index;
                 model.GroupByCell[index] = group;
             }
+            // 이동 비용(PlacementQuality.MoveCost)은 여기서 세지 않는다. 빔 캐시의 열쇠에 지금 자리가 없어, 어림이 지금
+            // 자리에 따라 달라지면 캐시를 쓴 답과 새로 푼 답이 갈린다. 지금·직전 배치는 늘 후보로 들어가고 비용은 배정·
+            // 다듬기·최종 비교가 센다.
             double total = 0, familiarity = Familiarity(problem, layout);
             int missing = 0, unheld = 0, unpreserved = 0, unsafeEmpty = 0, waste = 0;
             for (var rank = 0; rank < model.Items.Length; rank++)
@@ -1916,6 +1919,7 @@ namespace SephPlanner.Core.Solver
                 if (!occupancy.HasItem(cell) && Unsafe(cell, result)) unsafeEmpty++;
             }
             score -= CriticalCap.Penalty(problem, positions, result, occupancy);
+            score += PlacementQuality.KeptWorth(familiarity);
             // 재료를 잃는 것은 사용 유지를 어긴 것과 같은 무게로 본다.
             missing += CombineRecipes.Count(problem, positions);
             return new PlacementQuality(missing, unpreserved, unheld, comboMatches,
@@ -2104,9 +2108,10 @@ namespace SephPlanner.Core.Solver
                     var value = Objective(problem, charm, cell, result, occupancy, neighbors);
                     if (usable) value += PositionalWorth.ReceivedEnhanceWorth(
                         charm, cell, neighbors, result, problem.Grid, occupancy);
+                    var anchors = Anchors(problem, charm, cell);
                     cost[row, column] = new AssignmentCost(priority,
-                        -value,
-                        Unsafe(cell, result) ? -1 : 0, Waste(charm, cell, result), -Anchors(problem, charm, cell));
+                        -value - PlacementQuality.KeptWorth(anchors),
+                        Unsafe(cell, result) ? -1 : 0, Waste(charm, cell, result), -anchors);
                 }
             }
 
