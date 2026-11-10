@@ -62,8 +62,9 @@ namespace SephPlanner.Core.Runtime
         ///      3·5, 신비 3·5·6)에도 문턱 가치가 붙고 있었다.
         /// v27: 게임 1.1.0 나침반의 부모 칸(<c>parentOffsets</c>)을 담는다. 1.1.0 에서는 이 판부터 카탈로그가
         ///      지어진다.
+        /// v28: 마법 치명타 적용을 볼트에서 소환을 뺀 공격 마법 전부로 넓힌다.
         /// </summary>
-        public const int CatalogVersion = 27;
+        public const int CatalogVersion = 28;
 
         /// <summary>플러그인이 생성하고 진단 도구가 읽는 데이터 위치.</summary>
         public static string DataDirectory =>

@@ -140,8 +140,11 @@ namespace SephPlanner.Plugin
                 if (charm is Charm_Magic magic && magic.ContainedMagic != null)
                 {
                     definition.MagicCostByLevel = Doubles(magic.ContainedMagic.mpCostsByLevel);
-                    definition.UsesMagicCritical = magic.ContainedMagic.magicPrefab != null &&
-                        magic.ContainedMagic.magicPrefab.GetComponent<ActiveSkill>() is ActiveSkill_Bolt;
+                    // 마법 치명타는 마법 피해(DamageInstance 의 fromType == Magic) 전부에 붙는다. 공격 마법은 소환을 빼면
+                    // 모두 그 피해로 쏜다 - 소환은 소환수가 친다.
+                    var skill = magic.ContainedMagic.magicPrefab != null
+                        ? magic.ContainedMagic.magicPrefab.GetComponent<ActiveSkill>() : null;
+                    definition.UsesMagicCritical = skill != null && skill.IsAttackMagic() && !(skill is ActiveSkill_Summon);
                 }
                 Dependency(charm, definition);
                 ContextStats(charm, definition);
