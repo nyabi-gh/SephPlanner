@@ -308,9 +308,9 @@ namespace SephPlanner.Plugin
         }
 
         /// <summary>
-        /// 지금 고른 것으로 계산 설정을 만든다. 후보 추천을 끄면 프리셋이 알려 주는 것도 함께
-        /// 쉰다 - 그쪽은 "무엇을 집을지"에 대한 조언이기 때문이다. 강화 우선은 "어디에 놓을지"라
-        /// 남는다.
+        /// 지금 고른 것으로 계산 설정을 만든다. 후보 추천을 끄면 프리셋의 즐겨찾기만 함께 쉰다 -
+        /// 그쪽은 "무엇을 집을지"에 대한 조언이기 때문이다. 프리셋의 콤보 우선과 강화 우선은
+        /// "어디에 놓을지"라 남는다.
         /// </summary>
         public PlanPreferences ToPreferences(bool recommendations) => new PlanPreferences
         {
