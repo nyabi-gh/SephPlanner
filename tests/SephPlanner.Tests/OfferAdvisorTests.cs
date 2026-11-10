@@ -541,4 +541,24 @@ public class OfferAdvisorTests
         Assert.False(advice[0].MatchesPreset);
         Assert.Equal(0, advice[0].ComboBonus);
     }
+
+    /// <summary>
+    /// 후보에도 사용자가 그 종류에 건 지정이 그대로 걸린다. "콤보만" 으로 둔 종류는 집어도 배치 점수가 오르지 않으므로
+    /// 증가분도 없어야 한다 - 빠뜨렸을 때 +2.35 를 광고하고 집은 뒤에는 0 이었다.
+    /// </summary>
+    [Fact]
+    public void AnOfferCarriesTheUserPreferencesForItsKind()
+    {
+        var problem = BaseProblem();
+        var candidate = Charm("capped");
+        candidate.Charm!.EntityId = 77;
+        candidate.Charm.Rarity = Rarity.Legend;
+        var free = OfferAdvisor.Rank(problem, new List<OfferCandidate> { candidate }, gold: 0);
+
+        problem.LevelCaps[77] = SephPlanner.Core.Planning.PlanPreferences.ComboOnly;
+        var comboOnly = OfferAdvisor.Rank(problem, new List<OfferCandidate> { candidate }, gold: 0);
+
+        Assert.True(free[0].Gain > 0);
+        Assert.Equal(0, comboOnly[0].Gain, 6);
+    }
 }

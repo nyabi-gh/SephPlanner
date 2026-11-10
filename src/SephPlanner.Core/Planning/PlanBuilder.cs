@@ -247,6 +247,9 @@ namespace SephPlanner.Core.Planning
                 DeactivationAllowed = new HashSet<int>(preferences.DeactivationAllowed),
                 PinnedCharms = new Dictionary<int, int>(preferences.PinnedCharms),
                 RetainedCharms = new HashSet<int>(preferences.RetainedCharms),
+                LevelCaps = new Dictionary<int, int>(preferences.LevelCaps),
+                HeldCharms = new HashSet<int>(preferences.HeldCharms),
+                SupportTargets = new HashSet<int>(preferences.SupportTargets),
                 Critical = snapshot.Run?.Critical,
                 ComboBonus = snapshot.Run?.ComboBonus,
             };
@@ -323,23 +326,14 @@ namespace SephPlanner.Core.Planning
                     Enchant = definition is null ? 0 : item.Enchant,
                     IsFiller = definition is null,
                     Immovable = item.Immovable,
-                    LevelCap = definition is not null &&
-                               preferences.LevelCaps.TryGetValue(item.DefinitionId, out var cap) ? cap : null,
                     IsDormant = definition is not null && WeaponMatch.IsDormant(definition, weapon),
-                    Weight = definition is not null &&
-                             preferences.PinnedCharms.TryGetValue(item.DefinitionId, out var pin)
-                        ? PlanPreferences.WeightOf(pin)
-                        : 1,
-                    Held = definition is not null && preferences.HeldCharms.Contains(item.DefinitionId),
-                    IsSupportTarget = definition is not null && preferences.SupportTargets.Contains(item.DefinitionId),
-                    Retained = definition is not null && preferences.RetainedCharms.Contains(item.DefinitionId),
-                    AllowDeactivation = definition is not null && preferences.DeactivationAllowed.Contains(item.DefinitionId),
                     PreferredLeft = definition is not null && item.Arrived
                         ? ScalesPosition.PreferredLeft(definition, preferences.PriorityCategories)
                         : null,
                 };
                 if (definition is not null)
                 {
+                    problem.ApplyPreferences(slot);
                     var worth = CharmWorth.Resolve(definition, values.Of(definition));
                     slot.Worth = ProjectGrowth(worth, definition, item, catalog, values);
                 }

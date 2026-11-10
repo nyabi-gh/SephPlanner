@@ -274,6 +274,24 @@ namespace SephPlanner.Core.Solver
         public HashSet<int> DeactivationAllowed { get; set; } = new HashSet<int>();
         public Dictionary<int, int> PinnedCharms { get; set; } = new Dictionary<int, int>();
         public HashSet<int> RetainedCharms { get; set; } = new HashSet<int>();
+        public Dictionary<int, int> LevelCaps { get; set; } = new Dictionary<int, int>();
+        public HashSet<int> HeldCharms { get; set; } = new HashSet<int>();
+        public HashSet<int> SupportTargets { get; set; } = new HashSet<int>();
+
+        /// <summary>
+        /// 사용자가 아티팩트 종류에 건 지정을 칸에 옮긴다. 가방의 아티팩트와 후보가 같은 길을 지나야 한다 - 후보만 몇 가지를
+        /// 빠뜨리면 상한·콤보만·조건 무시 칸·강화 대상을 모르는 채 채점되어, 집은 뒤의 변화와 광고한 증가분이 어긋난다.
+        /// </summary>
+        public void ApplyPreferences(CharmSlot slot)
+        {
+            var entity = slot.Definition.EntityId;
+            slot.LevelCap = LevelCaps.TryGetValue(entity, out var cap) ? cap : (int?)null;
+            slot.Weight = PinnedCharms.TryGetValue(entity, out var pin) ? Planning.PlanPreferences.WeightOf(pin) : 1;
+            slot.Held = HeldCharms.Contains(entity);
+            slot.IsSupportTarget = SupportTargets.Contains(entity);
+            slot.Retained = RetainedCharms.Contains(entity);
+            slot.AllowDeactivation = DeactivationAllowed.Contains(entity);
+        }
 
         /// <summary>아티팩트 밖에서 오는 치명타. 모르면 <c>null</c> 이고 상한을 보지 않는다.</summary>
         public CriticalBase? Critical { get; set; }

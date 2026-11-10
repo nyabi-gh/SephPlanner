@@ -502,16 +502,15 @@ namespace SephPlanner.Core.Solver
         {
             if (candidate.Charm is not null)
             {
-                trial.Charms.Add(new CharmSlot
+                var slot = new CharmSlot
                 {
                     Definition = candidate.Charm,
                     InstanceId = candidateId,
                     IsDormant = candidate.CharmIsDormant,
                     Worth = CharmWorth.Resolve(candidate.Charm, values?.Of(candidate.Charm)),
-                    AllowDeactivation = trial.DeactivationAllowed.Contains(candidate.Charm.EntityId),
-                    Retained = trial.RetainedCharms.Contains(candidate.Charm.EntityId),
-                    Weight = trial.PinnedCharms.TryGetValue(candidate.Charm.EntityId, out var pin) ? PlanPreferences.WeightOf(pin) : 1,
-                });
+                };
+                trial.ApplyPreferences(slot);
+                trial.Charms.Add(slot);
                 return true;
             }
             if (candidate.Tablet is null) return false;
@@ -549,6 +548,9 @@ namespace SephPlanner.Core.Solver
                 DeactivationAllowed = problem.DeactivationAllowed,
                 PinnedCharms = problem.PinnedCharms,
                 RetainedCharms = problem.RetainedCharms,
+                LevelCaps = problem.LevelCaps,
+                HeldCharms = problem.HeldCharms,
+                SupportTargets = problem.SupportTargets,
                 Critical = problem.Critical,
                 ComboBonus = problem.ComboBonus,
                 ProtectedActive = new HashSet<int>(problem.ProtectedActive),
