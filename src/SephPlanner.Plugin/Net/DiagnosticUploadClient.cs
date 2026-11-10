@@ -30,6 +30,10 @@ namespace SephPlanner.Plugin.Net
         public static string ConsentKey(Uri endpoint) =>
             DisclosureVersion + "|" + DiagnosticArchive.SchemaVersion + "|" + endpoint.AbsoluteUri;
 
+        // 동의 여부는 매 프레임 묻는다. 그때마다 Uri 와 열쇠 문자열을 짓지 않게 한 번만 만든다.
+        public static readonly Uri DefaultEndpointUri = new Uri(DefaultEndpoint);
+        public static readonly string DefaultConsentKey = ConsentKey(DefaultEndpointUri);
+
         public async Task<string> SendAsync(Uri endpoint, string consent, Guid reportId, byte[] archive, CancellationToken cancellation)
         {
             if (endpoint.Scheme != Uri.UriSchemeHttps || endpoint.UserInfo.Length != 0 || endpoint.Fragment.Length != 0 ||

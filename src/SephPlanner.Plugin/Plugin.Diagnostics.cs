@@ -285,7 +285,7 @@ namespace SephPlanner.Plugin
             _diagnosticCancellation.CancelAfter(TimeSpan.FromSeconds(60));
             var cancellation = _diagnosticCancellation.Token;
             var consent = automatic
-                ? DiagnosticUploadClient.ConsentKey(new Uri(DiagnosticUploadClient.DefaultEndpoint))
+                ? DiagnosticUploadClient.DefaultConsentKey
                 : _settings.DiagnosticConsent.Value;
             _diagnosticTask = Task.Run(async () =>
             {
@@ -294,7 +294,7 @@ namespace SephPlanner.Plugin
                     cancellation.ThrowIfCancellationRequested();
                     var archive = DiagnosticArchive.Create(capture.Files);
                     File.WriteAllBytes(Path.Combine(capture.DirectoryPath, "report.zip"), archive);
-                    var receipt = await _diagnosticClient.SendAsync(new Uri(DiagnosticUploadClient.DefaultEndpoint), consent,
+                    var receipt = await _diagnosticClient.SendAsync(DiagnosticUploadClient.DefaultEndpointUri, consent,
                         capture.Id, archive, cancellation).ConfigureAwait(false);
                     var message = Phrase.Join(" · ", new Phrase("진단 접수 완료 · 제보 번호 {0}", receipt),
                         capture.HasFailures ? new Phrase("일부 자료 수집 실패 포함") : null);

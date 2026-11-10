@@ -20,12 +20,11 @@ namespace SephPlanner.Plugin
 
         public Action ReviewAutomaticDiagnostics { get; set; } = () => { };
 
-        public static string AutomaticDiagnosticKey => AutomaticDiagnosticPolicy.ConsentKey(new Uri(DiagnosticUploadClient.DefaultEndpoint));
+        public static string AutomaticDiagnosticKey => AutomaticDiagnosticPolicy.DefaultConsentKey;
 
         public bool AutomaticDiagnosticAllowed => AutomaticDiagnosticConsent.Value == AutomaticDiagnosticKey;
 
-        public bool DiagnosticUploadAllowed => DiagnosticConsent.Value ==
-            DiagnosticUploadClient.ConsentKey(new Uri(DiagnosticUploadClient.DefaultEndpoint));
+        public bool DiagnosticUploadAllowed => DiagnosticConsent.Value == DiagnosticUploadClient.DefaultConsentKey;
 
         private void BindDiagnostics(ISettingStore config)
         {
@@ -83,7 +82,7 @@ namespace SephPlanner.Plugin
             var previousChoice = DiagnosticChoiceMade.Value;
             try
             {
-                DiagnosticConsent.Value = allowed ? DiagnosticUploadClient.ConsentKey(new Uri(DiagnosticUploadClient.DefaultEndpoint)) : "";
+                DiagnosticConsent.Value = allowed ? DiagnosticUploadClient.DefaultConsentKey : "";
                 DiagnosticChoiceMade.Value = true;
                 _config.Commit();
             }

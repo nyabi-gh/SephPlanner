@@ -12,6 +12,8 @@ namespace SephPlanner.Plugin.Net
         private readonly HashSet<string> _seen = new HashSet<string>(StringComparer.Ordinal);
 
         public static string ConsentKey(Uri endpoint) => DisclosureVersion + "|" + DiagnosticUploadClient.ConsentKey(endpoint);
+
+        public static readonly string DefaultConsentKey = ConsentKey(DiagnosticUploadClient.DefaultEndpointUri);
         public bool TryAccept(string key, DiagnosticUploadThrottle throttle)
         {
             var shape = Shape(key);
