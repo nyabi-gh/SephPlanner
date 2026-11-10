@@ -1,6 +1,7 @@
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
+using SephPlanner.Core.Solver;
 
 namespace SephPlanner.Tests;
 
@@ -68,5 +69,14 @@ public class CombineRecipeTests
         var plain = PlanFingerprint.Placement(Snapshot(null, at), "");
         Assert.Equal(plain, PlanFingerprint.Placement(Snapshot(new List<List<int>>(), at), ""));
         Assert.NotEqual(plain, PlanFingerprint.Placement(Snapshot(new List<List<int>> { new() { Wing, Cloth } }, at), ""));
+    }
+
+    /// <summary>후보 조언은 판을 복제해 푼다. 레시피를 흘리면 후보를 놓는 자리가 재료를 붙인다.</summary>
+    [Fact]
+    public void AnOfferTrialKeepsTheRecipes()
+    {
+        var problem = new PlacementProblem { CombineRecipes = { new List<int> { Wing, Cloth } } };
+
+        Assert.Same(problem.CombineRecipes, OfferAdvisor.Clone(problem).CombineRecipes);
     }
 }

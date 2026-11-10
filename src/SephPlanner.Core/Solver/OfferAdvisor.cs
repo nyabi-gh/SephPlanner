@@ -543,6 +543,7 @@ namespace SephPlanner.Core.Solver
                 FixedEffects = problem.FixedEffects,
                 ComboEngraving = problem.ComboEngraving,
                 ComboCounts = problem.ComboCounts,
+                CombineRecipes = problem.CombineRecipes,
                 Combos = problem.Combos,
                 PriorityCategories = problem.PriorityCategories,
                 DeactivationAllowed = problem.DeactivationAllowed,
