@@ -147,14 +147,16 @@ namespace SephPlanner.Core.Solver
             var worth = 0.0;
             foreach (var category in categories)
             {
-                if (string.IsNullOrEmpty(category) || problem.ScoresComboItself(category)) continue;
+                if (string.IsNullOrEmpty(category)) continue;
 
                 var combo = problem.Combos(category);
                 if (combo is null) continue;
 
-                var step = problem.ComboStep(
-                    combo, ComboCounting.CountFor(problem, charm, category, neighbors, activity), out var completes, out _);
-                if (completes) worth += step;
+                var count = ComboCounting.CountFor(problem, charm, category, neighbors, activity);
+                var step = problem.ComboStep(combo, count, out var completes, out _);
+                if (!completes) continue;
+                // 신비 각인 판은 단계 값을 칸 점수로 이미 센다. 게임은 신비도 콤보로 세므로 콤보 능력치 몫은 남는다.
+                worth += problem.ScoresComboItself(category) ? step - problem.Scale.OfComboStep(combo, count, out _, out _) : step;
             }
             return worth;
         }
