@@ -64,7 +64,8 @@ namespace SephPlanner.Core.Solver
                 var at = cell.Offset(offset, 0);
                 if (!neighbors.TryGetValue(at, out var neighbor) || neighbor == charm || neighbor.IsFiller) continue;
                 side.Clear();
-                PositionalWorth.AddCategories(neighbor, at, side, neighbors);
+                // 꺼진 나침반은 카테고리를 비운다(게임 OnPreSetEffectRefreshed). 활성을 넘기지 않으면 켜진 것으로 본다.
+                PositionalWorth.AddCategories(neighbor, at, side, neighbors, activity);
                 foreach (var category in side) Add(matches, category);
             }
             foreach (var (category, count) in matches)

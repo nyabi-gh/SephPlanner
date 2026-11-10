@@ -302,7 +302,8 @@ namespace SephPlanner.Core.Solver
 
         /// <summary><see cref="CategoriesOf"/>와 같은 것을 목록에 담는다. 최내곽 루프는 이쪽을 쓴다.</summary>
         internal static void AddCategories(
-            CharmSlot charm, GridPos cell, List<string> into, IReadOnlyDictionary<GridPos, CharmSlot>? neighbors = null)
+            CharmSlot charm, GridPos cell, List<string> into, IReadOnlyDictionary<GridPos, CharmSlot>? neighbors = null,
+            in CharmActivity activity = default)
         {
             // 종이끼리는 갱신 순서와 이전 상태에 의존하므로 정적 정의 대신 최근 관측을 쓴다.
             if (charm.Definition.Behavior == "Charm_WhitePaper")
@@ -311,12 +312,12 @@ namespace SephPlanner.Core.Solver
             }
             else if (neighbors is not null && Compass.Is(charm.Definition))
             {
-                Compass.AddCategories(charm, cell, neighbors, default, into);
+                Compass.AddCategories(charm, cell, neighbors, activity, into);
             }
             else if (neighbors is not null && IsNeedle(charm.Definition))
             {
                 if (DependencyTarget(charm, cell, neighbors, out var target, out var targetCell))
-                    AddCategories(target, targetCell, into, neighbors);
+                    AddCategories(target, targetCell, into, neighbors, activity);
             }
             else if (charm.Definition.LineCategories.Count == 0) into.AddRange(charm.Definition.Categories);
             else into.Add(LineCategory(charm.Definition, cell));

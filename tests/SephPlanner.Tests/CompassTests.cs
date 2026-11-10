@@ -248,4 +248,27 @@ public class CompassTests
         Assert.Equal(new[] { "EMBER" }, Categories(problem, 4, withActivity: true));
         Assert.Contains(4, Score(problem).UnlinkedCharms);
     }
+
+    /// <summary>
+    /// 하얀 종이는 옆의 꺼진 나침반에서 카테고리를 받지 못한다. 게임 나침반은 꺼지면 <c>assignedCategory</c> 를 비운다.
+    /// </summary>
+    [Fact]
+    public void APaperGetsNothingFromASwitchedOffCompass()
+    {
+        var paper = new CharmSlot
+        {
+            InstanceId = 5,
+            Definition = new CharmDefinition { EntityId = 5, MaxLevel = 4, Behavior = "Charm_WhitePaper", PaperMatch = 2 },
+        };
+        var problem = Problem(new GridSpec(3, 2, 6),
+            (Root(1, "EMBER"), new GridPos(0, 0)),
+            (DamageUp(4), new GridPos(0, 1)),
+            (paper, new GridPos(1, 1)),
+            (Root(6, "EMBER"), new GridPos(2, 1)));
+
+        Assert.Equal(new[] { "EMBER" }, Categories(problem, 5, withActivity: true));
+
+        problem.FixedEffects.Add(new FixedEffectCell { Position = new GridPos(0, 1), Disable = 1 });
+        Assert.Empty(Categories(problem, 5, withActivity: true));
+    }
 }
