@@ -322,6 +322,77 @@ public class PlanRunnerTests
     }
 
     /// <summary>
+    /// 실패한 조언은 같은 판이어도 물러섰다가 다시 푼다. 다시 풀지 않으면 다음 지문 변화까지
+    /// 조언 칸이 비어 있다.
+    /// </summary>
+    [Fact]
+    public void AFailedAdviceIsRetriedOnTheSameBoard()
+    {
+        PlanBuildOperation build = (
+            GameSnapshot _, ICatalog _, PlanPreferences _,
+            out PlanBlocker blocker, Plan? _, LayoutCache _2, bool settled, CancellationToken _3) =>
+        {
+            blocker = PlanBlocker.None;
+            return new Plan();
+        };
+        var advices = 0;
+        PlanAdviceOperation advise = (
+            Plan placement, GameSnapshot _1, ICatalog _2, PlanPreferences _3,
+            LayoutCache _4, CancellationToken _5) =>
+        {
+            if (Interlocked.Increment(ref advices) == 1) throw new InvalidOperationException("조언 실패");
+            return placement;
+        };
+        var runner = new PlanRunner(EmptyCatalog, build, TimeSpan.Zero, advise);
+
+        runner.Submit(Snapshot(1), PlanPreferences.None, "catalog");
+        Assert.True(SpinWait.SpinUntil(
+            () => runner.State.AdviceError is not null, TimeSpan.FromSeconds(5)));
+
+        Assert.True(SpinWait.SpinUntil(() =>
+        {
+            runner.Submit(Snapshot(1), PlanPreferences.None, "catalog");
+            return runner.State.AdviceIsCurrent;
+        }, TimeSpan.FromSeconds(5)));
+        Assert.Null(runner.State.AdviceError);
+        Assert.Equal(2, Volatile.Read(ref advices));
+    }
+
+    /// <summary>
+    /// 같은 판을 다시 푸는 동안에도 실패 표시를 남긴다. 지우면 화면이 실패와 "계산 중" 사이를
+    /// 재시도마다 오간다.
+    /// </summary>
+    [Fact]
+    public void ARetryKeepsTheFailureUntilItSucceeds()
+    {
+        var calls = 0;
+        using var retrying = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        PlanBuildOperation build = (
+            GameSnapshot _, ICatalog _, PlanPreferences _,
+            out PlanBlocker blocker, Plan? _, LayoutCache _2, bool settled, CancellationToken _3) =>
+        {
+            blocker = PlanBlocker.None;
+            if (Interlocked.Increment(ref calls) == 1) throw new InvalidOperationException("broken");
+            retrying.Set();
+            release.Wait(TimeSpan.FromSeconds(5), CancellationToken.None);
+            return new Plan();
+        };
+        var runner = new PlanRunner(EmptyCatalog, build, TimeSpan.Zero);
+
+        runner.Submit(Snapshot(1), PlanPreferences.None, "catalog");
+        Assert.True(SpinWait.SpinUntil(() => runner.State.Error is not null, TimeSpan.FromSeconds(5)));
+
+        runner.Submit(Snapshot(1), PlanPreferences.None, "catalog");
+        Assert.True(retrying.Wait(TimeSpan.FromSeconds(5)));
+        Assert.Equal("broken", runner.State.Error);
+
+        release.Set();
+        Assert.True(SpinWait.SpinUntil(() => runner.State.IsCurrent, TimeSpan.FromSeconds(5)));
+        Assert.Null(runner.State.Error);
+    }
+
+    /// <summary>
     /// 뒤에 요청이 오면 지금 도는 풀이의 답은 어차피 버려진다. 그것을 끝까지 돌게 두면 CPU 와
     /// 할당을 그대로 버리는 것이고, 실측에서 그 한 번이 1초에 2GB 까지 갔다.
     /// </summary>

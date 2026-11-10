@@ -101,6 +101,7 @@ namespace SephPlanner.Core.Text
                 "強化上限：超過{0}級的強化格讓給其他物品。若有空餘格子，也可能放在更高等級。"),
 
             new Entry("후보를 계산하고 있습니다.", "Calculating candidates.", "候補を計算しています。", "正在计算候选。", "正在計算候選。"),
+            new Entry("후보 계산 실패 - 잠시 뒤 다시 계산합니다.", "Candidate calculation failed - retrying shortly.", "候補の計算に失敗 - しばらくして再計算します。", "候选计算失败 - 稍后将重新计算。", "候選計算失敗 - 稍後將重新計算。"),
             new Entry("효과를 충분히 비교하지 못한 아이템이 있습니다. 실제 체감도 함께 고려하세요.", "Some items couldn't be fully compared. Trust your own feel too.", "効果を十分に比較できていないアイテムがあります。実際の体感も考慮してください。", "部分物品未能充分比较效果，请结合实际体验判断。", "部分物品未能充分比較效果，請結合實際體感判斷。"),
             new Entry("순위는 참고용입니다.", "Rankings are for reference only.", "順位は参考です。", "排名仅供参考。", "排名僅供參考。"),
             new Entry("배치 못 찾음", "No layout found", "配置なし", "未找到布局", "未找到佈局"),
@@ -121,6 +122,8 @@ namespace SephPlanner.Core.Text
             new Entry("켜지는 아티팩트: {0}", "Artifacts turned on: {0}", "有効になるアーティファクト：{0}", "将启用的神器：{0}", "將啟用的神器：{0}"),
 
             new Entry("계산 중", "Calculating", "計算中", "计算中", "計算中"),
+            new Entry("계산 실패", "Failed", "計算失敗", "计算失败", "計算失敗"),
+            new Entry("잠시 뒤 다시 계산합니다.", "Retrying shortly.", "しばらくして再計算します。", "稍后将重新计算。", "稍後將重新計算。"),
             new Entry("인챈트 추천을 계산하고 있습니다.", "Calculating enchant suggestions.", "エンチャントのおすすめを計算しています。", "正在计算附魔建议。", "正在計算附魔建議。"),
             new Entry("추천 대상 없음", "No suggestion", "おすすめなし", "无推荐对象", "無推薦對象"),
             new Entry("제단 정보를 읽는 중입니다.", "Reading the altar.", "作業台の情報を読み込み中です。", "正在读取工作台信息。", "正在讀取工作臺資訊。"),

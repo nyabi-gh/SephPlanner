@@ -846,16 +846,18 @@ namespace SephPlanner.Plugin
             var stale = !state.IsCurrent;
 
             // 조언은 배치 뒤에 붙는다. 그 사이에 조언 칸이 빈 것은 "없다" 가 아니라 "아직" 이다.
-            var adviceBusy = state.AdviceBusy || plan.AdviceStatus == AdviceStatus.Pending;
+            // 실패한 조언은 다시 풀 때까지 Pending 으로 남으므로, 실패를 먼저 가른다.
+            var adviceFailed = state.AdviceError != null;
+            var adviceBusy = !adviceFailed && (state.AdviceBusy || plan.AdviceStatus == AdviceStatus.Pending);
 
             var mixerOpen = _settings.Recommendations.Value && GameReader.IsMixerOpen();
             var enchantOpen = _settings.Recommendations.Value && GameReader.IsEnchantOpen();
-            AutoExpand(plan, mixerOpen, enchantOpen, adviceBusy);
+            AutoExpand(plan, mixerOpen, enchantOpen, adviceBusy || adviceFailed);
 
             var preview = PreviewName(plan);
             try
             {
-                Render(plan, preview, state, mixerOpen, enchantOpen, stale, adviceBusy);
+                Render(plan, preview, state, mixerOpen, enchantOpen, stale, adviceBusy, adviceFailed);
             }
             catch (Exception ex)
             {
@@ -872,7 +874,7 @@ namespace SephPlanner.Plugin
 
         private void Render(
             Plan plan, string preview, PlanRunState state, bool mixerOpen, bool enchantOpen,
-            bool stale, bool adviceBusy)
+            bool stale, bool adviceBusy, bool adviceFailed)
         {
             _hud.Render(new HudFrame
             {
@@ -895,6 +897,7 @@ namespace SephPlanner.Plugin
                 PreviewKey = _previewKey,
                 Stale = stale,
                 AdviceBusy = adviceBusy,
+                AdviceFailed = adviceFailed,
             });
         }
 
@@ -1088,9 +1091,9 @@ namespace SephPlanner.Plugin
         /// 게시되므로 창을 연 직후에는 조언이 비어 있는데, 그때 접혀 있으면 계산 중이라는 말도
         /// 함께 숨는다.
         /// </summary>
-        private void AutoExpand(Plan plan, bool mixerOpen, bool enchantOpen, bool adviceBusy)
+        private void AutoExpand(Plan plan, bool mixerOpen, bool enchantOpen, bool adviceUnsettled)
         {
-            var coming = adviceBusy && _lastSnapshot != null && _lastSnapshot.Offers.Count > 0;
+            var coming = adviceUnsettled && _lastSnapshot != null && _lastSnapshot.Offers.Count > 0;
             var expanded = _adviceExpansion.Update(plan.Offers.Count > 0 || coming, mixerOpen, enchantOpen);
             if (expanded.HasValue) _expanded = expanded.Value;
         }

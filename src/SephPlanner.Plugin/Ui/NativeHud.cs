@@ -510,8 +510,8 @@ namespace SephPlanner.Plugin.Ui
                 _moves.End();
             }
             RenderOffers(plan, frame, previewed);
-            RenderMixes(plan, snapshot.Mixer, frame.MixerOpen, frame.AdviceBusy, previewed == null);
-            RenderEnchants(plan, snapshot.EnchantChance, frame.EnchantOpen, frame.AdviceBusy, previewed == null);
+            RenderMixes(plan, snapshot.Mixer, frame.MixerOpen, frame.AdviceBusy, frame.AdviceFailed, previewed == null);
+            RenderEnchants(plan, snapshot.EnchantChance, frame.EnchantOpen, frame.AdviceBusy, frame.AdviceFailed, previewed == null);
             RenderDiscards(plan, previewed == null);
             RenderChips(snapshot, frame);
         }
@@ -832,10 +832,10 @@ namespace SephPlanner.Plugin.Ui
 
             // 후보가 있는데 아직 조언이 안 붙었으면 그렇다고 말한다. 배치가 먼저 게시되므로
             // 창을 연 직후의 빈 칸은 "볼 것이 없다" 가 아니다.
-            var pending = plan.Offers.Count == 0 && frame.AdviceBusy &&
+            var pending = plan.Offers.Count == 0 && (frame.AdviceBusy || frame.AdviceFailed) &&
                           frame.Snapshot != null && frame.Snapshot.Offers.Count > 0;
             _offerNotice.text = pending
-                ? Tr("후보를 계산하고 있습니다.")
+                ? frame.AdviceFailed ? Tr("후보 계산 실패 - 잠시 뒤 다시 계산합니다.") : Tr("후보를 계산하고 있습니다.")
                 : guessed > 0
                     ? Tr("효과를 충분히 비교하지 못한 아이템이 있습니다. 실제 체감도 함께 고려하세요.")
                     : Tr("순위는 참고용입니다.");
@@ -914,7 +914,7 @@ namespace SephPlanner.Plugin.Ui
         /// 합성 추천이 상점을 열어도 따라 붙던 것과 같은 실수를 반복하지 않는다.
         /// </summary>
         private void RenderEnchants(
-            Plan plan, EnchantChanceState chance, bool enchantOpen, bool adviceBusy, bool planDrawn)
+            Plan plan, EnchantChanceState chance, bool enchantOpen, bool adviceBusy, bool adviceFailed, bool planDrawn)
         {
             _enchants.Begin();
             for (var i = 0; i < plan.Enchants.Count && i < EnchantRows; i++)
@@ -936,7 +936,9 @@ namespace SephPlanner.Plugin.Ui
             if (enchantOpen && plan.Enchants.Count == 0)
             {
                 // 조언은 배치보다 뒤에 붙는다. 그 사이에 "없음" 이라고 하면 거짓말이 된다.
-                if (adviceBusy)
+                if (adviceFailed)
+                    _enchants.Add(Tr("계산 실패"), Tr("잠시 뒤 다시 계산합니다."), NativeSkin.Bad);
+                else if (adviceBusy)
                     _enchants.Add(Tr("계산 중"), Tr("인챈트 추천을 계산하고 있습니다."), NativeSkin.TextDim);
                 else
                     _enchants.Add(Tr("추천 대상 없음"), chance == null ? Tr("제단 정보를 읽는 중입니다.") :
@@ -949,7 +951,7 @@ namespace SephPlanner.Plugin.Ui
             Widgets.SetActive(_enchants.Root, enchantOpen);
         }
 
-        private void RenderMixes(Plan plan, MixerState mixer, bool mixerOpen, bool adviceBusy, bool planDrawn)
+        private void RenderMixes(Plan plan, MixerState mixer, bool mixerOpen, bool adviceBusy, bool adviceFailed, bool planDrawn)
         {
             _mixes.Begin();
             for (var i = 0; i < plan.Mixes.Count && i < MixRows; i++)
@@ -973,7 +975,9 @@ namespace SephPlanner.Plugin.Ui
             if (mixerOpen && plan.Mixes.Count == 0)
             {
                 // 조언은 배치보다 뒤에 붙는다. 그 사이에 "없음" 이라고 하면 거짓말이 된다.
-                if (adviceBusy)
+                if (adviceFailed)
+                    _mixes.Add(Tr("계산 실패"), Tr("잠시 뒤 다시 계산합니다."), NativeSkin.Bad);
+                else if (adviceBusy)
                     _mixes.Add(Tr("계산 중"), Tr("합성 추천을 계산하고 있습니다."), NativeSkin.TextDim);
                 else
                     _mixes.Add(Tr("추천 조합 없음"), mixer == null ? Tr("합성기 정보를 읽는 중입니다.") :

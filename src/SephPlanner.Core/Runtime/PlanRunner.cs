@@ -200,7 +200,10 @@ namespace SephPlanner.Core.Runtime
         private long _adviceStarted;
         private long _advicePublished;
 
-        private DateTime _retryAfterUtc;
+        private long _placementRetryAt;
+        private int _placementFailures;
+        private long _adviceRetryAt;
+        private int _adviceFailures;
         private bool _disposed;
 
         private readonly PlanSolveStat _placementStat = new PlanSolveStat();
@@ -348,10 +351,16 @@ namespace SephPlanner.Core.Runtime
                     if (_running is { Advice: true }) _running.Cancellation.Cancel();
                 }
                 else if (_error is not null && _running is null &&
-                         !PlacementNeededLocked() && DateTime.UtcNow >= _retryAfterUtc)
+                         !PlacementNeededLocked() && SolveClock.Now >= _placementRetryAt)
                 {
-                    // 같은 판인데 앞선 계산이 실패했다. 물러섰다가 다시 해 본다.
-                    NewPlacementLocked();
+                    // 같은 판인데 앞선 계산이 실패했다. 물러섰다가 다시 해 본다. 실패 표시는 성공할
+                    // 때까지 남긴다 - 지우면 화면이 실패와 "계산 중" 사이를 오간다.
+                    RequestPlacementLocked();
+                }
+                else if (_adviceError is not null && _running is null &&
+                         !AdviceNeededLocked() && SolveClock.Now >= _adviceRetryAt)
+                {
+                    _adviceGeneration++;
                 }
 
                 StartNextLocked();
@@ -361,9 +370,15 @@ namespace SephPlanner.Core.Runtime
 
         private void NewPlacementLocked()
         {
+            _error = null;
+            _placementFailures = 0;
+            RequestPlacementLocked();
+        }
+
+        private void RequestPlacementLocked()
+        {
             _placementGeneration++;
             _placementRequestedAt = SolveClock.Now;
-            _error = null;
             NewAdviceLocked();
 
             // 돌고 있는 풀이의 답은 이제 쓰이지 않는다. 실측에서 한 번이 1초, 할당 2GB 까지
@@ -378,7 +393,22 @@ namespace SephPlanner.Core.Runtime
         {
             _adviceGeneration++;
             _adviceError = null;
+            _adviceFailures = 0;
         }
+
+        /// <summary>
+        /// 같은 판의 실패를 다시 풀기까지 기다릴 시간. 실패가 거듭되면 늘린다 - 끝에서 실패하는
+        /// 비싼 풀이를 고정 간격으로 되풀이하면 세션 내내 CPU 와 할당을 그만큼 쓴다.
+        /// </summary>
+        private long RetryAt(int failures)
+        {
+            var doublings = Math.Min(failures - 1, 16);
+            var delay = TimeSpan.FromTicks(Math.Min(_retryDelay.Ticks << doublings, MaxRetryDelay.Ticks));
+            return SolveClock.Now + (long)(delay.TotalSeconds * System.Diagnostics.Stopwatch.Frequency);
+        }
+
+        /// <summary>재시도 간격의 상한. 잰 값이 아니라 정한 값이다(추정).</summary>
+        private static readonly TimeSpan MaxRetryDelay = TimeSpan.FromSeconds(60);
 
         /// <summary>배치를 다시 풀어야 하는데 아직 시작하지 않았다.</summary>
         private bool PlacementNeededLocked() =>
@@ -623,7 +653,7 @@ namespace SephPlanner.Core.Runtime
                 RecordFailure(request, failure);
                 _error = failure.Message;
                 _blocker = PlanBlocker.None;
-                _retryAfterUtc = DateTime.UtcNow + _retryDelay;
+                _placementRetryAt = RetryAt(++_placementFailures);
                 return;
             }
 
@@ -636,6 +666,7 @@ namespace SephPlanner.Core.Runtime
             _replaySettled = request.Settled;
             _blocker = blocker;
             _error = null;
+            _placementFailures = 0;
 
             // 새 배치의 조언은 아직 아무것도 아니다. 0 은 어느 요청 세대와도 같지 않다.
             _advicePublished = 0;
@@ -663,6 +694,7 @@ namespace SephPlanner.Core.Runtime
                 // 배치는 멀쩡하다. 조언 칸만 낡은 채로 두고 그 사실을 적는다.
                 RecordFailure(request, failure);
                 _adviceError = failure.Message;
+                _adviceRetryAt = RetryAt(++_adviceFailures);
                 return;
             }
 
@@ -678,6 +710,8 @@ namespace SephPlanner.Core.Runtime
             _replayLanguage = request.Language;
             _latest = plan;
             _advicePublished = request.Generation;
+            _adviceError = null;
+            _adviceFailures = 0;
         }
     }
 }

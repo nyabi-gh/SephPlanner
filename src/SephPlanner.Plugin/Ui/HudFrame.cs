@@ -44,6 +44,9 @@ namespace SephPlanner.Plugin.Ui
         /// </summary>
         public bool AdviceBusy;
 
+        /// <summary>조언 계산이 실패해 다시 풀 차례를 기다린다. 그동안 "계산 중" 이라고 하면 거짓말이다.</summary>
+        public bool AdviceFailed;
+
         /// <summary>보고 있는 후보의 <see cref="OfferAdvice.Key"/>. 빈 문자열이면 미리보기가 없다.</summary>
         public string PreviewKey = "";
 
@@ -79,6 +82,7 @@ namespace SephPlanner.Plugin.Ui
         private readonly bool _multiplayerAutoPlace;
         private readonly bool _stale;
         private readonly bool _adviceBusy;
+        private readonly bool _adviceFailed;
 
         public HudFrameKey(HudFrame frame)
         {
@@ -108,6 +112,7 @@ namespace SephPlanner.Plugin.Ui
             // 계획 객체는 그대로인 채 이 표시만 켜지고 꺼진다.
             _stale = frame.Stale;
             _adviceBusy = frame.AdviceBusy;
+            _adviceFailed = frame.AdviceFailed;
         }
 
         public bool Matches(in HudFrameKey other) =>
@@ -127,6 +132,7 @@ namespace SephPlanner.Plugin.Ui
             _multiplayerAutoPlace == other._multiplayerAutoPlace &&
             _stale == other._stale &&
             _adviceBusy == other._adviceBusy &&
+            _adviceFailed == other._adviceFailed &&
             string.Equals(_hint, other._hint, StringComparison.Ordinal) &&
             string.Equals(_reason, other._reason, StringComparison.Ordinal) &&
             string.Equals(_previewKey, other._previewKey, StringComparison.Ordinal);
