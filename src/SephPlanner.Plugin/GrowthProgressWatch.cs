@@ -53,7 +53,7 @@ namespace SephPlanner.Plugin
 
         private static void Forget(string effectName)
         {
-            if (GrowthProgressReading.TryRead(effectName, "0", out var instanceId, out _))
+            if (GrowthProgressReading.TryReadInstance(effectName, out var instanceId))
                 Progress.Remove(instanceId);
         }
     }

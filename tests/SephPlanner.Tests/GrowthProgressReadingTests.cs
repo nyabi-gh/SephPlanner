@@ -35,11 +35,22 @@ public sealed class GrowthProgressReadingTests
     }
 
     [Fact]
-    public void ACounterWithoutAGoalStillReads()
+    public void ANumberWithoutAGoalIsNotProgress()
     {
-        // 게임이 목표 없이 숫자만 보내더라도 진행도는 알 수 있다.
-        Assert.True(GrowthProgressReading.TryRead("Charm_9", "12", out var instanceId, out var progress));
-        Assert.Equal(9, instanceId);
-        Assert.Equal(12, progress);
+        // 무딘 공명석은 같은 HUD 에 지금 이동 속도 %("100")를 보낸다. 목표 1 짜리를 다 자란 것으로 읽으면 안 된다.
+        Assert.False(GrowthProgressReading.TryRead("Charm_9", "100", out var instanceId, out var progress));
+        Assert.Equal(0, instanceId);
+        Assert.Equal(0, progress);
+    }
+
+    [Theory]
+    [InlineData("Charm_9", true, 9)]
+    [InlineData("Charm_x", false, 0)]
+    [InlineData("Other_9", false, 0)]
+    [InlineData(null, false, 0)]
+    public void TheInstanceIsReadFromTheNameAlone(string? effectName, bool read, int expected)
+    {
+        Assert.Equal(read, GrowthProgressReading.TryReadInstance(effectName, out var instanceId));
+        Assert.Equal(expected, instanceId);
     }
 }

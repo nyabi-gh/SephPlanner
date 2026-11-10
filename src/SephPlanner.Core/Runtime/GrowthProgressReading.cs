@@ -19,23 +19,37 @@ namespace SephPlanner.Core.Runtime
 
         public static bool TryRead(string? effectName, string? value, out int instanceId, out int progress)
         {
-            instanceId = 0;
             progress = 0;
-            if (effectName is null || value is null) return false;
-            if (!effectName.StartsWith(Prefix, StringComparison.Ordinal)) return false;
-            if (!int.TryParse(effectName.AsSpan(Prefix.Length), NumberStyles.Integer,
-                    CultureInfo.InvariantCulture, out instanceId)) return false;
+            if (!TryReadInstance(effectName, out instanceId) || value is null) return Fail(out instanceId);
 
+            // 진행도는 n/목표 꼴로만 온다. 무딘 공명석(Charm_GrowthMoveSpeed)은 같은 HUD 에 지금 이동
+            // 속도 %를 숫자만으로 보내는데, 그것을 진행도로 읽으면 목표 1을 넘겨 다 자란 것이 된다.
             var slash = value.IndexOf('/');
-            var counted = slash < 0 ? value.AsSpan() : value.AsSpan(0, slash);
-            if (!int.TryParse(counted.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out progress) ||
-                progress < 0)
+            if (slash < 0) return Fail(out instanceId);
+            if (!int.TryParse(value.AsSpan(0, slash).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture,
+                    out progress) || progress < 0)
             {
-                instanceId = 0;
                 progress = 0;
-                return false;
+                return Fail(out instanceId);
             }
             return true;
+        }
+
+        /// <summary>HUD 이름 <c>Charm_{인스턴스}</c>에서 인스턴스 번호만 읽는다.</summary>
+        public static bool TryReadInstance(string? effectName, out int instanceId)
+        {
+            instanceId = 0;
+            if (effectName is null || !effectName.StartsWith(Prefix, StringComparison.Ordinal)) return false;
+            if (int.TryParse(effectName.AsSpan(Prefix.Length), NumberStyles.Integer,
+                    CultureInfo.InvariantCulture, out instanceId)) return true;
+            instanceId = 0;
+            return false;
+        }
+
+        private static bool Fail(out int instanceId)
+        {
+            instanceId = 0;
+            return false;
         }
     }
 }
