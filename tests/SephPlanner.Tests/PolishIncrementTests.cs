@@ -105,6 +105,22 @@ public class PolishIncrementTests
     }
 
     /// <summary>
+    /// 못 박힌 아티팩트는 어느 다듬기에서도 옮겨지지 않는다. 지원 짝을 사슬째 옮기는 다듬기가 사슬 끝의 못 박힌
+    /// 대상까지 끌고 가, 적용기가 건너뛴 뒤 목표 확인이 실패한 적이 있다. 161 번 판이 그런 사슬이다(400판 중 하나).
+    /// </summary>
+    [Fact]
+    public void APinnedArtifactNeverMoves()
+    {
+        foreach (var seed in Enumerable.Range(0, 40).Append(161))
+        {
+            var problem = RandomBoard(seed);
+            var best = PlacementSolver.Solve(problem, new SolverOptions());
+            foreach (var charm in problem.Charms.Where(charm => charm.Immovable))
+                Assert.Equal(problem.CurrentCharms[charm.InstanceId], best.CharmPositions[charm.InstanceId]);
+        }
+    }
+
+    /// <summary>
     /// 이웃을 읽는 배치 조건들. 하나라도 "제 칸만 읽는다"로 잘못 분류되면 대조가 잡는다.
     /// </summary>
     private static readonly string[] Criteria =

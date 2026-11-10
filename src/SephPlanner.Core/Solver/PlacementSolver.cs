@@ -1680,6 +1680,7 @@ namespace SephPlanner.Core.Solver
                 {
                     if (!DirectedCharmSupport.Accepts(helper, target)) continue;
                     HashSet<CharmSlot>? connected = null;
+                    var pinned = false;
                     foreach (var cell in free)
                     {
                         options.Cancellation.ThrowIfCancellationRequested();
@@ -1705,7 +1706,10 @@ namespace SephPlanner.Core.Solver
                                     expanded |= connected.Add(existingTarget);
                                 }
                             } while (expanded);
+                            // 사슬은 통째로 옮긴다. 못 박힌 것이 끼면 이 대상으로는 옮길 수 없다.
+                            pinned = connected.Any(other => other.Immovable);
                         }
+                        if (pinned) break;
                         destinations.Clear();
                         destinations[target.InstanceId] = targetCell;
                         var origin = positions[target.InstanceId];
