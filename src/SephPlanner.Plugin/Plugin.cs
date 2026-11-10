@@ -216,8 +216,10 @@ namespace SephPlanner.Plugin
             }
             catch (Exception ex)
             {
-                if (NewError(label, ex.GetType().Name + ": " + ex.Message))
-                    Log.Error(label + " 실패 - " + ex);
+                // 같은 예외가 매 프레임 나면 로그만 아니라 자동 진단 큐도 처음 한 번만 거친다.
+                // 큐는 가림 정규식과 모양 비교를 돌므로 프레임마다 부르면 그 값이 매 프레임 든다.
+                if (!NewError(label, ex.GetType().Name + ": " + ex.Message)) return;
+                Log.Error(label + " 실패 - " + ex);
                 if (label != "진단 전송 상태" && label != "자동 진단 처리")
                     QueueAutomaticDiagnostic(label, ex.ToString());
             }
@@ -866,8 +868,8 @@ namespace SephPlanner.Plugin
                 // 반쯤 그려진 화면이 굳지 않게 다음 프레임에 처음부터 다시 그리게 한다.
                 _hud.Invalidate();
 
-                if (NewError("화면 그리기", ex.GetType().Name + ": " + ex.Message))
-                    Log.Error("화면 그리기 실패 - " + ex);
+                if (!NewError("화면 그리기", ex.GetType().Name + ": " + ex.Message)) return;
+                Log.Error("화면 그리기 실패 - " + ex);
                 QueueAutomaticDiagnostic("화면 그리기 실패 - ", ex.ToString());
             }
         }
