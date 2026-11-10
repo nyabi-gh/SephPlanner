@@ -1485,7 +1485,12 @@ PlayerAvatar -> GetComponent<WeaponControllerSimple>() -> currentWeapon.weaponTy
 어긋난다.
 
 값을 치러야 하는지 아닌지는 인벤토리의 주인으로 가른다. 상자(`ItemChest`)와 바닥에 떨어진
-꾸러미(`DroppedInventory`)는 `GridInventory.UnitAvatar`가 없고, 상인은 있다. 주인이 없으면 값은 0이다.
+꾸러미(`DroppedInventory`)는 `GridInventory.UnitAvatar`가 없다. 주인이 없으면 값은 0이다.
+
+상인의 재고(`UnitAI_NewBasic.CurrentSelling`)는 금고가 있으면 `Safe.Inventory`, 없으면 상인 아바타의
+인벤토리다. 금고 인벤토리의 `UnitAvatar`는 코드에서 대입하는 곳이 없는 직렬화 필드이고 `Safe` 프리팹에서도
+비어 있어서, 인벤토리만 보면 절차적 상인의 재고는 주인이 없는 것처럼 보인다. 게임의 가격 표시와 구매는
+창의 `UI_ShopPanel.ShopCharacter`로 재므로 우리도 상점 창이 띄운 재고는 그것으로 잰다(1.1.2 확인).
 
 소지금은 `UnitAvatar.Money`다.
 

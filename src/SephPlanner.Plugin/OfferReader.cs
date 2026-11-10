@@ -60,7 +60,8 @@ namespace SephPlanner.Plugin
             FrameCost.ChestFilter.Add(filtering);
 
             var collecting = FrameCost.Now;
-            foreach (var inventory in nearby) Collect(snapshot.Offers, inventory, player);
+            var shop = ShownShop();
+            foreach (var inventory in nearby) Collect(snapshot.Offers, inventory, SellerOf(inventory, shop), player);
             CollectReplenishment(snapshot.Offers, player);
             FrameCost.ChestCollect.Add(collecting);
 
@@ -84,8 +85,8 @@ namespace SephPlanner.Plugin
             var ui = UIManager.Instance;
             if (ui == null) return null;
 
-            var shop = ui.GetElement<UI_ShopPanel>();
-            if (shop == null || !shop.IsOpened || shop.Shop == null) return null;
+            var shop = ShownShop();
+            if (shop == null) return null;
 
             foreach (var candidate in NetworkRegistry.All<UnitAI_NewBasic>())
             {
@@ -135,14 +136,32 @@ namespace SephPlanner.Plugin
             var ui = UIManager.Instance;
             if (ui == null) return null;
 
-            var shop = ui.GetElement<UI_ShopPanel>();
-            if (shop != null && shop.IsOpened && shop.Shop != null) return shop.Shop;
+            var shop = ShownShop();
+            if (shop != null) return shop.Shop;
 
             var viewer = ui.GetElement<UI_InventoryViewer>();
             if (viewer == null || !viewer.IsOpened) return null;
 
             return ViewerInventory?.GetValue(viewer, null) as GridInventory;
         }
+
+        /// <summary>재고를 띄우고 있는 상점 창. 없으면 <c>null</c>.</summary>
+        private static UI_ShopPanel ShownShop()
+        {
+            var ui = UIManager.Instance;
+            if (ui == null) return null;
+
+            var shop = ui.GetElement<UI_ShopPanel>();
+            return shop != null && shop.IsOpened && shop.Shop != null ? shop : null;
+        }
+
+        /// <summary>
+        /// 값을 매기는 쪽. 상자와 바닥에 떨어진 꾸러미는 주인이 없어 그냥 집으면 되고, 주인이 있는
+        /// 인벤토리는 사야 한다. 금고를 가진 상인의 재고는 금고 인벤토리라 <c>UnitAvatar</c>가
+        /// 비어 있으므로(대입하는 코드가 없는 직렬화 필드다), 게임처럼 창의 <c>ShopCharacter</c>로 잰다.
+        /// </summary>
+        private static UnitAvatar SellerOf(GridInventory inventory, UI_ShopPanel shop) =>
+            shop != null && inventory == shop.Shop ? shop.ShopCharacter : inventory.UnitAvatar;
 
         private static readonly PropertyInfo ViewerInventory =
             GameBinding.Property(typeof(UI_InventoryViewer), "Inventory");
@@ -249,10 +268,8 @@ namespace SephPlanner.Plugin
             }
         }
 
-        private static void Collect(List<OfferedItem> offers, GridInventory inventory, PlayerAvatar buyer)
+        private static void Collect(List<OfferedItem> offers, GridInventory inventory, UnitAvatar seller, PlayerAvatar buyer)
         {
-            // 상자와 바닥에 떨어진 꾸러미는 주인이 없어 그냥 집으면 되고, 주인이 있는 인벤토리는 사야 한다.
-            var seller = inventory.UnitAvatar;
             var seen = new HashSet<int>();
             var instances = new List<NewItemOwnInstance>();
 
