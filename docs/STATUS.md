@@ -5,12 +5,13 @@
 
 ## 배포 상태
 
-**이번 판: 0.6.2.** `scripts/check.ps1` 이 이 줄의 버전을 `Directory.Build.props` 와 대조한다. 릴리스마다 이 줄만 고친다.
+**이번 판: 0.6.3.** `scripts/check.ps1` 이 이 줄의 버전을 `Directory.Build.props` 와 대조한다. 릴리스마다 이 줄만 고친다.
 
 - **GitHub:** 2026-11-05 01:26 UTC 공개(ZIP 둘). 태그 `v0.6.2` 는 `261ef99` 이고 두 ZIP 의 manifest 커밋도 같다.
 - **창작마당:** 글 `3832790875` 에 0.6.2 를 올렸다(11-05 01:28 UTC, 글의 변경 기록). 올리자 글 설명이 `metadata.json` 의 설명으로
   바뀌어([개발 문서](DEVELOPMENT.md)의 "창작마당 판"), 줄여 다시 쓴 한국어·영어 설명을 Steam 글 페이지에 붙여 넣었다. 그 원문은
   git 밖의 `artifacts/workshop-description.txt`(Mac)에만 있다 - 다음에 올린 뒤에도 다시 붙여 넣는다.
+- **0.6.3:** 버전과 CHANGELOG 를 올렸다. 태그·GitHub 릴리스·창작마당 업로드는 아직이다. 위 두 줄은 0.6.2 의 기록이다.
 
 ## 기준 버전
 
