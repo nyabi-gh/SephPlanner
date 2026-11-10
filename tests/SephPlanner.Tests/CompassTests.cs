@@ -233,4 +233,19 @@ public class CompassTests
 
         Assert.Equal(1, ComboCounting.CountFor(problem, problem.Charms[2], "EMBER", null));
     }
+
+    /// <summary>
+    /// 무기가 안 맞아 꺼진 뿌리도 카테고리는 넘긴다. 게임 <c>WalkToRoots</c> 는 뿌리의 활성을 보지 않는다 - 검을 든 채
+    /// 단검 전용 아티팩트 아래 침을 두면 게임은 그 카테고리를 센다. 피해 보너스는 꺼진 뿌리에 주지 않는다.
+    /// </summary>
+    [Fact]
+    public void AWeaponDormantRootStillLendsItsCategoryButNoDamage()
+    {
+        var problem = Fork();
+        problem.Charms[0].IsDormant = true;
+        problem.Charms[2].IsAttackable = false;
+
+        Assert.Equal(new[] { "EMBER" }, Categories(problem, 4, withActivity: true));
+        Assert.Contains(4, Score(problem).UnlinkedCharms);
+    }
 }

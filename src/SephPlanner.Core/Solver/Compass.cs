@@ -121,9 +121,12 @@ namespace SephPlanner.Core.Solver
             }
         }
 
-        /// <summary>게임 <c>Charm_Compass.IsDependencyValid</c> 가 나침반이 아닌 아티팩트에 내리는 판정.</summary>
+        /// <summary>
+        /// 게임 <c>Charm_Compass.IsDependencyValid</c> 가 나침반이 아닌 아티팩트에 내리는 판정. 뿌리가 켜졌는지는 보지 않는다 -
+        /// 카테고리(<c>WalkToRoots</c>)는 무기가 안 맞아 꺼진 뿌리의 것도 모은다. 피해 쪽은 뿌리마다 활성을 따로 본다.
+        /// </summary>
         private static bool IsValidRoot(CharmSlot root) =>
-            !root.IsFiller && !root.IsDormant && (root.IsAttackable ?? root.Definition.IsAttackable);
+            !root.IsFiller && (root.IsAttackable ?? root.Definition.IsAttackable);
 
         private static bool Bypasses(CharmDefinition definition) => definition.Behavior == Breakthrough;
 
@@ -174,7 +177,7 @@ namespace SephPlanner.Core.Solver
             var factor = 0.0;
             foreach (var root in roots)
             {
-                if (!activity.IsActive(root.Charm, root.Cell)) continue;
+                if (root.Charm.IsDormant || !activity.IsActive(root.Charm, root.Cell)) continue;
 
                 factor = damage
                     ? factor + PositionalWorth.TargetFactor(problem, compass, root.Charm, level, root.Bypass)
@@ -198,7 +201,7 @@ namespace SephPlanner.Core.Solver
             var found = false;
             foreach (var root in roots)
             {
-                if (!activity.IsActive(root.Charm, root.Cell)) continue;
+                if (root.Charm.IsDormant || !activity.IsActive(root.Charm, root.Cell)) continue;
                 if (!found || root.Charm.IsSupportTarget && !target.IsSupportTarget) target = root.Charm;
                 found = true;
             }
