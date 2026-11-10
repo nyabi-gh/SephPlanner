@@ -96,6 +96,8 @@ namespace SephPlanner.Core.Runtime
                 return AutoPlaceDecision.Deny(Tr("대립의 천칭을 있어야 할 쪽에 두지 못해 자동 배치를 실행하지 않습니다."));
             if (plan.Best.UnretainedCharms.Count > 0)
                 return AutoPlaceDecision.Deny(Tr("사용 유지 조건을 만족하는 배치를 찾지 못해 자동 배치를 실행하지 않습니다."));
+            if (plan.Best.CombinedCharms.Count > 0)
+                return AutoPlaceDecision.Deny(Tr("게임이 합칠 아티팩트를 떼어 두지 못해 자동 배치를 실행하지 않습니다."));
             if (plan.HasUnapprovedDeactivation || !ActivationPolicy.AllowsTransition(plan.Current, plan.Best))
                 return AutoPlaceDecision.Deny(Tr("끄기 허용 없이 아티팩트를 새로 비활성화하는 배치는 적용하지 않습니다."));
             if (!plan.HasPlacementChanges || plan.Targets.Count == 0)

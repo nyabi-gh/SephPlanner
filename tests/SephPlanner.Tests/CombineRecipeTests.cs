@@ -44,6 +44,30 @@ public class CombineRecipeTests
         Assert.Single(plan.RetentionWarnings);
     }
 
+    /// <summary>
+    /// 떼어 둘 자리가 없어 추천도 붙은 채면 적용하지 않고, 사유는 끄기 허용이 아니라 합쳐짐으로 댄다.
+    /// </summary>
+    [Fact]
+    public void MaterialsThatCannotBeKeptApartBlockTheSuggestionForThatReason()
+    {
+        var inventory = new InventoryState { Width = 2, Height = 1, Storage = 2 };
+        inventory.Items.Add(new PlacedItem { DefinitionId = Wing, InstanceId = 10, Position = new GridPos(0, 0), IsActive = true });
+        inventory.Items.Add(new PlacedItem { DefinitionId = Cloth, InstanceId = 11, Position = new GridPos(1, 0), IsActive = true });
+        var snapshot = new GameSnapshot
+        {
+            Inventory = inventory,
+            Run = new RunState { CombineRecipes = new List<List<int>> { new() { Wing, Cloth } } },
+        };
+
+        var plan = PlanBuilder.Build(snapshot, Catalog())!;
+
+        Assert.NotEmpty(plan.Best.CombinedCharms);
+        Assert.False(plan.HasUnapprovedDeactivation);
+        Assert.Empty(plan.Targets);
+        Assert.Contains(plan.RetentionWarnings, warning => warning.Contains("떼어 둘 자리를 찾지 못해"));
+        Assert.DoesNotContain(plan.RetentionWarnings, warning => warning.Contains("추천 배치는 떼어 둡니다"));
+    }
+
     [Fact]
     public void DiagonalMaterialsDoNotCombine()
     {

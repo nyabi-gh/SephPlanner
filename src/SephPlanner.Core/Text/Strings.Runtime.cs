@@ -90,6 +90,7 @@ namespace SephPlanner.Core.Text
             new Entry("배치 계산 이후 게임 상태가 바뀌어 최신 계획을 기다립니다.", "The game state changed after the layout was calculated. Waiting for the latest plan.", "配置の計算後にゲーム状態が変わったため、最新のプランを待っています。", "布局计算后游戏状态已变化，正在等待最新方案。", "佈局計算後遊戲狀態已變化，正在等待最新方案。"),
             new Entry("석판 {0}개를 놓을 자리가 없어 자동 배치를 실행하지 않습니다.", "There is no room for {0} tablets, so auto-place will not run.", "石版{0}個を置く場所がないため、自動配置を実行しません。", "没有空间放置{0}个石板，不执行自动布局。", "沒有空間放置{0}個石板，不執行自動佈局。"),
             new Entry("대립의 천칭을 있어야 할 쪽에 두지 못해 자동 배치를 실행하지 않습니다.", "Scale of Conflict cannot be placed on its required side, so auto-place will not run.", "対立の天秤を本来の側に置けないため、自動配置を実行しません。", "无法将对立之秤放在应在的一侧，不执行自动布局。", "無法將對立之秤放在應在的一側，不執行自動佈局。"),
+            new Entry("게임이 합칠 아티팩트를 떼어 두지 못해 자동 배치를 실행하지 않습니다.", "Artifacts the game would merge can't be kept apart, so auto-place will not run.", "ゲームが合体させるアーティファクトを離しておけないため、自動配置を実行しません。", "无法将游戏会合成的神器分开放置，不执行自动布局。", "無法將遊戲會合成的神器分開放置，不執行自動佈局。"),
             new Entry("사용 유지 조건을 만족하는 배치를 찾지 못해 자동 배치를 실행하지 않습니다.", "No layout satisfies the ‘Keep’ conditions, so auto-place will not run.", "「使用維持」の条件を満たす配置が見つからないため、自動配置を実行しません。", "找不到满足“保持使用”条件的布局，不执行自动布局。", "找不到滿足「保持使用」條件的佈局，不執行自動佈局。"),
             new Entry("끄기 허용 없이 아티팩트를 새로 비활성화하는 배치는 적용하지 않습니다.", "Layouts that newly disable artifacts are not applied without ‘Allow off’.", "「オフ許可」なしでアーティファクトを新たに無効にする配置は適用しません。", "未开启“允许关闭”时，不会应用会新禁用神器的布局。", "未開啟「允許關閉」時，不會套用會新停用神器的佈局。"),
             new Entry("멀티플레이 세션에서는 자동 배치를 실행하지 않습니다. 함께하는 사람의 동의를 받은 뒤 설정({0})의 ‘멀티 자동 배치’에서 켤 수 있습니다.",

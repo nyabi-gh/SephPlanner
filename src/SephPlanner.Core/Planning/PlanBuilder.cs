@@ -406,7 +406,7 @@ namespace SephPlanner.Core.Planning
             if (PriorityPlacement.Compare(best, current) < 0) best = current;
 
             var moves = Moves(problem, current, best, out var manualMovesAvailable);
-            var unapprovedDeactivation = !ActivationPolicy.AllowsTransition(current, best);
+            var unapprovedDeactivation = !ActivationPolicy.DisablesNothingNew(current, best);
             var targets = Targets(problem, best);
             var hasPlacementChanges = targets.Any(target =>
                 target.From != target.To || target.IsTablet && target.FromRotation != target.Rotation);
@@ -427,7 +427,7 @@ namespace SephPlanner.Core.Planning
                 Moves = moves,
                 ComboPlacementWarnings = ComboPlacementWarnings(problem, best),
                 RetentionWarnings = problem.Charms.Where(charm => best.UnretainedCharms.Contains(charm.InstanceId))
-                    .Select(charm => RetentionWarning(charm, best)).Concat(CombineWarnings(problem)).ToList(),
+                    .Select(charm => RetentionWarning(charm, best)).Concat(CombineWarnings(problem, best)).ToList(),
                 SupportWarnings = problem.Charms.Where(charm => best.UnlinkedCharms.Contains(charm.InstanceId) && !charm.Retained)
                     .Select(charm => Naming.Of(charm.Definition.Names, charm.Definition.Id, Tr("아티팩트")) + ": " +
                         Explain.SupportMissing(charm.Definition)).ToList(),
@@ -460,8 +460,11 @@ namespace SephPlanner.Core.Planning
         /// 가방에 레시피의 재료가 다 있으면 한 줄로 알린다. 추천은 떼어 두지만, 손으로 옮기다 붙이면 게임이 합쳐 버린다.
         /// 일부러 합치려는 사람은 이 줄을 보고 손으로 붙인다.
         /// </summary>
-        private static IEnumerable<string> CombineWarnings(PlacementProblem problem)
+        private static IEnumerable<string> CombineWarnings(PlacementProblem problem, Arrangement best)
         {
+            var advice = best.CombinedCharms.Count > 0
+                ? Tr("상하좌우로 붙여 두면 게임이 합쳐 다른 아이템으로 바꿉니다. 떼어 둘 자리를 찾지 못해 추천 배치를 적용하지 않습니다.")
+                : Tr("상하좌우로 붙여 두면 게임이 합쳐 다른 아이템으로 바꿉니다. 추천 배치는 떼어 둡니다.");
             foreach (var recipe in problem.CombineRecipes)
             {
                 var pool = problem.Charms.ToList();
@@ -474,8 +477,7 @@ namespace SephPlanner.Core.Planning
                     names.Add(Naming.Of(material.Definition.Names, material.Definition.Id, Tr("아티팩트")));
                 }
                 if (names.Count != recipe.Count) continue;
-                yield return string.Join(" + ", names) + ": " +
-                    Tr("상하좌우로 붙여 두면 게임이 합쳐 다른 아이템으로 바꿉니다. 추천 배치는 떼어 둡니다.");
+                yield return string.Join(" + ", names) + ": " + advice;
             }
         }
 
