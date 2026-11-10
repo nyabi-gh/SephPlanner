@@ -8,7 +8,7 @@ namespace SephPlanner.Plugin.Net
     {
         // 실측 수집량이 없는 초기 운영 상한이다. 같은 실행에서는 동일 오류를 한 번만 수집한다.
         public const int SessionLimit = 10;
-        public const string DisclosureVersion = "automatic-v1";
+        public const string DisclosureVersion = "automatic-v2";
         private readonly HashSet<string> _seen = new HashSet<string>(StringComparer.Ordinal);
 
         public static string ConsentKey(Uri endpoint) => DisclosureVersion + "|" + DiagnosticUploadClient.ConsentKey(endpoint);

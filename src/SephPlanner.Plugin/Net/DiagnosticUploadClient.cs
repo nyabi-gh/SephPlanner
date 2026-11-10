@@ -25,7 +25,7 @@ namespace SephPlanner.Plugin.Net
 
         // 보내는 항목이 바뀌면 올린다. 동의 열쇠가 바뀌어 이미 동의한 사람에게도 다시 묻는다
         // (docs/DIAGNOSTIC-UPLOAD.md). 서버가 보는 SchemaVersion 과 따로 두어 파일 구성이 같으면 서버는 그대로다.
-        public const string DisclosureVersion = "game-log";
+        public const string DisclosureVersion = "local-copy";
 
         public static string ConsentKey(Uri endpoint) =>
             DisclosureVersion + "|" + DiagnosticArchive.SchemaVersion + "|" + endpoint.AbsoluteUri;
