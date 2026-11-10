@@ -561,4 +561,62 @@ public class OfferAdvisorTests
         Assert.True(free[0].Gain > 0);
         Assert.Equal(0, comboOnly[0].Gain, 6);
     }
+
+    /// <summary>석판 하나·둘과 아티팩트로 꽉 찬 4×2 가방. 씨앗 14 에서 후보끼리 잣대를 나눠 쓰던 결함이 드러났다.</summary>
+    private static (PlacementProblem Problem, OfferCandidate First, OfferCandidate Second) FullSmallBag(int seed)
+    {
+        var random = new Random(seed * 7919 + 3);
+        var problem = new PlacementProblem { Grid = new GridSpec(4, 2, 8) };
+        var queries = new[] { "RIGHT 1", "O 1", "LEFT 2\nRIGHT 1", "UP 1\nDOWN 1", "HORIZONTAL 1" };
+        var tablets = 1 + random.Next(2);
+        for (var i = 0; i < tablets; i++)
+        {
+            problem.Tablets.Add(new TabletSlot
+            {
+                InstanceId = 900 + i,
+                Definition = new TabletDefinition { Id = "t" + i, EntityId = 700 + i, Query = queries[random.Next(queries.Length)] },
+            });
+        }
+        var cells = Enumerable.Range(0, 8).Select(problem.Grid.ToPosition).OrderBy(_ => random.Next()).ToList();
+        var at = 0;
+        foreach (var tablet in problem.Tablets) problem.CurrentTablets[tablet.InstanceId] = new TabletSpot(cells[at++], 0);
+        for (var i = 0; at < 8; i++)
+        {
+            problem.Charms.Add(new CharmSlot
+            {
+                InstanceId = i,
+                Definition = new CharmDefinition { Id = "c" + i, EntityId = 200 + i, MaxLevel = 3 },
+                Worth = new CharmWorth { ByLevel = Enumerable.Range(0, 4).Select(_ => (double)random.Next(0, 9)).ToArray() },
+            });
+            problem.CurrentCharms[i] = cells[at++];
+        }
+        OfferCandidate Offer(int n) => new()
+        {
+            Kind = "charm",
+            Name = "o" + n,
+            Charm = new CharmDefinition { Id = "o" + n, EntityId = 500 + n, MaxLevel = 3, Rarity = (Rarity)random.Next(4) },
+        };
+        return (problem, Offer(0), Offer(1));
+    }
+
+    /// <summary>
+    /// 석판 잣대는 아티팩트를 보지 않는 열쇠로 캐시된다. 후보끼리 그 잣대를 나눠 쓰면 먼저 물은 후보가 고른 잣대로
+    /// 다음 후보를 채점해, 같이 뜬 후보가 무엇이냐에 따라 증가분과 밀어낼 아이템이 바뀌었다.
+    /// </summary>
+    [Theory]
+    [InlineData(14)]
+    [InlineData(0)]
+    [InlineData(1)]
+    public void ACandidateIsJudgedTheSameWhateverIsOfferedBesideIt(int seed)
+    {
+        var (problem, first, second) = FullSmallBag(seed);
+        var together = OfferAdvisor.Rank(problem, new List<OfferCandidate> { first, second }, gold: 0)
+            .Single(advice => advice.Candidate.Name == second.Name);
+
+        var (alone, _, only) = FullSmallBag(seed);
+        var single = OfferAdvisor.Rank(alone, new List<OfferCandidate> { only }, gold: 0).Single();
+
+        Assert.Equal(single.Displaced, together.Displaced);
+        Assert.Equal(single.Gain, together.Gain, 6);
+    }
 }

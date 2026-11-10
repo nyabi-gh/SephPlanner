@@ -368,19 +368,20 @@ namespace SephPlanner.Core.Solver
             // 석판을 그대로 둔 갈래들의 배치. 석판을 하나 빼는 갈래는 여기서 그 자리만 빼면
             // 되므로, 그런 갈래마다 탐색을 다시 돌리지 않는다 - 그 탐색들이 남은 비용의 대부분이었다.
             IReadOnlyList<List<TabletPlacement>>? kept = null;
+            var scope = candidate.Charm is not null ? "charm:" + candidate.Charm.EntityId : "";
 
             foreach (var outcome in Trials(problem, candidate, candidateId, values))
             {
                 IReadOnlyList<List<TabletPlacement>> yardstick;
                 if (outcome.RemovedTabletIndex < 0)
                 {
-                    yardstick = layouts.Yardstick(outcome.Trial, faster);
+                    yardstick = layouts.Yardstick(outcome.Trial, faster, scope);
                     kept = yardstick;
                 }
                 else
                 {
                     yardstick = Without(kept, outcome.RemovedTabletIndex)
-                                ?? layouts.Yardstick(outcome.Trial, faster);
+                                ?? layouts.Yardstick(outcome.Trial, faster, scope);
                 }
 
                 outcome.Solved = PlacementSolver.EvaluateLayouts(outcome.Trial, yardstick, faster);

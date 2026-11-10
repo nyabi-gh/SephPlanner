@@ -233,10 +233,14 @@ namespace SephPlanner.Core.Solver
         /// 것은 배치가 아니다.</b> 그래서 견줄 때는 이 하나로 견주고, 이긴 갈래만 배치 후보
         /// 전부로 다시 풀어 보고할 점수를 낸다.
         /// </summary>
+        /// <param name="scope">
+        /// 잣대를 함께 쓸 범위. 열쇠가 아티팩트를 보지 않으므로, 범위 없이 두면 계획에서 처음 물은 후보의 갈래가 고른 잣대를
+        /// 다른 후보도 쓰게 되어 같이 뜬 후보에 따라 답이 달라진다.
+        /// </param>
         public IReadOnlyList<List<TabletPlacement>> Yardstick(
-            PlacementProblem problem, SolverOptions options)
+            PlacementProblem problem, SolverOptions options, string scope = "")
         {
-            var key = ScoringKey(problem, options);
+            var key = scope + "|" + ScoringKey(problem, options);
             var cached = Find(_yardsticks, key)?.Value;
             if (cached is not null)
             {
