@@ -831,16 +831,21 @@ fixedMultiplyLevel)를 들고 있고, 배수는 석판과 같은 `multiplyLevelM
 여전히 안 바꾸지만 **자동 배치가 재료를 붙이는 순간 다음 프레임에 아이템이 사라진다** - 솔버와 적용기는 이 규칙을
 모른다.
 
-**1.1.0 베타의 레시피는 둘이고 둘 다 합치기형이 아니다**(2026-10-30, `resources.assets` 의 `ArrangementBonusEntity`).
+**1.1.2 의 레시피는 다섯이고 그중 하나가 합치기형이다**(2026-11-09 검토, `resources.assets` 의 `ArrangementBonusEntity`,
+모두 `isEnabled`). 1.1.0 베타에는 위의 둘만 있었다.
 
-| 레시피 | 묶음(상하좌우로 이어짐) | `activeBonusIDs` | 받는 쪽의 효과 |
-|---|---|---|---|
-| `0001_BlackHole` | 1241 공허 행성 + 1102 화염 지대(지속) | 행성에 `BLACKHOLE` | `Charm_SummonGreenBat.changedToBlackhole` |
-| `0002_Trio` | 1101 화염 지대(범위) + 1141 전기 + 1175 프로스티움 반지 | 셋 다 `FAST` | `Charm_FrostiumRing.enabledFast`(받는 코드는 반지뿐) |
+| 레시피 | 묶음(상하좌우로 이어짐) | 효과 |
+|---|---|---|
+| `0001_BlackHole` | 1241 공허 행성 + 1102 화염 지대(지속) | 행성에 `BLACKHOLE`(`Charm_SummonGreenBat.changedToBlackhole`) |
+| `0002_Trio` | 1101 화염 지대(범위) + 1141 전기 + 1175 프로스티움 반지 | 셋 다 `FAST`(받는 코드는 `Charm_FrostiumRing.enabledFast` 뿐) |
+| `0003_WideBalisong` | 1114 + 1009 | 1114 에 `WIDE` |
+| `0004_Keys` | 1297 + 1298 + 1299 | 없음(`stats`·`activeBonusIDs` 가 비었다) |
+| `0005_Wing` | 1143 날개 + 1215 천 갑옷 | **합치기형 → 27 사과주스** |
 
-둘 다 `stats` 가 비었고 `combine.resultItem` 도 없다. 에셋에서 `ARRANGEMENT_BONUS` 를 주는 것은 패시브 오브젝트
-(`PassiveObject_StatusInstance`, `ARRANGEMENT_BONUS/1` 과 `DISABLE_DUAL_ARTIFACT/1`) 하나다. 그래서 지금 콘텐츠로는 아이템이
-사라지지 않고, 우리는 두 효과를 점수에 넣지 않는다([백로그](ROADMAP.md) 4번의 표).
+`ARRANGEMENT_BONUS` 를 주는 것은 탐욕(`Passive_Greed`) 20레벨 특전 `10_LV20_ArrangementBonus`(`ARRANGEMENT_BONUS/1`)와
+패시브 오브젝트(`PassiveObject_StatusInstance`)다. 결과가 이미 가진 고유효과 아티팩트면 합치기를 취소하는 분기가 있다.
+그래서 능력치가 켜진 판에서 자동 배치가 날개와 천 갑옷을 붙이면 둘이 사라진다. 막는 방법은 [백로그](ROADMAP.md)의
+"게임 1.1.2 에서 정한 것" 에 있다. 효과 넷은 점수에 넣지 않는다.
 
 ### 이웃 의존 아티팩트
 
