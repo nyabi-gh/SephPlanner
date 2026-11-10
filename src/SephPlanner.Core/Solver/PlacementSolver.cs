@@ -1908,6 +1908,8 @@ namespace SephPlanner.Core.Solver
                 if (!occupancy.HasItem(cell) && Unsafe(cell, result)) unsafeEmpty++;
             }
             score -= CriticalCap.Penalty(problem, positions, result, occupancy);
+            // 재료를 잃는 것은 사용 유지를 어긴 것과 같은 무게로 본다.
+            missing += CombineRecipes.Count(problem, positions);
             return new PlacementQuality(missing, unpreserved, unheld, comboMatches,
                 comboProgress, supportMatches, score, unsafeEmpty, waste, familiarity,
                 problem.Scale.ScoreStep);
@@ -2481,6 +2483,7 @@ namespace SephPlanner.Core.Solver
             arrangement.Score -= overflow;
             arrangement.Objective -= overflow;
             PriorityPlacement.Describe(problem, arrangement, neighbors);
+            arrangement.CombinedCharms.AddRange(CombineRecipes.Groups(problem, positions));
             var quality = ScoreOf(problem, layout, positions, occupancy, result, neighbors);
             arrangement.UnsafeEmptyCells = quality.UnsafeEmpty;
             arrangement.WastedLevels = quality.Waste;

@@ -828,8 +828,8 @@ fixedMultiplyLevel)를 들고 있고, 배수는 석판과 같은 `multiplyLevelM
 활성 여부는 보지 않는다. 성립하면 `stats` 를 아바타에 더한다. `combine.resultItem` 이 있는 합치기형은
 `pendingArrangementBonusCombines` 에 쌓였다가, 서버 `LateUpdate` 의 `CombineArrangementBonus` 가 재료를
 `ForceRemoveItem` 하고 결과 아이템을 새 인스턴스로 기준 칸에 넣는다(인챈트는 합쳐 옮기고 상한에서 자른다). 레벨은
-여전히 안 바꾸지만 **자동 배치가 재료를 붙이는 순간 다음 프레임에 아이템이 사라진다** - 솔버와 적용기는 이 규칙을
-모른다.
+여전히 안 바꾸지만 **재료를 붙이는 순간 다음 프레임에 아이템이 사라진다.** 덩어리는 한 재료에서 시작해 상하좌우로
+뻗어 가며 남은 재료를 모으는 방식으로 찾는다(대각선은 이어지지 않는다).
 
 **1.1.2 의 레시피는 다섯이고 그중 하나가 합치기형이다**(2026-11-09 검토, `resources.assets` 의 `ArrangementBonusEntity`,
 모두 `isEnabled`). 1.1.0 베타에는 위의 둘만 있었다.
@@ -844,8 +844,10 @@ fixedMultiplyLevel)를 들고 있고, 배수는 석판과 같은 `multiplyLevelM
 
 `ARRANGEMENT_BONUS` 를 주는 것은 탐욕(`Passive_Greed`) 20레벨 특전 `10_LV20_ArrangementBonus`(`ARRANGEMENT_BONUS/1`)와
 패시브 오브젝트(`PassiveObject_StatusInstance`)다. 결과가 이미 가진 고유효과 아티팩트면 합치기를 취소하는 분기가 있다.
-그래서 능력치가 켜진 판에서 자동 배치가 날개와 천 갑옷을 붙이면 둘이 사라진다. 막는 방법은 [백로그](ROADMAP.md)의
-"게임 1.1.2 에서 정한 것" 에 있다. 효과 넷은 점수에 넣지 않는다.
+그래서 능력치가 켜진 판에서 날개와 천 갑옷을 붙이면 둘이 사라진다. 플러그인은 능력치가 있을 때만 합치기형 레시피의 재료를
+스냅샷에 싣고(`RunState.CombineRecipes`), 솔버는 재료 덩어리를 사용 유지 위반과 같은 1단계로 센다(`CombineRecipes`,
+[배치 목표](PLACEMENT-OBJECTIVE.md)). 그래도 붙은 배치가 남으면 자동 적용과 이동 안내를 막는다. 재료가 다 있으면 붙이면
+합쳐진다는 안내를 한 줄 띄운다 - 일부러 합치려는 사람은 손으로 붙인다. 효과 넷은 점수에 넣지 않는다.
 
 ### 이웃 의존 아티팩트
 

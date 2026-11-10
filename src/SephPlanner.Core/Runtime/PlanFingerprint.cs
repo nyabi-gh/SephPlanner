@@ -91,6 +91,10 @@ namespace SephPlanner.Core.Runtime
                 Add(builder, "unlimitedCombo", comboBonus.UnlimitedCombo);
                 Add(builder, "comboBonusDamage", comboBonus.ComboBonusDamage);
             }
+            foreach (var recipe in (snapshot.Run?.CombineRecipes ?? Enumerable.Empty<List<int>>())
+                         .Select(recipe => string.Join(",", recipe.OrderBy(entity => entity)))
+                         .OrderBy(recipe => recipe, StringComparer.Ordinal))
+                Add(builder, "combineRecipe", recipe);
 
             var inventory = snapshot.Inventory;
             Add(builder, "inventory", inventory is not null);

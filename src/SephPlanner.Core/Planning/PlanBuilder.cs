@@ -285,6 +285,7 @@ namespace SephPlanner.Core.Planning
             problem.FixedEffects.AddRange(inventory.FixedEffects);
             problem.ComboEngraving = inventory.ComboEngraving;
             problem.ComboCounts = inventory.ComboCounts;
+            if (snapshot.Run?.CombineRecipes is { } recipes) problem.CombineRecipes = recipes;
             problem.Combos = catalog.Combo;
             problem.PriorityCategories = new System.Collections.Generic.HashSet<string>(preferences.PriorityCategories);
 
@@ -416,8 +417,9 @@ namespace SephPlanner.Core.Planning
             var hasPlacementChanges = targets.Any(target =>
                 target.From != target.To || target.IsTablet && target.FromRotation != target.Rotation);
 
-            if (best.UnplacedTablets > 0 || !verification.Passed || best.UnretainedCharms.Count > 0 || best.WrongSideCharms.Count > 0 || unapprovedDeactivation) targets.Clear();
-            if (best.UnretainedCharms.Count > 0 || best.WrongSideCharms.Count > 0 || unapprovedDeactivation)
+            var combines = best.CombinedCharms.Count > 0;
+            if (best.UnplacedTablets > 0 || !verification.Passed || best.UnretainedCharms.Count > 0 || best.WrongSideCharms.Count > 0 || unapprovedDeactivation || combines) targets.Clear();
+            if (best.UnretainedCharms.Count > 0 || best.WrongSideCharms.Count > 0 || unapprovedDeactivation || combines)
             {
                 moves.Clear();
                 manualMovesAvailable = false;
@@ -431,7 +433,7 @@ namespace SephPlanner.Core.Planning
                 Moves = moves,
                 ComboPlacementWarnings = ComboPlacementWarnings(problem, best),
                 RetentionWarnings = problem.Charms.Where(charm => best.UnretainedCharms.Contains(charm.InstanceId))
-                    .Select(charm => RetentionWarning(charm, best)).ToList(),
+                    .Select(charm => RetentionWarning(charm, best)).Concat(CombineWarnings(problem)).ToList(),
                 SupportWarnings = problem.Charms.Where(charm => best.UnlinkedCharms.Contains(charm.InstanceId) && !charm.Retained)
                     .Select(charm => Naming.Of(charm.Definition.Names, charm.Definition.Id, Tr("아티팩트")) + ": " +
                         Explain.SupportMissing(charm.Definition)).ToList(),
@@ -458,6 +460,29 @@ namespace SephPlanner.Core.Planning
                 Charms = CharmsByCell(problem, best),
                 Targets = targets,
             };
+        }
+
+        /// <summary>
+        /// 가방에 레시피의 재료가 다 있으면 한 줄로 알린다. 추천은 떼어 두지만, 손으로 옮기다 붙이면 게임이 합쳐 버린다.
+        /// 일부러 합치려는 사람은 이 줄을 보고 손으로 붙인다.
+        /// </summary>
+        private static IEnumerable<string> CombineWarnings(PlacementProblem problem)
+        {
+            foreach (var recipe in problem.CombineRecipes)
+            {
+                var pool = problem.Charms.ToList();
+                var names = new List<string>();
+                foreach (var entity in recipe)
+                {
+                    var material = pool.FirstOrDefault(charm => charm.Definition.EntityId == entity);
+                    if (material is null) break;
+                    pool.Remove(material);
+                    names.Add(Naming.Of(material.Definition.Names, material.Definition.Id, Tr("아티팩트")));
+                }
+                if (names.Count != recipe.Count) continue;
+                yield return string.Join(" + ", names) + ": " +
+                    Tr("상하좌우로 붙여 두면 게임이 합쳐 다른 아이템으로 바꿉니다. 추천 배치는 떼어 둡니다.");
+            }
         }
 
         private static string RetentionWarning(CharmSlot charm, Arrangement best)

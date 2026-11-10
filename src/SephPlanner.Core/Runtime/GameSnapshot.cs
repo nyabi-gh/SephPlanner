@@ -113,6 +113,13 @@ namespace SephPlanner.Core.Runtime
         /// 자료가 그렇고, 그때 지문과 점수가 전과 같아야 한다.
         /// </summary>
         public ComboStatBonus? ComboBonus { get; set; }
+
+        /// <summary>
+        /// 붙여 두면 게임이 합쳐 버리는 배치 보너스 레시피마다 재료의 엔티티 번호(같은 재료가 둘이면 두 번).
+        /// 게임은 <c>ARRANGEMENTBONUS</c> 능력치가 있을 때만 레시피를 찾으므로 그때만 싣는다. <c>null</c> 은
+        /// 능력치가 없거나 이 항목이 없던 자료다.
+        /// </summary>
+        public List<List<int>>? CombineRecipes { get; set; }
     }
 
     /// <summary>

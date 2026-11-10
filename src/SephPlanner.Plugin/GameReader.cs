@@ -265,6 +265,7 @@ namespace SephPlanner.Plugin
                 Gold = avatar.Money,
                 ComboBonus = ComboStatBonus.Of(
                     avatar.GetCustomStatUnsafe("UNLIMITEDCOMBO"), avatar.GetCustomStatUnsafe("COMBOBONUSDAMAGE")),
+                CombineRecipes = avatar.GetCustomStatUnsafe("ARRANGEMENTBONUS") > 0 ? CombineRecipeReader.Read() : null,
             };
         }
 

@@ -266,6 +266,9 @@ namespace SephPlanner.Core.Solver
         /// 없으면 하얀 종이는 평범한 아티팩트로만 평가된다.
         /// </summary>
         public IReadOnlyDictionary<string, int>? ComboCounts { get; set; }
+
+        /// <summary>붙여 두면 합쳐지는 레시피의 재료 묶음(<see cref="CombineRecipes"/>). 능력치가 없는 판에서는 비어 있다.</summary>
+        public List<List<int>> CombineRecipes { get; set; } = new List<List<int>>();
         public Func<string, ComboDefinition?>? Combos { get; set; }
         public HashSet<string> PriorityCategories { get; set; } = new HashSet<string>();
         public HashSet<int> DeactivationAllowed { get; set; } = new HashSet<int>();
@@ -570,6 +573,9 @@ namespace SephPlanner.Core.Solver
         public List<int> UnretainedCharms { get; } = new List<int>();
         public List<int> UnpreservedCharms { get; } = new List<int>();
         public List<int> UnapprovedDeactivations { get; } = new List<int>();
+
+        /// <summary>이 배치에서 게임이 합쳐 없앨 재료 덩어리. 덩어리마다 재료의 인스턴스 번호다.</summary>
+        public List<List<int>> CombinedCharms { get; } = new List<List<int>>();
         public int UnsafeEmptyCells { get; set; }
         public int WastedLevels { get; set; }
 

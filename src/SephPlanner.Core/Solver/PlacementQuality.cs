@@ -29,7 +29,7 @@ namespace SephPlanner.Core.Solver
             scoreStep > 0 ? Math.Floor(value / scoreStep) * scoreStep : value;
 
         internal static PlacementQuality From(Arrangement value) => new PlacementQuality(
-            value.UnretainedCharms.Count + value.UnapprovedDeactivations.Count + value.WrongSideCharms.Count, value.UnpreservedCharms.Count, value.UnheldCharms.Count,
+            value.UnretainedCharms.Count + value.UnapprovedDeactivations.Count + value.WrongSideCharms.Count + value.CombinedCharms.Count, value.UnpreservedCharms.Count, value.UnheldCharms.Count,
             value.PriorityComboMatches, value.PriorityComboProgress, value.SupportTargetMatches, value.Objective,
             value.UnsafeEmptyCells, value.WastedLevels, value.Preference, value.ScoreStep);
 
