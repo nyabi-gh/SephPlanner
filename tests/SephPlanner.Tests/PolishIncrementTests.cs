@@ -241,6 +241,13 @@ public class PolishIncrementTests
             problem.CurrentTablets[tablet.InstanceId] = new TabletSpot(cells[at++], 0);
         foreach (var charm in problem.Charms)
             if (at < cells.Count) problem.CurrentCharms[charm.InstanceId] = cells[at++];
+
+        // 못 박힌 칸이 있으면 빔이 도는 칸 목록이 격자와 어긋난다. 그 어긋남이 스레드 수에 따라 답을 갈랐다.
+        if (random.Next(3) == 0)
+        {
+            var placed = problem.Charms.Where(charm => problem.CurrentCharms.ContainsKey(charm.InstanceId)).ToList();
+            if (placed.Count > 1) placed[random.Next(placed.Count)].Immovable = true;
+        }
         return problem;
     }
 }

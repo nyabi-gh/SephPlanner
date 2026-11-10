@@ -895,6 +895,7 @@ namespace SephPlanner.Core.Solver
             var ordered = rows.OrderByDescending(row => RequiresUse(problem, row.Charm))
                 .ThenByDescending(row => row.Charm.Held).ThenByDescending(row => Preserve(row.Charm))
                 .ThenByDescending(row => row.Values.Max()).ThenBy(row => row.Charm.InstanceId).ToList();
+            var cellIndex = Cells(problem).Select((cell, index) => (cell, index)).ToDictionary(pair => pair.cell, pair => pair.index);
             return new EstimateModel(problem.Grid, anyMagic)
             {
                 LevelCap = levelCap,
@@ -908,8 +909,8 @@ namespace SephPlanner.Core.Solver
                     ScalesPosition.Left(problem, row.Charm) ? ScalesSide.Left : ScalesSide.Right).ToArray(),
                 Required = ordered.Select(row => RequiresUse(problem, row.Charm)).ToArray(),
                 Preserved = ordered.Select(row => Preserve(row.Charm)).ToArray(),
-                Current = ordered.Select(row => AnchorIndex(problem, row.Charm, problem.CurrentCharms)).ToArray(),
-                Planned = ordered.Select(row => AnchorIndex(problem, row.Charm, problem.PlannedCharms)).ToArray(),
+                Current = ordered.Select(row => AnchorIndex(cellIndex, row.Charm, problem.CurrentCharms)).ToArray(),
+                Planned = ordered.Select(row => AnchorIndex(cellIndex, row.Charm, problem.PlannedCharms)).ToArray(),
                 Groups = new EstimateGroup[problem.Grid.Storage],
                 Members = new int[problem.Grid.Storage * problem.Grid.Storage],
                 Stride = problem.Grid.Storage,
@@ -952,9 +953,12 @@ namespace SephPlanner.Core.Solver
             return (composition.ToString(), protection.ToString());
         }
 
-        private static int AnchorIndex(PlacementProblem problem, CharmSlot charm, Dictionary<int, GridPos> anchors) =>
-            anchors.TryGetValue(charm.InstanceId, out var cell) && problem.Grid.Contains(cell)
-                ? problem.Grid.ToIndex(cell.X, cell.Y) : -1;
+        /// <summary>
+        /// 앵커는 <see cref="Estimate"/>가 도는 <see cref="Cells"/> 목록의 순번이다. 격자 번호로 두면 못 박힌 칸이 빠진
+        /// 목록과 어긋나 남의 칸을 지금 자리로 읽고, 목록 밖 번호는 작업 공간에 표시를 남겨 호출 순서에 따라 답이 갈린다.
+        /// </summary>
+        private static int AnchorIndex(Dictionary<GridPos, int> cellIndex, CharmSlot charm, Dictionary<int, GridPos> anchors) =>
+            anchors.TryGetValue(charm.InstanceId, out var cell) && cellIndex.TryGetValue(cell, out var index) ? index : -1;
 
         /// <summary>
         /// 직전 제안의 배치를 후보로 되살린다. 계획에 없는 새 석판이 끼면 계획된 자리는 그대로
