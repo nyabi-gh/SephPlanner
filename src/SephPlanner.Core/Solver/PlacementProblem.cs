@@ -107,6 +107,22 @@ namespace SephPlanner.Core.Solver
             }
         }
 
+        private int _positional = -1;
+
+        /// <summary>
+        /// <see cref="ComboCounting.IsPositional"/>를 한 번만 판정해 둔 것. 콤보 셈이 채점마다 가방의 아티팩트를 모두
+        /// 돌며 묻는데, 판정이 행동 이름 문자열을 최대 다섯 번 견준다.
+        /// </summary>
+        public bool IsPositional
+        {
+            get
+            {
+                var positional = Volatile.Read(ref _positional);
+                if (positional < 0) Volatile.Write(ref _positional, positional = ComboCounting.IsPositional(Definition) ? 1 : 0);
+                return positional == 1;
+            }
+        }
+
         /// <summary>
         /// 인챈트만 다른 사본. <see cref="OfferAdvisor.Clone"/>은 목록만 얕게 복사하므로 슬롯을
         /// 제자리에서 고치면 <b>기준 배치까지 함께 바뀐다</b> - 버리기 조언이 목록에서 빼기만

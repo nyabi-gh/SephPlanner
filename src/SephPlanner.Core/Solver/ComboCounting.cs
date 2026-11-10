@@ -109,7 +109,7 @@ namespace SephPlanner.Core.Solver
                 var charm = pair.Value;
                 if (charm.IsFiller) continue;
 
-                if (!IsPositional(charm.Definition))
+                if (!charm.IsPositional)
                 {
                     foreach (var category in charm.Definition.Categories) Add(counts, category, 1);
                 }
@@ -142,7 +142,7 @@ namespace SephPlanner.Core.Solver
             foreach (var pair in neighbors)
             {
                 var other = pair.Value;
-                if (other == charm || other.IsFiller || !IsPositional(other.Definition)) continue;
+                if (other == charm || other.IsFiller || !other.IsPositional) continue;
 
                 positional ??= _countForScratch ??= new List<string>();
                 positional.Clear();
@@ -227,7 +227,7 @@ namespace SephPlanner.Core.Solver
                 var charm = pair.Value;
                 if (charm.IsFiller) continue;
 
-                if (!IsPositional(charm.Definition))
+                if (!charm.IsPositional)
                 {
                     if (charm.Definition.Categories.Contains(category)) count++;
                     continue;
@@ -267,7 +267,7 @@ namespace SephPlanner.Core.Solver
             var positional = new List<string>();
             foreach (var pair in byCell)
             {
-                if (pair.Value.IsFiller || !IsPositional(pair.Value.Definition)) continue;
+                if (pair.Value.IsFiller || !pair.Value.IsPositional) continue;
 
                 positional.Clear();
                 // 종이와 나침반은 게임이 매긴 지금 카테고리를 그대로 뺀다. 종이는 갱신 순서에, 나침반은

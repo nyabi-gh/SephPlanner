@@ -134,7 +134,7 @@ namespace SephPlanner.Core.Solver
             PlacementProblem problem, CharmSlot charm, GridPos cell,
             Dictionary<GridPos, CharmSlot>? neighbors, in CharmActivity activity)
         {
-            if (problem.Combos is null || !ComboCounting.IsPositional(charm.Definition)) return 0;
+            if (problem.Combos is null || !charm.IsPositional) return 0;
 
             // 열쇠는 이웃이 없어도 행만으로 정해진다. 침과 종이는 이웃이 있어야 한다.
             if (neighbors is null && charm.Definition.LineCategories.Count == 0) return 0;
