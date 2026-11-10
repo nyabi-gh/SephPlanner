@@ -80,7 +80,10 @@ namespace SephPlanner.Plugin.Host
     {
         private static readonly Dictionary<KeyCode, Key> Map = BuildMap();
 
-        private static readonly Key[] PhysicalKeys = Map.Values.Distinct().ToArray();
+        private static readonly Key[] ModifierKeys =
+        {
+            Key.LeftCtrl, Key.RightCtrl, Key.LeftAlt, Key.RightAlt, Key.LeftShift, Key.RightShift, Key.LeftMeta, Key.RightMeta,
+        };
 
         /// <summary>
         /// 물리 키마다 이름 하나. 별칭이 함께 잡히면 단축키 지정이 "RightAlt + AltGr + K" 처럼 같은 키를 두 번 적는다.
@@ -93,7 +96,7 @@ namespace SephPlanner.Plugin.Host
 
         public static bool IsDown(Shortcut shortcut) =>
             shortcut.MainKey != KeyCode.None &&
-            ShortcutMatch.IsDown(shortcut.MainKey, shortcut.Modifiers, Map, PhysicalKeys, Pressed, Held);
+            ShortcutMatch.IsDown(shortcut.MainKey, shortcut.Modifiers, Map, ModifierKeys, Pressed, Held);
 
         private static bool Held(Key key) => Keyboard.current?[key].isPressed == true;
 

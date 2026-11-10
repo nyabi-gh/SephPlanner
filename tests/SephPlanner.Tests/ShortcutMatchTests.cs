@@ -17,10 +17,10 @@ public sealed class ShortcutMatchTests
         [Name.W] = Key.W,
     };
 
-    private static readonly Key[] Keys = Enum.GetValues<Key>();
+    private static readonly Key[] ModifierKeys = { Key.RightAlt, Key.LeftShift };
 
     private static bool IsDown(Name main, Name[] modifiers, params Key[] held) =>
-        ShortcutMatch.IsDown(main, modifiers, Physical, Keys, key => key == Physical[main], held.Contains);
+        ShortcutMatch.IsDown(main, modifiers, Physical, ModifierKeys, key => key == Physical[main], held.Contains);
 
     [Theory]
     [InlineData(Name.RightAlt)]
@@ -32,12 +32,20 @@ public sealed class ShortcutMatchTests
     }
 
     [Fact]
-    public void MissingModifierOrExtraKeyBlocks()
+    public void MissingModifierOrExtraModifierBlocks()
     {
         Assert.False(IsDown(Name.K, [Name.RightAlt], Key.K));
         Assert.False(IsDown(Name.K, [Name.RightAlt], Key.K, Key.RightAlt, Key.LeftShift));
-        Assert.False(IsDown(Name.K, [], Key.K, Key.W));
+        Assert.False(IsDown(Name.K, [], Key.K, Key.RightAlt));
         Assert.True(IsDown(Name.K, [], Key.K));
+    }
+
+    /// <summary>걸으면서(W) 누른 단축키도 발동한다. 수정키가 아닌 눌림은 막지 않는다.</summary>
+    [Fact]
+    public void AHeldMovementKeyDoesNotBlock()
+    {
+        Assert.True(IsDown(Name.K, [], Key.K, Key.W));
+        Assert.True(IsDown(Name.K, [Name.LeftShift], Key.K, Key.LeftShift, Key.W));
     }
 
     [Fact]

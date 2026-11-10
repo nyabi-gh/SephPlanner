@@ -110,7 +110,7 @@ In multiplayer, auto-place is off by default. Get the other players' consent fir
 
 **I don't see any suggestions.** Check that `Acquire/combine/enchant/remove suggestions` is on in `F3`.
 
-**Hotkeys don't work.** Hotkeys don't respond while you are holding down another key. Don't press them while walking; let go of the movement keys first. Also check the `Shortcuts` tab in `F3` for conflicts with other keys. Turning off `Show planner` also stops `F1` and `F4`–`F8`.
+**Hotkeys don't work.** Hotkeys don't respond while you hold Ctrl, Alt, Shift or Cmd that isn't part of the hotkey. Let go of that key first. Holding movement keys is fine. Also check the `Shortcuts` tab in `F3` for conflicts with other keys. Turning off `Show planner` also stops `F1` and `F4`–`F8`.
 
 **Still not solved.** Press `F10` while the problem is happening, then let us know through [Issues](https://github.com/nyabi-gh/SephPlanner/issues), a comment on the Workshop page or [nyabi@tb.pro](mailto:nyabi@tb.pro) along with the **report number** shown on screen. The saved diagnostic file contains game data, so do not post it to public Issues. ([Reporting guide](docs/USAGE.md#제보에-필요한-정보) (Korean))
 
