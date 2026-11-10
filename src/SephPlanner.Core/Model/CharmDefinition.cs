@@ -154,7 +154,8 @@ namespace SephPlanner.Core.Model
         public List<string> StatWorthUnconverted { get; set; } = new List<string>();
 
         /// <summary>
-        /// 조건을 채우면 다른 아티팩트로 바뀌는 것(<c>Charm_GrowthStatusInstance</c>)의 목표 횟수.
+        /// 조건을 채우면 다른 아티팩트로 바뀌는 것(<c>Charm_GrowthStatusInstance</c>, 처치로 자라는 <c>Charm_SweepRange</c>)의
+        /// 목표 횟수.
         /// 0 이면 성장하지 않는다. 진행도 자체는 인스턴스마다 다르므로 스냅샷에서 읽는다.
         /// </summary>
         public int GrowthQuestGoal { get; set; }

@@ -339,8 +339,7 @@ namespace SephPlanner.Plugin
                         : null,
                     Enchant = EnchantOf(instance.InstanceID),
                     GrowthProgress = GrowthProgressOf(instance.InstanceID, instance.Charm),
-                    GrowthGoal = instance.Charm is Charm_GrowthStatusInstance goal && goal.hasGrowthQuest
-                        ? goal.growthQuestGoal : 0,
+                    GrowthGoal = GrowthQuest.Goal(instance.Charm),
                 });
             }
 
@@ -403,9 +402,6 @@ namespace SephPlanner.Plugin
                 : 0;
         }
 
-        private static readonly System.Reflection.FieldInfo GrowthCounter =
-            GameBinding.Field(typeof(Charm_GrowthStatusInstance), "questCounter");
-
         /// <summary>
         /// 성장 아티팩트가 목표까지 얼마나 왔는지. 읽지 못하면 <c>null</c> 이다.
         ///
@@ -416,7 +412,7 @@ namespace SephPlanner.Plugin
         /// </summary>
         private static int? GrowthProgressOf(int instanceId, Charm_Basic charm)
         {
-            if (charm is not Charm_GrowthStatusInstance growth || !growth.hasGrowthQuest) return null;
+            if (GrowthQuest.Goal(charm) == 0) return null;
 
             // 게임이 보내 준 표시값이 먼저다. 호스트든 참가자든 같은 이벤트로 오고, 효과가 켜질
             // 때마다 다시 오므로 배치가 갱신되면 최신값이 들어와 있다.
@@ -425,8 +421,7 @@ namespace SephPlanner.Plugin
 
             // 아직 한 번도 안 왔으면 서버에서만 원본을 읽는다. 참가자 자리에서 이 필드를 읽으면
             // 서버의 값이 아니라 초기값이 나오므로 모르는 채로 둔다.
-            if (!Mirror.NetworkServer.active || GrowthCounter == null) return null;
-            return GrowthCounter.GetValue(growth) is int counter ? counter : (int?)null;
+            return Mirror.NetworkServer.active ? GrowthQuest.Counter(charm) : null;
         }
 
         private static PlacedTablet Describe(StoneTablet tablet, InventoryView view) => new PlacedTablet

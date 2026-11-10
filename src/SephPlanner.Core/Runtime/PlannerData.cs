@@ -63,8 +63,9 @@ namespace SephPlanner.Core.Runtime
         /// v27: 게임 1.1.0 나침반의 부모 칸(<c>parentOffsets</c>)을 담는다. 1.1.0 에서는 이 판부터 카탈로그가
         ///      지어진다.
         /// v28: 마법 치명타 적용을 볼트에서 소환을 뺀 공격 마법 전부로 넓힌다.
+        /// v29: 처치 수로 자라는 버려진 금반지(<c>Charm_SweepRange</c>)의 성장 목표와 보상을 담는다.
         /// </summary>
-        public const int CatalogVersion = 28;
+        public const int CatalogVersion = 29;
 
         /// <summary>플러그인이 생성하고 진단 도구가 읽는 데이터 위치.</summary>
         public static string DataDirectory =>

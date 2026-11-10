@@ -113,10 +113,8 @@ namespace SephPlanner.Plugin
                     IsAttackable = charm is IAttackableCharm &&
                                    (!(charm is Charm_Magic attackMagic) || attackMagic.IsAttackableCharm()),
                     IsCompanion = charm is ICompanionCharm,
-                    GrowthQuestGoal = charm is Charm_GrowthStatusInstance growth && growth.hasGrowthQuest
-                        ? growth.growthQuestGoal : 0,
-                    GrowthRewardEntityId = charm is Charm_GrowthStatusInstance reward && reward.reward != null
-                        ? reward.reward.id : 0,
+                    GrowthQuestGoal = GrowthQuest.Goal(charm),
+                    GrowthRewardEntityId = GrowthQuest.Reward(charm),
                     NeighborEnhanceCategory = NeighborEnhanceCategory(charm),
                     IsSummonPlanet = charm is Charm_SummonGreenBat,
                     SummonDamageByLevel = SummonDamageByLevel(charm),
