@@ -904,7 +904,8 @@ namespace SephPlanner.Plugin
             // 런 밖이나 죽은 뒤에는 보여 줄 배치가 없다. 직전 런의 점수를 남겨 두면 거짓말이 된다.
             // "탐험"은 게임 자체가 쓰는 말이다.
             if (_lastSnapshot?.Inventory == null) return Tr("탐험 중이 아닙니다.");
-            if (_panelAwaitingRefresh) return Tr("최신 게임 상태를 읽는 중입니다.");
+            // 실행기가 아직 없으면 감출 낡은 계획도 없다. 그때는 데이터 준비·실패 안내가 나가야 한다.
+            if (_panelAwaitingRefresh && state != null) return Tr("최신 게임 상태를 읽는 중입니다.");
 
             var error = state?.Error;
             if (error != null) return Tr("계산 실패 - {0}", error);
