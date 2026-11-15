@@ -8,6 +8,7 @@ namespace SephPlanner.Tests;
 /// 돌파의 나침반 몫 나누기(<c>Compass.Lifted</c>, <c>PlacementSolver.LiftWorth</c>)와 끼워 넣기 다듬기
 /// (<c>PolishLiftInsertions</c>)를 일부러 어긋난 판으로 흔든다. 기대값은 docs/RESEARCH.md 의 1.1.0 나침반
 /// 규칙이다 - 돌파는 제 몫이 없고, 길에서 침에 가장 가까운 돌파가 희귀도 조건을 풀어 준 덤을 갖는다.
+/// 같은 무작위 판으로 다듬기가 끝난 배치에 한 수로 나아지는 길이 남지 않는지도 본다.
 /// </summary>
 public class BreakthroughAdversarialTests
 {
@@ -500,5 +501,90 @@ public class BreakthroughAdversarialTests
             Assert.Equal(first.CharmPositions.OrderBy(p => p.Key), second.CharmPositions.OrderBy(p => p.Key));
             Assert.Equal(first.Score, second.Score);
         }
+    }
+    // ---- 다듬기가 끝난 배치에는 한 수로 나아지는 길이 없다 ----
+
+    /// <summary>
+    /// 다듬기 전 배정과 다듬은 배치가 같은 값이면 다듬기 전 것이 남았는데, 다듬기는 그 배정이 아니라 처음부터
+    /// 다시 출발해 다른 지역 최적에 닿았다. 남은 배정은 비어 있는 지금 칸으로 한 칸만 돌아가도 자리 유지 몫이 늘었다.
+    /// </summary>
+    [Fact]
+    public void ASolvedBoardKeepsWhatASingleMoveWouldKeep()
+    {
+        var problem = Problem(new GridSpec(3, 3, 8),
+            (Root(1, Rarity.Legend, 6), new GridPos(0, 2)),
+            (Root(2, Rarity.Legend, 10), new GridPos(2, 1)),
+            (Needle(3, rarityCondition: false), new GridPos(1, 1)),
+            (Needle(4), new GridPos(0, 1)));
+
+        var solved = PlacementSolver.Solve(problem);
+
+        Assert.Equal(new GridPos(0, 2), solved.CharmPositions[1]);
+        Assert.Null(BetterSingleMove(problem, solved));
+    }
+
+    [Fact]
+    public void NoSingleMoveImprovesARandomSolvedBoard()
+    {
+        for (var variant = 0; variant < 2; variant++)
+            for (var seed = 0; seed < 300; seed++)
+            {
+                var problem = variant == 0 ? RandomBoard(seed) : LargerRandomBoard(seed);
+                var solved = PlacementSolver.Solve(problem);
+                var move = BetterSingleMove(problem, solved);
+                Assert.True(move is null, $"판 {variant}/{seed}: {Layout(solved)} 에서 {move} 가 낫다");
+            }
+    }
+
+    /// <summary>못 박히지 않은 아이템 하나를 다른 칸으로 옮기거나(차 있으면 맞바꾸기) 솔버의 비교 기준으로 나아지는 수.</summary>
+    private static string? BetterSingleMove(PlacementProblem problem, Arrangement solved)
+    {
+        var open = new List<GridPos>();
+        for (var y = 0; y < problem.Grid.Height; y++)
+            for (var x = 0; x < problem.Grid.Width; x++)
+                if (problem.Grid.Contains(x, y)) open.Add(new GridPos(x, y));
+        foreach (var charm in problem.Charms.Where(charm => !charm.Immovable))
+            foreach (var cell in open)
+            {
+                var positions = new Dictionary<int, GridPos>(solved.CharmPositions);
+                var from = positions[charm.InstanceId];
+                if (from == cell) continue;
+                var occupant = problem.Charms.FirstOrDefault(other => positions[other.InstanceId] == cell);
+                if (occupant is not null && occupant.Immovable) continue;
+                positions[charm.InstanceId] = cell;
+                if (occupant is not null) positions[occupant.InstanceId] = from;
+                if (PriorityPlacement.Compare(Score(problem, positions), solved) > 0) return $"{charm.InstanceId}->{cell}";
+            }
+        return null;
+    }
+
+    private static PlacementProblem LargerRandomBoard(int seed)
+    {
+        var random = new Random(seed * 7919 + 1);
+        var width = random.Next(3, 6);
+        var height = random.Next(3, 6);
+        var problem = new PlacementProblem { Grid = new GridSpec(width, height, width * height - random.Next(0, 3)) };
+        var open = new List<GridPos>();
+        for (var y = 0; y < height; y++)
+            for (var x = 0; x < width; x++)
+                if (problem.Grid.Contains(x, y)) open.Add(new GridPos(x, y));
+        var count = Math.Min(open.Count - random.Next(0, 3), random.Next(6, 11));
+        var cells = open.OrderBy(_ => random.Next()).Take(count).ToList();
+        var rarities = new[] { Rarity.Common, Rarity.Uncommon, Rarity.Rare, Rarity.Legend };
+        for (var index = 0; index < count; index++)
+        {
+            var id = index + 1;
+            var roll = random.Next(10);
+            CharmSlot charm = index < 2 || roll < 4 ? Root(id, rarities[random.Next(4)], random.Next(1, 12))
+                : roll < 7 ? Needle(id, random.Next(3) > 0)
+                : roll < 8 ? Distribute(id)
+                : roll < 9 ? Breakthrough(id)
+                : Filler(id);
+            charm.IsSupportTarget = charm.Definition.IsAttackable && random.Next(6) == 0;
+            problem.Charms.Add(charm);
+            problem.CurrentCharms[id] = cells[index];
+        }
+        if (random.Next(4) == 0) problem.Charms[random.Next(count)].Immovable = true;
+        return problem;
     }
 }

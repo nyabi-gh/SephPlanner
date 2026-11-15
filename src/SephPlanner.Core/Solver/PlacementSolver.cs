@@ -29,14 +29,20 @@ namespace SephPlanner.Core.Solver
             var best = ImproveTablets(problem, Choose(problem, candidates, options, null, evaluated), evaluated, options);
             var cells = Cells(problem);
             var sided = ImproveEmptySides(problem, cells, evaluated, best, options);
-            if (!ReferenceEquals(sided, best) && options.PolishPasses > 0)
-            {
-                // 빈칸 시도는 다듬지 않은 배정이라 같은 점수에서도 지금 자리를 덜 지킨다(제보 008cffa4).
-                options.Cancellation.ThrowIfCancellationRequested();
-                var polished = Evaluate(problem, cells, sided.Tablets, options, polish: true, seed: sided.CharmPositions);
-                if (PriorityPlacement.Compare(polished, sided) > 0) sided = polished;
-            }
-            return PriorityPlacement.Improve(problem, sided, options);
+            // 빈칸 시도는 다듬지 않은 배정이라 같은 점수에서도 지금 자리를 덜 지킨다(제보 008cffa4).
+            if (!ReferenceEquals(sided, best)) sided = PolishFrom(problem, cells, sided, options);
+            // 지정 대상 맞추기도 자리를 맞바꾸기만 하고 다듬지 않는다.
+            var improved = PriorityPlacement.Improve(problem, sided, options);
+            return ReferenceEquals(improved, sided) ? sided : PolishFrom(problem, cells, improved, options);
+        }
+
+        private static Arrangement PolishFrom(
+            PlacementProblem problem, List<GridPos> cells, Arrangement arrangement, SolverOptions options)
+        {
+            if (options.PolishPasses <= 0) return arrangement;
+            options.Cancellation.ThrowIfCancellationRequested();
+            var polished = Evaluate(problem, cells, arrangement.Tablets, options, polish: true, seed: arrangement.CharmPositions);
+            return PriorityPlacement.Compare(polished, arrangement) > 0 ? polished : arrangement;
         }
 
         internal static void CaptureProtectedActivation(PlacementProblem problem)
@@ -225,10 +231,12 @@ namespace SephPlanner.Core.Solver
 
             // 다듬기는 이긴 배치에만 건다. 후보마다 걸면 O(아티팩트^3)가 후보 수만큼 곱해져
             // 실시간 폴링이 못 따라온다 - 재어 보면 풀이 시간이 두 자릿수 배로 뛴다.
+            // 이긴 배치에서 출발한다. 처음부터 다시 풀면 다듬기가 다른 지역 최적에 닿고, 그 값이 같으면
+            // 한 칸 옮기기도 거치지 않은 이긴 배치가 남는다.
             if (bestLayout != null && options.PolishPasses > 0)
             {
                 options.Cancellation.ThrowIfCancellationRequested();
-                var polished = Evaluate(problem, cells, bestLayout, options, polish: true, seed: seed);
+                var polished = Evaluate(problem, cells, bestLayout, options, polish: true, seed: best.CharmPositions);
                 if (PriorityPlacement.Compare(polished, best) > 0) best = polished;
             }
             return best;
