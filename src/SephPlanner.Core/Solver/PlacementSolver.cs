@@ -1665,16 +1665,10 @@ namespace SephPlanner.Core.Solver
                 positions.ContainsKey(charm.InstanceId)).ToList();
             if (targets.Count == 0) return false;
             var available = new HashSet<GridPos>(free);
-            var byCell = CharmsByCell(problem, positions);
-            var familiarity = Familiarity(problem, layout);
-            var scratch = new PolishScratch(problem, layout, options.VerifyIncrementalPolish);
-            scratch.Reset(layout, positions);
-            var scoring = new PolishScoring(problem);
-            scoring.Prime();
-            var score = ScoreOf(problem, layout, positions, occupancy, result, byCell, familiarity, scoring);
+            var work = new SupportWork(problem, layout, positions, occupancy, result, options, forcedCharm, forcedCell);
+            var byCell = work.ByCell;
             var destinations = new Dictionary<int, GridPos>();
             var distinct = new HashSet<GridPos>();
-            var trial = new SupportTrial();
             var moved = false;
             foreach (var helper in helpers)
             {
@@ -1724,48 +1718,167 @@ namespace SephPlanner.Core.Solver
                         connected.Add(helper);
                         destinations[helper.InstanceId] = cell;
                         if (!Distinct(destinations, available, distinct)) continue;
-                        // 연결된 사슬의 상대 위치를 보존하고, 밀려난 아이템은 교환으로 보존한다.
-                        trial.Begin();
-                        foreach (var other in connected)
-                            trial.Move(positions, byCell, other, destinations[other.InstanceId]);
-                        if (forcedCharm.HasValue && positions[forcedCharm.Value] != forcedCell)
-                        {
-                            trial.Undo(positions, byCell);
-                            continue;
-                        }
-                        var trialResult = scratch.Apply(trial.Touched, layout, positions, byCell);
-                        var trialOccupancy = scratch.Occupancy;
-                        if (!CanUse(problem, helper, positions[helper.InstanceId], trialResult, trialOccupancy, byCell) ||
-                            BrokenSupport(problem, connected, positions, trialResult, trialOccupancy, byCell))
-                        {
-                            trial.Undo(positions, byCell);
-                            scratch.Undo(trial.Touched, byCell);
-                            continue;
-                        }
-                        scoring.Begin(trial.Touched, scratch.MatrixChanged);
-                        var quality = ScoreOf(
-                            problem, layout, positions, trialOccupancy, trialResult, byCell, familiarity, scoring);
-                        if (options.VerifyIncrementalPolish) VerifyScoring(
-                            problem, layout, positions, trialOccupancy, trialResult, byCell, familiarity, quality);
-                        if (quality.CompareTo(score) <= 0)
-                        {
-                            trial.Undo(positions, byCell);
-                            scratch.Undo(trial.Touched, byCell);
-                            continue;
-                        }
-                        // 호출자에게 넘기는 것은 작업 공간이 아니라 새로 지은 것이다.
-                        occupancy = OccupancyFrom(layout, positions, problem);
-                        result = TabletSimulator.Run(
-                            WithFixed(problem, layout), occupancy, problem.Grid, problem.EffectsFor(byCell));
-                        scratch.Accept();
-                        scoring.Forget();
+                        if (!work.TryMove(helper, connected, destinations, ref occupancy, ref result)) continue;
                         connected = null;
-                        score = quality;
                         moved = true;
                     }
                 }
             }
+            return moved | PolishLiftInsertions(work, helpers, available, distinct, ref occupancy, ref result);
+        }
+
+        /// <summary>
+        /// 돌파의 나침반을 침과 그 위 칸 사이에 끼워 본다. 침과 그 아래 사슬은 한 칸씩 물러난다.
+        /// 돌파는 아래 침이 있어야 값어치가 생기고(<see cref="LiftWorth"/>) 침은 돌파가 없어도 같은 몫을 받으므로,
+        /// 한 아티팩트씩 옮기거나 지원과 대상을 짝지어 옮기는 수로는 중간 배치가 나아지지 않아 닿지 못한다 -
+        /// 지정 대상 바로 밑의 침 사이로 들어가는 것이 그 예다.
+        /// </summary>
+        private static bool PolishLiftInsertions(
+            SupportWork work, List<CharmSlot> helpers, HashSet<GridPos> available, HashSet<GridPos> distinct,
+            ref GridOccupancy occupancy, ref SimulationResult result)
+        {
+            var lifters = helpers.Where(charm => Compass.Lifts(charm.Definition)).ToList();
+            if (lifters.Count == 0) return false;
+
+            var positions = work.Positions;
+            var destinations = new Dictionary<int, GridPos>();
+            var moved = false;
+            foreach (var lifter in lifters)
+            {
+                var lift = Compass.PrimaryOffset(lifter.Definition);
+                foreach (var needle in helpers)
+                {
+                    work.Options.Cancellation.ThrowIfCancellationRequested();
+                    if (needle == lifter || !Compass.Is(needle.Definition) || !PositionalWorth.IsNeedle(needle.Definition)) continue;
+                    var needleCell = positions[needle.InstanceId];
+                    var up = Compass.PrimaryOffset(needle.Definition);
+                    var parentCell = needleCell.Offset(up.X, up.Y);
+                    if (!work.ByCell.TryGetValue(parentCell, out var parent) || parent == lifter) continue;
+
+                    var lifterCell = parentCell.Offset(-lift.X, -lift.Y);
+                    var shift = (X: lifterCell.X - up.X - needleCell.X, Y: lifterCell.Y - up.Y - needleCell.Y);
+                    var hanging = Hanging(work, helpers, needle);
+                    if (hanging.Contains(lifter) || hanging.Any(other => other.Immovable)) continue;
+
+                    destinations.Clear();
+                    foreach (var other in hanging)
+                        destinations[other.InstanceId] = positions[other.InstanceId].Offset(shift.X, shift.Y);
+                    destinations[lifter.InstanceId] = lifterCell;
+                    if (!Distinct(destinations, available, distinct)) continue;
+
+                    hanging.Add(lifter);
+                    if (work.TryMove(lifter, hanging, destinations, ref occupancy, ref result)) moved = true;
+                }
+            }
             return moved;
+        }
+
+        /// <summary>이 나침반과 그 아래로 매달린 지원 사슬 전부.</summary>
+        private static HashSet<CharmSlot> Hanging(SupportWork work, List<CharmSlot> helpers, CharmSlot top)
+        {
+            var hanging = new HashSet<CharmSlot> { top };
+            bool expanded;
+            do
+            {
+                expanded = false;
+                foreach (var other in helpers)
+                {
+                    if (hanging.Contains(other)) continue;
+                    var direction = DirectedCharmSupport.Offset(other);
+                    var adjacent = work.Positions[other.InstanceId].Offset(direction.X, direction.Y);
+                    if (work.ByCell.TryGetValue(adjacent, out var above) && hanging.Contains(above) &&
+                        DirectedCharmSupport.Accepts(other, above))
+                        expanded |= hanging.Add(other);
+                }
+            } while (expanded);
+            return hanging;
+        }
+
+        /// <summary>
+        /// 사슬째 옮기는 수들이 함께 쓰는 작업 공간. 시도는 배치를 제자리에서 고쳤다 되돌리고, 효과 행렬과
+        /// 채점은 <see cref="Polish"/>와 같은 작업 공간으로 바뀐 칸만 다시 본다.
+        /// </summary>
+        private sealed class SupportWork
+        {
+            private readonly PlacementProblem _problem;
+            private readonly List<TabletPlacement> _layout;
+            private readonly double _familiarity;
+            private readonly PolishScratch _scratch;
+            private readonly PolishScoring _scoring;
+            private readonly SupportTrial _trial = new SupportTrial();
+            private readonly int? _forcedCharm;
+            private readonly GridPos _forcedCell;
+            private PlacementQuality _score;
+
+            public SupportWork(
+                PlacementProblem problem, List<TabletPlacement> layout, Dictionary<int, GridPos> positions,
+                GridOccupancy occupancy, SimulationResult result, SolverOptions options,
+                int? forcedCharm, GridPos forcedCell)
+            {
+                _problem = problem;
+                _layout = layout;
+                Positions = positions;
+                Options = options;
+                _forcedCharm = forcedCharm;
+                _forcedCell = forcedCell;
+                ByCell = CharmsByCell(problem, positions);
+                _familiarity = Familiarity(problem, layout);
+                _scratch = new PolishScratch(problem, layout, options.VerifyIncrementalPolish);
+                _scratch.Reset(layout, positions);
+                _scoring = new PolishScoring(problem);
+                _scoring.Prime();
+                _score = ScoreOf(problem, layout, positions, occupancy, result, ByCell, _familiarity, _scoring);
+            }
+
+            public Dictionary<int, GridPos> Positions { get; }
+            public Dictionary<GridPos, CharmSlot> ByCell { get; }
+            public SolverOptions Options { get; }
+
+            /// <summary>
+            /// <paramref name="moving"/> 를 <paramref name="destinations"/> 로 옮겨 보고 나아지면 남긴다. 밀려난
+            /// 아이템은 교환으로 보존한다.
+            /// </summary>
+            public bool TryMove(
+                CharmSlot helper, HashSet<CharmSlot> moving, Dictionary<int, GridPos> destinations,
+                ref GridOccupancy occupancy, ref SimulationResult result)
+            {
+                _trial.Begin();
+                foreach (var other in moving)
+                    _trial.Move(Positions, ByCell, other, destinations[other.InstanceId]);
+                if (_forcedCharm.HasValue && Positions[_forcedCharm.Value] != _forcedCell)
+                {
+                    _trial.Undo(Positions, ByCell);
+                    return false;
+                }
+                var trialResult = _scratch.Apply(_trial.Touched, _layout, Positions, ByCell);
+                var trialOccupancy = _scratch.Occupancy;
+                if (!CanUse(_problem, helper, Positions[helper.InstanceId], trialResult, trialOccupancy, ByCell) ||
+                    BrokenSupport(_problem, moving, Positions, trialResult, trialOccupancy, ByCell))
+                {
+                    _trial.Undo(Positions, ByCell);
+                    _scratch.Undo(_trial.Touched, ByCell);
+                    return false;
+                }
+                _scoring.Begin(_trial.Touched, _scratch.MatrixChanged);
+                var quality = ScoreOf(
+                    _problem, _layout, Positions, trialOccupancy, trialResult, ByCell, _familiarity, _scoring);
+                if (Options.VerifyIncrementalPolish) VerifyScoring(
+                    _problem, _layout, Positions, trialOccupancy, trialResult, ByCell, _familiarity, quality);
+                if (quality.CompareTo(_score) <= 0)
+                {
+                    _trial.Undo(Positions, ByCell);
+                    _scratch.Undo(_trial.Touched, ByCell);
+                    return false;
+                }
+                // 호출자에게 넘기는 것은 작업 공간이 아니라 새로 지은 것이다.
+                occupancy = OccupancyFrom(_layout, Positions, _problem);
+                result = TabletSimulator.Run(
+                    WithFixed(_problem, _layout), occupancy, _problem.Grid, _problem.EffectsFor(ByCell));
+                _scratch.Accept();
+                _scoring.Forget();
+                _score = quality;
+                return true;
+            }
         }
 
         private static bool Distinct(Dictionary<int, GridPos> destinations, HashSet<GridPos> available, HashSet<GridPos> seen)
@@ -2188,6 +2301,8 @@ namespace SephPlanner.Core.Solver
             if (charm.Definition.Behavior == "Charm_NearLevelDamage")
                 value += CharmWorth.ApplyWeight(
                     NearLevelDamageWorth(problem, charm, cell, effective, result, neighbors), charm.Weight);
+            if (neighbors is not null && Compass.Lifts(charm.Definition))
+                value += LiftWorth(problem, charm, cell, result, occupancy, neighbors, activity);
 
             // 자리가 대상을 정하는 것들. 무엇이 걸리는지는 정의가 답한다.
             value += CharmWorth.ApplyWeight(PositionalWorth.ComboWorth(problem, charm, cell, neighbors, activity), charm.Weight);
@@ -2196,6 +2311,34 @@ namespace SephPlanner.Core.Solver
 
             return value;
         }
+
+        /// <summary>
+        /// 돌파의 나침반이 아래 침에게 풀어 주는 희귀도 조건의 몫. 침은 돌파가 없을 때의 몫만 갖고
+        /// (<see cref="Compass.Factor"/>) 그 차이를 여기서 돌파가 갖는다 - 둘을 더하면 게임이 주는 것과 같다.
+        /// 침의 값어치는 그 침 자신을 채점할 때와 같은 레벨·가중치로 잰다.
+        /// </summary>
+        private static double LiftWorth(
+            PlacementProblem problem, CharmSlot breakthrough, GridPos cell, SimulationResult result,
+            GridOccupancy occupancy, Dictionary<GridPos, CharmSlot> neighbors, in CharmActivity activity)
+        {
+            var lifted = _lifted ??= new List<LiftedRoot>();
+            Compass.Lifted(breakthrough, cell, neighbors, activity, lifted);
+            var value = 0.0;
+            foreach (var entry in lifted)
+            {
+                var needle = entry.Needle;
+                if (needle.IsFiller || needle.ComboOnly) continue;
+                var level = Math.Min(needle.WorthLevelCap, result.EffectiveLevel(entry.NeedleCell, needle.Enchant));
+                var gain = PositionalWorth.TargetFactor(problem, needle, entry.Root, level, bypassRarity: true) -
+                           PositionalWorth.TargetFactor(problem, needle, entry.Root, level, bypassRarity: false);
+                if (gain <= 0) continue;
+                value += BuildStatWorth.Value(problem, needle, level, result, occupancy, neighbors) * gain;
+            }
+            return value;
+        }
+
+        // LiftWorth 한 호출 안에서 채우고 다 읽는다.
+        [ThreadStatic] private static List<LiftedRoot>? _lifted;
 
         /// <summary>
         /// 필수 조건·효과·감점·초과 강화가 같을 때 현재 자리, 직전 제안 순으로 유지한다.

@@ -60,6 +60,7 @@ public class CompassTests
         {
             EntityId = id,
             MaxLevel = 4,
+            Rarity = Rarity.Legend,
             Behavior = "Charm_CompassBreakthrough",
             DependencyParents = { Up },
         },
@@ -179,12 +180,63 @@ public class CompassTests
             (Breakthrough(2), new GridPos(0, 1)),
             (DamageUp(3, rarityCondition: true), new GridPos(0, 2)));
 
-        var neighbors = ByCell(lifted);
-        var factor = Compass.Factor(lifted, lifted.Charms[2], new GridPos(0, 2), 0, neighbors, default);
-        var withoutBreakthrough = Compass.Factor(plain, plain.Charms[2], new GridPos(0, 2), 0, ByCell(plain), default);
+        var root = lifted.Charms[0].Worth.At(0);
+        var needle = lifted.Charms[2].Worth.At(0);
 
-        Assert.Equal(1, withoutBreakthrough, 6);
-        Assert.Equal(1 + 25.0 / 10, factor, 6);
+        Assert.Equal(1, Compass.Factor(plain, plain.Charms[2], new GridPos(0, 2), 0, ByCell(plain), default), 6);
+        // 침은 돌파 없이 받을 몫만 갖고, 돌파가 풀어 준 덤(25/10)은 돌파의 몫이다. 합은 게임과 같다.
+        Assert.Equal(1, Compass.Factor(lifted, lifted.Charms[2], new GridPos(0, 2), 0, ByCell(lifted), default), 6);
+        Assert.Equal(0, Compass.Factor(lifted, lifted.Charms[1], new GridPos(0, 1), 0, ByCell(lifted), default), 6);
+        Assert.Equal(root + needle * (1 + 25.0 / 10), Score(lifted).Score, 6);
+    }
+
+    /// <summary>
+    /// 아래에 침이 없는 돌파는 게임에서 아무것도 주지 않는다. 값진 뿌리 밑이라고 몫을 주면 쓸모없는 자리를
+    /// 차지하러 간다(제보 <c>eebed530</c>).
+    /// </summary>
+    [Fact]
+    public void ABreakthroughWithoutANeedleBelowIsWorthNothing()
+    {
+        var problem = Problem(new GridSpec(1, 2, 2),
+            (Root(1, "EMBER"), new GridPos(0, 0)),
+            (Breakthrough(2), new GridPos(0, 1)));
+
+        var scored = Score(problem);
+
+        Assert.Empty(scored.UnlinkedCharms);
+        Assert.Equal(problem.Charms[0].Worth.At(0), scored.Score, 6);
+    }
+
+    private static PlacementProblem BreakthroughAside()
+    {
+        var target = Root(1, "EMBER", Rarity.Legend);
+        target.Worth = new CharmWorth { Base = 5, PerLevel = 5 };
+        target.IsSupportTarget = true;
+        var kunai = Root(2, "PRECISION", Rarity.Uncommon);
+        kunai.Worth = new CharmWorth { Base = 10, PerLevel = 10 };
+        var needle = DamageUp(3, rarityCondition: true);
+        needle.Worth = new CharmWorth { Base = 2, PerLevel = 2 };
+        return Problem(new GridSpec(2, 3, 6),
+            (target, new GridPos(0, 0)),
+            (kunai, new GridPos(1, 0)),
+            (needle, new GridPos(0, 1)),
+            (Breakthrough(4), new GridPos(1, 1)));
+    }
+
+    /// <summary>
+    /// 지정한 전설 대상 밑에 침이 있고, 돌파는 더 값진 쿠나이 밑에 있다(제보 <c>eebed530</c>). 돌파는 침과
+    /// 대상 사이에 들어가야 덤을 푼다. 돌파 하나만 옮기거나 지원과 대상을 짝지어 옮겨서는 닿지 못한다 -
+    /// 침을 한 칸 내리며 끼워 넣어야 한다.
+    /// </summary>
+    [Fact]
+    public void ABreakthroughSlidesBetweenTheDesignatedTargetAndItsNeedle()
+    {
+        var solved = PlacementSolver.Solve(BreakthroughAside());
+
+        var target = solved.CharmPositions[1];
+        Assert.Equal(target.Offset(0, 1), solved.CharmPositions[4]);
+        Assert.Equal(target.Offset(0, 2), solved.CharmPositions[3]);
+        Assert.Equal(1, solved.SupportTargetMatches);
     }
 
     [Fact]

@@ -33,19 +33,36 @@ namespace SephPlanner.Core.Solver
             PlacementSolver.Reason(charm, cell, _result, _grid, _occupancy!) == CharmInactiveReason.None;
     }
 
-    /// <summary>나침반이 이어진 뿌리 하나. <see cref="Bypass"/> 는 길에 돌파의 나침반이 있었는지다.</summary>
+    /// <summary>
+    /// 나침반이 이어진 뿌리 하나. <see cref="Breaker"/> 는 길에서 출발한 나침반에 가장 가까운 돌파의 나침반이다.
+    /// </summary>
     internal readonly struct CompassRoot
     {
-        internal CompassRoot(CharmSlot charm, GridPos cell, bool bypass)
+        internal CompassRoot(CharmSlot charm, GridPos cell, CharmSlot? breaker)
         {
             Charm = charm;
             Cell = cell;
-            Bypass = bypass;
+            Breaker = breaker;
         }
 
         internal CharmSlot Charm { get; }
         internal GridPos Cell { get; }
-        internal bool Bypass { get; }
+        internal CharmSlot? Breaker { get; }
+    }
+
+    /// <summary>돌파의 나침반 아래 침이 그 돌파를 지나 닿는 뿌리 하나.</summary>
+    internal readonly struct LiftedRoot
+    {
+        internal LiftedRoot(CharmSlot needle, GridPos needleCell, CharmSlot root)
+        {
+            Needle = needle;
+            NeedleCell = needleCell;
+            Root = root;
+        }
+
+        internal CharmSlot Needle { get; }
+        internal GridPos NeedleCell { get; }
+        internal CharmSlot Root { get; }
     }
 
     /// <summary>
@@ -64,6 +81,8 @@ namespace SephPlanner.Core.Solver
 
         internal static bool Is(CharmDefinition definition) =>
             definition.Behavior == Distribute || definition.Behavior == DamageUp || definition.Behavior == Breakthrough;
+
+        internal static bool Lifts(CharmDefinition definition) => definition.Behavior == Breakthrough;
 
         /// <summary>
         /// 꺼지지 않은 이 나침반에서 위로 걸어 닿는 뿌리들. 게임 <c>Charm_Compass.WalkToRoots</c> 와 같은
@@ -86,38 +105,100 @@ namespace SephPlanner.Core.Solver
             var visited = _visited ??= new List<CharmSlot>();
             visited.Clear();
             visited.Add(compass);
-            Walk(compass, cell, compass, cell, neighbors, activity, Bypasses(compass.Definition), visited, into);
+            Walk(compass, cell, compass, cell, neighbors, activity, Lifts(compass.Definition) ? compass : null, visited, into);
         }
 
         // 한 호출 안에서 채우고 다 읽는다. 걸음은 저 자신만 부른다.
         [ThreadStatic] private static List<CharmSlot>? _visited;
         [ThreadStatic] private static List<CompassRoot>? _roots;
+        [ThreadStatic] private static List<CompassRoot>? _liftedRoots;
+
+        /// <summary>
+        /// <paramref name="moved"/> 를 <paramref name="movedCell"/> 에 세운 판에서 그 칸의 아티팩트.
+        /// 배정은 직전 반복의 이웃으로 채점하고 자리를 맞바꾸므로, 옮긴 것의 옛 칸에는 지금 목표 칸에 있던
+        /// 아티팩트가 선다 - 1.0.33 침의 걸음(PositionalWorth.Step)과 같은 갈음.
+        /// </summary>
+        private static bool At(
+            IReadOnlyDictionary<GridPos, CharmSlot> neighbors, CharmSlot moved, GridPos movedCell,
+            GridPos cell, out CharmSlot charm)
+        {
+            if (cell == movedCell)
+            {
+                charm = moved;
+                return true;
+            }
+            if (!neighbors.TryGetValue(cell, out charm)) return false;
+            return charm != moved || neighbors.TryGetValue(movedCell, out charm) && charm != moved;
+        }
 
         private static void Walk(
-            CharmSlot origin, GridPos originCell, CharmSlot current, GridPos at,
-            IReadOnlyDictionary<GridPos, CharmSlot> neighbors, in CharmActivity activity, bool bypass,
+            CharmSlot moved, GridPos movedCell, CharmSlot current, GridPos at,
+            IReadOnlyDictionary<GridPos, CharmSlot> neighbors, in CharmActivity activity, CharmSlot? breaker,
             List<CharmSlot> visited, List<CompassRoot> into)
         {
             foreach (var offset in current.Definition.DependencyParents)
             {
                 var parentCell = at.Offset(offset.X, offset.Y);
-                if (!neighbors.TryGetValue(parentCell, out var parent)) continue;
-
-                // 직전 반복에서 자기가 서 있던 칸이다. 배정은 자리 맞바꾸기라 실제로는 지금 목표 칸에
-                // 있는 아티팩트가 그 자리를 채운다 - 1.0.33 침의 걸음(PositionalWorth.Step)과 같은 갈음.
-                if (parent == origin && (parentCell == originCell || !neighbors.TryGetValue(originCell, out parent))) continue;
-                if (parent == origin || visited.Contains(parent)) continue;
+                if (!At(neighbors, moved, movedCell, parentCell, out var parent)) continue;
+                if (visited.Contains(parent)) continue;
                 visited.Add(parent);
 
                 if (Is(parent.Definition))
                 {
                     if (!activity.IsActive(parent, parentCell)) continue;
-                    Walk(origin, originCell, parent, parentCell, neighbors, activity,
-                        bypass || Bypasses(parent.Definition), visited, into);
+                    Walk(moved, movedCell, parent, parentCell, neighbors, activity,
+                        breaker ?? (Lifts(parent.Definition) ? parent : null), visited, into);
                     continue;
                 }
 
-                if (IsValidRoot(parent)) into.Add(new CompassRoot(parent, parentCell, bypass));
+                if (IsValidRoot(parent)) into.Add(new CompassRoot(parent, parentCell, breaker));
+            }
+        }
+
+        /// <summary>
+        /// 이 돌파의 나침반을 지나 뿌리에 닿는 아래 침들. 길에 돌파가 여럿이면 침에 가장 가까운 것이 받는다.
+        /// 돌파 자리를 바꿔 보는 배정이 부르므로 침의 칸도 <see cref="At"/> 의 맞바꾸기로 읽는다.
+        /// </summary>
+        internal static void Lifted(
+            CharmSlot breakthrough, GridPos cell, IReadOnlyDictionary<GridPos, CharmSlot> neighbors,
+            in CharmActivity activity, List<LiftedRoot> into)
+        {
+            into.Clear();
+            if (!activity.IsActive(breakthrough, cell)) return;
+
+            var hasOldCell = false;
+            var oldCell = default(GridPos);
+            foreach (var pair in neighbors)
+            {
+                if (pair.Value != breakthrough) continue;
+                hasOldCell = true;
+                oldCell = pair.Key;
+                break;
+            }
+
+            var roots = _liftedRoots ??= new List<CompassRoot>();
+            var visited = _visited ??= new List<CharmSlot>();
+            foreach (var pair in neighbors)
+            {
+                var needle = pair.Value;
+                if (needle == breakthrough || !Is(needle.Definition) || !PositionalWorth.IsNeedle(needle.Definition)) continue;
+                var needleCell = pair.Key;
+                if (needleCell == cell)
+                {
+                    if (!hasOldCell) continue;
+                    needleCell = oldCell;
+                }
+                if (needle.IsDormant || !activity.IsActive(needle, needleCell)) continue;
+
+                roots.Clear();
+                visited.Clear();
+                visited.Add(needle);
+                Walk(breakthrough, cell, needle, needleCell, neighbors, activity, null, visited, roots);
+                foreach (var root in roots)
+                {
+                    if (root.Breaker != breakthrough || root.Charm.IsDormant || !activity.IsActive(root.Charm, root.Cell)) continue;
+                    into.Add(new LiftedRoot(needle, needleCell, root.Charm));
+                }
             }
         }
 
@@ -127,8 +208,6 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         private static bool IsValidRoot(CharmSlot root) =>
             !root.IsFiller && (root.IsAttackable ?? root.Definition.IsAttackable);
-
-        private static bool Bypasses(CharmDefinition definition) => definition.Behavior == Breakthrough;
 
         /// <summary>
         /// 이 나침반이 내보이는 카테고리. 게임 <c>OnPreSetEffectRefreshed</c> 가 이어진 뿌리의
@@ -162,14 +241,21 @@ namespace SephPlanner.Core.Solver
         /// 1.0.33 침의 배수(<see cref="PositionalWorth.DependencyFactor"/>)를 뿌리마다 더한다 - 분배의 나침반
         /// 아래 침은 두 뿌리에 같은 몫을 준다.
         ///
-        /// 분배와 돌파는 제 몫이 없고 아래 침이 그 몫을 받는다. 그 몫은 아래 침의 배수에 이미 들어가므로
-        /// 여기서는 <b>어림으로</b> 가장 값진 뿌리의 몫만 준다. 0 으로 두면 이 둘이 어디에 서든 같아져
-        /// 이어지지 않는 칸에 버려진다.
+        /// 침의 배수는 돌파가 없을 때의 것이다. 돌파가 희귀도 조건을 풀어 더 받는 몫은 그 돌파의 값어치로
+        /// 센다(<see cref="Lifted"/>) - 침에 주면 돌파는 어디에 서든 0 이라 침과 뿌리 사이로 끌려올 까닭이
+        /// 없고, 아래에 침이 없는 돌파에 뿌리 몫을 주면 쓸모없는 자리를 차지하러 간다(제보 <c>eebed530</c>:
+        /// 지정 대상 대신 쿠나이 밑). 그래서 돌파 자신의 배수는 0 이다.
+        ///
+        /// 분배는 제 몫이 없고 아래 침이 그 몫을 받는다. 그 몫은 아래 침의 배수에 이미 들어가므로 여기서는
+        /// <b>어림으로</b> 가장 값진 뿌리의 몫만 준다. 0 으로 두면 어디에 서든 같아져 이어지지 않는 칸에
+        /// 버려진다.
         /// </summary>
         internal static double Factor(
             PlacementProblem problem, CharmSlot compass, GridPos cell, int level,
             IReadOnlyDictionary<GridPos, CharmSlot> neighbors, in CharmActivity activity)
         {
+            if (Lifts(compass.Definition)) return 0;
+
             var roots = _roots ??= new List<CompassRoot>();
             Roots(compass, cell, neighbors, activity, roots);
 
@@ -180,7 +266,7 @@ namespace SephPlanner.Core.Solver
                 if (root.Charm.IsDormant || !activity.IsActive(root.Charm, root.Cell)) continue;
 
                 factor = damage
-                    ? factor + PositionalWorth.TargetFactor(problem, compass, root.Charm, level, root.Bypass)
+                    ? factor + PositionalWorth.TargetFactor(problem, compass, root.Charm, level, bypassRarity: false)
                     : Math.Max(factor, PositionalWorth.TargetShare(problem, root.Charm));
             }
             return factor;
