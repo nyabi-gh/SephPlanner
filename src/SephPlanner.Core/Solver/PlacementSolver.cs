@@ -1728,7 +1728,8 @@ namespace SephPlanner.Core.Solver
         }
 
         /// <summary>
-        /// 돌파의 나침반을 침과 그 위 칸 사이에 끼워 본다. 침과 그 아래 사슬은 한 칸씩 물러난다.
+        /// 돌파의 나침반을 침과 그 위 칸 사이에 끼워 본다. 침과 그 아래 사슬을 한 칸씩 내리고, 그 자리가 없거나
+        /// 나아지지 않으면 침 위의 사슬을 한 칸 올린다 - 침이 가방 맨 아랫줄에 있으면 내릴 칸이 없다.
         /// 돌파는 아래 침이 있어야 값어치가 생기고(<see cref="LiftWorth"/>) 침은 돌파가 없어도 같은 몫을 받으므로,
         /// 한 아티팩트씩 옮기거나 지원과 대상을 짝지어 옮기는 수로는 중간 배치가 나아지지 않아 닿지 못한다 -
         /// 지정 대상 바로 밑의 침 사이로 들어가는 것이 그 예다.
@@ -1758,19 +1759,51 @@ namespace SephPlanner.Core.Solver
                     var lifterCell = parentCell.Offset(-lift.X, -lift.Y);
                     var shift = (X: lifterCell.X - up.X - needleCell.X, Y: lifterCell.Y - up.Y - needleCell.Y);
                     var hanging = Hanging(work, helpers, needle);
-                    if (hanging.Contains(lifter) || hanging.Any(other => other.Immovable)) continue;
+                    if (hanging.Contains(lifter) || hanging.Any(other => other.Immovable)) hanging.Clear();
 
-                    destinations.Clear();
-                    foreach (var other in hanging)
-                        destinations[other.InstanceId] = positions[other.InstanceId].Offset(shift.X, shift.Y);
-                    destinations[lifter.InstanceId] = lifterCell;
-                    if (!Distinct(destinations, available, distinct)) continue;
+                    if (TryShifted(work, lifter, lifterCell, hanging, shift, available, distinct, destinations, ref occupancy, ref result))
+                    {
+                        moved = true;
+                        continue;
+                    }
 
-                    hanging.Add(lifter);
-                    if (work.TryMove(lifter, hanging, destinations, ref occupancy, ref result)) moved = true;
+                    var above = Above(work, parent);
+                    if (above.Contains(lifter) || above.Contains(needle) || above.Any(other => other.Immovable)) continue;
+                    if (TryShifted(work, lifter, parentCell, above, lift, available, distinct, destinations, ref occupancy, ref result))
+                        moved = true;
                 }
             }
             return moved;
+        }
+
+        private static bool TryShifted(
+            SupportWork work, CharmSlot lifter, GridPos lifterCell, HashSet<CharmSlot> shifted, (int X, int Y) shift,
+            HashSet<GridPos> available, HashSet<GridPos> distinct, Dictionary<int, GridPos> destinations,
+            ref GridOccupancy occupancy, ref SimulationResult result)
+        {
+            if (shifted.Count == 0) return false;
+            destinations.Clear();
+            foreach (var other in shifted)
+                destinations[other.InstanceId] = work.Positions[other.InstanceId].Offset(shift.X, shift.Y);
+            destinations[lifter.InstanceId] = lifterCell;
+            if (!Distinct(destinations, available, distinct)) return false;
+
+            var moving = new HashSet<CharmSlot>(shifted) { lifter };
+            return work.TryMove(lifter, moving, destinations, ref occupancy, ref result);
+        }
+
+        /// <summary>이 칸의 아티팩트와, 그것이 나침반이면 첫 부모 방향으로 이어지는 위 사슬 전부.</summary>
+        private static HashSet<CharmSlot> Above(SupportWork work, CharmSlot bottom)
+        {
+            var above = new HashSet<CharmSlot>();
+            var current = bottom;
+            while (above.Add(current) && Compass.Is(current.Definition))
+            {
+                var up = Compass.PrimaryOffset(current.Definition);
+                if (!work.ByCell.TryGetValue(work.Positions[current.InstanceId].Offset(up.X, up.Y), out var next)) break;
+                current = next;
+            }
+            return above;
         }
 
         /// <summary>이 나침반과 그 아래로 매달린 지원 사슬 전부.</summary>

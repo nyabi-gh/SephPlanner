@@ -92,8 +92,7 @@ namespace SephPlanner.Core.Solver
         ///
         /// 피해 보너스는 게임이 뿌리에서 아래로 BFS 를 돌며(<c>RequestCharmDamageBonusOnRoot</c>) 같은 길을
         /// 거꾸로 걷는다. 돌파의 몫은 BFS 가 처음 닿은 길의 것인데, 같은 뿌리에 닿는 길이 둘 이상이면 어느
-        /// 길이 먼저인지는 의존성 등록 순서라 알 수 없다. 그래서 돌파를 지나는 길이 하나라도 있으면 푼다고
-        /// 본다(어림).
+        /// 길이 먼저인지는 의존성 등록 순서라 알 수 없다. 그래서 깊이 우선으로 먼저 걸은 길의 것을 쓴다(어림).
         /// </summary>
         internal static void Roots(
             CharmSlot compass, GridPos cell, IReadOnlyDictionary<GridPos, CharmSlot> neighbors,
