@@ -11,7 +11,9 @@
 - **창작마당:** 글 `3832790875` 에 0.6.3 이 올라가 있다(제보 `eebed530` 이 0.6.3 창작마당 판에서 왔다). 올린 뒤마다 글 설명이
   `metadata.json` 의 설명으로 바뀌므로([개발 문서](DEVELOPMENT.md)의 "창작마당 판"), git 밖의 `artifacts/workshop-description.txt`(Mac)
   원문을 Steam 글 페이지에 다시 붙여 넣는다.
-- **0.6.4:** 버전과 CHANGELOG 를 올렸다. GitHub 릴리스 공개와 창작마당 업로드는 아직이다. 위 두 줄은 0.6.3 의 기록이다.
+- **0.6.4:** 창작마당 글 `3832790875` 에 게임에서 올려 검수에 접수됐다(2026-11-15, 접수 `22m-pqtj9qij`, `Player.log` 의
+  `[WorkshopUploader]`). 승인 여부는 다음에 게임을 켤 때 `[ModGuardReviewStatus]` 로 본다. GitHub 릴리스는 Windows ZIP 만 든
+  드래프트다(태그 `v0.6.4` 는 `c93c492`). 위 두 줄은 0.6.3 의 기록이다.
 
 
 ## 기준 버전

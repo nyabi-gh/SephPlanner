@@ -40,9 +40,9 @@
 1. **돌파 실기**(게임, 사용자). STATUS 표 "돌파의 나침반 끼워 넣기". 제보자에게 남은 항목("1." 뒤)을 런 도중 F10 으로 다시
    받으면 좋다.
 2. **F9 로 새 측정 덤프**(게임, 사용자). 카탈로그 판 29 라 덤프가 없으면 재현 대조가 옛 표로 돈다.
-3. **0.6.4 배포.** 태그와 Windows 드래프트까지 했다. [개발 문서](DEVELOPMENT.md) "배포" 순서대로 Mac ZIP(`git checkout v0.6.4`
-   뒤 `make-release.ps1`, 출력된 `gh release upload`) → 공개(사용자, `publish-release.ps1`) → 창작마당 업로드(사용자, 게임 안,
-   올린 뒤 설명 다시 붙여 넣기)를 한다.
+3. **0.6.4 배포.** 태그, Windows 드래프트, 창작마당 검수 접수까지 했다. 남은 것은 창작마당 승인 확인(`[ModGuardReviewStatus]`)
+   과 올린 뒤 설명 다시 붙여 넣기, Mac ZIP(태그를 옮겼으니 `git fetch --tags --force` → `git checkout v0.6.4` →
+   `make-release.ps1` → 출력된 `gh release upload`), 공개(사용자, `publish-release.ps1`)다.
 4. **게임 실기.** 날개와 천 갑옷(탐욕 20레벨 특전이나 패시브 오브젝트로 `ARRANGEMENT_BONUS` 를 얻은 판)에서 추천이 둘을 떼어
    두는지와 안내 줄, 걸으면서 누른 단축키, 다시 뜨는 동의 창, 금반지의 성장 표시, 상인 금고 재고의 가격(3-2), 조언 실패 문구,
    STATUS 표의 0.6.1·0.6.0 줄. 멀티 둘은 `winhttp.dll.off` 를 `winhttp.dll` 로 돌려 BepInEx 판으로 본다.
