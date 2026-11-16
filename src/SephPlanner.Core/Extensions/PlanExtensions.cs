@@ -23,7 +23,7 @@ namespace SephPlanner.Core.Extensions
         /// <summary>확장 어셈블리의 버전. 창작마당 글의 버전과 다를 수 있다.</summary>
         public string Version { get; set; } = "";
 
-        /// <summary>예외를 던져 이번 판 동안 꺼졌는가.</summary>
+        /// <summary>예외를 던지거나 쓸 수 없는 표를 돌려줘 새 판까지 꺼졌는가.</summary>
         public bool Disabled { get; set; }
     }
 
