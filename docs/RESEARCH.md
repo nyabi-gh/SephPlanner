@@ -395,6 +395,25 @@ BepInEx 가 깔린 채로는 `Player.log` 에 `[ModEnvironment] 동봉 Harmony 2
 - **어셈블리 이름이 겹칠 때.** 라이브러리(`libraries`)는 같은 이름이 이미 로드돼 있으면 그것을 다시 쓰고 경고만
   남긴다. 주 모듈(`dll`)은 같은 이름이 다른 위치에서 로드돼 있으면 "어셈블리 이름 충돌" 로 실행을 보류한다
   (`TryLoadAssembly`). 그 판단은 이름만 본다.
+- **모드 사이의 의존**(1.1.2 `workshop-beta`, 어셈블리 SHA-256 `2f899303…`, 2026-11-16 Mac 디컴파일). 다른 모드가 우리
+  DLL 을 참조하는 확장을 만들 때의 규칙이다.
+  - `mod.dependencies` 는 `{ "modId", "version"?, "workshopId"? }` 배열이다(`WorkshopManifestReader.ReadDependencies`).
+    `version` 은 정확히 같은 문자열만 받는다 - 범위 연산자는 형식 오류이고, 다르면 `DependencyVersionMismatch` 로 그 모드가
+    실리지 않는다. 그래서 `version` 을 적은 확장은 우리가 버전을 올릴 때마다 함께 다시 올려야 한다. `workshopId` 는 다르면
+    경고만 남긴다.
+  - 의존 대상이 없거나 꺼져 있거나 검수 미승인이면 의존하는 쪽도 실리지 않는다. 대상이 활성화에 실패해도
+    `DependencyFailed` 로 건너뛴다(`WorkshopDllActivator.Activate`).
+  - 순서는 의존을 따른 위상 정렬이다. 의존이 없는 모드끼리는 modId 사전순, 그 위에 사용자가 창작마당 창에서 정한 순서가
+    덮인다(`WorkshopModLoadPlanner.Build`, `WorkshopModOrder.Sort`). 의존을 선언하지 않으면 누가 먼저 실릴지 보장되지 않는다.
+  - 활성화기는 `AppDomain.AssemblyResolve` 에 걸려 있다가, 자기가 실은 어셈블리 이름(라이브러리와 주 모듈 모두)을 그 경로로
+    돌려준다(`ResolveDeclared`). 따라서 우리를 의존으로 선언한 확장은 `SephPlanner.Plugin`·`SephPlanner.Core` 를 동봉하지
+    않아도 우리가 실은 것에 연결된다. 동봉해서 `libraries` 에 적으면 이미 실린 우리 것을 쓰고 경고만 남긴다. 의존 없이
+    `SephPlanner.Plugin.dll` 을 라이브러리로 동봉한 확장이 우리보다 먼저 실리면, 우리 주 모듈이 "어셈블리 이름 충돌" 로 보류된다.
+  - DLL 없이 `data` 모듈만 든 모드도 있다. `{ "type": "data", "path": 폴더, "consumer"?: modId }` 이고, `consumer` 가 자기가
+    아니면 그 모드를 `dependencies` 에도 적어야 한다. 받는 쪽은 `WorkshopModBase.GetDataPackages()` 로 폴더 목록을 얻는데,
+    이 목록은 활성화가 전부 끝난 뒤 채워지는 `WorkshopModRuntime.LastResults` 에서 나온다. 그래서 우리 `OnModLoaded` 에서는
+    아직 비어 있고(뒤에 실리는 모드가 빠진다), 그보다 나중에 읽어야 한다. 코드가 없는 패키지는 검수 대상이 아니다
+    (`WorkshopModLoadPlanner.NeedsVerification` → `HasCode`).
 - **Harmony.** 게임에 든 Lib.Harmony 2.4.3 만 쓰고, 모드에 넣은 `0Harmony.dll` 은 무시된다. BepInEx·MelonLoader 는
   지원하지 않는다. BepInEx 가 깔린 게임에서는 위처럼 HarmonyX 가 대신 돌아오므로, 창작마당 판은 2.4.3 에 맞춰 짓되
   HarmonyX 에서도 도는 멤버만 쓴다. 인자 다섯의 `Patch` 는 둘 다에 있고, `UnpatchSelf` 는 HarmonyX 에만 있어
