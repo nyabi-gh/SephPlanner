@@ -30,6 +30,12 @@ namespace SephPlanner.Plugin.Ui
         /// <summary>기준 크기. 창의 모든 치수가 여기에 대한 비율이다.</summary>
         protected float Base { get; private set; }
 
+        /// <summary>
+        /// 설정의 크기 배율. HUD 화면과 같은 값을 따른다. 창마다 따로 들지 않는 것은 설정이 하나이고,
+        /// 지을 때 한 번 읽으면 되기 때문이다 - 바뀌면 창을 버리고 다시 짓는다.
+        /// </summary>
+        public static float Scale { get; set; } = 1f;
+
         public bool IsOpen => _panel != null && _panel.IsOpened;
         protected bool HasControl => IsOpen && _panel.IsControlEnabled;
         public string Blocker { get; private set; } = "";
@@ -137,7 +143,7 @@ namespace SephPlanner.Plugin.Ui
             Blocker = "";
             _canvas = root.Canvas;
             Skin = NativeSkin.Borrow(root);
-            Base = Skin.BaseSize;
+            Base = Skin.BaseSize * Mathf.Clamp(Scale, PluginSettings.MinScale, PluginSettings.MaxScale);
 
             // 창이 밖에서 파괴됐으면 Destroy() 를 거치지 않았다. 죽은 줄 위에 덧짓지 않는다.
             Cleared();
@@ -269,6 +275,26 @@ namespace SephPlanner.Plugin.Ui
         /// 그대로 두면 시간이 멈춘 채로 남는다.
         /// </summary>
         private void OnDestroy() => Resume();
+
+        /// <summary>
+        /// 창이 화면보다 크면 들어갈 만큼만 줄인다. 크기 배율을 올리면 줄이 많은 탭은 작은 화면
+        /// (스팀덱 1280x800)의 높이를 넘는데, 넘친 줄은 누를 길이 없다. 높이는 탭과 쪽마다 달라
+        /// 지을 때 한 번 재서는 모자라므로 열려 있는 동안 계속 본다.
+        /// </summary>
+        private void LateUpdate()
+        {
+            if (!IsOpened) return;
+
+            var rect = (RectTransform)transform;
+            if (!(rect.parent is RectTransform screen)) return;
+
+            var size = rect.rect.size;
+            var room = screen.rect.size;
+            if (size.x <= 0f || size.y <= 0f || room.x <= 0f || room.y <= 0f) return;
+
+            var fit = Mathf.Min(1f, Mathf.Min(room.x / size.x, room.y / size.y));
+            if (!Mathf.Approximately(rect.localScale.x, fit)) rect.localScale = new Vector3(fit, fit, 1f);
+        }
 
         private void Resume()
         {

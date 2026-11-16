@@ -129,6 +129,8 @@ namespace SephPlanner.Plugin
         private void StartLanguage()
         {
             _settings.Language.SettingChanged += (_, _) => ApplyLanguage();
+            PlannerWindow.Scale = _settings.Scale.Value;
+            _settings.Scale.SettingChanged += (_, _) => ApplyWindowScale();
             LocalizationManager.Instance.OnLanguageChanged += GameLanguageChanged;
             ApplyLanguage();
         }
@@ -157,7 +159,7 @@ namespace SephPlanner.Plugin
             Guarded(_takePlanFailure ??= TakePlanFailure, "자동 진단 처리");
             PollDiagnostics();
             PollUpdates();
-            Guarded(_dropStaleWindows ??= DropStaleWindows, "언어 바꾼 창 정리");
+            Guarded(_dropStaleWindows ??= DropStaleWindows, "낡은 창 정리");
 
             var panelStarted = FrameCost.Now;
             Guarded(_updateNativePanel ??= UpdateNativePanel, "화면 갱신");
@@ -474,36 +476,47 @@ namespace SephPlanner.Plugin
             Localization.Current = language;
             _settings.ForgetRows();
             _hud.Destroy();
-            _languageStale = true;
+            RebuildWindows();
+            Log.Info("화면 언어: " + Localization.Code(language));
+        }
+
+        private void ApplyWindowScale()
+        {
+            PlannerWindow.Scale = _settings.Scale.Value;
+            RebuildWindows();
+        }
+
+        private void RebuildWindows()
+        {
+            _windowsStale = true;
             if (_window != null && _window.IsOpen)
             {
                 _reopenSettings = true;
                 _window.Close();
             }
-            Log.Info("화면 언어: " + Localization.Code(language));
         }
 
         private bool _languageApplied;
-        private bool _languageStale;
+        private bool _windowsStale;
         private bool _reopenSettings;
 
         private void DropStaleWindows()
         {
-            if (!_languageStale) return;
+            if (!_windowsStale) return;
             var open = false;
-            foreach (var window in LanguageWindows())
+            foreach (var window in OwnWindows())
             {
                 if (window == null) continue;
                 if (window.IsOpen) open = true;
                 else window.Destroy();
             }
-            _languageStale = open;
+            _windowsStale = open;
             if (!_reopenSettings || _window.IsOpen) return;
             _reopenSettings = false;
             ToggleWindow(_window, _settings.SettingsKey, "설정 창");
         }
 
-        private IEnumerable<PlannerWindow> LanguageWindows()
+        private IEnumerable<PlannerWindow> OwnWindows()
         {
             yield return _window;
             yield return _build;
