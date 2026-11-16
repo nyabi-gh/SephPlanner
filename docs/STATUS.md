@@ -7,13 +7,12 @@
 
 **이번 판: 0.6.5.** `scripts/check.ps1` 이 이 줄의 버전을 `Directory.Build.props` 와 대조한다. 릴리스마다 이 줄만 고친다.
 
-- **GitHub:** 0.6.3 을 2026-11-11 01:20 UTC 에 공개했다(ZIP 둘). 태그 `v0.6.3` 은 `788aa22` 다.
+- **GitHub:** 0.6.4 를 2026-11-16 02:17 UTC 에 공개했다(ZIP 둘). 태그 `v0.6.4` 는 `c93c492` 이고 두 ZIP 의 manifest 커밋도 같다.
 - **창작마당:** 글 `3832790875` 에 0.6.3 이 올라가 있다(제보 `eebed530` 이 0.6.3 창작마당 판에서 왔다). 올린 뒤마다 글 설명이
   `metadata.json` 의 설명으로 바뀌므로([개발 문서](DEVELOPMENT.md)의 "창작마당 판"), git 밖의 `artifacts/workshop-description.txt`(Mac)
   원문을 Steam 글 페이지에 다시 붙여 넣는다.
-- **0.6.4:** 창작마당 글 `3832790875` 에 게임에서 올려 검수에 접수됐다(2026-11-15, 접수 `22m-pqtj9qij`, `Player.log` 의
-  `[WorkshopUploader]`). 승인 여부는 다음에 게임을 켤 때 `[ModGuardReviewStatus]` 로 본다. GitHub 릴리스는 Windows ZIP 만 든
-  드래프트다(태그 `v0.6.4` 는 `c93c492`). 위 두 줄은 0.6.3 의 기록이다.
+- **0.6.4 창작마당:** 글 `3832790875` 에 게임에서 올려 검수에 접수됐다(2026-11-15, 접수 `22m-pqtj9qij`, `Player.log` 의
+  `[WorkshopUploader]`). 승인 여부는 다음에 게임을 켤 때 `[ModGuardReviewStatus]` 로 본다. 위 창작마당 줄은 0.6.3 의 기록이다.
 - **0.6.5:** 버전과 CHANGELOG 를 올렸다. 태그·GitHub 릴리스·창작마당 업로드는 아직이다.
 
 
