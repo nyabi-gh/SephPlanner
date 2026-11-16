@@ -550,7 +550,7 @@ namespace SephPlanner.Plugin
             try
             {
                 capture.Finish(PluginIdentity.Describe(),
-                    ReplayPreferences.From(_prefs.ToPreferences(_settings.Recommendations.Value)), note,
+                    ReplayPreferences.From(Preferences()), note,
                     extensions: PlanExtensions.Shared.Stamps());
                 Log.Info("이번 진단 보관 위치: " + capture.DirectoryPath);
                 return true;
