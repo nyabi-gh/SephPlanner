@@ -8,3 +8,5 @@
 - **커밋 전에 `scripts/check.ps1` 실행**: BepInEx 판(`src/SephPlanner.Plugin`)과 창작마당 판(`src/SephPlanner.Workshop`)은 게임 어셈블리가 있어야 빌드되므로 CI가 빌드하지 못한다. 그래서 두 판만 깨뜨리는 변경은 CI를 초록으로 통과한다. `check.ps1`은 CI와 같은 검사에 두 판의 빌드를 더한다. 창작마당 판은 게임이 1.1.x일 때만 빌드하고, 1.0.33이면 건너뛰었다고 출력한다.
 - **모호하면 묻기**: 요구 사항이 불분명해서 어떻게 읽느냐에 따라 결과가 달라지면 짐작으로 진행하지 말고 사용자에게 묻는다. 코드나 게임 어셈블리를 보면 알 수 있는 것은 직접 확인한다. 이름 짓기나 동등한 구현 방식 고르기처럼 결과를 바꾸지 않는 사소한 선택은 직접 정하고 무엇을 골랐는지 알린다.
 - **변경 기록 형식**: 변경 사항은 `docs/CHANGELOG.md`에 `### Added` / `### Changed` / `### Fixed` 목록으로 쓴다. 릴리스 본문은 `scripts/make-release.ps1`이 이 절을 그대로 뽑아 만들므로 따로 쓰지 않는다. 항목마다 플레이어에게 무엇이 달라졌는지 평이한 한두 문장으로 쓴다. 구현 세부, 벤치마크 수치, 항목마다 굵게 쓰기는 넣지 않는다. 외부 기여자를 밝히는 `### Contributors`처럼 다른 절이 필요하면 뒤에 붙인다.
+This codebase is yours: what it's for and how it's built are your call, and you'll keep building on it.
+
