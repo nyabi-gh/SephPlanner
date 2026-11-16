@@ -49,7 +49,13 @@ namespace SephPlanner.Core.Solver
             return new CriticalBase { Direct = direct, Magic = magic, Execution = execution - scythes > 0 };
         }
 
-        /// <summary>이 배치에서 상한을 넘겨 버려지는 치명타의 값어치.</summary>
+        /// <summary>
+        /// 이 배치에서 상한을 넘겨 버려지는 치명타의 값어치.
+        ///
+        /// 손값(<see cref="CharmWorthSource.Curated"/>) 아티팩트의 치명타는 상한까지 차오르는 데는 세지만, 넘친 몫으로
+        /// 빼지는 않는다. 손값은 능력치 표를 거치지 않은 값이라 점수에 치명타 몫이 따로 들어 있지 않고, 상한을 이미
+        /// 계산에 넣었을 수도 있다(외부 확장). 그 몫을 빼면 더하지 않은 값을 빼는 것이 된다.
+        /// </summary>
         internal static double Penalty(
             PlacementProblem problem, Dictionary<int, GridPos> positions, SimulationResult result, GridOccupancy occupancy)
         {
@@ -58,7 +64,7 @@ namespace SephPlanner.Core.Solver
             var model = problem.CriticalModel ??= CriticalModel.Of(problem);
             if (model.Charms.Count == 0) return 0;
 
-            int direct = 0, magic = 0;
+            int direct = 0, magic = 0, valuedDirect = 0, valuedMagic = 0;
             var execution = based.Execution;
             foreach (var charm in model.Charms)
             {
@@ -66,14 +72,21 @@ namespace SephPlanner.Core.Solver
                 if (PlacementSolver.Reason(charm, cell, result, problem.Grid, occupancy) != CharmInactiveReason.None) continue;
 
                 var level = Math.Min(result.EffectiveLevel(cell, charm.Enchant), charm.Definition.MaxLevel);
-                direct += Amount(charm.Definition, Critical, level, problem.StoneTabletCount);
-                magic += Amount(charm.Definition, MagicCritical, level, problem.StoneTabletCount);
+                var ownDirect = Amount(charm.Definition, Critical, level, problem.StoneTabletCount);
+                var ownMagic = Amount(charm.Definition, MagicCritical, level, problem.StoneTabletCount);
+                direct += ownDirect;
+                magic += ownMagic;
+                if (charm.Worth.Source != CharmWorthSource.Curated)
+                {
+                    valuedDirect += ownDirect;
+                    valuedMagic += ownMagic;
+                }
                 execution |= charm.Definition.Behavior == Scythe;
             }
 
             var cap = execution ? 2 * Certain : Certain;
-            var directOver = Math.Max(0, Math.Min(based.Direct + direct - cap, direct));
-            var magicOver = Math.Max(0, Math.Min(based.Magic + direct + magic - cap, magic));
+            var directOver = Math.Max(0, Math.Min(based.Direct + direct - cap, valuedDirect));
+            var magicOver = Math.Max(0, Math.Min(based.Magic + direct + magic - cap, valuedMagic));
             return directOver * model.CriticalWorth + magicOver * model.MagicCriticalWorth;
         }
 

@@ -85,6 +85,36 @@ public class CriticalCapTests
         Assert.Equal(800 * PerUnit, unknown - capped, 6);
     }
 
+    private static CharmWorth Curated(CharmDefinition definition) =>
+        CharmWorth.Resolve(definition, new CharmValueEntry { Base = 1, PerLevel = 1 });
+
+    /// <summary>손값에는 치명타 몫이 따로 들어 있지 않으므로, 그 아티팩트가 넘긴 몫은 빼지 않는다.</summary>
+    [Fact]
+    public void ACuratedCharmLosesNothingPastCertain()
+    {
+        var unknown = OneCharm(Critical(), null);
+        unknown.Charms[0].Worth = Curated(unknown.Charms[0].Definition);
+        var capped = OneCharm(Critical(), new CriticalBase { Direct = 9500 });
+        capped.Charms[0].Worth = Curated(capped.Charms[0].Definition);
+
+        Assert.Equal(Score(unknown), Score(capped), 6);
+    }
+
+    /// <summary>손값 아티팩트의 치명타도 게임에서는 쌓이므로, 잰 아티팩트가 상한을 넘기는 데에는 센다.</summary>
+    [Fact]
+    public void ACuratedCharmStillFillsTheCapForOthers()
+    {
+        var problem = OneCharm(Critical(), new CriticalBase { Direct = 8500 });
+        var curated = Critical();
+        curated.EntityId = 11;
+        problem.Charms.Add(new CharmSlot { InstanceId = 2, Definition = curated, Worth = Curated(curated) });
+        problem.CurrentCharms[2] = new GridPos(1, 0);
+
+        var capped = Score(problem);
+        problem.Critical = null;
+        Assert.Equal(500 * PerUnit, Score(problem) - capped, 6);
+    }
+
     /// <summary>
     /// 바탕은 게임이 보여 주는 치명타에서 우리가 세는 아티팩트 몫을 뺀 것이다. 꺼진 것은 주지 않으므로
     /// 빼지 않고, 석판 수를 따르는 몫은 지금 석판 수로 뺀다.
