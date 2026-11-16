@@ -16,8 +16,9 @@ function Invoke-DotNet([string[]]$Arguments, [string]$Failure) {
 # 버전은 다섯 곳에 손으로 적힌다. 어긋나도 빌드와 테스트는 통과하므로 여기서 붙잡는다.
 # BepInEx 로그와 F10 덤프 첫 줄에 찍히는 것이 플러그인 쪽 값이라, 어긋나면 제보를 받고도
 # 어느 빌드인지 되짚을 수 없다. STATUS 는 그 자체가 정본이라고 규정된 문서인데 갱신을
-# 강제하는 것이 없어 두 판이 밀린 적이 있다. 창작마당의 metadata.json 버전은 멀티 로비가 모드 판을
-# 견주는 값이라, 내용을 바꾸고 이것을 그대로 두면 판이 다른 사람이 한 방에 들어온다(공식 모드 가이드).
+# 강제하는 것이 없어 두 판이 밀린 적이 있다. 창작마당의 metadata.json 버전은 창작마당 판의 진단 첫 줄과
+# 게임의 모드 로그에 찍히는 값이라 같은 이유로 맞춘다. 멀티 로비는 이 판을 견주지 않는다 - local_only 모드는
+# 로비 비교에서 빠진다(docs/RESEARCH.md "공식 모드 API").
 $version = ([xml](Get-Content (Join-Path $root "Directory.Build.props"))).Project.PropertyGroup.Version |
     Where-Object { $_ } | Select-Object -First 1
 if (-not $version) { throw "배포 버전을 읽지 못했습니다." }

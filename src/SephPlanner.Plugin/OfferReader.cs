@@ -54,7 +54,7 @@ namespace SephPlanner.Plugin
                 nearby.Add(inventory);
             }
 
-            // FindObjectsByType 의 순서는 비보장이다. 순서만 흔들려도 스냅샷이 "변경"으로 보여
+            // NetworkRegistry 가 도는 Mirror spawned 사전의 순서는 비보장이다. 순서만 흔들려도 스냅샷이 "변경"으로 보여
             // 재계산이 돌고 후보 순번이 바뀐다.
             nearby.Sort((a, b) => a.netId.CompareTo(b.netId));
             FrameCost.ChestFilter.Add(filtering);

@@ -70,8 +70,6 @@
    - 구독한 사본 실기(`[WorkshopModManager]` 로 어느 쪽이 실리는지).
    - 제거·인챈트 조언의 후보 나누기(PERFORMANCE 1c).
    - RESEARCH 의 솔버 정책·구현 설명을 PLACEMENT-OBJECTIVE·PERFORMANCE·DEVELOPMENT 로 옮길지(사용자).
-   - 코드 쪽에서 틀린 것: `check.ps1` 주석의 "멀티 로비가 metadata 판을 견준다", `OfferReader.cs` 주석의 `FindObjectsByType`,
-     번체 `配置異常`, `LayoutCache.cs`·`SolverCostTests.cs` 의 "48GB" 대 PERFORMANCE "40GB".
    - 조건 칸이 낡은 석판(ROADMAP), HUD 불투명도 → Auto 언어 구독 → 첫 검증 안내.
 
 **문서를 새로 만들기 전에** STATUS 의 문서 지도에 들어갈 자리가 있는지 먼저 본다. 날짜가 붙은 보고서 파일은
