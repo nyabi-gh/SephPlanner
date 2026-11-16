@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Newtonsoft.Json;
+using SephPlanner.Core.Extensions;
 using SephPlanner.Core.Runtime;
 
 namespace SephPlanner.Plugin
@@ -64,7 +65,8 @@ namespace SephPlanner.Plugin
             _partial[name] = _partial.TryGetValue(name, out var existing) ? existing + " / " + text : text;
         }
 
-        public void Finish(string producer, ReplayPreferences preferences, DiagnosticNote? note = null, object? incident = null, string? incidentLog = null)
+        public void Finish(string producer, ReplayPreferences preferences, DiagnosticNote? note = null, object? incident = null, string? incidentLog = null,
+            IReadOnlyList<ExtensionStamp>? extensions = null)
         {
             note ??= DiagnosticNote.None;
             Files["sephplanner.log"] = incidentLog ?? _text.Snapshot();
@@ -79,6 +81,8 @@ namespace SephPlanner.Plugin
                 // 사용자가 직접 적은 것이다. 가리지 않고 그대로 보낸다.
                 Note = note.IsEmpty ? null : new { note.Category, note.CategoryLabel, note.Text },
                 CurrentPreferences = preferences,
+                // 확장이 바꾼 값어치 표는 재현 자료에 통째로 있다. 여기서는 제보가 확장 때문인지 가를 단서만 남긴다.
+                Extensions = extensions is { Count: > 0 } ? extensions : null,
                 Collection = _status,
             }, Formatting.Indented);
             File.WriteAllText(Path.Combine(DirectoryPath, "report.json"), Files["report.json"]);

@@ -266,6 +266,10 @@ namespace SephPlanner.Core.Runtime
             Add(builder, prefix + "Tier", entry.Tier);
             Add(builder, prefix + "Base", entry.Base.HasValue ? FingerprintNumber.Of(entry.Base.Value, format, true) : "unset");
             Add(builder, prefix + "PerLevel", entry.PerLevel.HasValue ? FingerprintNumber.Of(entry.PerLevel.Value, format, true) : "unset");
+            // 표가 없던 시절의 재현 자료가 지문 불일치로 거부되지 않게 표가 있을 때만 더한다.
+            if (entry.ByLevel is { Count: > 0 } table)
+                foreach (var value in table)
+                    Add(builder, prefix + "ByLevel", FingerprintNumber.Of(value, format, true));
         }
 
         private static void AddTablet(StringBuilder builder, string prefix, PlacedTablet tablet)

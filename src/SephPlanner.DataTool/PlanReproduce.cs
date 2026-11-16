@@ -1,4 +1,5 @@
 using System.Text.Json;
+using SephPlanner.Core.Extensions;
 using SephPlanner.Core.Runtime;
 using SephPlanner.Core.Solver;
 
@@ -16,6 +17,8 @@ public static class PlanReproduce
                 throw new InvalidDataException("재현 입력이 비었습니다.");
             Console.WriteLine($"저장: {replay.CapturedUtc}, {replay.Producer}");
             Console.WriteLine($"게시 요청 {replay.PublishedGeneration}, 마지막 요청 {replay.RequestedGeneration}");
+            foreach (var extension in replay.Extensions ?? new List<ExtensionStamp>())
+                Console.WriteLine($"확장: {extension.Id} {extension.Version}{(extension.Disabled ? " (실패해 꺼짐)" : "")}");
             if (replay.RequestedGeneration != replay.PublishedGeneration || replay.LatestError.Length > 0)
                 Console.WriteLine("마지막으로 게시된 계획을 재생합니다. F10 시점의 최신 상태와 다를 수 있습니다. " + replay.LatestError);
             if (replay.CoreBuild != PlanReplay.CurrentCoreBuild)

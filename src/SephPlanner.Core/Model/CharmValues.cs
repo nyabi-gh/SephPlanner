@@ -28,6 +28,13 @@ namespace SephPlanner.Core.Model
         public double? PerLevel { get; set; }
 
         /// <summary>
+        /// 레벨별 값어치(색인이 레벨). 지정하면 <see cref="Tier"/>·<see cref="Base"/>·<see cref="PerLevel"/>를
+        /// 모두 덮는다. 표보다 높은 레벨은 마지막 값을 쓴다. 효과가 레벨에 곧게 늘지 않아 두 수로 적을 수 없는
+        /// 아티팩트를 위한 자리다.
+        /// </summary>
+        public List<double>? ByLevel { get; set; }
+
+        /// <summary>
         /// 빌드 성향 꼬리표. 지금은 저장·표시만 하고 점수에 쓰지 않는다.
         /// </summary>
         public List<string> Tags { get; set; } = new List<string>();
@@ -37,6 +44,19 @@ namespace SephPlanner.Core.Model
 
         /// <summary>판단의 근거로 삼은 글. 참고 문헌으로만 적고 본문을 옮기지 않는다.</summary>
         public List<string> Sources { get; set; } = new List<string>();
+
+        internal CharmValueEntry Copy() => new CharmValueEntry
+        {
+            Id = Id ?? "",
+            EntityId = EntityId,
+            Tier = Tier,
+            Base = Base,
+            PerLevel = PerLevel,
+            ByLevel = ByLevel is null ? null : new List<double>(ByLevel),
+            Tags = new List<string>(Tags ?? new List<string>()),
+            Note = Note ?? "",
+            Sources = new List<string>(Sources ?? new List<string>()),
+        };
     }
 
     /// <summary>

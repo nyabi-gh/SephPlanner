@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using SephPlanner.Core.Extensions;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Solver;
@@ -69,6 +70,13 @@ namespace SephPlanner.Core.Runtime
         /// 들어가므로 같은 언어로 다시 풀어야 한다. 한국어이거나 다국어 전의 자료면 없다.
         /// </summary>
         public string? Language { get; set; }
+
+        /// <summary>
+        /// 잡을 때 등록돼 있던 확장(<see cref="IPlanExtension"/>). 재현에는 쓰지 않는다 - 확장이 덮은 표는
+        /// <see cref="Preferences"/>의 값어치 표에 통째로 실려 있다. 제보가 확장 때문인지 가를 때 본다.
+        /// 확장 통로가 생기기 전 자료와 확장이 없던 판에는 없다.
+        /// </summary>
+        public List<ExtensionStamp>? Extensions { get; set; }
 
         public Plan Rebuild(bool allowModelChange = false)
         {

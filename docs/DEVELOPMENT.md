@@ -108,6 +108,25 @@ dotnet build src/SephPlanner.Workshop -c Release -p:PackWorkshop=true -p:DeployT
   조사](RESEARCH.md)의 "공식 모드 API").
 - 게임은 미리보기 한 장만 올린다(`SetItemPreview`). 스크린샷 같은 추가 이미지는 Steam 글 페이지에서 넣는다.
 
+### 확장 모드
+
+다른 창작마당 모드가 판 상황에 맞춰 아티팩트 값어치를 덮어 넣는 통로다(`SephPlanner.Core.Extensions`). **실험적이다.**
+처음 몇 판 동안은 모양이 바뀔 수 있고, 약속하는 것은 `IPlanExtension` 과 `CharmValueEntry` 뿐이다. Core 의 다른 형식은
+예고 없이 바뀐다.
+
+- 확장은 자기 `OnModLoaded` 에서 `PlanExtensions.Register` 를 한 번 부른다. `IPlanExtension.Values` 는 계획을 지을 때마다
+  메인 스레드에서 불리고, 돌려준 표는 기본 표(`data/values/charms.json`) 위에 덮인다. 엔티티 번호나 식별자 어느 한쪽이라도 같은
+  기본 항목은 통째로 빠진다. 같은 아티팩트를 확장 둘이 건드리면 나중에 등록한 쪽이 이긴다.
+- 값의 단위는 기본 표와 같은 **레벨**이다. 그래야 콤보 가치·조화의 수정 환산과 한 자로 비교된다. 점수 눈금(`WorthScale`)은
+  카탈로그가 재는 것 하나뿐이라 확장이 바꾸지 않는다. 레벨에 곧게 늘지 않는 효과는 `ByLevel` 로 레벨마다 적는다.
+- 확장이 예외를 던지거나 쓸 수 없는 표(빈 항목, 번호도 식별자도 없는 항목, 유한하지 않은 값)를 돌려주면 그 확장만 새 판이
+  시작될 때까지 끄고 로그에 남긴다. 플래너는 기본 표로 계속 돈다.
+- 확장의 이름과 어셈블리 버전은 진단의 `report.json` 과 재현 자료(`Extensions`)에 남는다. 덮인 표는 재현 자료의 계산 설정에
+  통째로 실리므로 확장 없이도 재현된다.
+- 패키지 규칙은 [게임 내부 조사](RESEARCH.md)의 "모드 사이의 의존" 에 있다. 요약하면 `dependencies` 에 `nyabi.sephplanner` 를
+  `version` 없이 적고, `SephPlanner.Plugin.dll`·`SephPlanner.Core.dll` 을 동봉하지 않는다. 고정된 표만 넘길 거라면 DLL 없이
+  `data` 모듈로 넘기는 길도 있다.
+
 ## 진단 도구
 
 `SephPlanner.DataTool` 은 게임 없이 돈다. 한 번에 명령 하나만 받고, 전체 목록은 `--help` 가 보여 준다.

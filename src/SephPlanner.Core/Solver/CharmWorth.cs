@@ -149,6 +149,17 @@ namespace SephPlanner.Core.Solver
         {
             var fallback = Worth.OfRarity(definition.Rarity);
 
+            if (curated?.ByLevel is { Count: > 0 } table)
+            {
+                return new CharmWorth
+                {
+                    ByLevel = table,
+                    Base = table[0],
+                    PerLevel = table.Count > 1 ? table[1] - table[0] : 0,
+                    Source = CharmWorthSource.Curated,
+                };
+            }
+
             if (curated is not null && (curated.Base.HasValue || curated.PerLevel.HasValue || curated.Tier > 0))
             {
                 var (tierBase, tierPerLevel) = OfTier(curated.Tier);
@@ -215,6 +226,32 @@ namespace SephPlanner.Core.Solver
             Version = 1,
             Charms = new List<CharmValueEntry>(_entries),
         };
+
+        /// <summary>
+        /// <paramref name="top"/>의 항목을 이 책 위에 덮은 새 책. 엔티티 번호나 식별자 어느 한쪽이라도 같은 기존 항목은
+        /// 통째로 빠진다 - 남겨 두면 <see cref="Of"/>가 번호로 옛 항목을 먼저 집을 수 있다.
+        /// </summary>
+        internal CharmValueBook Overlay(IReadOnlyList<CharmValueEntry> top)
+        {
+            if (top.Count == 0) return this;
+
+            var entities = new HashSet<int>();
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var entry in top)
+            {
+                if (entry.EntityId > 0) entities.Add(entry.EntityId);
+                if (entry.Id.Length > 0) ids.Add(entry.Id);
+            }
+
+            var charms = new List<CharmValueEntry>(top);
+            foreach (var entry in _entries)
+            {
+                if ((entry.EntityId > 0 && entities.Contains(entry.EntityId)) || (entry.Id.Length > 0 && ids.Contains(entry.Id)))
+                    continue;
+                charms.Add(entry);
+            }
+            return new CharmValueBook(new CharmValueFile { Version = 1, Charms = charms });
+        }
 
         internal IEnumerable<KeyValuePair<int, CharmValueEntry>> EntityValues => _byEntity;
         internal IEnumerable<KeyValuePair<string, CharmValueEntry>> IdValues => _byId;

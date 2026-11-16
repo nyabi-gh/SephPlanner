@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using HarmonyLib;
 using Mirror;
+using SephPlanner.Core.Extensions;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
 using SephPlanner.Core.Solver;
@@ -46,6 +47,9 @@ namespace SephPlanner.Plugin
         private BuildWindow _build;
         private PluginPreferences _prefs;
         private bool _newRunPending;
+
+        // 확장이 덮은 값어치 표. 계획·화면·진단이 같은 표를 보도록 폴링마다 한 번 짓고 함께 쓴다.
+        private CharmValueBook _charmValues;
         private PlanRunner _runner;
         private GameSnapshot _lastSnapshot;
         private DiagnosticCapture _pendingDiagnostic;
@@ -437,6 +441,8 @@ namespace SephPlanner.Plugin
                 var replay = _runner?.CaptureReplay();
                 if (replay == null) return null;
                 replay.Producer = PluginIdentity.Describe();
+                var extensions = PlanExtensions.Shared.Stamps();
+                if (extensions.Count > 0) replay.Extensions = extensions;
                 var directory = Path.Combine(PlannerData.DataDirectory, "reproductions");
                 Directory.CreateDirectory(directory);
                 var original = Path.Combine(directory, CatalogBundleStore.NewGeneration() + ".replay");
@@ -544,7 +550,8 @@ namespace SephPlanner.Plugin
             try
             {
                 capture.Finish(PluginIdentity.Describe(),
-                    ReplayPreferences.From(_prefs.ToPreferences(_settings.Recommendations.Value)), note);
+                    ReplayPreferences.From(_prefs.ToPreferences(_settings.Recommendations.Value)), note,
+                    extensions: PlanExtensions.Shared.Stamps());
                 Log.Info("이번 진단 보관 위치: " + capture.DirectoryPath);
                 return true;
             }
@@ -648,7 +655,11 @@ namespace SephPlanner.Plugin
         /// </summary>
         private void StartSession(bool isSaved)
         {
-            if (!isSaved) _newRunPending = true;
+            if (!isSaved)
+            {
+                _newRunPending = true;
+                PlanExtensions.Shared.Restore();
+            }
             GameReader.ForgetArrivals();
             GameReader.ForgetCritical();
         }
@@ -753,6 +764,7 @@ namespace SephPlanner.Plugin
                 _runner = new PlanRunner(catalog);
             }
 
+            _charmValues = PlanExtensions.Shared.Overlay(snapshot, CharmValueSource.Book, message => Log.Error(message));
             var preferences = Preferences();
             _currentCatalogGeneration = CatalogDump.ActiveGeneration;
             _runner.Submit(snapshot, preferences, _currentCatalogGeneration);
@@ -790,8 +802,12 @@ namespace SephPlanner.Plugin
         /// 배치(정렬)는 손으로도 할 수 있는 일의 대행이지만 무엇을 집을지에 대한 조언은 판단을
         /// 빌려주는 것이라, 끄겠다고 한 사람에게는 답을 만들지도 않는 편이 정직하다.
         /// </summary>
-        private PlanPreferences Preferences() =>
-            _prefs.ToPreferences(_settings.Recommendations.Value);
+        private PlanPreferences Preferences()
+        {
+            var preferences = _prefs.ToPreferences(_settings.Recommendations.Value);
+            if (_charmValues != null) preferences.CharmValues = _charmValues;
+            return preferences;
+        }
 
         /// <summary>
         /// 화면을 만들고 최신 배치를 그린다. 만드는 것은 UI 가 준비된 뒤라야 되고, 씬이 바뀌면
@@ -909,7 +925,7 @@ namespace SephPlanner.Plugin
                 Plan = plan,
                 Catalog = CatalogSource.Get(),
                 Prefs = _prefs,
-                Values = CharmValueSource.Book,
+                Values = _charmValues ?? CharmValueSource.Book,
                 Expanded = _expanded,
                 MixerOpen = mixerOpen,
                 EnchantOpen = enchantOpen,

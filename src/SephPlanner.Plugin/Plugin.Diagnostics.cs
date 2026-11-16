@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using SephPlanner.Core.Extensions;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
 using SephPlanner.Plugin.Host;
@@ -197,7 +198,8 @@ namespace SephPlanner.Plugin
             {
                 var capture = CollectDiagnostic();
                 capture.Finish(PluginIdentity.Describe(),
-                    ReplayPreferences.From(Preferences()), incident: incident, incidentLog: log);
+                    ReplayPreferences.From(Preferences()), incident: incident, incidentLog: log,
+                    extensions: PlanExtensions.Shared.Stamps());
                 StartDiagnosticUpload(capture, automatic: true, reserved: true);
             }
             catch (Exception ex)
