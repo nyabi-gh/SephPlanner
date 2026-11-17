@@ -126,8 +126,8 @@ dotnet build src/SephPlanner.Workshop -c Release -p:PackWorkshop=true -p:DeployT
 - 확장의 이름과 어셈블리 버전은 진단의 `report.json` 과 재현 자료(`Extensions`)에 남는다. 덮인 표는 재현 자료의 계산 설정에
   통째로 실리므로 확장 없이도 재현된다.
 - 패키지 규칙은 [게임 내부 조사](RESEARCH.md)의 "모드 사이의 의존" 에 있다. 요약하면 `dependencies` 에 `nyabi.sephplanner` 를
-  `version` 없이 적고, `SephPlanner.Plugin.dll`·`SephPlanner.Core.dll` 을 동봉하지 않는다. 고정된 표만 넘길 거라면 DLL 없이
-  `data` 모듈로 넘기는 길도 있다.
+  `version` 없이 적고, `SephPlanner.Plugin.dll`·`SephPlanner.Core.dll` 을 동봉하지 않는다. 게임에는 DLL 없는 `data` 모듈도
+  있지만 플래너는 그것을 읽지 않는다. 고정된 표라도 DLL 로 `Register` 해야 한다.
 
 ## 진단 도구
 
