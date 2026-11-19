@@ -34,7 +34,7 @@ namespace SephPlanner.Plugin
         internal static void ForgetCritical() => _critical = null;
 
         /// <summary>
-        /// 항상 스냅샷을 돌려준다. 런이 끝났거나 플레이어가 죽었으면 인벤토리가 비어 있는 스냅샷이다.
+        /// 항상 스냅샷을 돌려준다. 런이 끝났으면 인벤토리가 비어 있는 스냅샷이다.
         /// 이 상태를 넘겨야 HUD에서 직전 런의 배치를 지울 수 있다.
         /// </summary>
         public static GameSnapshot Read(float offerRadius, bool includeRecommendations = true)
@@ -44,7 +44,7 @@ namespace SephPlanner.Plugin
                 GameVersion = Application.version,
             };
 
-            // 아바타가 없거나 죽어서 일찍 돌아가는 스냅샷도 멀티 여부는 정확해야 한다.
+            // 아바타가 없거나 런이 끝나 일찍 돌아가는 스냅샷도 멀티 여부는 정확해야 한다.
             // 여기서 기본값 false 로 두면 자동 배치 잠금이 열린 쪽으로 무너진다.
             snapshot.IsMultiplayer = IsMultiplayerSession();
 
@@ -52,7 +52,7 @@ namespace SephPlanner.Plugin
 
             // 성장 진행도는 게임이 화면으로 보낼 때만 손에 들어온다. 아바타가 바뀌면 다시 붙는다.
             GrowthProgressWatch.Follow(avatar);
-            if (avatar == null || avatar.Inventory == null || avatar.IsDead)
+            if (avatar == null || avatar.Inventory == null || RunEnded(avatar))
             {
                 FixedEffectLayer.Forget();
                 return snapshot;
@@ -81,7 +81,7 @@ namespace SephPlanner.Plugin
         public static RuntimeSimulationCheck CheckSimulation()
         {
             var avatar = FindLocalPlayer();
-            if (avatar == null || avatar.Inventory == null || avatar.IsDead)
+            if (avatar == null || avatar.Inventory == null || RunEnded(avatar))
             {
                 return new RuntimeSimulationCheck
                 {
@@ -91,6 +91,19 @@ namespace SephPlanner.Plugin
             }
 
             return SimulationVerifier.Check(avatar.Inventory);
+        }
+
+        /// <summary>
+        /// 죽은 것만으로는 런이 끝나지 않는다. 멀티에서는 동료가 살릴 때까지 가방을 열고 정리할 수 있다
+        /// (게임 <c>HandleOnOpenCharacterStatusPanel</c> 과 <c>GridInventory</c> 는 사망을 보지 않는다). 게임은
+        /// 접속한 플레이어가 모두 죽었을 때 게임 오버 창을 연다(<c>PlayerSpawner.HandleDieServerside</c> →
+        /// <c>ClientGameOver</c>). 혼자 하는 판은 죽는 즉시 그렇게 된다.
+        /// </summary>
+        private static bool RunEnded(PlayerAvatar avatar)
+        {
+            if (!avatar.IsDead) return false;
+            var label = UIManager.Instance != null ? UIManager.Instance.GetElement<UI_GameOverLabel>() : null;
+            return label == null || label.IsOpened;
         }
 
         /// <summary>

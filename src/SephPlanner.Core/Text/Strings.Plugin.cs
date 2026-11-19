@@ -101,6 +101,7 @@ namespace SephPlanner.Core.Text
                 "プランがどのゲーム状態から作られたか確認できないため、自動配置を実行しません。",
                 "无法确认该方案来自哪个游戏状态，不执行自动布局。",
                 "無法確認該方案來自哪個遊戲狀態，不執行自動佈局。"),
+            new Entry("쓰러져 있는 동안에는 자동 배치를 실행하지 않습니다. 부활한 뒤 다시 시도하세요.", "Auto-place does not run while you are down. Try again after you are revived.", "倒れている間は自動配置を実行しません。復活してからもう一度お試しください。", "倒下期间不会执行自动布局。请在复活后重试。", "倒下期間不會執行自動佈局。請在復活後重試。"),
             new Entry("적용할 인벤토리가 없습니다.", "There is no inventory to apply to.", "適用するバッグがありません。", "没有可应用的背包。", "沒有可套用的背包。"),
             new Entry("자동 배치를 준비하다 오류가 나 아무것도 바꾸지 않았습니다({0}).",
                 "An error occurred while preparing auto-place; nothing was changed ({0}).",

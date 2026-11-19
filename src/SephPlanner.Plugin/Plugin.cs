@@ -947,7 +947,7 @@ namespace SephPlanner.Plugin
         /// <summary>보여 줄 계획이 없는 까닭. 계획이 있으면 null 이다. 화면과 빌드 창이 같은 말을 쓴다.</summary>
         private string Blocked(PlanRunState state)
         {
-            // 런 밖이나 죽은 뒤에는 보여 줄 배치가 없다. 직전 런의 점수를 남겨 두면 거짓말이 된다.
+            // 런 밖이나 게임 오버 뒤에는 보여 줄 배치가 없다. 직전 런의 점수를 남겨 두면 거짓말이 된다.
             // "탐험"은 게임 자체가 쓰는 말이다.
             if (_lastSnapshot?.Inventory == null) return Tr("탐험 중이 아닙니다.");
             // 실행기가 아직 없으면 감출 낡은 계획도 없다. 그때는 데이터 준비·실패 안내가 나가야 한다.

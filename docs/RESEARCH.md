@@ -4,7 +4,8 @@
 성능은 [성능](PERFORMANCE.md)에 있다. 무엇이 구현됐고 무엇을 실기에서 못 봤는지는 [현재 상태](STATUS.md)에 있다.
 절에 붙은 날짜는 그 사실을 확인한 날이다. 게임 업데이트로 플러그인이 깨지면 여기부터 다시 확인한다.
 
-세피리아(App 2436940)의 두 판을 지원한다. 기본 브랜치 1.0.33 과 `workshop-beta` 브랜치 1.1.x 다. 판 표시가 없는
+세피리아(App 2436940)의 두 판을 지원한다. 1.0.33 과 1.1.x 다. 1.1.x 는 `workshop-beta` 브랜치로 나왔다가 정식이 됐다
+(2026-11-19 에 1.1.4 가 기본 브랜치인 것을 확인). 판 표시가 없는
 규칙은 1.0.x 에서 확인한 것이다. 판별 어셈블리 지문과 어느 판까지 대조했는지는 [현재 상태](STATUS.md)의 "게임 버전"
 에 있다.
 
@@ -225,6 +226,20 @@ Mirror.NetworkClient.localPlayer -> GetComponent<PlayerAvatar>()
 
 초기화 중에는 `localPlayer`가 비어 있을 수 있어 `FindObjectsOfType<PlayerAvatar>()` +
 `isLocalPlayer` 폴백을 둔다.
+
+### 죽은 것과 런이 끝난 것은 다르다 (1.1.4, 2026-11-19)
+
+`UnitAvatar.IsDead` 는 SyncVar 다. 멀티에서 죽은 플레이어는 동료가 `RevivePlayerByInteraction` 으로 살릴 수 있고
+(`UnitAvatar.Revive` 가 `NetworkIsDead = false`), 그동안 가방은 그대로 남는다.
+
+- 가방 창을 여는 `PlayerInputController.HandleOnOpenCharacterStatusPanel` 과 `GridInventory` 의 쓰기 명령에는 사망 검사가 없다.
+  `UI_ItemInteractionPanel.TryOpen` 만 죽은 플레이어를 거른다. 죽은 채 아이템을 실제로 옮길 수 있는지는 게임에서 못 봤다.
+- 런이 끝나는 것은 서버의 `PlayerSpawner.HandleDieServerside` 가 접속한 플레이어 전원이 죽은 것을 볼 때다. `RpcGameOver` →
+  `ClientGameOver` 가 `UI_GameOverLabel` 을 연다. 혼자 하는 판은 죽는 즉시 그렇게 된다. `PlayerAvatar.dieIsGameOver` 가 꺼진
+  구간은 죽어도 게임 오버가 아니다.
+
+그래서 `GameReader` 는 죽었고 게임 오버 창이 열렸을 때만 가방을 비운 스냅샷을 낸다(제보 `eeb4f2ad`: 멀티에서 쓰러진 동안
+"탐험 중이 아닙니다"). 1.0.33 에 같은 타입이 있는지는 확인하지 않았다.
 
 ## 게임 상태 쓰기 경로 (자동 배치)
 
