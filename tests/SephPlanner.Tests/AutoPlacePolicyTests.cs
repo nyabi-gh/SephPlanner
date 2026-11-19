@@ -206,6 +206,20 @@ public class AutoPlacePolicyTests
         Assert.Contains("석판 2개", decision.Reason);
     }
 
+    /// <summary>끝 배치는 재료를 떼어 두지만 옮기는 도중에 맞붙는 계획. 목표가 비어 있어도 "옮길 것이 없습니다" 가 아니다.</summary>
+    [Fact]
+    public void MaterialsMeetingOnTheWaySayWhatIsActuallyWrong()
+    {
+        var context = Context();
+        context.Runner!.Latest!.CombinesInTransit = true;
+        context.Runner.Latest.Targets.Clear();
+
+        var decision = AutoPlacePolicy.Evaluate(context);
+
+        Assert.False(decision.Allowed);
+        Assert.Contains("옮기는 도중", decision.Reason);
+    }
+
     private static AutoPlaceContext Context()
     {
         var plan = new Plan

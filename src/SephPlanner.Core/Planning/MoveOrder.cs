@@ -7,6 +7,7 @@ namespace SephPlanner.Core.Planning
 {
     internal sealed class Relocation
     {
+        public int InstanceId;
         public string Name = "";
         public GridPos From;
         public GridPos To;

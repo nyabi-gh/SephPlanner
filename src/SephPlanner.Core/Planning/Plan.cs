@@ -81,6 +81,9 @@ namespace SephPlanner.Core.Planning
         public List<string> ActivationWarnings { get; set; } = new List<string>();
         public List<string> TabletWarnings { get; set; } = new List<string>();
         public bool HasUnapprovedDeactivation { get; set; }
+
+        /// <summary>끝 배치는 합치기 재료를 떼어 두지만, 거기까지 옮기는 어느 순서로도 도중에 맞붙는다.</summary>
+        public bool CombinesInTransit { get; set; }
         public bool ManualMoveInstructionsAvailable { get; set; } = true;
         public bool HasPlacementChanges { get; set; }
         public int InventoryWidth { get; set; }

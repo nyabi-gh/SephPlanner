@@ -52,6 +52,98 @@ namespace SephPlanner.Core.Solver
             return groups;
         }
 
+        /// <summary>
+        /// 옮길 것을 하나씩 제자리에 넣는 순서 가운데, <b>도중의 어느 배치에서도</b> 새 덩어리가 생기지 않는 것.
+        /// 끝 배치만 떼어 두어서는 모자라다 - 참가자의 자동 배치는 교환마다 서버 왕복을 기다리고 손으로 옮길 때도
+        /// 한 수씩 반영되므로, 그 사이 서버 <c>LateUpdate</c> 가 중간 배치의 덩어리를 합쳐 버린다.
+        ///
+        /// 한 걸음은 게임의 칸 교환이다(<see cref="Planning.MoveOrder"/>, <c>ApplyPlanRoutine.ApplySwaps</c> 와 같은 걸음).
+        /// 받은 순서가 안전하면 그대로 돌려주고, 찾지 못하면 null 이다. 지금 배치에 이미 있는 덩어리는 게임이 합치지
+        /// 않고 둔 것이라 세지 않는다.
+        /// </summary>
+        internal static List<int>? SafeOrder(
+            PlacementProblem problem, IReadOnlyDictionary<int, GridPos> current, IReadOnlyList<(int Id, GridPos To)> movers)
+        {
+            var order = new List<int>(movers.Count);
+            if (problem.CombineRecipes.Count == 0)
+            {
+                foreach (var mover in movers) order.Add(mover.Id);
+                return order;
+            }
+
+            var positions = new Dictionary<int, GridPos>();
+            var occupants = new Dictionary<GridPos, int>();
+            foreach (var pair in current)
+            {
+                positions[pair.Key] = pair.Value;
+                occupants[pair.Value] = pair.Key;
+            }
+            var standing = new HashSet<string>();
+            foreach (var group in Groups(problem, positions)) standing.Add(Key(group));
+
+            var budget = SafeOrderBudget;
+            return Place(problem, positions, occupants, standing, new List<(int Id, GridPos To)>(movers), order, ref budget)
+                ? order
+                : null;
+        }
+
+        /// <summary>
+        /// 순서 탐색이 펼쳐 볼 걸음 수의 상한. 받은 순서가 안전하면 옮길 것의 수만큼만 쓴다. 넘기면 못 찾은 것으로
+        /// 보고 적용을 막는다 - 잰 값이 아니라 조언 시간에 드러나지 않을 만큼으로 고른 추정치다.
+        /// </summary>
+        private const int SafeOrderBudget = 20000;
+
+        private static bool Place(
+            PlacementProblem problem, Dictionary<int, GridPos> positions, Dictionary<GridPos, int> occupants,
+            HashSet<string> standing, List<(int Id, GridPos To)> remaining, List<int> order, ref int budget)
+        {
+            if (remaining.Count == 0) return true;
+
+            for (var index = 0; index < remaining.Count; index++)
+            {
+                if (budget-- <= 0) return false;
+
+                var mover = remaining[index];
+                if (!positions.TryGetValue(mover.Id, out var from)) return false;
+                var displaced = from != mover.To && occupants.TryGetValue(mover.To, out var occupant) ? occupant : 0;
+                Swap(positions, occupants, mover.Id, from, mover.To, displaced);
+
+                if (from == mover.To || !CreatesGroup(problem, positions, standing))
+                {
+                    remaining.RemoveAt(index);
+                    order.Add(mover.Id);
+                    if (Place(problem, positions, occupants, standing, remaining, order, ref budget)) return true;
+                    order.RemoveAt(order.Count - 1);
+                    remaining.Insert(index, mover);
+                }
+                Swap(positions, occupants, mover.Id, mover.To, from, displaced);
+            }
+            return false;
+        }
+
+        private static void Swap(
+            Dictionary<int, GridPos> positions, Dictionary<GridPos, int> occupants, int id, GridPos from, GridPos to, int displaced)
+        {
+            if (from == to) return;
+            positions[id] = to;
+            occupants[to] = id;
+            if (displaced == 0) occupants.Remove(from);
+            else
+            {
+                positions[displaced] = from;
+                occupants[from] = displaced;
+            }
+        }
+
+        private static bool CreatesGroup(PlacementProblem problem, Dictionary<int, GridPos> positions, HashSet<string> standing)
+        {
+            foreach (var group in Groups(problem, positions))
+                if (!standing.Contains(Key(group))) return true;
+            return false;
+        }
+
+        private static string Key(List<int> group) => string.Join(",", group.OrderBy(id => id));
+
         private static void Expand(
             PlacementProblem problem, Dictionary<GridPos, CharmSlot> cells, List<GridPos> group,
             Dictionary<int, int> remaining, List<List<int>> groups, HashSet<string> seen)

@@ -405,15 +405,19 @@ namespace SephPlanner.Core.Planning
             // 조건부 배정은 수렴하지 않을 수 있으므로 현재 배치도 같은 우선순위로 비교한다.
             if (PriorityPlacement.Compare(best, current) < 0) best = current;
 
-            var moves = Moves(problem, current, best, out var manualMovesAvailable);
             var unapprovedDeactivation = !ActivationPolicy.DisablesNothingNew(current, best);
             var targets = Targets(problem, best);
+            // 끝 배치가 이미 붙어 있으면 아래에서 적용을 막는다. 순서를 찾을 것이 없다.
+            var order = best.CombinedCharms.Count > 0 ? null : TransitOrder(problem, targets);
+            var combinesInTransit = order is null && best.CombinedCharms.Count == 0;
+            if (order is not null) targets = targets.OrderBy(target => order.IndexOf(target.InstanceId)).ToList();
+            var moves = Moves(problem, current, best, order, out var manualMovesAvailable);
             var hasPlacementChanges = targets.Any(target =>
                 target.From != target.To || target.IsTablet && target.FromRotation != target.Rotation);
 
             var combines = best.CombinedCharms.Count > 0;
-            if (best.UnplacedTablets > 0 || !verification.Passed || best.UnretainedCharms.Count > 0 || best.WrongSideCharms.Count > 0 || unapprovedDeactivation || combines) targets.Clear();
-            if (best.UnretainedCharms.Count > 0 || best.WrongSideCharms.Count > 0 || unapprovedDeactivation || combines)
+            if (best.UnplacedTablets > 0 || !verification.Passed || best.UnretainedCharms.Count > 0 || best.WrongSideCharms.Count > 0 || unapprovedDeactivation || combines || combinesInTransit) targets.Clear();
+            if (best.UnretainedCharms.Count > 0 || best.WrongSideCharms.Count > 0 || unapprovedDeactivation || combines || combinesInTransit)
             {
                 moves.Clear();
                 manualMovesAvailable = false;
@@ -427,11 +431,12 @@ namespace SephPlanner.Core.Planning
                 Moves = moves,
                 ComboPlacementWarnings = ComboPlacementWarnings(problem, best),
                 RetentionWarnings = problem.Charms.Where(charm => best.UnretainedCharms.Contains(charm.InstanceId))
-                    .Select(charm => RetentionWarning(charm, best)).Concat(CombineWarnings(problem, best)).ToList(),
+                    .Select(charm => RetentionWarning(charm, best)).Concat(CombineWarnings(problem, best, combinesInTransit)).ToList(),
                 SupportWarnings = problem.Charms.Where(charm => best.UnlinkedCharms.Contains(charm.InstanceId) && !charm.Retained)
                     .Select(charm => Naming.Of(charm.Definition.Names, charm.Definition.Id, Tr("아티팩트")) + ": " +
                         Explain.SupportMissing(charm.Definition)).ToList(),
                 HasUnapprovedDeactivation = unapprovedDeactivation,
+                CombinesInTransit = combinesInTransit,
                 ActivationWarnings = problem.Charms.Where(charm => best.UnpreservedCharms.Contains(charm.InstanceId) &&
                         !charm.Retained && !best.UnlinkedCharms.Contains(charm.InstanceId))
                     .Select(charm => Naming.Of(charm.Definition.Names, charm.Definition.Id, Tr("아티팩트")) + ": " +
@@ -460,10 +465,12 @@ namespace SephPlanner.Core.Planning
         /// 가방에 레시피의 재료가 다 있으면 한 줄로 알린다. 추천은 떼어 두지만, 손으로 옮기다 붙이면 게임이 합쳐 버린다.
         /// 일부러 합치려는 사람은 이 줄을 보고 손으로 붙인다.
         /// </summary>
-        private static IEnumerable<string> CombineWarnings(PlacementProblem problem, Arrangement best)
+        private static IEnumerable<string> CombineWarnings(PlacementProblem problem, Arrangement best, bool combinesInTransit)
         {
             var advice = best.CombinedCharms.Count > 0
                 ? Tr("상하좌우로 붙여 두면 게임이 합쳐 다른 아이템으로 바꿉니다. 떼어 둘 자리를 찾지 못해 추천 배치를 적용하지 않습니다.")
+                : combinesInTransit
+                ? Tr("상하좌우로 붙여 두면 게임이 합쳐 다른 아이템으로 바꿉니다. 옮기는 도중에 맞붙지 않는 순서를 찾지 못해 추천 배치를 적용하지 않습니다.")
                 : Tr("상하좌우로 붙여 두면 게임이 합쳐 다른 아이템으로 바꿉니다. 추천 배치는 떼어 둡니다.");
             foreach (var recipe in problem.CombineRecipes)
             {
@@ -818,7 +825,7 @@ namespace SephPlanner.Core.Planning
         /// 순서를 정하는 일은 <see cref="MoveOrder"/>가 맡는다.
         /// </summary>
         private static List<Move> Moves(
-            PlacementProblem problem, Arrangement current, Arrangement best, out bool complete)
+            PlacementProblem problem, Arrangement current, Arrangement best, List<int>? order, out bool complete)
         {
             var pending = new List<Relocation>();
             var stationary = new List<GridPos>();
@@ -836,6 +843,7 @@ namespace SephPlanner.Core.Planning
 
                 pending.Add(new Relocation
                 {
+                    InstanceId = problem.Tablets[i].InstanceId,
                     Name = Naming.OfTablet(to),
                     From = from.Position,
                     To = to.Position,
@@ -857,6 +865,7 @@ namespace SephPlanner.Core.Planning
 
                 pending.Add(new Relocation
                 {
+                    InstanceId = charm.InstanceId,
                     Name = Naming.Of(
                         charm.Definition.Names, charm.Definition.Id, charm.IsFiller ? Tr("아이템") : Tr("아티팩트")),
                     From = from,
@@ -864,7 +873,32 @@ namespace SephPlanner.Core.Planning
                 });
             }
 
+            if (order is not null) pending = pending.OrderBy(item => order.IndexOf(item.InstanceId)).ToList();
             return MoveOrder.Sequence(problem.Grid, pending, stationary, out complete);
+        }
+
+        /// <summary>
+        /// 목표를 넣는 순서. 도중에 합치기 재료가 맞붙지 않게 고른다(<see cref="CombineRecipes.SafeOrder"/>) - 재료가 없는
+        /// 판에서는 받은 순서 그대로다. 그런 순서가 없으면 null 이다.
+        /// </summary>
+        private static List<int>? TransitOrder(PlacementProblem problem, List<PlanTarget> targets)
+        {
+            var positions = new Dictionary<int, GridPos>(problem.CurrentCharms);
+            foreach (var tablet in problem.CurrentTablets) positions[tablet.Key] = tablet.Value.Position;
+
+            var movers = new List<(int Id, GridPos To)>();
+            foreach (var target in targets)
+                if (!target.Immovable) movers.Add((target.InstanceId, target.To));
+
+            var safe = CombineRecipes.SafeOrder(problem, positions, movers);
+            if (safe is null) return null;
+
+            // 못 옮기는 것은 걸음이 없으니 제 차례에 그대로 둔다 - 받은 순서가 안전하면 목표 목록이 한 줄도 달라지지 않는다.
+            var order = new List<int>(targets.Count);
+            var next = 0;
+            foreach (var target in targets)
+                order.Add(target.Immovable ? target.InstanceId : safe[next++]);
+            return order;
         }
     }
 }
