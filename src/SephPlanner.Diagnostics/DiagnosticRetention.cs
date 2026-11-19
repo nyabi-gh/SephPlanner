@@ -9,8 +9,7 @@ public sealed partial class DiagnosticRetention(DiagnosticStore store, Diagnosti
     /// </summary>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromHours(1));
-        do
+        while (true)
         {
             try
             {
@@ -19,11 +18,13 @@ public sealed partial class DiagnosticRetention(DiagnosticStore store, Diagnosti
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
-                health.Failure = "보관 기한이 지난 진단을 지우지 못했습니다.";
+                health.Failure = DiagnosticHealth.PruneFailure;
                 PruneFailed(log, exception);
             }
+            // 실패한 동안은 자주 다시 해 본다. 저장소가 돌아온 뒤에도 다음 정시까지 /health 가 503 이면 상태 검사가
+            // 멀쩡한 서버를 고장으로 본다. 간격은 추정값이다.
+            await Task.Delay(health.Failure is null ? TimeSpan.FromHours(1) : TimeSpan.FromMinutes(1), stoppingToken);
         }
-        while (await timer.WaitForNextTickAsync(stoppingToken));
     }
 
     [LoggerMessage(Level = LogLevel.Error, Message = "보관 기한이 지난 진단을 지우지 못했습니다. 다음 주기에 다시 시도합니다.")]
@@ -32,6 +33,8 @@ public sealed partial class DiagnosticRetention(DiagnosticStore store, Diagnosti
 
 public sealed class DiagnosticHealth
 {
+    public const string PruneFailure = "보관 기한이 지난 진단을 지우지 못했습니다.";
+
     private volatile string? _failure;
 
     public string? Failure

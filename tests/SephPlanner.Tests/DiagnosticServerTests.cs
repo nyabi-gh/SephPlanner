@@ -425,6 +425,64 @@ public sealed class DiagnosticServerTests
         await retention.StopAsync(CancellationToken.None);
     }
 
+    /// <summary>
+    /// 기한이 지난 제보 하나를 못 지워도 목록과 조회는 돌고, 나머지는 지우며, 실패는 /health 로 알린다. 지울 수 있게
+    /// 되면 다음 요청에서 지우고 상태도 곧바로 돌아온다. 지우기를 막는 방법이 운영체제마다 달라 둘로 나눈다 - Windows 는
+    /// 파일을 열어 두면 그 파일만, Unix 는 폴더의 쓰기 권한을 빼면 폴더 전체가 막힌다.
+    /// </summary>
+    [Fact]
+    public async Task AnUndeletableExpiredReportDoesNotStopTheServer()
+    {
+        await using var server = await DiagnosticTestServer.StartAsync();
+        var kept = Guid.NewGuid();
+        using (var response = await server.Upload(kept, Payload(kept))) Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var stuck = ExpiredReport(server, Guid.NewGuid());
+        var other = ExpiredReport(server, Guid.NewGuid());
+
+        server.Authorize();
+        using (Block(server.Options.StorageDirectory, stuck))
+        {
+            using var list = await server.Client.GetAsync("/admin/reports");
+            Assert.Equal(HttpStatusCode.OK, list.StatusCode);
+            using var read = await server.Client.GetAsync("/admin/reports/" + kept.ToString("N"));
+            Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+            using var health = await server.Client.GetAsync("/health");
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, health.StatusCode);
+            if (OperatingSystem.IsWindows()) Assert.False(File.Exists(other));
+        }
+
+        using (var list = await server.Client.GetAsync("/admin/reports")) Assert.Equal(HttpStatusCode.OK, list.StatusCode);
+        Assert.False(File.Exists(stuck));
+        Assert.False(File.Exists(other));
+        using var recovered = await server.Client.GetAsync("/health");
+        Assert.Equal(HttpStatusCode.OK, recovered.StatusCode);
+    }
+
+    private static string ExpiredReport(DiagnosticTestServer server, Guid id)
+    {
+        var path = Path.Combine(server.Options.StorageDirectory, id.ToString("N") + ".zip");
+        File.WriteAllBytes(path, Payload(id));
+        File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddDays(-server.Options.RetentionDays - 1));
+        return path;
+    }
+
+    private static IDisposable Block(string directory, string file) => OperatingSystem.IsWindows()
+        ? new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.None)
+        : ReadOnly(directory);
+
+    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
+    private static IDisposable ReadOnly(string directory)
+    {
+        var mode = File.GetUnixFileMode(directory);
+        File.SetUnixFileMode(directory, UnixFileMode.UserRead | UnixFileMode.UserExecute);
+        return new Restore(() => File.SetUnixFileMode(directory, mode));
+    }
+
+    private sealed class Restore(Action restore) : IDisposable
+    {
+        public void Dispose() => restore();
+    }
+
     [Fact]
     public async Task HealthReportsAFailedPrune()
     {

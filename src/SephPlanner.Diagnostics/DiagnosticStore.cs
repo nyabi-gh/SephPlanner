@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -21,10 +22,12 @@ public sealed class DiagnosticStore : IDisposable
     // 보낸 곳을 디스크에 남기면 동의 창이 알리지 않은 자료를 14일 쥐게 된다. 그래서 메모리에만 두고,
     // 다시 시작하면 그 전 제보는 어느 곳의 몫에도 들지 않는다.
     private readonly Dictionary<Guid, string> _sources = new();
+    private readonly DiagnosticHealth? _health;
 
-    public DiagnosticStore(DiagnosticServerOptions options)
+    public DiagnosticStore(DiagnosticServerOptions options, DiagnosticHealth? health = null)
     {
         _options = options;
+        _health = health;
         Directory.CreateDirectory(options.StorageDirectory);
         foreach (var file in new DirectoryInfo(options.StorageDirectory).EnumerateFiles("*.upload"))
             if (Guid.TryParseExact(Path.GetFileNameWithoutExtension(file.Name), "N", out _)) file.Delete();
@@ -140,7 +143,10 @@ public sealed class DiagnosticStore : IDisposable
     public async Task PruneAsync(CancellationToken cancellation)
     {
         await _gate.WaitAsync(cancellation);
-        try { DeleteExpired(); }
+        try
+        {
+            if (DeleteExpired() is { } failure) ExceptionDispatchInfo.Capture(failure).Throw();
+        }
         finally { _gate.Release(); }
     }
 
@@ -194,14 +200,28 @@ public sealed class DiagnosticStore : IDisposable
     private IEnumerable<FileInfo> StoredFiles() => new DirectoryInfo(_options.StorageDirectory).EnumerateFiles("*.zip")
         .Where(file => Guid.TryParseExact(Path.GetFileNameWithoutExtension(file.Name), "N", out _));
 
-    private void DeleteExpired()
+    /// <summary>
+    /// 하나를 못 지워도 나머지는 지우고, 업로드·목록·조회도 멈추지 않는다. 정리 실패로 요청이 모두 500 이면 서버가 멎은
+    /// 것과 같다. 실패는 <c>/health</c> 가 알리고, 정리에 성공하면 곧바로 거둔다.
+    /// </summary>
+    private Exception? DeleteExpired()
     {
         var before = DateTime.UtcNow.AddDays(-_options.RetentionDays);
+        Exception? failure = null;
         foreach (var file in StoredFiles().Where(file => file.LastWriteTimeUtc < before).ToArray())
         {
-            file.Delete();
-            _sources.Remove(IdOf(file));
+            try
+            {
+                file.Delete();
+                _sources.Remove(IdOf(file));
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                failure ??= exception;
+            }
         }
+        if (_health is not null) _health.Failure = failure is null ? null : DiagnosticHealth.PruneFailure;
+        return failure;
     }
 
     public void Dispose() => _gate.Dispose();
