@@ -134,9 +134,10 @@ public static class DiagnosticServer
         catch (OperationCanceledException) when (timeout.IsCancellationRequested) { return Results.StatusCode(StatusCodes.Status408RequestTimeout); }
     }
 
+    // 라우팅은 메서드를 대소문자 없이 맞춘다. 여기서 "POST" 만 세면 "post" 로 보낸 업로드가 받아들여지면서 제한은 모두 비켜 간다.
     private static PartitionedRateLimiter<HttpContext> Uploads(Func<HttpContext, RateLimitPartition<string>> partition) =>
         PartitionedRateLimiter.Create<HttpContext, string>(context =>
-            context.Request.Method == "POST" ? partition(context) : RateLimitPartition.GetNoLimiter("read"));
+            HttpMethods.IsPost(context.Request.Method) ? partition(context) : RateLimitPartition.GetNoLimiter("read"));
 
     /// <summary>
     /// 한도와 몫을 나누는 단위. 전달 헤더를 푼 뒤의 주소다. IPv6 는 한 회선이 /64 를 통째로 받는 것이 보통이라

@@ -109,6 +109,21 @@ public sealed class DiagnosticServerTests
         Assert.Single(Directory.GetFiles(server.Options.StorageDirectory));
     }
 
+    /// <summary>
+    /// Kestrel 은 소문자 메서드를 그대로 넘기고 라우팅은 대소문자 없이 맞춘다. 제한이 "POST" 만 세면 "post" 업로드가
+    /// 빈도와 동시 처리 제한을 모두 비켜 간다. <see cref="HttpClient"/>는 메서드를 바꿔 보낼 수 있어 소켓으로 직접 보낸다.
+    /// </summary>
+    [Theory]
+    [InlineData("post")]
+    [InlineData("Post")]
+    public async Task UploadLimitsDoNotDependOnTheCaseOfTheMethod(string method)
+    {
+        await using var server = await DiagnosticTestServer.StartAsync(options => options.UploadsPerMinute = 1);
+        Assert.Equal(201, await server.UploadRaw(method));
+        Assert.Equal(429, await server.UploadRaw(method));
+        Assert.Equal(429, await server.UploadRaw("POST"));
+    }
+
     [Fact]
     public async Task ExpiredFilesAndInterruptedUploadsAreRemovedOnRestart()
     {
@@ -480,6 +495,26 @@ internal sealed class DiagnosticTestServer : IAsyncDisposable
         request.Content = new ByteArrayContent(archive);
         request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
         return await Client.SendAsync(request);
+    }
+
+    /// <summary>메서드 글자를 그대로 보내는 업로드. 상태 코드만 돌려준다.</summary>
+    internal async Task<int> UploadRaw(string method)
+    {
+        var id = Guid.NewGuid();
+        var archive = DiagnosticArchive.Create(new Dictionary<string, string>
+        {
+            ["report.json"] = JsonSerializer.Serialize(new { Version = DiagnosticArchive.SchemaVersion, ReportId = id.ToString("N") }),
+        });
+        using var tcp = new System.Net.Sockets.TcpClient();
+        await tcp.ConnectAsync(Client.BaseAddress!.Host, Client.BaseAddress.Port);
+        var stream = tcp.GetStream();
+        var head = $"{method} /api/v1/reports HTTP/1.1\r\nHost: localhost\r\nX-Forwarded-Proto: https\r\nContent-Type: application/zip\r\n" +
+                   $"X-SephPlanner-Report-Id: {id:N}\r\nX-SephPlanner-SHA256: {DiagnosticArchive.Hash(archive)}\r\n" +
+                   $"Content-Length: {archive.Length}\r\nConnection: close\r\n\r\n";
+        await stream.WriteAsync(System.Text.Encoding.ASCII.GetBytes(head));
+        await stream.WriteAsync(archive);
+        var status = (await new StreamReader(stream).ReadLineAsync())!.Split(' ')[1];
+        return int.Parse(status, System.Globalization.CultureInfo.InvariantCulture);
     }
 
     public async ValueTask DisposeAsync()
