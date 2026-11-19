@@ -45,7 +45,10 @@ $changelog = Get-Content (Join-Path $root "docs/CHANGELOG.md")
 
 # 릴리스 본문은 CHANGELOG 의 해당 절을 그대로 뽑는다. 손으로 옮겨 적으면 두 벌이 되고,
 # 한쪽만 고친 채 나가면 배포된 본문과 저장소가 갈라진다.
-$start = $changelog.IndexOf("## $version") + 1
+# 제목 줄이 정확히 같아야 찾는다. 못 찾으면 IndexOf 가 -1 이라 문서 첫머리를 본문으로 집는다.
+$heading = $changelog.IndexOf("## $version")
+if ($heading -lt 0) { throw "CHANGELOG.md 에 '## $version' 절이 없습니다." }
+$start = $heading + 1
 $end = $start
 while ($end -lt $changelog.Count -and $changelog[$end] -notlike "## *") { $end++ }
 # $start -eq $end 면 아래 범위가 거꾸로 돌아 엉뚱한 줄을 집는다. 먼저 붙잡는다.
