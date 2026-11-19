@@ -1,3 +1,5 @@
+#Requires -Version 7
+# 아래 ZipFile 은 5.1 에서는 어셈블리를 따로 불러와야 쓸 수 있다.
 $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path $PSScriptRoot -Parent
 $bundle = Join-Path $projectRoot ("artifacts/diagnostics-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
@@ -12,6 +14,7 @@ foreach ($name in @("Dockerfile", ".dockerignore", "compose.yaml", "sephplanner.
     Copy-Item -LiteralPath (Join-Path $templates $name) -Destination $bundle
 }
 $archive = $bundle + ".zip"
-Compress-Archive -Path (Join-Path $bundle "*") -DestinationPath $archive
+# Compress-Archive 의 와일드카드는 macOS·Linux 에서 점으로 시작하는 파일을 말없이 빼므로 .dockerignore 가 빠진다.
+[System.IO.Compression.ZipFile]::CreateFromDirectory($bundle, $archive)
 Write-Host "진단 서버 배포 준비 파일: $archive"
 Get-FileHash -LiteralPath $archive -Algorithm SHA256
