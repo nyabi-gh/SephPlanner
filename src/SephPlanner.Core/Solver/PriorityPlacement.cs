@@ -108,7 +108,7 @@ namespace SephPlanner.Core.Solver
             => PlacementQuality.From(left).CompareTo(PlacementQuality.From(right));
 
         internal static void Describe(
-            PlacementProblem problem, Arrangement arrangement, Dictionary<GridPos, CharmSlot> neighbors)
+            PlacementProblem problem, Arrangement arrangement, Dictionary<GridPos, CharmSlot> neighbors, in CharmActivity activity)
         {
             if (problem.PriorityCategories.Count == 0) return;
             var categories = new List<string>();
@@ -117,7 +117,7 @@ namespace SephPlanner.Core.Solver
             {
                 if (charm.IsFiller || !Applies(charm.Definition)) continue;
                 var placed = arrangement.CharmPositions.TryGetValue(charm.InstanceId, out var cell);
-                if (Contribute(problem, charm, placed, cell, neighbors, categories, ref progress))
+                if (Contribute(problem, charm, placed, cell, neighbors, activity, categories, ref progress))
                     arrangement.PriorityComboMatches++;
                 else arrangement.UnmatchedComboCharms.Add(charm.InstanceId);
             }
@@ -130,10 +130,11 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         internal static bool Contribute(
             PlacementProblem problem, CharmSlot charm, bool placed, GridPos cell,
-            Dictionary<GridPos, CharmSlot> neighbors, List<string> categories, ref double progress)
+            Dictionary<GridPos, CharmSlot> neighbors, in CharmActivity activity, List<string> categories, ref double progress)
         {
             categories.Clear();
-            if (placed) ComboCounting.PositionalCategories(charm, cell, neighbors, categories);
+            // 1.1 의 나침반은 꺼지면 카테고리를 비운다. 활성을 넘기지 않으면 꺼진 나침반도 지정 콤보를 채운 것으로 센다.
+            if (placed) ComboCounting.PositionalCategories(charm, cell, neighbors, categories, activity);
 
             var matched = false;
             foreach (var category in categories)

@@ -325,4 +325,22 @@ public class CompassTests
         problem.FixedEffects.Add(new FixedEffectCell { Position = new GridPos(0, 1), Disable = 1 });
         Assert.Empty(Categories(problem, 5, withActivity: true));
     }
+
+    /// <summary>
+    /// 꺼진 나침반은 지정 콤보도 채우지 못한다. 채점·배정·설명이 활성을 보지 않으면 꺼지는 자리를 콤보 자리로 고른다.
+    /// </summary>
+    [Fact]
+    public void ASwitchedOffCompassDoesNotFillAPriorityCombo()
+    {
+        var problem = Problem(new GridSpec(1, 2, 2),
+            (Root(1, "EMBER"), new GridPos(0, 0)),
+            (DamageUp(4), new GridPos(0, 1)));
+        problem.PriorityCategories.Add("EMBER");
+        Assert.Equal(1, Score(problem).PriorityComboMatches);
+
+        problem.FixedEffects.Add(new FixedEffectCell { Position = new GridPos(0, 1), Disable = 1 });
+        var switchedOff = Score(problem);
+        Assert.Equal(0, switchedOff.PriorityComboMatches);
+        Assert.Contains(4, switchedOff.UnmatchedComboCharms);
+    }
 }

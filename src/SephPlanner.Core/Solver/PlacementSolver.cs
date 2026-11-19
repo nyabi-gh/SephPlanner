@@ -2061,7 +2061,7 @@ namespace SephPlanner.Core.Solver
                 waste += part.Waste;
                 if (categories is not null && !charm.IsFiller && PriorityPlacement.Applies(charm.Definition) &&
                     PriorityPlacement.Contribute(problem, charm, true, positions[charm.InstanceId],
-                        neighbors!, categories, ref comboProgress))
+                        neighbors!, new CharmActivity(result, problem.Grid, occupancy), categories, ref comboProgress))
                     comboMatches++;
                 if (designated && !part.Inactive && (DirectedCharmSupport.Strengthens(charm)
                         ? DirectedCharmSupport.ConnectedTarget(charm, positions[charm.InstanceId], result, problem.Grid,
@@ -2224,6 +2224,7 @@ namespace SephPlanner.Core.Solver
             var cost = AssignmentScratch(rows, columns);
             var unit = rows + 1.0;
             var comboNeighbors = (IReadOnlyDictionary<GridPos, CharmSlot>?)neighbors ?? new Dictionary<GridPos, CharmSlot>();
+            var comboActivity = new CharmActivity(result, problem.Grid, occupancy);
             var comboCategories = new List<string>();
             var designated = problem.DesignatedTargets.Count > 0;
 
@@ -2254,7 +2255,7 @@ namespace SephPlanner.Core.Solver
                     if (problem.PriorityCategories.Count > 0 && !charm.IsFiller && PriorityPlacement.Applies(charm.Definition))
                     {
                         comboCategories.Clear();
-                        ComboCounting.PositionalCategories(charm, cell, comboNeighbors, comboCategories);
+                        ComboCounting.PositionalCategories(charm, cell, comboNeighbors, comboCategories, comboActivity);
                         if (ContainsAny(problem.PriorityCategories, comboCategories)) priority -= unit;
                     }
                     if (Preserve(charm) && usable) priority--;
@@ -2686,7 +2687,7 @@ namespace SephPlanner.Core.Solver
             var overflow = CriticalCap.Penalty(problem, positions, result, occupancy);
             arrangement.Score -= overflow;
             arrangement.Objective -= overflow;
-            PriorityPlacement.Describe(problem, arrangement, neighbors);
+            PriorityPlacement.Describe(problem, arrangement, neighbors, new CharmActivity(result, problem.Grid, occupancy));
             arrangement.CombinedCharms.AddRange(CombineRecipes.Groups(problem, positions));
             var quality = ScoreOf(problem, layout, positions, occupancy, result, neighbors);
             arrangement.UnsafeEmptyCells = quality.UnsafeEmpty;
