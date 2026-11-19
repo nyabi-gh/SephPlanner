@@ -7,9 +7,8 @@ using UnityEngine.InputSystem;
 namespace SephPlanner.Plugin.Host
 {
     /// <summary>
-    /// 키 조합 하나. 주 키를 누르는 순간 조합키가 모두 눌려 있고, 조합에 없는 키는 마우스 버튼 말고 하나도 눌려 있지
-    /// 않아야 발동한다. 0.5.x 까지 쓰던 BepInEx <c>KeyboardShortcut</c> 과 같은 규칙이다 - 걸으면서(WASD) F8 을 눌러도
-    /// 안 되던 것까지 그대로 두어 손에 익은 동작을 바꾸지 않는다.
+    /// 키 조합 하나. 주 키를 누르는 순간 조합키가 모두 눌려 있고, 조합에 없는 Ctrl·Alt·Shift·Cmd(Windows 키) 가 눌려 있지 않아야
+    /// 발동한다. 그 밖의 키는 보지 않는다 - 걸으면서(WASD) 누른 F8 도 발동하고, Alt+F4 는 F4 단축키가 되지 않는다.
     ///
     /// 글자 모양("F9", "P + LeftControl + LeftAlt", 빈 값은 해제)도 BepInEx 설정 파일과 같아서 그 값을 그대로 읽는다.
     /// </summary>
