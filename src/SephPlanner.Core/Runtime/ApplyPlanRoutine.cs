@@ -168,6 +168,9 @@ namespace SephPlanner.Core.Runtime
             // 뒤에도 잠시 옛 값이 남아 있으므로, 어긋났다고 알리기 전에 그만큼 기다린다.
             Progress = Tr("자동 배치 - 레벨 확인 중");
             var settle = _now() + (_port.WritesLandImmediately ? 0 : SyncTimeout);
+            // 앞 국면이 예산 끝에 마지막 걸음을 보냈으면 이 대기는 국면의 시한을 넘는다. 시한이 먼저 지나면 부르는 쪽이
+            // 진행 중을 풀어, 아직 가방을 읽는 사이 F8 이 두 번째 적용을 시작한다. 국면과 같이 걸음 하나의 창을 더 둔다.
+            AbandonAt = Math.Max(AbandonAt, settle + SyncTimeout);
             while (LevelDrift() != null && _now() < settle) yield return null;
 
             var drift = TargetDrift();

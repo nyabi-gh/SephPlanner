@@ -1010,6 +1010,42 @@ public class ApplyPlanRoutineTests
         Assert.Equal("자동 배치 완료 - 이동 1건, 회전 0건", routine.Result.Korean);
     }
 
+    /// <summary>
+    /// 앞 국면이 예산을 거의 다 쓴 뒤의 레벨 확인도 시한 안에 있어야 한다. 시한이 먼저 지나면 부르는 쪽이
+    /// 진행 중을 풀어, 반복자가 아직 도는 사이 F8 이 두 번째 적용을 시작한다.
+    /// </summary>
+    [Fact]
+    public void TheFinalLevelWaitStaysWithinTheAbandonDeadline()
+    {
+        // 마지막 걸음을 예산 끝 직전에 보내 그 3초 창이 30초를 넘게 하고, 레벨은 끝내 맞지 않게 해 확인도 3초를 다 쓰게 한다.
+        var (inventory, clock) = Guest(latency: 2.6);
+        var targets = new List<PlanTarget>();
+        for (var i = 0; i < 12; i++)
+        {
+            inventory.Cells[At(i % Width, i / Width)] = 10 + i;
+            targets.Add(Charm(10 + i, At(i % Width, i / Width), At(i % Width, 3 + i / Width)));
+        }
+        var command = Command(targets.ToArray());
+        command.ExpectedStorage = Width * Height;
+        inventory.Grid = new GridSpec(Width, Height, Width * Height);
+        command.ExpectedCellLevels[At(0, 3)] = 3;
+
+        var routine = Routine(command, inventory, clock);
+        var run = routine.Run();
+        var levelWaitSeen = false;
+        while (run.MoveNext())
+        {
+            levelWaitSeen |= routine.Progress == "자동 배치 - 레벨 확인 중";
+            Assert.True(clock.Now < routine.AbandonAt, $"{clock.Now}초에 아직 도는데 시한은 {routine.AbandonAt}초");
+            clock.Now += 0.1;
+            inventory.Settle();
+        }
+
+        Assert.True(levelWaitSeen, routine.Result.Korean);
+        Assert.True(clock.Now > ApplyPlanRoutine.PhaseTimeout + ApplyPlanRoutine.SyncTimeout, $"끝난 시각 {clock.Now}초");
+        AssertContains("적용 뒤 레벨이 예상과 다른 칸", routine.Result.Korean);
+    }
+
     [Fact]
     public void TargetsAlreadyInPlaceAreNotTouched()
     {
