@@ -262,27 +262,69 @@ public sealed class DiagnosticServerTests
         Assert.Equal(HttpStatusCode.Created, afterwards.StatusCode);
     }
 
+    /// <summary>
+    /// 빈도는 곳마다만 센다. 서버 전체로 세면 몇 곳이 헤더만 틀린 값싼 요청으로 1분 몫을 다 써 정상 제보를 막는다.
+    /// </summary>
     [Fact]
-    public async Task ManySourcesCannotExceedTheServerWideRate()
+    public async Task CheapInvalidRequestsFromManySourcesDoNotBlockAValidReport()
     {
-        await using var server = await DiagnosticTestServer.StartAsync(options => options.TotalUploadsPerMinute = 2);
-        foreach (var (from, expected) in new[]
-                 {
-                     ("203.0.113.9", HttpStatusCode.Created), ("198.51.100.7", HttpStatusCode.Created),
-                     ("192.0.2.33", HttpStatusCode.TooManyRequests),
-                 })
+        await using var server = await DiagnosticTestServer.StartAsync();
+        for (var source = 1; source <= 10; source++)
         {
-            var id = Guid.NewGuid();
-            using var response = await server.Upload(id, Payload(id), from: from);
-            Assert.True(expected == response.StatusCode, $"{from}: {response.StatusCode}");
+            for (var attempt = 0; attempt < server.Options.UploadsPerMinute; attempt++)
+            {
+                var id = Guid.NewGuid();
+                using var invalid = await server.Upload(id, Payload(id), new string('0', 64), from: "203.0.113." + source);
+                Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+            }
         }
+
+        var valid = Guid.NewGuid();
+        using var response = await server.Upload(valid, Payload(valid), from: "198.51.100.7");
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    /// <summary>
+    /// 기준보다 느리게 흘리는 업로드는 유예 뒤에 끊겨 서버 전체의 동시 처리 몫을 내놓는다. 그러지 않으면 몇 곳이
+    /// 아주 느린 연결로 업로드 시간 제한 내내 모두를 막는다.
+    /// </summary>
+    [Fact]
+    public async Task AnUploadBelowTheMinimumRateGivesUpItsServerWideSlot()
+    {
+        await using var server = await DiagnosticTestServer.StartAsync(options =>
+        {
+            options.TotalConcurrentUploads = 1;
+            options.MinimumUploadRateGraceSeconds = 2;
+        });
+        // 초당 1KB. Kestrel 기본 최소 속도(초당 240바이트)는 넘고 서버의 기준(초당 4KB)에는 못 미친다.
+        var (stalled, pending) = await StartStalledUpload(server, "203.0.113.9", bytesPerQuarterSecond: 256);
+
+        var other = Guid.NewGuid();
+        using (var blocked = await server.Upload(other, Payload(other), from: "198.51.100.7"))
+            Assert.Equal(HttpStatusCode.TooManyRequests, blocked.StatusCode);
+
+        // 시험 클라이언트의 시간 제한(10초)이 느린 요청을 먼저 끊으면 서버가 끊은 것과 구별되지 않는다. 유예 2초에
+        // Kestrel 의 1초 점검 주기를 더해도 넉넉한 6초 안에 풀려야 한다.
+        var accepted = false;
+        var deadline = DateTime.UtcNow.AddSeconds(6);
+        while (!accepted && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(250);
+            using var retry = await server.Upload(other, Payload(other), from: "198.51.100.7");
+            accepted = retry.StatusCode == HttpStatusCode.Created;
+        }
+        Assert.True(accepted);
+
+        stalled.Release.SetResult();
+        // 끊긴 쪽은 응답 대신 연결 오류를 받을 수도 있다. 여기서 보는 것은 몫이 풀렸다는 것뿐이다.
+        await Record.ExceptionAsync(async () => (await pending).Dispose());
     }
 
     /// <summary>본문을 조금 보낸 뒤 멈춘 업로드를 연다. 서버가 그 요청으로 동시 처리 몫을 쥔 뒤에 돌려준다.</summary>
     private static async Task<(StalledContent Stalled, Task<HttpResponseMessage> Pending)> StartStalledUpload(
-        DiagnosticTestServer server, string from)
+        DiagnosticTestServer server, string from, int bytesPerQuarterSecond = 0)
     {
-        var stalled = new StalledContent();
+        var stalled = new StalledContent(bytesPerQuarterSecond);
         var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/reports") { Content = stalled };
         request.Headers.Add("X-SephPlanner-Report-Id", Guid.NewGuid().ToString("N"));
         request.Headers.Add("X-SephPlanner-SHA256", new string('0', 64));
@@ -303,13 +345,26 @@ public sealed class DiagnosticServerTests
         internal TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public StalledContent() => Headers.ContentType = new MediaTypeHeaderValue("application/zip");
+        private readonly int _trickle;
+
+        /// <param name="bytesPerQuarterSecond">0 이면 멈추고, 아니면 풀릴 때까지 0.25초마다 이만큼 흘린다.</param>
+        public StalledContent(int bytesPerQuarterSecond = 0)
+        {
+            _trickle = bytesPerQuarterSecond;
+            Headers.ContentType = new MediaTypeHeaderValue("application/zip");
+        }
 
         protected override async Task SerializeToStreamAsync(Stream stream, TransportContext? context)
         {
             await stream.WriteAsync(new byte[16]);
             await stream.FlushAsync();
             Started.SetResult();
+            while (_trickle > 0 && !Release.Task.IsCompleted)
+            {
+                await stream.WriteAsync(new byte[_trickle]);
+                await stream.FlushAsync();
+                await Task.WhenAny(Release.Task, Task.Delay(250));
+            }
             await Release.Task;
         }
 

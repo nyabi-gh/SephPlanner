@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using SephPlanner.Core.Runtime;
 
 namespace SephPlanner.Diagnostics;
@@ -18,7 +19,13 @@ public static class DiagnosticServer
         var adminToken = File.ReadAllText(options.AdminTokenFile).Trim();
         if (adminToken.Length < 32) throw new InvalidOperationException("관리자 토큰 파일에 충분한 길이의 무작위 비밀값이 필요합니다.");
         var adminHash = SHA256.HashData(Encoding.UTF8.GetBytes(adminToken));
-        builder.WebHost.ConfigureKestrel(server => server.Limits.MaxRequestBodySize = DiagnosticArchive.MaximumArchiveBytes);
+        builder.WebHost.ConfigureKestrel(server =>
+        {
+            server.Limits.MaxRequestBodySize = DiagnosticArchive.MaximumArchiveBytes;
+            // 기본값(초당 240바이트)이면 그만큼만 흘리는 연결이 업로드 시간 제한 내내 서버 전체의 동시 처리 몫을 쥔다.
+            server.Limits.MinRequestBodyDataRate = new MinDataRate(
+                options.MinimumUploadBytesPerSecond, TimeSpan.FromSeconds(options.MinimumUploadRateGraceSeconds));
+        });
         builder.Services.AddSingleton(options);
         builder.Services.AddSingleton<DiagnosticStore>();
         builder.Services.AddSingleton<DiagnosticHealth>();
@@ -40,18 +47,17 @@ public static class DiagnosticServer
         builder.Services.AddRateLimiter(limits =>
         {
             limits.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            // 보낸 곳마다 세고 서버 전체로도 센다. 곳마다만 세면 주소를 여럿 쓰는 쪽이 업로드를 끝없이 겹쳐 메모리와 디스크를
-            // 다 쓰고, 전체로만 세면 느리게 흘리는 연결 둘이 모두의 업로드를 막는다. 동시 처리를 앞에 두어, 동시 처리에서
-            // 거절된 요청은 빈도 몫을 쓰지 않는다.
+            // 동시 처리는 보낸 곳마다 세고 서버 전체로도 센다. 곳마다만 세면 주소를 여럿 쓰는 쪽이 업로드를 끝없이 겹쳐 메모리와
+            // 디스크를 다 쓰고, 전체로만 세면 느리게 흘리는 연결 둘이 모두의 업로드를 막는다. 빈도는 곳마다만 센다 - 서버 전체
+            // 빈도는 몇 곳의 값싼 잘못된 요청으로도 다 써 버려 정상 제보를 막는다. 일감은 전체 동시 처리가, 디스크는 보관 상한이
+            // 묶는다. 동시 처리를 앞에 두어, 동시 처리에서 거절된 요청은 빈도 몫을 쓰지 않는다.
             limits.GlobalLimiter = PartitionedRateLimiter.CreateChained(
                 Uploads(context => RateLimitPartition.GetConcurrencyLimiter(SourceOf(context), _ => new ConcurrencyLimiterOptions
                 { PermitLimit = options.ConcurrentUploads, QueueLimit = 0 })),
                 Uploads(_ => RateLimitPartition.GetConcurrencyLimiter("", _ => new ConcurrencyLimiterOptions
                 { PermitLimit = options.TotalConcurrentUploads, QueueLimit = 0 })),
                 Uploads(context => RateLimitPartition.GetFixedWindowLimiter(SourceOf(context), _ => new FixedWindowRateLimiterOptions
-                { PermitLimit = options.UploadsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })),
-                Uploads(_ => RateLimitPartition.GetFixedWindowLimiter("", _ => new FixedWindowRateLimiterOptions
-                { PermitLimit = options.TotalUploadsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
+                { PermitLimit = options.UploadsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
         });
         var app = builder.Build();
         app.UseForwardedHeaders();
