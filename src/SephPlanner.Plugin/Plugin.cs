@@ -159,11 +159,13 @@ namespace SephPlanner.Plugin
 
             // 단축키·화면 쪽에서 난 예외가 폴링까지 굶기면 안 된다. Update 안의 예외는 유니티가
             // Player.log 에만 쌓고 우리 로그는 조용하므로, 여기서 잡아 같은 것 한 번씩 남긴다.
+            // 창을 여는 일(단축키, 진단·업데이트 안내)보다 먼저 낡은 창을 버린다. 뒤에 두면 크기·언어를 바꾼 직후 한 프레임
+            // 동안 옛 창이 열려 그대로 남는다. 바꾸는 쪽은 설정 창의 버튼이라 우리 Update 밖에서 온다.
+            Guarded(_dropStaleWindows ??= DropStaleWindows, "낡은 창 정리");
             Guarded(_handleInput ??= HandleInput, "입력 처리");
             Guarded(_takePlanFailure ??= TakePlanFailure, "자동 진단 처리");
             PollDiagnostics();
             PollUpdates();
-            Guarded(_dropStaleWindows ??= DropStaleWindows, "낡은 창 정리");
 
             var panelStarted = FrameCost.Now;
             Guarded(_updateNativePanel ??= UpdateNativePanel, "화면 갱신");
