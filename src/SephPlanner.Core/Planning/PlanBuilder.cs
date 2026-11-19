@@ -416,7 +416,9 @@ namespace SephPlanner.Core.Planning
                 target.From != target.To || target.IsTablet && target.FromRotation != target.Rotation);
 
             var combines = best.CombinedCharms.Count > 0;
-            if (best.UnplacedTablets > 0 || !verification.Passed || best.UnretainedCharms.Count > 0 || best.WrongSideCharms.Count > 0 || unapprovedDeactivation || combines || combinesInTransit) targets.Clear();
+            // 도중에 맞붙는 계획도 목표는 남긴다. 호스트의 자동 배치는 한 프레임에 다 옮겨 게임이 중간 배치를 합치지 않는다
+            // (AutoPlacePolicy). 손으로는 한 수씩 반영되므로 이동 안내만 거둔다.
+            if (best.UnplacedTablets > 0 || !verification.Passed || best.UnretainedCharms.Count > 0 || best.WrongSideCharms.Count > 0 || unapprovedDeactivation || combines) targets.Clear();
             if (best.UnretainedCharms.Count > 0 || best.WrongSideCharms.Count > 0 || unapprovedDeactivation || combines || combinesInTransit)
             {
                 moves.Clear();
@@ -470,7 +472,7 @@ namespace SephPlanner.Core.Planning
             var advice = best.CombinedCharms.Count > 0
                 ? Tr("상하좌우로 붙여 두면 게임이 합쳐 다른 아이템으로 바꿉니다. 떼어 둘 자리를 찾지 못해 추천 배치를 적용하지 않습니다.")
                 : combinesInTransit
-                ? Tr("상하좌우로 붙여 두면 게임이 합쳐 다른 아이템으로 바꿉니다. 옮기는 도중에 맞붙지 않는 순서를 찾지 못해 추천 배치를 적용하지 않습니다.")
+                ? Tr("상하좌우로 붙여 두면 게임이 합쳐 다른 아이템으로 바꿉니다. 옮기는 도중에 맞붙지 않는 순서를 찾지 못해 이동 안내를 내지 않습니다. 자동 배치는 혼자 하거나 방을 만든 쪽에서만 적용합니다.")
                 : Tr("상하좌우로 붙여 두면 게임이 합쳐 다른 아이템으로 바꿉니다. 추천 배치는 떼어 둡니다.");
             foreach (var recipe in problem.CombineRecipes)
             {

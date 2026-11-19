@@ -630,7 +630,8 @@ namespace SephPlanner.Plugin.Ui
             if (unexplainedFixedCells > 0)
                 warnings.Add(Tr("가방에 이유를 알 수 없는 칸 효과 {0}칸이 있어 게임에 보이는 값 그대로 계산했습니다.", unexplainedFixedCells));
 
-            if (!plan.ManualMoveInstructionsAvailable)
+            // 도중에 맞붙는 계획은 목표가 유효하다. 까닭은 계획의 합치기 경고가 말한다.
+            if (!plan.ManualMoveInstructionsAvailable && !plan.CombinesInTransit)
                 warnings.Add(Tr("목표 배치가 유효하지 않아 수동 이동 순서를 만들 수 없습니다."));
 
             if (plan.SkippedOffers > 0)
@@ -785,7 +786,9 @@ namespace SephPlanner.Plugin.Ui
             _moves.Begin();
             if (!plan.ManualMoveInstructionsAvailable)
             {
-                _moves.Add(Tr("수동 이동 불가"), Tr("목표 배치를 다시 계산해야 합니다."), NativeSkin.Amber);
+                _moves.Add(Tr("수동 이동 불가"), plan.CombinesInTransit
+                    ? Tr("옮기는 도중에 합쳐질 재료가 맞붙습니다.")
+                    : Tr("목표 배치를 다시 계산해야 합니다."), NativeSkin.Amber);
                 _moves.End();
                 return;
             }

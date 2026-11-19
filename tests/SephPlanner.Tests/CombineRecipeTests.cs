@@ -198,6 +198,40 @@ public class CombineRecipeTests
         Assert.Null(CombineRecipes.SafeOrder(problem, problem.CurrentCharms, movers));
     }
 
+    /// <summary>
+    /// 꽉 찬 2x2 에서 강화칸이 다른 대각선에 있어 재료 둘이 그리로 가야 하는 판. 어느 걸음으로 시작하든 둘이 맞붙는다.
+    /// 목표는 남겨 호스트가 적용하게 하고, 손으로 따라 할 이동 안내는 내지 않는다.
+    /// </summary>
+    [Fact]
+    public void APlanWithNoSafeOrderKeepsTheTargetsForTheHostOnly()
+    {
+        var inventory = new InventoryState { Width = 2, Height = 2, Storage = 4 };
+        inventory.Items.Add(new PlacedItem { DefinitionId = Wing, InstanceId = 10, Position = new GridPos(0, 0), IsActive = true });
+        inventory.Items.Add(new PlacedItem { DefinitionId = Cloth, InstanceId = 11, Position = new GridPos(1, 1), IsActive = true });
+        inventory.Items.Add(new PlacedItem { DefinitionId = 9001, InstanceId = 20, Position = new GridPos(1, 0), EffectiveLevel = 3, IsActive = true });
+        inventory.Items.Add(new PlacedItem { DefinitionId = 9002, InstanceId = 21, Position = new GridPos(0, 1), EffectiveLevel = 3, IsActive = true });
+        foreach (var cell in new[] { new GridPos(1, 0), new GridPos(0, 1) })
+        {
+            inventory.FixedEffects.Add(new FixedEffectCell { Position = cell, Level = 3 });
+            inventory.LevelMatrix[cell.X + "," + cell.Y] = 3;
+        }
+        var snapshot = new GameSnapshot
+        {
+            Inventory = inventory,
+            Run = new RunState { CombineRecipes = new List<List<int>> { new() { Wing, Cloth } } },
+        };
+
+        var plan = PlanBuilder.Build(snapshot, Catalog())!;
+
+        Assert.True(plan.Verification.Passed, plan.Verification.Reason);
+        Assert.True(plan.CombinesInTransit);
+        Assert.Contains(plan.Targets, target => target.InstanceId == 10 && target.From != target.To);
+        Assert.True(plan.CreateApplyCommand().RequiresImmediateWrites);
+        Assert.Empty(plan.Moves);
+        Assert.False(plan.ManualMoveInstructionsAvailable);
+        Assert.Contains(plan.RetentionWarnings, warning => warning.Contains("방을 만든 쪽에서만"));
+    }
+
     /// <summary>계획이 내놓는 자동 적용 목표와 손 이동 안내 둘 다 같은 안전한 순서를 따른다.</summary>
     [Fact]
     public void ThePlanOrdersItsTargetsAndMovesSafely()
@@ -231,6 +265,15 @@ public class CombineRecipeTests
             var plan = PlanBuilder.Build(snapshot, TransitCatalog())!;
             if (plan.Targets.Count == 0) continue;
             checkedPlans++;
+
+            // 안전한 순서가 없으면 목표는 남기되(호스트만 적용한다) 손으로 따라 할 이동 안내는 내지 않는다.
+            Assert.Equal(plan.CombinesInTransit, plan.CreateApplyCommand().RequiresImmediateWrites);
+            if (plan.CombinesInTransit)
+            {
+                Assert.Empty(plan.Moves);
+                Assert.False(plan.ManualMoveInstructionsAvailable);
+                continue;
+            }
 
             var at = plan.Targets.ToDictionary(target => target.InstanceId, target => target.From);
             foreach (var target in plan.Targets)

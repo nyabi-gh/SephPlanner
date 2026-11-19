@@ -82,7 +82,10 @@ namespace SephPlanner.Core.Planning
         public List<string> TabletWarnings { get; set; } = new List<string>();
         public bool HasUnapprovedDeactivation { get; set; }
 
-        /// <summary>끝 배치는 합치기 재료를 떼어 두지만, 거기까지 옮기는 어느 순서로도 도중에 맞붙는다.</summary>
+        /// <summary>
+        /// 끝 배치는 합치기 재료를 떼어 두지만, 거기까지 옮기는 어느 순서로도 도중에 맞붙는다. 목표는 남기고 이동
+        /// 안내는 비운다 - 쓰기가 그 자리에서 반영되는 쪽만 적용할 수 있다(<see cref="ApplyPlanCommand.RequiresImmediateWrites"/>).
+        /// </summary>
         public bool CombinesInTransit { get; set; }
         public bool ManualMoveInstructionsAvailable { get; set; } = true;
         public bool HasPlacementChanges { get; set; }
@@ -175,6 +178,7 @@ namespace SephPlanner.Core.Planning
             ExpectedCatalogGeneration = CatalogGeneration,
             Targets = new List<PlanTarget>(Targets),
             ExpectedCellLevels = new Dictionary<GridPos, int>(Best.CellLevels),
+            RequiresImmediateWrites = CombinesInTransit,
         };
     }
 }

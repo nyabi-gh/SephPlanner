@@ -1383,6 +1383,7 @@ namespace SephPlanner.Plugin
                 AllowMultiplayer = _settings.MultiplayerAutoPlace.Value,
                 SettingsKey = Describe(_settings.SettingsKey),
                 SessionActive = NetworkServer.active || NetworkClient.active,
+                WritesLandImmediately = NetworkServer.active,
                 Applying = PlanApplier.InProgress,
                 RecoveryRequired = PlanApplier.RecoveryRequired,
                 Previewing = _previewKey.Length > 0,

@@ -22,6 +22,9 @@ namespace SephPlanner.Core.Runtime
         /// <summary>네트워크 세션이 살아 있는가. 호스트든 참가자든 상관없다 - 쓰기가 나갈 곳이 있는지다.</summary>
         public bool SessionActive { get; set; }
 
+        /// <summary>가방 쓰기가 그 자리에서 반영되는가(호스트). 참가자는 걸음마다 서버 왕복을 기다린다.</summary>
+        public bool WritesLandImmediately { get; set; }
+
         /// <summary>
         /// 앞선 적용이 아직 도는 중인가. 참가자 세션에서는 걸음마다 서버 왕복을 기다리므로 수 초가
         /// 걸린다. 그동안 안내 줄이 계속 키를 광고하면 눌러야만 진행 중인 줄 알게 된다.
@@ -52,6 +55,10 @@ namespace SephPlanner.Core.Runtime
         /// <summary>멀티 세션의 거절 사유. 이 정책과 적용기의 사전 검증이 같은 말을 쓴다.</summary>
         public static Phrase MultiplayerLocked(string settingsKey) =>
             new Phrase("멀티플레이 세션에서는 자동 배치를 실행하지 않습니다. 함께하는 사람의 동의를 받은 뒤 설정({0})의 ‘멀티 자동 배치’에서 켤 수 있습니다.", settingsKey);
+
+        /// <summary>참가자가 도중에 맞붙는 계획을 적용하려 할 때의 거절 사유. 정책과 적용기가 같은 말을 쓴다.</summary>
+        public static Phrase TransitCombineRefused() =>
+            new Phrase("방에 참가한 쪽에서는 옮기는 도중에 게임이 합칠 아티팩트가 맞붙어 자동 배치를 실행하지 않습니다.");
 
         public static AutoPlaceDecision Evaluate(AutoPlaceContext context)
         {
@@ -98,8 +105,8 @@ namespace SephPlanner.Core.Runtime
                 return AutoPlaceDecision.Deny(Tr("사용 유지 조건을 만족하는 배치를 찾지 못해 자동 배치를 실행하지 않습니다."));
             if (plan.Best.CombinedCharms.Count > 0)
                 return AutoPlaceDecision.Deny(Tr("게임이 합칠 아티팩트를 떼어 두지 못해 자동 배치를 실행하지 않습니다."));
-            if (plan.CombinesInTransit)
-                return AutoPlaceDecision.Deny(Tr("옮기는 도중에 게임이 합칠 아티팩트가 맞붙어 자동 배치를 실행하지 않습니다."));
+            if (plan.CombinesInTransit && !context.WritesLandImmediately)
+                return AutoPlaceDecision.Deny(TransitCombineRefused().ToString());
             if (plan.HasUnapprovedDeactivation || !ActivationPolicy.AllowsTransition(plan.Current, plan.Best))
                 return AutoPlaceDecision.Deny(Tr("끄기 허용 없이 아티팩트를 새로 비활성화하는 배치는 적용하지 않습니다."));
             if (!plan.HasPlacementChanges || plan.Targets.Count == 0)

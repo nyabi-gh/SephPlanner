@@ -35,6 +35,7 @@ namespace SephPlanner.Core.Text
             new Entry("미리보기를 종료한 뒤 실행하세요.", "Exit the preview first.", "プレビューを終了してから実行してください。", "请先退出预览再执行。", "請先退出預覽再執行。"),
             new Entry("수동 이동 불가", "Manual moves unavailable", "手動移動不可", "无法手动移动", "無法手動移動"),
             new Entry("목표 배치를 다시 계산해야 합니다.", "Target layout needs recalculating.", "目標配置の再計算が必要です。", "需要重新计算目标布局。", "需要重新計算目標佈局。"),
+            new Entry("옮기는 도중에 합쳐질 재료가 맞붙습니다.", "Materials the game would merge touch along the way.", "移動の途中で合体する素材が隣接します。", "移动途中会合成的材料会相邻。", "移動途中會合成的材料會相鄰。"),
             new Entry("… 외 {0}개", "… {0} more", "… 他{0}個", "… 另有{0}项", "… 另有{0}項"),
 
             new Entry("갱신 중 - 가방이 바뀌어 다시 계산하고 있습니다. 아래는 직전 계획입니다.", "Updating - your inventory changed and is being recalculated. Below is the previous plan.", "更新中 - バッグが変わったため再計算しています。以下は直前のプランです。", "更新中 - 背包已变化，正在重新计算。以下为之前的方案。", "更新中 - 背包已變動，正在重新計算。以下為先前的方案。"),

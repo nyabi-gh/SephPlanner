@@ -206,18 +206,32 @@ public class AutoPlacePolicyTests
         Assert.Contains("석판 2개", decision.Reason);
     }
 
-    /// <summary>끝 배치는 재료를 떼어 두지만 옮기는 도중에 맞붙는 계획. 목표가 비어 있어도 "옮길 것이 없습니다" 가 아니다.</summary>
+    /// <summary>
+    /// 끝 배치는 재료를 떼어 두지만 옮기는 도중에 맞붙는 계획. 참가자는 걸음마다 서버 왕복을 기다리는 사이 게임이
+    /// 합쳐 버리므로 막는다.
+    /// </summary>
     [Fact]
-    public void MaterialsMeetingOnTheWaySayWhatIsActuallyWrong()
+    public void MaterialsMeetingOnTheWayAreRefusedToAParticipant()
     {
         var context = Context();
         context.Runner!.Latest!.CombinesInTransit = true;
-        context.Runner.Latest.Targets.Clear();
+        context.WritesLandImmediately = false;
 
         var decision = AutoPlacePolicy.Evaluate(context);
 
         Assert.False(decision.Allowed);
         Assert.Contains("옮기는 도중", decision.Reason);
+    }
+
+    /// <summary>호스트는 한 프레임에 다 옮겨 게임이 중간 배치를 합치지 않는다.</summary>
+    [Fact]
+    public void MaterialsMeetingOnTheWayAreAppliedByTheHost()
+    {
+        var context = Context();
+        context.Runner!.Latest!.CombinesInTransit = true;
+        context.WritesLandImmediately = true;
+
+        Assert.True(AutoPlacePolicy.Evaluate(context).Allowed);
     }
 
     private static AutoPlaceContext Context()

@@ -248,6 +248,48 @@ public class ApplyPlanRoutineTests
     }
 
     /// <summary>
+    /// 도중에 합치기 재료가 맞붙는 명령. 참가자는 걸음 사이에 서버가 합쳐 버리므로 한 걸음도 보내지 않는다.
+    /// </summary>
+    [Fact]
+    public void AParticipantDoesNotStartAMoveThatCombinesOnTheWay()
+    {
+        var (inventory, clock) = Guest();
+        inventory.Cells[At(0, 0)] = 10;
+        var command = Command(Charm(10, At(0, 0), At(1, 0)));
+        command.RequiresImmediateWrites = true;
+
+        var routine = Routine(command, inventory, clock, allowMultiplayer: true);
+        Drive(routine, inventory, clock);
+
+        Assert.Equal(0, inventory.SwapCount);
+        Assert.False(routine.RequiresResync);
+        AssertContains("옮기는 도중", routine.Result.Korean);
+    }
+
+    /// <summary>
+    /// 호스트가 도중에 맞붙는 명령을 안전하게 적용하는 것은 걸음 사이에 프레임을 넘기지 않아서다 - 게임은 다음
+    /// <c>LateUpdate</c> 에 아직 있는 덩어리만 합친다. 첫 프레임 안에 모든 걸음이 끝나야 한다.
+    /// </summary>
+    [Fact]
+    public void TheHostMakesEveryMoveWithinOneFrame()
+    {
+        var (inventory, clock) = Host();
+        inventory.Cells[At(0, 0)] = 10;
+        inventory.Cells[At(1, 0)] = 11;
+        inventory.Cells[At(2, 0)] = 12;
+        var command = Command(Charm(10, At(0, 0), At(2, 0)), Charm(11, At(1, 0), At(0, 0)), Charm(12, At(2, 0), At(1, 0)));
+        command.RequiresImmediateWrites = true;
+
+        var run = Routine(command, inventory, clock).Run();
+        run.MoveNext();
+
+        Assert.Equal(2, inventory.SwapCount);
+        Assert.Equal(10, inventory.InstanceAt(At(2, 0)));
+        Assert.Equal(11, inventory.InstanceAt(At(0, 0)));
+        Assert.Equal(12, inventory.InstanceAt(At(1, 0)));
+    }
+
+    /// <summary>
     /// 같은 게임 번호를 쓰는 석판 둘은 칸 번호로 가리키므로 회전 단계에서 번호로 찾으면 못 찾는다.
     /// 제자리·제 각도가 목표이니 건너뛰고 나머지 이동을 마쳐야 한다.
     /// </summary>

@@ -94,6 +94,13 @@ namespace SephPlanner.Core.Runtime
                 Result = _stateFailure!;
                 yield break;
             }
+            // 정책이 이미 거르지만, 적용기는 명령만 보고도 지킨다. 이 경우 ApplySwaps 가 걸음 사이에 프레임을 넘기지 않는 것이
+            // 합치기를 막는 유일한 장치다.
+            if (_command.RequiresImmediateWrites && !_port.WritesLandImmediately)
+            {
+                Result = AutoPlacePolicy.TransitCombineRefused();
+                yield break;
+            }
             NewPhase();
             _levelsBefore = CountLevels();
             var journal = new List<Step>();

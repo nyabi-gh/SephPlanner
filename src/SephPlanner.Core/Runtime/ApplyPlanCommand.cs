@@ -23,6 +23,14 @@ namespace SephPlanner.Core.Runtime
         /// 첫 적용에서 잡는 유일한 신호다.
         /// </summary>
         public Dictionary<GridPos, int> ExpectedCellLevels { get; set; } = new Dictionary<GridPos, int>();
+
+        /// <summary>
+        /// 목표까지 가는 길에 합치기 재료가 맞붙는다. 게임은 교환마다 합칠 덩어리를 다시 찾되 실제로 합치는 것은 다음
+        /// 서버 <c>LateUpdate</c> 에서 그 덩어리가 아직 있을 때뿐이다(게임 1.1.4 <c>GridInventory.ReleasePermission</c>,
+        /// <c>CombineArrangementBonus</c>). 호스트는 걸음 사이에 프레임을 넘기지 않아 중간 배치가 합쳐지지 않지만,
+        /// 참가자는 걸음마다 서버 왕복을 기다리는 사이 합쳐진다.
+        /// </summary>
+        public bool RequiresImmediateWrites { get; set; }
     }
 
     /// <summary>인스턴스 하나가 최종적으로 있어야 할 자리.</summary>
