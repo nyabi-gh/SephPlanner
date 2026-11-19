@@ -14,27 +14,26 @@
 
 ## 下载
 
-下载渠道因游戏分支而异。
+下载渠道因游戏版本和使用方式而异。
 
 | 游戏 | 下载 |
 | --- | --- |
-| **1.1 测试版**（`workshop-beta` 分支） | 在 [Steam 创意工坊](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)订阅 |
-| **默认分支**，Windows | [最新版本](https://github.com/nyabi-gh/SephPlanner/releases/latest)中的 `SephPlanner-v<版本>.zip` |
-| **默认分支**，macOS | [最新版本](https://github.com/nyabi-gh/SephPlanner/releases/latest)中的 `SephPlanner-macos-v<版本>.zip` |
+| **游戏 1.1 及以上** | 在 [Steam 创意工坊](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)订阅 |
+| **BepInEx 版**，Windows | [最新版本](https://github.com/nyabi-gh/SephPlanner/releases/latest)中的 `SephPlanner-v<版本>.zip` |
+| **BepInEx 版**，macOS | [最新版本](https://github.com/nyabi-gh/SephPlanner/releases/latest)中的 `SephPlanner-macos-v<版本>.zip` |
 
-ZIP 是内含 BepInEx 的版本，在 1.1 测试版上也能运行。请下载上面的 ZIP，而不是 `Source code`。
+ZIP 是内含 BepInEx 的版本。在游戏 1.1 及以上也能运行，而 1.0.33 及以下只能使用这个版本。请下载上面的 ZIP，而不是 `Source code`。
 
 > [!NOTE]
 > 本模组由个人制作，与 TEAM HORAY 无关。使用模组的风险由你自行承担，重要的存档请提前备份。
 
 ## 安装
 
-### 创意工坊（游戏 1.1 测试版）
+### 创意工坊（游戏 1.1 及以上）
 
-1. 在 Steam 中右键点击《塞菲莉亚》→ **属性 → 游戏版本及测试版**，选择 `workshop-beta`。
-2. 在 [创意工坊页面](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)点击**订阅**。
-3. 启动游戏，在标题画面的创意工坊窗口中确认 SephPlanner 已启用。
-4. 开始探险后，SephPlanner 就会出现在画面上。
+1. 在 [创意工坊页面](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)点击**订阅**。
+2. 启动游戏，在标题画面的创意工坊窗口中确认 SephPlanner 已启用。
+3. 开始探险后，SephPlanner 就会出现在画面上。
 
 更新由 Steam 自动下载。
 

@@ -9,7 +9,7 @@ SephPlanner 설치 안내
    생긴 문제(보안·버그·세이브 손상)는 개발사가 도와줄 수 없다고 밝혀 두었습니다. 이 도구도
    마찬가지로 보증하지 않습니다. 중요한 세이브는 미리 백업해 두세요.
 
-※ 게임 1.1 베타(workshop-beta 브랜치)를 쓴다면 이 zip 대신 Steam 창작마당에서 구독할 수도
+※ 게임 1.1 이상을 쓴다면 이 zip 대신 Steam 창작마당에서 구독할 수도
    있습니다. BepInEx가 필요 없고 업데이트는 Steam이 합니다.
    https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875
    창작마당 판으로 옮길 때는 BepInEx\plugins\의 SephPlanner DLL 두 개를 지워야 합니다.

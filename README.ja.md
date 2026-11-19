@@ -14,27 +14,26 @@
 
 ## ダウンロード
 
-ゲームのブランチによってダウンロード先が異なります。
+ゲームのバージョンと使い方によってダウンロード先が異なります。
 
 | ゲーム | ダウンロード |
 | --- | --- |
-| **1.1 ベータ**（`workshop-beta` ブランチ） | [Steamワークショップ](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)でサブスクライブ |
-| **デフォルトブランチ**、Windows | [最新リリース](https://github.com/nyabi-gh/SephPlanner/releases/latest)の `SephPlanner-v<バージョン>.zip` |
-| **デフォルトブランチ**、macOS | [最新リリース](https://github.com/nyabi-gh/SephPlanner/releases/latest)の `SephPlanner-macos-v<バージョン>.zip` |
+| **ゲーム 1.1 以降** | [Steamワークショップ](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)でサブスクライブ |
+| **BepInEx版**、Windows | [最新リリース](https://github.com/nyabi-gh/SephPlanner/releases/latest)の `SephPlanner-v<バージョン>.zip` |
+| **BepInEx版**、macOS | [最新リリース](https://github.com/nyabi-gh/SephPlanner/releases/latest)の `SephPlanner-macos-v<バージョン>.zip` |
 
-ZIPはBepInExが入った版で、1.1 ベータでも動きます。`Source code` ではなく、上のZIPをダウンロードしてください。
+ZIPはBepInExが入った版です。ゲーム 1.1 以降でも動き、1.0.33 以前ではこの版だけが使えます。`Source code` ではなく、上のZIPをダウンロードしてください。
 
 > [!NOTE]
 > TEAM HORAYとは関係のない個人が作ったMODです。MODの使用は自己責任でお願いします。大切なセーブデータは事前にバックアップしておいてください。
 
 ## インストール
 
-### ワークショップ（ゲーム 1.1 ベータ）
+### ワークショップ（ゲーム 1.1 以降）
 
-1. Steamでセフィリアを右クリック → **プロパティ → ゲームバージョンとベータ** で `workshop-beta` を選びます。
-2. [ワークショップのページ](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)で**サブスクライブ**を押します。
-3. ゲームを起動し、タイトル画面のワークショップウィンドウでSephPlannerが有効になっているか確認します。
-4. 探検を始めると、画面にSephPlannerが表示されます。
+1. [ワークショップのページ](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)で**サブスクライブ**を押します。
+2. ゲームを起動し、タイトル画面のワークショップウィンドウでSephPlannerが有効になっているか確認します。
+3. 探検を始めると、画面にSephPlannerが表示されます。
 
 アップデートはSteamが自動でダウンロードします。
 

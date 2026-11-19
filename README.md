@@ -14,27 +14,26 @@
 
 ## 다운로드
 
-게임 브랜치에 따라 받는 곳이 다릅니다.
+게임 버전과 쓰는 방식에 따라 받는 곳이 다릅니다.
 
 | 게임 | 다운로드 |
 | --- | --- |
-| **1.1 베타** (`workshop-beta` 브랜치) | [Steam 창작마당](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)에서 구독 |
-| **기본 브랜치**, Windows | [최신 릴리스](https://github.com/nyabi-gh/SephPlanner/releases/latest)의 `SephPlanner-v버전.zip` |
-| **기본 브랜치**, macOS | [최신 릴리스](https://github.com/nyabi-gh/SephPlanner/releases/latest)의 `SephPlanner-macos-v버전.zip` |
+| **게임 1.1 이상** | [Steam 창작마당](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)에서 구독 |
+| **BepInEx 판**, Windows | [최신 릴리스](https://github.com/nyabi-gh/SephPlanner/releases/latest)의 `SephPlanner-v버전.zip` |
+| **BepInEx 판**, macOS | [최신 릴리스](https://github.com/nyabi-gh/SephPlanner/releases/latest)의 `SephPlanner-macos-v버전.zip` |
 
-ZIP은 BepInEx가 들어 있는 판으로, 1.1 베타에서도 돌아갑니다. `Source code`가 아니라 위 ZIP을 받습니다.
+ZIP은 BepInEx가 들어 있는 판입니다. 게임 1.1 이상에서도 돌아가고, 1.0.33 이하에서는 이 판만 쓸 수 있습니다. `Source code`가 아니라 위 ZIP을 받습니다.
 
 > [!NOTE]
 > TEAM HORAY와 관계없는 개인이 만든 모드입니다. 모드 사용은 본인 책임이며, 중요한 세이브는 미리 백업해 두세요.
 
 ## 설치
 
-### 창작마당 (게임 1.1 베타)
+### 창작마당 (게임 1.1 이상)
 
-1. Steam에서 세피리아 우클릭 → **속성 → 게임 버전 및 베타**에서 `workshop-beta`를 고릅니다.
-2. [창작마당 글](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)에서 **구독**을 누릅니다.
-3. 게임을 켜고 타이틀의 창작마당 창에서 SephPlanner가 켜져 있는지 확인합니다.
-4. 탐험에 들어가면 화면에 SephPlanner가 나타납니다.
+1. [창작마당 글](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)에서 **구독**을 누릅니다.
+2. 게임을 켜고 타이틀의 창작마당 창에서 SephPlanner가 켜져 있는지 확인합니다.
+3. 탐험에 들어가면 화면에 SephPlanner가 나타납니다.
 
 업데이트는 Steam이 알아서 받습니다.
 

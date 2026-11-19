@@ -14,27 +14,26 @@
 
 ## 下載
 
-下載來源依遊戲分支而不同。
+下載來源依遊戲版本與使用方式而不同。
 
 | 遊戲 | 下載 |
 | --- | --- |
-| **1.1 測試版**（`workshop-beta` 分支） | 在 [Steam 工作坊](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)訂閱 |
-| **預設分支**，Windows | [最新版本](https://github.com/nyabi-gh/SephPlanner/releases/latest)中的 `SephPlanner-v<版本>.zip` |
-| **預設分支**，macOS | [最新版本](https://github.com/nyabi-gh/SephPlanner/releases/latest)中的 `SephPlanner-macos-v<版本>.zip` |
+| **遊戲 1.1 以上** | 在 [Steam 工作坊](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)訂閱 |
+| **BepInEx 版**，Windows | [最新版本](https://github.com/nyabi-gh/SephPlanner/releases/latest)中的 `SephPlanner-v<版本>.zip` |
+| **BepInEx 版**，macOS | [最新版本](https://github.com/nyabi-gh/SephPlanner/releases/latest)中的 `SephPlanner-macos-v<版本>.zip` |
 
-ZIP 是內含 BepInEx 的版本，在 1.1 測試版也能執行。請下載上方的 ZIP，而不是 `Source code`。
+ZIP 是內含 BepInEx 的版本。在遊戲 1.1 以上也能執行，而 1.0.33 以下只能使用這個版本。請下載上方的 ZIP，而不是 `Source code`。
 
 > [!NOTE]
 > 這是由個人製作、與 TEAM HORAY 無關的模組。使用模組須自行承擔風險，重要的存檔請事先備份。
 
 ## 安裝
 
-### 工作坊（遊戲 1.1 測試版）
+### 工作坊（遊戲 1.1 以上）
 
-1. 在 Steam 對《塞菲莉亞》按右鍵 → **內容 → 遊戲版本與測試版**，選擇 `workshop-beta`。
-2. 在 [工作坊頁面](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)按下**訂閱**。
-3. 啟動遊戲，在標題畫面的工作坊視窗確認 SephPlanner 已啟用。
-4. 開始探險後，畫面上就會出現 SephPlanner。
+1. 在 [工作坊頁面](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)按下**訂閱**。
+2. 啟動遊戲，在標題畫面的工作坊視窗確認 SephPlanner 已啟用。
+3. 開始探險後，畫面上就會出現 SephPlanner。
 
 更新會由 Steam 自動下載。
 

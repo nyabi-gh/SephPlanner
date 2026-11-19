@@ -14,27 +14,26 @@
 
 ## Download
 
-Where to download it depends on your game branch.
+Where to download it depends on your game version and how you want to run it.
 
 | Game | Download |
 | --- | --- |
-| **1.1 beta** (`workshop-beta` branch) | Subscribe on the [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875) |
-| **Default branch**, Windows | `SephPlanner-v<version>.zip` from the [latest release](https://github.com/nyabi-gh/SephPlanner/releases/latest) |
-| **Default branch**, macOS | `SephPlanner-macos-v<version>.zip` from the [latest release](https://github.com/nyabi-gh/SephPlanner/releases/latest) |
+| **Game 1.1 or later** | Subscribe on the [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875) |
+| **BepInEx version**, Windows | `SephPlanner-v<version>.zip` from the [latest release](https://github.com/nyabi-gh/SephPlanner/releases/latest) |
+| **BepInEx version**, macOS | `SephPlanner-macos-v<version>.zip` from the [latest release](https://github.com/nyabi-gh/SephPlanner/releases/latest) |
 
-The ZIP is the version with BepInEx included, and it also runs on the 1.1 beta. Download the ZIP above, not `Source code`.
+The ZIP is the version with BepInEx included. It also runs on game 1.1 or later, and it is the only version that works on 1.0.33 or earlier. Download the ZIP above, not `Source code`.
 
 > [!NOTE]
 > This is a mod made by an individual, not affiliated with TEAM HORAY. You use mods at your own risk, so back up any saves you care about first.
 
 ## Installation
 
-### Workshop (game 1.1 beta)
+### Workshop (game 1.1 or later)
 
-1. In Steam, right-click Sephiria → **Properties → Game Versions & Betas** and choose `workshop-beta`.
-2. Press **Subscribe** on the [Workshop page](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875).
-3. Launch the game and check that SephPlanner is enabled in the Workshop window on the title screen.
-4. Start a run; SephPlanner appears on screen.
+1. Press **Subscribe** on the [Workshop page](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875).
+2. Launch the game and check that SephPlanner is enabled in the Workshop window on the title screen.
+3. Start a run; SephPlanner appears on screen.
 
 Steam downloads updates automatically.
 
