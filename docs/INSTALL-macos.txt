@@ -9,6 +9,12 @@ SephPlanner는 세피리아 Steam macOS판에 설치하는 모드입니다. TEAM
    생긴 문제(보안·버그·세이브 손상)는 개발사가 도와줄 수 없다고 밝혀 두었습니다. 중요한 세이브는
    미리 백업해 두세요.
 
+※ 게임 1.1 이상을 쓴다면 이 ZIP 대신 Steam 창작마당에서 구독할 수도
+   있습니다. BepInEx가 필요 없고 업데이트는 Steam이 합니다.
+   https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875
+   창작마당 판으로 옮길 때는 BepInEx/plugins의 SephPlanner DLL 두 개를 지워야 합니다.
+   그대로 두면 이 ZIP의 판만 실행됩니다. 쓰던 설정은 창작마당 판이 처음 켤 때 가져옵니다.
+
 1. 게임을 종료하고 ZIP을 풉니다.
 2. Steam에서 세피리아 우클릭 → 관리 → 로컬 파일 보기로 게임 폴더를 엽니다.
 3. "게임 폴더에 복사" 안의 내용물을 게임 폴더에 복사합니다. Sephiria.app 안이 아니라

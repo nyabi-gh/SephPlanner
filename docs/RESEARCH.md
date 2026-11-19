@@ -239,7 +239,7 @@ Mirror.NetworkClient.localPlayer -> GetComponent<PlayerAvatar>()
   구간은 죽어도 게임 오버가 아니다.
 
 그래서 `GameReader` 는 죽었고 게임 오버 창이 열렸을 때만 가방을 비운 스냅샷을 낸다(제보 `eeb4f2ad`: 멀티에서 쓰러진 동안
-"탐험 중이 아닙니다"). 1.0.33 에 같은 타입이 있는지는 확인하지 않았다.
+"탐험 중이 아닙니다"). 1.0.33 의 `UI_GameOverLabel` 과 게임 오버 경로도 1.1.4 와 같다(2026-11-19 디컴파일).
 
 ## 게임 상태 쓰기 경로 (자동 배치)
 
