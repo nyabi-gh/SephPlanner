@@ -765,7 +765,10 @@ namespace SephPlanner.Plugin
                 _runner = new PlanRunner(catalog);
             }
 
-            _charmValues = PlanExtensions.Shared.Overlay(snapshot, CharmValueSource.Book, message => Log.Error(message));
+            // 확장은 계획을 지을 때만 부른다(IPlanExtension 의 약속). 가방이 없는 스냅샷으로는 계획을 짓지 않는데, 그때도
+            // 부르면 가방을 null 로 받을 줄 모르는 확장이 마을·타이틀에서 터져 그 판 내내 꺼진다.
+            if (snapshot.Inventory != null)
+                _charmValues = PlanExtensions.Shared.Overlay(snapshot, CharmValueSource.Book, message => Log.Error(message));
             var preferences = Preferences();
             _currentCatalogGeneration = CatalogDump.ActiveGeneration;
             _runner.Submit(snapshot, preferences, _currentCatalogGeneration);
