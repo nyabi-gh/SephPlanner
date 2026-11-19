@@ -131,6 +131,11 @@ namespace SephPlanner.Core.Runtime
         private static bool Finite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
         private void Fact(string key, object value) => Facts[key] = Convert.ToString(value, CultureInfo.InvariantCulture) ?? "";
 
+        // 인스턴스 번호는 음수일 수 있고, 음수 기호는 문화권마다 다르다(sv-SE 는 U+2212). 저장한 기계와 재생하는 기계의
+        // 문화권이 다르면 같은 배치가 다르게 보인다.
+        private static string Id(int id) => id.ToString(CultureInfo.InvariantCulture);
+        private static string Ids(IEnumerable<int> ids) => string.Join(",", ids.OrderBy(id => id).Select(Id));
+
         private void Arrangement(string key, Arrangement arrangement)
         {
             Scores[key] = arrangement.Score;
@@ -138,19 +143,19 @@ namespace SephPlanner.Core.Runtime
             Scores[key + "/콤보 진행"] = arrangement.PriorityComboProgress;
             Fact(key + "/콤보 만족", arrangement.PriorityComboMatches);
             Fact(key + "/미배치 석판", arrangement.UnplacedTablets);
-            Fact(key + "/비활성", string.Join(",", arrangement.InactiveCharms.OrderBy(id => id)));
-            Fact(key + "/고정 실패", string.Join(",", arrangement.UnheldCharms.OrderBy(id => id)));
+            Fact(key + "/비활성", Ids(arrangement.InactiveCharms));
+            Fact(key + "/고정 실패", Ids(arrangement.UnheldCharms));
             if (arrangement.WrongSideCharms.Count > 0)
-                Fact(key + "/천칭 방향 실패", string.Join(",", arrangement.WrongSideCharms.OrderBy(id => id)));
-            Fact(key + "/유지 실패", string.Join(",", arrangement.UnretainedCharms.OrderBy(id => id)));
-            Fact(key + "/활성 보호 실패", string.Join(",", arrangement.UnpreservedCharms.OrderBy(id => id)));
-            Fact(key + "/미허용 비활성", string.Join(",", arrangement.UnapprovedDeactivations.OrderBy(id => id)));
+                Fact(key + "/천칭 방향 실패", Ids(arrangement.WrongSideCharms));
+            Fact(key + "/유지 실패", Ids(arrangement.UnretainedCharms));
+            Fact(key + "/활성 보호 실패", Ids(arrangement.UnpreservedCharms));
+            Fact(key + "/미허용 비활성", Ids(arrangement.UnapprovedDeactivations));
             Fact(key + "/감점 빈칸", arrangement.UnsafeEmptyCells);
             Fact(key + "/상한 초과", arrangement.WastedLevels);
-            Fact(key + "/연결 실패", string.Join(",", arrangement.UnlinkedCharms.OrderBy(id => id)));
-            foreach (var item in arrangement.CharmPositions) Fact(key + "/아이템/" + item.Key, item.Value);
+            Fact(key + "/연결 실패", Ids(arrangement.UnlinkedCharms));
+            foreach (var item in arrangement.CharmPositions) Fact(key + "/아이템/" + Id(item.Key), item.Value);
             foreach (var item in arrangement.TabletPositions)
-                Fact(key + "/석판/" + item.Key, FormattableString.Invariant($"{item.Value.Position.X},{item.Value.Position.Y}r{item.Value.Rotation}"));
+                Fact(key + "/석판/" + Id(item.Key), FormattableString.Invariant($"{item.Value.Position.X},{item.Value.Position.Y}r{item.Value.Rotation}"));
             foreach (var cell in arrangement.CellLevels) Fact(key + "/칸 레벨/" + cell.Key, cell.Value);
             foreach (var cell in arrangement.EffectiveLevels) Fact(key + "/유효 레벨/" + cell.Key, cell.Value);
         }
