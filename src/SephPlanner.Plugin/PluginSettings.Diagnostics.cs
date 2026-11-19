@@ -20,6 +20,11 @@ namespace SephPlanner.Plugin
 
         public Action ReviewAutomaticDiagnostics { get; set; } = () => { };
 
+        /// <summary>F3 에서 전송을 끈다. 저장이 실패하면 버튼 이벤트 밖으로 새지 않게 플러그인이 받아 알린다.</summary>
+        public Action WithdrawDiagnostics { get; set; } = () => { };
+
+        public Action WithdrawAutomaticDiagnostics { get; set; } = () => { };
+
         public static string AutomaticDiagnosticKey => AutomaticDiagnosticPolicy.DefaultConsentKey;
 
         public bool AutomaticDiagnosticAllowed => AutomaticDiagnosticConsent.Value == AutomaticDiagnosticKey;
@@ -48,14 +53,14 @@ namespace SephPlanner.Plugin
                 Label = Tr("진단 서버 전송"),
                 Choices = new[] { Tr("꺼짐"), Tr("켜짐") },
                 Read = () => DiagnosticUploadAllowed ? 1 : 0,
-                Write = i => { if (i == 0) SetDiagnosticConsent(false); else ReviewDiagnostics(); },
+                Write = i => { if (i == 0) WithdrawDiagnostics(); else ReviewDiagnostics(); },
             });
             rows.Add(new OptionRow
             {
                 Label = Tr("오류 진단 자동 전송"),
                 Choices = new[] { Tr("꺼짐"), Tr("켜짐") },
                 Read = () => AutomaticDiagnosticAllowed ? 1 : 0,
-                Write = i => { if (i == 0) SetAutomaticDiagnosticConsent(false); else ReviewAutomaticDiagnostics(); },
+                Write = i => { if (i == 0) WithdrawAutomaticDiagnostics(); else ReviewAutomaticDiagnostics(); },
             });
             rows.AddRange(updates);
         }

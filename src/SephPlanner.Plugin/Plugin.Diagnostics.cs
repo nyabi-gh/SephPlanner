@@ -54,6 +54,22 @@ namespace SephPlanner.Plugin
             };
             _settings.ReviewDiagnostics = () => OpenDiagnosticConsent(null);
             _settings.ReviewAutomaticDiagnostics = OpenAutomaticDiagnosticConsent;
+            _settings.WithdrawDiagnostics = () => WithdrawConsent(
+                () => _settings.SetDiagnosticConsent(false), "진단 전송 설정 저장 실패: ",
+                Tr("진단 전송을 끄는 설정을 저장하지 못했습니다. 이번 실행에서는 보내지 않지만, 다시 실행하면 켜져 있을 수 있습니다."));
+            _settings.WithdrawAutomaticDiagnostics = () => WithdrawConsent(
+                () => _settings.SetAutomaticDiagnosticConsent(false), "자동 진단 동의 저장 실패: ",
+                Tr("자동 진단 설정을 저장하지 못했습니다. 설정에서 다시 확인해 주세요."));
+        }
+
+        private void WithdrawConsent(Action withdraw, string logPrefix, string failure)
+        {
+            try { withdraw(); }
+            catch (Exception ex)
+            {
+                Log.Error(logPrefix + ex);
+                ReportDiagnostic(failure);
+            }
         }
 
         private Action _checkDiagnosticUpload, _checkAutomaticDiagnostic;
