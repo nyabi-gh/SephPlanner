@@ -35,18 +35,8 @@ public static class SnapshotCheck
             return 1;
         }
 
-        var tablets = Load<List<TabletDefinition>>(PlannerData.TabletDbFile);
-        var charms = Load<List<CharmDefinition>>(PlannerData.CharmDbFile);
-        if (tablets is null || charms is null)
-        {
-            Console.Error.WriteLine($"카탈로그가 없습니다. 게임을 한 번 실행해 {PlannerData.DataDirectory} 를 채우세요.");
-            return 1;
-        }
-
-        // 콤보를 빼고 만들면 플러그인과 다른 점수가 나온다. 진단 도구가 실제 동작과 어긋나면
-        // 여기서 통과한 것이 실사용에서 재현되지 않는다. 콤보 파일은 없을 수 있어 선택이다.
-        var combos = Load<List<ComboDefinition>>(PlannerData.ComboDbFile);
-        var catalog = new Catalog(tablets, charms, combos);
+        var catalog = LocalCatalog.Load();
+        if (catalog is null) return 1;
         var plan = PlanBuilder.Build(snapshot, catalog);
         if (plan is null)
         {
@@ -99,11 +89,4 @@ public static class SnapshotCheck
 
     private static string Describe(string? value) => string.IsNullOrEmpty(value) ? "(스냅샷에 없음)" : value!;
 
-    private static T? Load<T>(string fileName)
-    {
-        var path = PlannerData.ActiveDataFile(fileName);
-        return path is not null && File.Exists(path)
-            ? JsonSerializer.Deserialize<T>(File.ReadAllText(path), Options)
-            : default;
-    }
 }

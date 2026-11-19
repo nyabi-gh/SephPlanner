@@ -1,5 +1,6 @@
 using System.Text.Json;
 using SephPlanner.Core.Extensions;
+using SephPlanner.Core.Model;
 using SephPlanner.Core.Runtime;
 using SephPlanner.Core.Solver;
 
@@ -65,8 +66,29 @@ public static class PlanReproduce
         if (measurement is null || measurement.CharmStats.Count == 0) return;
 
         var before = charms.Count(charm => charm.StatWorthByLevel.Count > 0);
-        CharmStatWorth.Apply(charms, measurement);
+        // 지금 덤프의 카탈로그에 없는 아티팩트(모드나 다른 게임 판의 것)는 저장된 표를 그대로 둔다. 함께 넘기면 측정에
+        // 없다는 이유로 표가 지워져 레어도 어림값으로 떨어진다. 카탈로그에 있는데 측정에 없는 것은 능력치가 없는 것이라
+        // 지우는 것이 맞다.
+        var dumped = LocalCharmIds();
+        if (dumped.Count == 0)
+        {
+            Console.WriteLine("지금 덤프에 아티팩트 카탈로그가 없어 재현 자료의 표를 그대로 씁니다.");
+            return;
+        }
+        var known = charms.Where(charm => dumped.Contains(charm.EntityId)).ToList();
+        CharmStatWorth.Apply(known, measurement);
+        // 눈금도 같은 측정에서 나온다. 표만 새로 재고 눈금을 두면 옛 자와 새 자가 섞인다.
+        replay.Catalog!.Scale = WorthScale.Measure(measurement, charms);
         var after = charms.Count(charm => charm.StatWorthByLevel.Count > 0);
-        Console.WriteLine($"값어치를 지금 덤프로 다시 쟀습니다: 능력치 표가 있는 아티팩트 {before}종 → {after}종");
+        Console.WriteLine($"값어치와 점수 눈금을 지금 덤프로 다시 쟀습니다: 능력치 표가 있는 아티팩트 {before}종 → {after}종, " +
+                          $"덤프에 없어 저장된 표를 둔 아티팩트 {charms.Count - known.Count}종");
+    }
+
+    private static HashSet<int> LocalCharmIds()
+    {
+        var path = PlannerData.ActiveDataFile(PlannerData.CharmDbFile);
+        if (path is null || !File.Exists(path)) return new HashSet<int>();
+        var charms = JsonSerializer.Deserialize<List<CharmDefinition>>(File.ReadAllText(path), Read);
+        return charms is null ? new HashSet<int>() : charms.Select(charm => charm.EntityId).ToHashSet();
     }
 }

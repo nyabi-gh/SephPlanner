@@ -21,7 +21,7 @@ public static class SnapshotReplay
     /// </summary>
     public static int Run(string dir)
     {
-        var catalog = LoadCatalog();
+        var catalog = LocalCatalog.Load();
         if (catalog is null) return 1;
 
         _previous = null;
@@ -43,18 +43,6 @@ public static class SnapshotReplay
 
         Console.WriteLine($"스냅샷 {count}장, 풀이 평균 {(count > 0 ? total / count : 0)}ms, 합계 {total}ms, 실패 {failed}장");
         return count == 0 || failed > 0 ? 1 : 0;
-    }
-
-    private static Catalog? LoadCatalog()
-    {
-        var tablets = Load<List<TabletDefinition>>(PlannerData.TabletDbFile);
-        var charms = Load<List<CharmDefinition>>(PlannerData.CharmDbFile);
-        if (tablets is null || charms is null)
-        {
-            Console.Error.WriteLine($"카탈로그가 없습니다. 게임을 한 번 실행해 {PlannerData.DataDirectory} 를 채우세요.");
-            return null;
-        }
-        return new Catalog(tablets, charms, Load<List<ComboDefinition>>(PlannerData.ComboDbFile));
     }
 
     private static Dictionary<int, (GridPos To, int Rotation)>? Describe(
@@ -109,11 +97,4 @@ public static class SnapshotReplay
         return targets;
     }
 
-    private static T? Load<T>(string fileName)
-    {
-        var path = PlannerData.ActiveDataFile(fileName);
-        return path is not null && File.Exists(path)
-            ? JsonSerializer.Deserialize<T>(File.ReadAllText(path), Options)
-            : default;
-    }
 }

@@ -32,14 +32,8 @@ public static class SnapshotChurn
             return 1;
         }
 
-        var tablets = Load<List<TabletDefinition>>(PlannerData.TabletDbFile);
-        var charms = Load<List<CharmDefinition>>(PlannerData.CharmDbFile);
-        if (tablets is null || charms is null)
-        {
-            Console.Error.WriteLine($"카탈로그가 없습니다. 게임을 한 번 실행해 {PlannerData.DataDirectory} 를 채우세요.");
-            return 1;
-        }
-        var catalog = new Catalog(tablets, charms, Load<List<ComboDefinition>>(PlannerData.ComboDbFile));
+        var catalog = LocalCatalog.Load();
+        if (catalog is null) return 1;
         var preferences = Preferences();
 
         var recounted = Recount(inventory, catalog);
@@ -151,6 +145,8 @@ public static class SnapshotChurn
         foreach (var item in inventory.Items)
         {
             if (plan.Best.Levels.TryGetValue(item.Position, out var level)) item.EffectiveLevel = level;
+            // 게임은 꺼진 칸의 아티팩트를 비활성으로 알린다. 갱신하지 않으면 다음 판 검증이 옛 칸의 활성과 견줘 실패한다.
+            item.IsActive = !plan.Best.DisabledCells.Contains(item.Position);
         }
         inventory.ComboCounts = Recount(inventory, catalog);
     }
@@ -171,11 +167,4 @@ public static class SnapshotChurn
         return ComboCounting.CountAll(byCell);
     }
 
-    private static T? Load<T>(string fileName)
-    {
-        var path = PlannerData.ActiveDataFile(fileName);
-        return path is not null && File.Exists(path)
-            ? JsonSerializer.Deserialize<T>(File.ReadAllText(path), Options)
-            : default;
-    }
 }
