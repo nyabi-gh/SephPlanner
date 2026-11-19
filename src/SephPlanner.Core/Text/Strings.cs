@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace SephPlanner.Core.Text
 {
@@ -52,7 +53,13 @@ namespace SephPlanner.Core.Text
         internal static string? Find(string korean, Language language)
         {
             if (language == Language.Korean) return null;
-            var table = _table ??= Build();
+            // 계획은 백그라운드 스레드에서도 문구를 짓는다. 다 지은 표만 보이게 게시한다(PERFORMANCE "지연해 짓는 값").
+            var table = Volatile.Read(ref _table);
+            if (table is null)
+            {
+                Interlocked.CompareExchange(ref _table, Build(), null);
+                table = Volatile.Read(ref _table)!;
+            }
             if (!table.TryGetValue(korean, out var entry)) return null;
             var text = entry.In(language);
             if (text.Length > 0) return text;
