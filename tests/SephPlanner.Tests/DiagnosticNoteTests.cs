@@ -47,6 +47,15 @@ public sealed class DiagnosticNoteTests
         Assert.Equal("가\n\n나", note.Text);
     }
 
+    /// <summary>Windows 에서 붙여넣은 글의 줄바꿈도 같은 규칙으로 접는다. 줄 끝에 공백이 남지 않는다.</summary>
+    [Theory]
+    [InlineData("가\r\n\r\n\r\n나")]
+    [InlineData("가\r\r\r나")]
+    public void PastedLineEndingsFoldLikeTypedOnes(string text)
+    {
+        Assert.Equal("가\n\n나", DiagnosticNote.Create("other", text).Text);
+    }
+
     [Fact]
     public void LongTextIsTruncatedToTheLimit()
     {

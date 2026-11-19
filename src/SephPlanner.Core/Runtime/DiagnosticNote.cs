@@ -91,9 +91,12 @@ namespace SephPlanner.Core.Runtime
         private static string Clean(string? text)
         {
             if (string.IsNullOrEmpty(text)) return "";
-            var builder = new StringBuilder(text!.Length);
+            // Windows 클립보드에서 붙여넣은 글은 줄이 \r\n 으로 끝난다(입력 칸은 붙여넣기의 \r 을 거르지 않는다).
+            // \r 을 제어문자로 두면 빈 줄 접기가 끊기고 줄마다 공백이 붙는다.
+            var lines = text!.Replace("\r\n", "\n").Replace('\r', '\n');
+            var builder = new StringBuilder(lines.Length);
             var newlines = 0;
-            foreach (var character in text)
+            foreach (var character in lines)
             {
                 if (character == '\n')
                 {
