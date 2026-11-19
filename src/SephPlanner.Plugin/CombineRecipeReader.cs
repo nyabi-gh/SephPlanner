@@ -47,6 +47,9 @@ namespace SephPlanner.Plugin
             return Copy(recipes);
         }
 
+        /// <summary>카탈로그와 함께 버린다. F9 처럼 정의가 바뀌었을 수 있을 때 카탈로그만 새로 지으면 레시피는 옛것이 남는다.</summary>
+        public static void Invalidate() => _recipes = null;
+
         private static List<List<int>> Copy(List<List<int>> recipes)
         {
             var copy = new List<List<int>>(recipes.Count);

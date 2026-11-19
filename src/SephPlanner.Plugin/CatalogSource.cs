@@ -107,6 +107,7 @@ namespace SephPlanner.Plugin
         {
             _catalog = null;
             LastError = "";
+            CombineRecipeReader.Invalidate();
 
             ItemCatalog.Release();
         }
