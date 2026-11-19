@@ -2063,9 +2063,11 @@ namespace SephPlanner.Core.Solver
                     PriorityPlacement.Contribute(problem, charm, true, positions[charm.InstanceId],
                         neighbors!, categories, ref comboProgress))
                     comboMatches++;
-                if (designated && !part.Inactive && DirectedCharmSupport.Strengthens(charm) &&
-                    DirectedCharmSupport.ConnectedTarget(charm, positions[charm.InstanceId], result, problem.Grid,
-                        occupancy, neighbors, out var linked) && linked.IsSupportTarget) supportMatches++;
+                if (designated && !part.Inactive && (DirectedCharmSupport.Strengthens(charm)
+                        ? DirectedCharmSupport.ConnectedTarget(charm, positions[charm.InstanceId], result, problem.Grid,
+                            occupancy, neighbors, out var linked) && linked.IsSupportTarget
+                        : DirectedCharmSupport.LiftsDesignatedTarget(charm, positions[charm.InstanceId], result,
+                            problem.Grid, occupancy, neighbors))) supportMatches++;
             }
             for (var index = 0; index < problem.Grid.Storage; index++)
             {
@@ -2242,10 +2244,12 @@ namespace SephPlanner.Core.Solver
                     if (RequiresUse(problem, charm) && !charm.IsFiller && usable) priority -= unit * unit * unit * unit;
                     if (!ScalesPosition.Accepts(problem, charm, cell)) priority += unit * unit * unit * unit;
                     if (charm.Held && !charm.IsFiller && result.IgnoreCriteriaAt(cell) > 0) priority -= unit * unit * unit;
-                    if (designated && !charm.IsFiller && DirectedCharmSupport.Strengthens(charm) &&
+                    if (designated && !charm.IsFiller &&
                         Reason(charm, cell, result, problem.Grid, occupancy) == CharmInactiveReason.None &&
-                        DirectedCharmSupport.ConnectedTarget(charm, cell, result, problem.Grid, occupancy, neighbors, out var linked) &&
-                        linked.IsSupportTarget)
+                        (DirectedCharmSupport.Strengthens(charm)
+                            ? DirectedCharmSupport.ConnectedTarget(charm, cell, result, problem.Grid, occupancy, neighbors, out var linked) &&
+                              linked.IsSupportTarget
+                            : DirectedCharmSupport.LiftsDesignatedTarget(charm, cell, result, problem.Grid, occupancy, neighbors)))
                         priority -= unit * unit;
                     if (problem.PriorityCategories.Count > 0 && !charm.IsFiller && PriorityPlacement.Applies(charm.Definition))
                     {
@@ -2669,6 +2673,9 @@ namespace SephPlanner.Core.Solver
                         else if (DirectedCharmSupport.WantsDesignatedTarget(problem, charm))
                             arrangement.UnmatchedSupportCharms.Add(charm.InstanceId);
                     }
+                    else if (problem.DesignatedTargets.Count > 0 && DirectedCharmSupport.LiftsDesignatedTarget(
+                                 charm, positions[charm.InstanceId], result, problem.Grid, occupancy, neighbors))
+                        arrangement.SupportTargetMatches++;
                 }
                 if (unlinked) arrangement.UnlinkedCharms.Add(charm.InstanceId);
                 if (charm.Retained && (inactive || unlinked)) arrangement.UnretainedCharms.Add(charm.InstanceId);

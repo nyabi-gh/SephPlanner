@@ -11,12 +11,37 @@ namespace SephPlanner.Core.Solver
         internal static bool HasConnection(CharmSlot charm) => Strengthens(charm) || Compass.Is(charm.Definition);
 
         /// <summary>
-        /// 이어진 대상에게 제 몫을 주는가. 강화 대상 지정은 이것만 센다 - 분배·돌파의 나침반은 아래 나침반을
-        /// 이어 줄 뿐 몫이 없다(게임 <c>OnRequestCharmDamageBonus</c> 가 0). 그 아래 피해 나침반이 대상에 닿으면
-        /// 그것이 센다.
+        /// 이어진 대상에게 제 몫을 주는가. 강화 대상 지정은 이것과 <see cref="LiftsDesignatedTarget"/> 만 센다 -
+        /// 분배·돌파의 나침반은 아래 나침반을 이어 줄 뿐 몫이 없다(게임 <c>OnRequestCharmDamageBonus</c> 가 0).
+        /// 그 아래 피해 나침반이 대상에 닿으면 그것이 센다.
         /// </summary>
         internal static bool Strengthens(CharmSlot charm) =>
             charm.Definition.MagicSupport is not null || PositionalWorth.IsNeedle(charm.Definition);
+
+        /// <summary>
+        /// 돌파의 나침반이 지정 대상과 그 침 사이에서 희귀도 조건을 실제로 풀어 주는가. 제 몫은 없어도 이때는 대상을
+        /// 강화하므로 강화 대상 지정이 침과 함께 센다. 세지 않으면 지정 콤보 단계가 돌파를 사슬에서 빼내 다른 뿌리의
+        /// 카테고리를 보이게 한다(제보 <c>eeb4f2ad</c>: 정밀을 채우려고 쿠나이 밑으로). 조건이 이미 맞는 대상이나
+        /// 아래에 침이 없는 돌파는 풀어 주는 것이 없어 세지 않는다.
+        /// </summary>
+        internal static bool LiftsDesignatedTarget(
+            CharmSlot charm, GridPos cell, SimulationResult result, GridSpec grid, GridOccupancy occupancy,
+            IReadOnlyDictionary<GridPos, CharmSlot>? neighbors)
+        {
+            if (neighbors is null || !Compass.Lifts(charm.Definition)) return false;
+
+            var lifted = _lifted ??= new List<LiftedRoot>();
+            Compass.Lifted(charm, cell, neighbors, new CharmActivity(result, grid, occupancy), lifted);
+            foreach (var entry in lifted)
+            {
+                var needle = entry.Needle.Definition;
+                if (entry.Root.IsSupportTarget && needle.HasDependencyCondition &&
+                    entry.Root.Definition.Rarity > needle.DependencyMaxRarity) return true;
+            }
+            return false;
+        }
+
+        [ThreadStatic] private static List<LiftedRoot>? _lifted;
 
         internal static (int X, int Y) Offset(CharmSlot charm) =>
             charm.Definition.MagicSupport is { } support

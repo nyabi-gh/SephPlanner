@@ -236,7 +236,8 @@ public class CompassTests
         var target = solved.CharmPositions[1];
         Assert.Equal(target.Offset(0, 1), solved.CharmPositions[4]);
         Assert.Equal(target.Offset(0, 2), solved.CharmPositions[3]);
-        Assert.Equal(1, solved.SupportTargetMatches);
+        // 침과, 전설 대상의 희귀도 조건을 풀어 주는 돌파.
+        Assert.Equal(2, solved.SupportTargetMatches);
     }
 
     [Fact]
@@ -252,7 +253,8 @@ public class CompassTests
 
     /// <summary>
     /// 강화 대상 지정은 대상에게 몫을 주는 나침반만 센다. 분배·돌파는 몫이 없어(게임 <c>OnRequestCharmDamageBonus</c>
-    /// 가 0) 지정 대상 옆에 붙여도 얻는 것이 없다 - 세면 점수를 깎아서라도 거기 붙인다.
+    /// 가 0) 지정 대상 옆에 붙여도 얻는 것이 없다 - 세면 점수를 깎아서라도 거기 붙인다. 아래 침의 희귀도 조건을
+    /// 풀어 주는 돌파만 예외다(<c>BreakthroughAdversarialTests</c>).
     /// </summary>
     [Fact]
     public void OnlyCompassesWithTheirOwnBonusMeetADesignatedTarget()

@@ -398,6 +398,59 @@ public class BreakthroughAdversarialTests
             new[] { solved.CharmPositions[3], solved.CharmPositions[5] }.OrderBy(cell => cell.Y));
     }
 
+    private static PlacementProblem ChainBesideAPriorityComboRoot(Rarity targetRarity)
+    {
+        var target = Root(1, targetRarity, 5);
+        target.IsSupportTarget = true;
+        target.Definition.Categories.Clear();
+        target.Definition.Categories.Add("SHADOW");
+        var kunai = Kunai(2);
+        kunai.Definition.Categories.Clear();
+        kunai.Definition.Categories.Add("PRECISION");
+        var problem = Problem(new GridSpec(2, 4, 8),
+            (target, new GridPos(0, 0)),
+            (kunai, new GridPos(1, 0)),
+            (Breakthrough(4), new GridPos(0, 1)),
+            (WorthNeedle(3), new GridPos(0, 2)));
+        problem.PriorityCategories.Add("PRECISION");
+        problem.ComboCounts = new Dictionary<string, int> { ["PRECISION"] = 1, ["SHADOW"] = 1 };
+        problem.Combos = id => id == "PRECISION" ? new ComboDefinition { Id = id, Thresholds = { 2 } } : null;
+        return problem;
+    }
+
+    /// <summary>
+    /// 제보 eeb4f2ad. 돌파가 지정 대상과 침 사이에 있는데, 쿠나이 밑으로 가면 우선 콤보(정밀)가 하나 찬다.
+    /// 지정 대상이 콤보보다 앞서므로 돌파는 사슬에 남는다 - 예전에는 돌파를 지원으로 세지 않아 콤보가 빼 갔다.
+    /// </summary>
+    [Fact]
+    public void APriorityComboDoesNotPullTheBreakthroughOffTheDesignatedTarget()
+    {
+        var problem = ChainBesideAPriorityComboRoot(Rarity.Rare);
+
+        var solved = PlacementSolver.Solve(problem);
+
+        AssertValid(problem, solved);
+        var target = solved.CharmPositions[1];
+        Assert.Equal(target.Offset(0, 1), solved.CharmPositions[4]);
+        Assert.Equal(target.Offset(0, 2), solved.CharmPositions[3]);
+        Assert.Equal(2, solved.SupportTargetMatches);
+    }
+
+    /// <summary>희귀도 조건이 이미 맞는 대상에게는 돌파가 풀어 줄 것이 없다. 지원으로 세지 않으니 콤보가 데려간다.</summary>
+    [Fact]
+    public void ABreakthroughThatLiftsNothingIsNotCountedForTheDesignatedTarget()
+    {
+        var problem = ChainBesideAPriorityComboRoot(Rarity.Uncommon);
+
+        Assert.Equal(1, Score(problem).SupportTargetMatches);
+
+        var solved = PlacementSolver.Solve(problem);
+
+        AssertValid(problem, solved);
+        Assert.Equal(solved.CharmPositions[2].Offset(0, 1), solved.CharmPositions[4]);
+        Assert.Equal(solved.CharmPositions[1].Offset(0, 1), solved.CharmPositions[3]);
+    }
+
     /// <summary>
     /// 침이 대상 바로 밑 맨 아랫줄에 있어 사슬을 내릴 수 없다. 대상째 한 칸 올리면 돌파가 들어간다 -
     /// 788aa22 는 이 판에서 돌파를 대상 밑에 넣었다(게임 값 12.5 대 10).
