@@ -124,6 +124,23 @@ public sealed class DiagnosticServerTests
         Assert.Equal(429, await server.UploadRaw("POST"));
     }
 
+    /// <summary>값싼 토큰을 빽빽이 채운 설명도 받는다. 서버는 설명 전체를 펴지 않고 필요한 칸만 읽는다.</summary>
+    [Fact]
+    public async Task ADenseReportIsReadWithoutExpandingItIntoADocument()
+    {
+        await using var server = await DiagnosticTestServer.StartAsync();
+        var id = Guid.NewGuid();
+        var report = new System.Text.StringBuilder($"{{\"Version\":{DiagnosticArchive.SchemaVersion},\"ReportId\":\"{id:N}\",\"Pad\":[0");
+        while (report.Length < 4 * 1024 * 1024) report.Append(",0");
+        report.Append("],\"Note\":{\"CategoryLabel\":\"기타\",\"Text\":\"끝에 있는 메모\"}}");
+        using (var response = await server.Upload(id, DiagnosticArchive.Create(new Dictionary<string, string> { ["report.json"] = report.ToString() })))
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        server.Authorize();
+        using var json = JsonDocument.Parse(await server.Client.GetStringAsync("/admin/reports"));
+        Assert.Equal("끝에 있는 메모", Assert.Single(json.RootElement.EnumerateArray()).GetProperty("note").GetString());
+    }
+
     [Fact]
     public async Task ExpiredFilesAndInterruptedUploadsAreRemovedOnRestart()
     {

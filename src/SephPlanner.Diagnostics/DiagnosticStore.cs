@@ -53,14 +53,14 @@ public sealed class DiagnosticStore : IDisposable
             if (DiagnosticArchive.Hash(bytes) != expectedHash) throw new InvalidDataException("진단 자료의 해시가 다릅니다.");
             using (var content = new MemoryStream(bytes))
             {
-                var files = DiagnosticArchive.Read(content);
-                using var metadata = JsonDocument.Parse(files["report.json"]);
-                var root = metadata.RootElement;
-                if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("Version", out var version) || version.ValueKind != JsonValueKind.Number ||
-                    !version.TryGetInt32(out var number) || number != DiagnosticArchive.SchemaVersion ||
-                    !root.TryGetProperty("ReportId", out var report) || report.ValueKind != JsonValueKind.String || report.GetString() != id.ToString("N"))
+                var header = Header(DiagnosticArchive.ReadEntries(content)["report.json"]);
+                if (header.Version != DiagnosticArchive.SchemaVersion || header.ReportId != id.ToString("N"))
                     throw new InvalidDataException("진단 설명의 형식 또는 제보 번호가 다릅니다.");
-                CheckNote(root);
+                // 메모 길이를 서버에서도 지킨다. 500자 제한이 클라이언트에만 있으면 손으로 지은 요청 몇 건으로 관리자 목록이
+                // 메모리를 다 쓴다. 분류 식별자는 모르는 값이어도 받는다 - 다음 판의 분류일 수 있다.
+                if (header.Note is { } note && (note.Category?.Length > MaximumLabelLength || note.CategoryLabel?.Length > MaximumLabelLength ||
+                                                note.Text?.Length > DiagnosticNote.MaximumTextLength))
+                    throw new InvalidDataException("진단 메모의 형식 또는 길이가 올바르지 않습니다.");
             }
 
             await _gate.WaitAsync(cancellation);
@@ -91,19 +91,24 @@ public sealed class DiagnosticStore : IDisposable
 
     public async Task<IReadOnlyList<DiagnosticStoredReport>> ListAsync(int offset, CancellationToken cancellation)
     {
+        FileInfo[] page;
         await _gate.WaitAsync(cancellation);
         try
         {
             DeleteExpired();
-            return StoredFiles().OrderByDescending(file => file.LastWriteTimeUtc).ThenBy(file => file.Name, StringComparer.Ordinal)
-                .Skip(offset).Take(100).Select(file =>
-                {
-                    var (category, note) = ReadNote(file);
-                    return new DiagnosticStoredReport(
-                        Path.GetFileNameWithoutExtension(file.Name), file.LastWriteTimeUtc, file.Length, category, note);
-                }).ToArray();
+            page = StoredFiles().OrderByDescending(file => file.LastWriteTimeUtc).ThenBy(file => file.Name, StringComparer.Ordinal)
+                .Skip(offset).Take(100).ToArray();
         }
         finally { _gate.Release(); }
+        // 메모는 잠금 밖에서 읽는다. 백 건을 푸는 동안 업로드가 기다리지 않게 한다. 그 사이 지워진 파일은 메모 없이 나온다.
+        var rows = new List<DiagnosticStoredReport>(page.Length);
+        foreach (var file in page)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            var (category, note) = ReadNote(file);
+            rows.Add(new DiagnosticStoredReport(Path.GetFileNameWithoutExtension(file.Name), file.LastWriteTimeUtc, file.Length, category, note));
+        }
+        return rows;
     }
 
     public async Task<byte[]?> ReadAsync(Guid id, CancellationToken cancellation)
@@ -148,11 +153,8 @@ public sealed class DiagnosticStore : IDisposable
         try
         {
             using var stream = file.OpenRead();
-            using var document = JsonDocument.Parse(DiagnosticArchive.ReadReport(stream));
-            if (document.RootElement.ValueKind != JsonValueKind.Object ||
-                !document.RootElement.TryGetProperty("Note", out var note) || note.ValueKind != JsonValueKind.Object)
-                return ("", "");
-            return (Shown(Text(note, "CategoryLabel"), MaximumLabelLength), Shown(Text(note, "Text"), DiagnosticNote.MaximumTextLength));
+            var note = Header(DiagnosticArchive.ReadReport(stream)).Note;
+            return note is null ? ("", "") : (Shown(note.CategoryLabel ?? "", MaximumLabelLength), Shown(note.Text ?? "", DiagnosticNote.MaximumTextLength));
         }
         catch (Exception exception) when (exception is IOException or InvalidDataException or JsonException or DecoderFallbackException)
         {
@@ -160,25 +162,18 @@ public sealed class DiagnosticStore : IDisposable
         }
     }
 
+    /// <summary>
+    /// 설명 파일에서 서버가 보는 칸만 읽는다. 문서 전체를 <see cref="JsonDocument"/>로 펴면 값싼 토큰을 빽빽이 채운
+    /// 16MB 설명 하나가 수백 MB 를 쓴다. 이 방식은 나머지 값을 건너뛰며 문법만 검사한다.
+    /// </summary>
+    private static ReportHeader Header(byte[] report) =>
+        JsonSerializer.Deserialize<ReportHeader>(report) ?? throw new InvalidDataException("진단 설명이 비었습니다.");
+
+    private sealed record ReportHeader(int? Version, string? ReportId, ReportNote? Note);
+    private sealed record ReportNote(string? Category, string? CategoryLabel, string? Text);
+
     // 화면의 분류 이름은 열 자 안팎이다. 다음 판이 분류를 더해도 거절하지 않을 만큼 넉넉히 둔다.
     private const int MaximumLabelLength = 64;
-
-    /// <summary>
-    /// 메모 길이를 서버에서도 지킨다. 500자 제한이 클라이언트에만 있으면 손으로 지은 요청 몇 건으로
-    /// 관리자 목록이 메모리를 다 쓴다. 분류 식별자는 모르는 값이어도 받는다 - 다음 판의 분류일 수 있다.
-    /// </summary>
-    private static void CheckNote(JsonElement root)
-    {
-        if (!root.TryGetProperty("Note", out var note) || note.ValueKind == JsonValueKind.Null) return;
-        if (note.ValueKind != JsonValueKind.Object ||
-            !Fits(note, "Category", MaximumLabelLength) || !Fits(note, "CategoryLabel", MaximumLabelLength) ||
-            !Fits(note, "Text", DiagnosticNote.MaximumTextLength))
-            throw new InvalidDataException("진단 메모의 형식 또는 길이가 올바르지 않습니다.");
-    }
-
-    private static bool Fits(JsonElement note, string name, int maximum) =>
-        !note.TryGetProperty(name, out var value) || value.ValueKind == JsonValueKind.Null ||
-        value.ValueKind == JsonValueKind.String && value.GetString()!.Length <= maximum;
 
     /// <summary>
     /// 제한을 두기 전에 받은 자료도 목록에 실리므로 읽을 때도 자른다. 제어문자는 관리자가 터미널로 목록을
@@ -193,9 +188,6 @@ public sealed class DiagnosticStore : IDisposable
             builder.Append(char.IsControl(character) && character != '\n' ? ' ' : character);
         return builder.ToString();
     }
-
-    private static string Text(JsonElement element, string name) =>
-        element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? "" : "";
 
     private string PathFor(Guid id) => Path.Combine(_options.StorageDirectory, id.ToString("N") + ".zip");
     private static Guid IdOf(FileInfo file) => Guid.ParseExact(Path.GetFileNameWithoutExtension(file.Name), "N");

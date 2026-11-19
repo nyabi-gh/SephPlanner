@@ -88,7 +88,7 @@ public sealed class DiagnosticNoteTests
         };
         var archive = DiagnosticArchive.Create(files);
         using var stream = new MemoryStream(archive);
-        Assert.Equal("{\"Version\":1}", DiagnosticArchive.ReadReport(stream));
+        Assert.Equal("{\"Version\":1}", Encoding.UTF8.GetString(DiagnosticArchive.ReadReport(stream)));
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public sealed class DiagnosticNoteTests
     {
         var archive = DiagnosticArchive.Create(new Dictionary<string, string> { ["report.json"] = "{}" });
         using var stream = new MemoryStream(archive);
-        Assert.Equal("{}", DiagnosticArchive.ReadReport(stream));
+        Assert.Equal("{}", Encoding.UTF8.GetString(DiagnosticArchive.ReadReport(stream)));
 
         using var empty = new MemoryStream();
         using (var writer = new System.IO.Compression.ZipArchive(empty, System.IO.Compression.ZipArchiveMode.Create, true))
