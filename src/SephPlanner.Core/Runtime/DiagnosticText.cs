@@ -35,10 +35,11 @@ namespace SephPlanner.Core.Runtime
             @"(?i)(\bmember\s+)[^,\r\n]+|(\bguid\s*[=:]\s*)[^\s,:()]+",
             RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
         // 로비 참가 코드는 숫자만이 아니다. 스팀 LobbyData 는 16진 HexId 로, EOS 는 lobbyId 문자열로 찍혀
-        // 앞뒤 문구로만 알아본다.
+        // 앞뒤 문구로만 알아본다. 뒷문구 갈래는 토큰 첫 글자에서만 시작하고 되짚지 않는다 - 아니면 공백·콜론 없는
+        // 긴 줄에서 시작 위치마다 끝까지 다시 훑어 1초 제한을 넘기고, 그 줄이 남은 동안 진단 전체가 실패한다.
         private static readonly Regex LobbyCodes = new Regex(
             @"(?i)(\bjoining lobby\s+|\blobby data unavailable:\s*|\blobby join timed out:\s*|\[SteamInvitation\]\s+Join\s+)[^\s,:()]+" +
-            @"|[^\s:]+(?=\s*:\s*DIFF VERSION LOBBY\b)",
+            @"|(?<![^\s:])(?>[^\s:]+)(?=\s*:\s*DIFF VERSION LOBBY\b)",
             RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
         // 스팀 ID·로비 ID 는 17자리 안팎이다. 게임 수치가 이만큼 길어질 일은 없다.
         private static readonly Regex LongNumber = new Regex(

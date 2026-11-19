@@ -251,6 +251,22 @@ public sealed class DiagnosticTests
     }
 
     [Fact]
+    public void LobbyCodeRuleHidesOnlyTheTokenAfterAColon()
+    {
+        var log = new DiagnosticText();
+        log.AppendGame(GameLogKind.Warning, "lobby:1A2B3C4D : DIFF VERSION LOBBY 1.1.0 != 1.1.1", "", DateTime.UtcNow);
+        Assert.Contains("[Warning] lobby:<가림> : DIFF VERSION LOBBY", log.Snapshot());
+    }
+
+    [Fact]
+    public void LongTokenDoesNotTimeOutTheGameRules()
+    {
+        // 게임 문장 상한(8192자)으로는 빠른 기계에서 1초 제한에 안 닿아, 제곱 시간이 확실히 드러나는 길이를 쓴다.
+        var token = new string('a', 32768);
+        Assert.Equal(token, new DiagnosticText().RedactGame(token));
+    }
+
+    [Fact]
     public void OwnLogIsNotRewrittenByGameRules()
     {
         var log = new DiagnosticText();

@@ -270,10 +270,6 @@
 - `Update` 앞머리와 `OnDestroy` 가 `Guarded` 밖이다.
 - `inventory-snapshot.json`·`plan.replay` 는 진단 텍스트의 가림을 거치지 않는다(`DiagnosticCapture`).
   `DiagnosticText` 의 정규식은 `?token=` 꼴을 놓친다.
-- **긴 토큰 하나가 진단을 막는다**(검증 2026-11-19, .NET 에서 재현). `DiagnosticText.LobbyCodes` 의 둘째 갈래
-  `[^\s:]+(?=\s*:\s*DIFF VERSION LOBBY\b)` 가 공백·콜론 없는 긴 문자열에 제곱 시간이 든다. 8192자 한 줄이면 `Snapshot()` 이
-  1초 제한에 걸려 `RegexMatchTimeoutException` 을 던지고, 그 줄이 64KB 버퍼에서 밀려날 때까지 F10 과 자동 진단이 실패한다.
-  게임이 그런 줄을 찍는지와 Mono 에서의 속도는 못 봤다.
 - **합치기 재료를 비켜 두는 걸음이 없다**(검증 2026-11-19). `CombineRecipes.SafeOrder` 는 제자리로 넣는 교환의 순서만 바꾼다.
   재료를 빈칸에 잠깐 옮겨야 풀리는 판은 적용을 막는다. 넣으려면 적용 목표에 거쳐 가는 칸을 실을 수 있어야 한다.
   재료가 아티팩트가 아닌 레시피도 못 본다(게임은 모든 아이템에서 찾는다) - 1.1.4 에 그런 레시피가 있는지 에셋으로 확인한다.
