@@ -261,7 +261,9 @@ namespace SephPlanner.Plugin
 
         private void OpenDiagnosticConsent(DiagnosticCapture capture)
         {
-            _pendingDiagnostic = capture;
+            // F3 에서 여는 길은 진단 없이 온다. F10 이 이미 연 창이면 그 창이 묻고 있는 진단을 지우지 않는다 - 지우면 설명
+            // 파일도 쓰이지 않은 채 폴더만 남는다.
+            if (capture != null || !_diagnosticWindow.IsOpen) _pendingDiagnostic = capture;
             if (!_diagnosticWindow.IsOpen) _diagnosticWindow.Toggle(Tr("ESC: 이번에는 전송하지 않기"));
             if (_diagnosticWindow.Blocker.Length > 0)
             {
