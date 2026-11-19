@@ -31,7 +31,7 @@ namespace SephPlanner.Plugin
     /// </summary>
     internal static class PlanApplier
     {
-        private static bool _running;
+        private static readonly ApplyLease Lease = new ApplyLease();
         private static ApplyPlanRoutine _routine;
         private static GridInventory _uncertainInventory;
 
@@ -42,16 +42,11 @@ namespace SephPlanner.Plugin
         /// <summary>
         /// 적용이 진행 중인가. 클라이언트에서는 여러 프레임에 걸치므로, 겹쳐 시작하면 두 적용기가
         /// 같은 격자를 서로 다른 예상 위에서 밀게 된다.
-        ///
-        /// 시한을 함께 보는 것은 유니티가 코루틴을 소유한 오브젝트가 비활성화될 때 반복자를
-        /// <c>Dispose</c> 하지 않기 때문이다. 그러면 <c>finally</c> 가 돌지 않아 F8 이 세션 내내
-        /// "진행 중"으로 잠긴다.
         /// </summary>
-        public static bool InProgress =>
-            _running && (_routine == null || Time.unscaledTime < _routine.AbandonAt);
+        public static bool InProgress => Lease.IsHeld(Time.frameCount);
 
         /// <summary>진행 상황 한 줄. 참가자 세션의 적용은 수 초가 걸리므로 화면에 이것이라도 있어야 한다.</summary>
-        public static string Progress => _routine?.Progress ?? "";
+        public static string Progress => InProgress ? _routine?.Progress ?? "" : "";
 
         /// <summary>
         /// 배치를 적용하고 사람이 읽을 한 줄을 <paramref name="report"/> 로 돌려준다. 사전 검증에서
@@ -77,8 +72,9 @@ namespace SephPlanner.Plugin
                 yield break;
             }
 
-            _running = true;
+            var lease = Lease.Take(Time.frameCount);
             GridInventory inventory = null;
+            ApplyPlanRoutine routine = null;
             try
             {
                 var setup = Prepare(command, allowMultiplayer, settingsKey);
@@ -95,26 +91,29 @@ namespace SephPlanner.Plugin
                 // 한다 - 중간에 프레임이 끼면 그 사이에 게임 상태가 바뀔 수 있고, 그러면
                 // 원자적이라는 전제가 무너진다.
                 var port = new GridInventoryPort(setup.Inventory);
-                _routine = new ApplyPlanRoutine(
+                routine = new ApplyPlanRoutine(
                     command, port, () => Time.unscaledTime, allowMultiplayer);
-                var run = _routine.Run();
+                _routine = routine;
+                var run = routine.Run();
                 while (run.MoveNext())
                 {
                     // 코루틴이 강제로 중단돼 finally가 실행되지 않아도 미확정 쓰기를 잊지 않는다.
-                    _uncertainInventory = _routine.RequiresResync ? inventory : null;
+                    _uncertainInventory = routine.RequiresResync ? inventory : null;
                     yield return run.Current;
+                    Lease.Resumed(lease, Time.frameCount);
                 }
-                var detail = port.DiagnosticError ?? _routine.DiagnosticError?.Korean;
+                var detail = port.DiagnosticError ?? routine.DiagnosticError?.Korean;
                 if (detail != null) diagnostic?.Invoke(detail);
-                report(_routine.Result, _routine.Settled);
+                report(routine.Result, routine.Settled);
             }
             finally
             {
                 FixedEffectLayer.Invalidate();
-                if (_routine != null)
-                    _uncertainInventory = _routine.RequiresResync ? inventory : null;
-                _running = false;
-                _routine = null;
+                if (Lease.Release(lease))
+                {
+                    if (routine != null) _uncertainInventory = routine.RequiresResync ? inventory : null;
+                    _routine = null;
+                }
             }
         }
 

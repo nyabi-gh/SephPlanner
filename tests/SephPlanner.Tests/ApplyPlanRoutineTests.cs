@@ -807,7 +807,6 @@ public class ApplyPlanRoutineTests
 
         // 되돌리기가 새 국면을 받았다는 증거 - 앞이 30초 안에 멈췄는데도 되돌린 걸음 전부가 반영됐다.
         Assert.True(clock.Now > ApplyPlanRoutine.PhaseTimeout, $"되돌리기까지 {clock.Now}초");
-        Assert.True(routine.AbandonAt > ApplyPlanRoutine.PhaseTimeout + ApplyPlanRoutine.SyncTimeout);
     }
 
     [Fact]
@@ -1053,11 +1052,11 @@ public class ApplyPlanRoutineTests
     }
 
     /// <summary>
-    /// 앞 국면이 예산을 거의 다 쓴 뒤의 레벨 확인도 시한 안에 있어야 한다. 시한이 먼저 지나면 부르는 쪽이
-    /// 진행 중을 풀어, 반복자가 아직 도는 사이 F8 이 두 번째 적용을 시작한다.
+    /// 앞 국면이 예산을 거의 다 쓴 뒤에도 레벨 확인은 제 창을 다 기다린다. 국면의 시한에 걸려 끊기면 늦게 온 레벨
+    /// 동기화를 어긋남으로 읽는다.
     /// </summary>
     [Fact]
-    public void TheFinalLevelWaitStaysWithinTheAbandonDeadline()
+    public void TheFinalLevelWaitRunsPastThePhaseBudget()
     {
         // 마지막 걸음을 예산 끝 직전에 보내 그 3초 창이 30초를 넘게 하고, 레벨은 끝내 맞지 않게 해 확인도 3초를 다 쓰게 한다.
         var (inventory, clock) = Guest(latency: 2.6);
@@ -1078,7 +1077,6 @@ public class ApplyPlanRoutineTests
         while (run.MoveNext())
         {
             levelWaitSeen |= routine.Progress == "자동 배치 - 레벨 확인 중";
-            Assert.True(clock.Now < routine.AbandonAt, $"{clock.Now}초에 아직 도는데 시한은 {routine.AbandonAt}초");
             clock.Now += 0.1;
             inventory.Settle();
         }

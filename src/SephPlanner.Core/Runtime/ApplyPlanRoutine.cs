@@ -55,12 +55,6 @@ namespace SephPlanner.Core.Runtime
         /// <summary>진행 상황 한 줄. 참가자 세션의 적용은 수 초가 걸리므로 화면에 이것이라도 있어야 한다.</summary>
         public string Progress { get; private set; } = "";
 
-        /// <summary>
-        /// 이 시각을 넘기면 반복자가 죽은 것으로 보아도 된다. 유니티는 코루틴을 소유한 오브젝트가
-        /// 비활성화될 때 반복자를 Dispose 하지 않아, 부르는 쪽이 "진행 중" 을 영영 풀지 못할 수 있다.
-        /// </summary>
-        public double AbandonAt { get; private set; }
-
         /// <summary>끝났을 때 사람이 읽을 한 줄. 반복자가 끝나기 전에는 비어 있다.</summary>
         public Phrase Result { get; private set; } = Phrase.Verbatim("");
 
@@ -175,9 +169,6 @@ namespace SephPlanner.Core.Runtime
             // 뒤에도 잠시 옛 값이 남아 있으므로, 어긋났다고 알리기 전에 그만큼 기다린다.
             Progress = Tr("자동 배치 - 레벨 확인 중");
             var settle = _now() + (_port.WritesLandImmediately ? 0 : SyncTimeout);
-            // 앞 국면이 예산 끝에 마지막 걸음을 보냈으면 이 대기는 국면의 시한을 넘는다. 시한이 먼저 지나면 부르는 쪽이
-            // 진행 중을 풀어, 아직 가방을 읽는 사이 F8 이 두 번째 적용을 시작한다. 국면과 같이 걸음 하나의 창을 더 둔다.
-            AbandonAt = Math.Max(AbandonAt, settle + SyncTimeout);
             while (LevelDrift() != null && _now() < settle) yield return null;
 
             var drift = TargetDrift();
@@ -246,7 +237,6 @@ namespace SephPlanner.Core.Runtime
         private void NewPhase()
         {
             _phaseUntil = _now() + PhaseTimeout;
-            AbandonAt = _phaseUntil + SyncTimeout;
         }
 
         /// <summary>이 걸음의 마감. 호스트는 쓰기가 그 자리에서 끝나므로 기다릴 것이 없어 지금이 곧 마감이다.</summary>
