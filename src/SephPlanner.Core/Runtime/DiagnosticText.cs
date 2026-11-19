@@ -21,8 +21,10 @@ namespace SephPlanner.Core.Runtime
         private static readonly Regex UserDirectory = new Regex(
             @"(?i)\b[A-Z]:[\\/](?:Users|Documents and Settings)[\\/][^\\/\r\n<>"":|?*]+|/home/[^/\s]+|/Users/[^/\s]+",
             RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+        // 자격 증명과 게임 문구 규칙의 앞뒤 문구는 공백·탭만 건넌다. 로그는 줄을 이어 붙여 한 번에 가리므로, \s 로 두면 줄 끝의 열쇠말이
+        // 다음 줄의 첫 낱말(다른 로그나 스택의 한 줄)을 지운다.
         private static readonly Regex Credentials = new Regex(
-            @"(?im)(authorization\s*[:=]\s*|(?:access[_-]?token|api[_-]?key|password|secret)\s*[:=]\s*)[^\r\n]+",
+            @"(?im)(authorization[ \t]*[:=][ \t]*|(?:access[_-]?token|api[_-]?key|password|secret)[ \t]*[:=][ \t]*)[^\r\n]+",
             RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
         // 게임이 경고·오류 줄에 남기는 것 중 남을 가리킬 수 있는 것들이다(1.0.33·1.1.1 디컴파일).
@@ -32,14 +34,14 @@ namespace SephPlanner.Core.Runtime
             RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
         // 닉네임에는 공백이 들 수 있어 "member " 뒤는 쉼표까지 지운다.
         private static readonly Regex GameIdentities = new Regex(
-            @"(?i)(\bmember\s+)[^,\r\n]+|(\bguid\s*[=:]\s*)[^\s,:()]+",
+            @"(?i)(\bmember[ \t]+)[^,\r\n]+|(\bguid[ \t]*[=:][ \t]*)[^\s,:()]+",
             RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
         // 로비 참가 코드는 숫자만이 아니다. 스팀 LobbyData 는 16진 HexId 로, EOS 는 lobbyId 문자열로 찍혀
         // 앞뒤 문구로만 알아본다. 뒷문구 갈래는 토큰 첫 글자에서만 시작하고 되짚지 않는다 - 아니면 공백·콜론 없는
         // 긴 줄에서 시작 위치마다 끝까지 다시 훑어 1초 제한을 넘기고, 그 줄이 남은 동안 진단 전체가 실패한다.
         private static readonly Regex LobbyCodes = new Regex(
-            @"(?i)(\bjoining lobby\s+|\blobby data unavailable:\s*|\blobby join timed out:\s*|\[SteamInvitation\]\s+Join\s+)[^\s,:()]+" +
-            @"|(?<![^\s:])(?>[^\s:]+)(?=\s*:\s*DIFF VERSION LOBBY\b)",
+            @"(?i)(\bjoining lobby[ \t]+|\blobby data unavailable:[ \t]*|\blobby join timed out:[ \t]*|\[SteamInvitation\][ \t]+Join[ \t]+)[^\s,:()]+" +
+            @"|(?<![^\s:])(?>[^\s:]+)(?=[ \t]*:[ \t]*DIFF VERSION LOBBY\b)",
             RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
         // 스팀 ID·로비 ID 는 17자리 안팎이다. 게임 수치가 이만큼 길어질 일은 없다.
         private static readonly Regex LongNumber = new Regex(

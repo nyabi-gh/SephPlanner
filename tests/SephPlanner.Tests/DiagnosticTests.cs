@@ -258,6 +258,22 @@ public sealed class DiagnosticTests
         Assert.Contains("[Warning] lobby:<가림> : DIFF VERSION LOBBY", log.Snapshot());
     }
 
+    /// <summary>로그는 줄을 이어 붙여 가린다. 줄 끝의 열쇠말이 다음 줄의 첫 낱말까지 지우면 진단이 다른 로그나 스택 한 줄을 잃는다.</summary>
+    [Theory]
+    [InlineData("api_key=\nGameManager started")]
+    [InlineData("member \nPlayer joined")]
+    [InlineData("guid =\nabc123 next")]
+    [InlineData("joining lobby \nNextLine")]
+    [InlineData("[SteamInvitation] Join\nNextLine")]
+    [InlineData("abc\n: DIFF VERSION LOBBY")]
+    public void RulesDoNotReachIntoTheNextLine(string text)
+    {
+        var next = text.Split('\n')[1];
+        Assert.EndsWith(next, new DiagnosticText().Redact(text));
+        Assert.EndsWith(next, new DiagnosticText().RedactGame(text));
+        Assert.StartsWith(text.Split('\n')[0].Split(' ')[0], new DiagnosticText().RedactGame(text));
+    }
+
     [Fact]
     public void LongTokenDoesNotTimeOutTheGameRules()
     {
