@@ -1387,7 +1387,14 @@ namespace SephPlanner.Plugin
                 Applying = PlanApplier.InProgress,
                 RecoveryRequired = PlanApplier.RecoveryRequired,
                 Previewing = _previewKey.Length > 0,
+                Downed = LocalPlayerDowned(),
             });
+
+        private static bool LocalPlayerDowned()
+        {
+            var avatar = GameReader.FindLocalPlayer();
+            return avatar != null && avatar.IsDead;
+        }
 
         /// <summary>
         /// 커서 위치. 게임이 새 InputSystem 을 쓰므로 그쪽을 먼저 본다. 구식 <c>Input</c> 은

@@ -32,6 +32,9 @@ namespace SephPlanner.Core.Runtime
         public bool Applying { get; set; }
         public bool RecoveryRequired { get; set; }
         public bool Previewing { get; set; }
+
+        /// <summary>내 플레이어가 쓰러져 있다. 멀티에서는 동료가 살릴 때까지 런이 이어져 계획은 계속 보인다.</summary>
+        public bool Downed { get; set; }
     }
 
     public sealed class AutoPlaceDecision
@@ -60,6 +63,13 @@ namespace SephPlanner.Core.Runtime
         public static Phrase TransitCombineRefused() =>
             new Phrase("방에 참가한 쪽에서는 옮기는 도중에 게임이 합칠 아티팩트가 맞붙어 자동 배치를 실행하지 않습니다.");
 
+        /// <summary>
+        /// 쓰러진 동안의 거절 사유. 정책과 적용기가 같은 말을 쓴다. 죽은 플레이어의 가방 쓰기를 서버가 어떻게 다루는지
+        /// 확인하지 못해 막는다.
+        /// </summary>
+        public static Phrase DownedRefused() =>
+            new Phrase("쓰러져 있는 동안에는 자동 배치를 실행하지 않습니다. 부활한 뒤 다시 시도하세요.");
+
         public static AutoPlaceDecision Evaluate(AutoPlaceContext context)
         {
             if (context.Applying) return AutoPlaceDecision.Deny(Tr("자동 배치가 아직 진행 중입니다."));
@@ -67,6 +77,7 @@ namespace SephPlanner.Core.Runtime
                 return AutoPlaceDecision.Deny(Tr("이전 명령의 서버 반영이 불확실해 자동 배치를 잠갔습니다. 방에 재접속한 뒤 시도하세요."));
             if (context.Previewing)
                 return AutoPlaceDecision.Deny(Tr("후보 미리보기 중입니다. 현재 가방 배치로 돌아온 뒤 자동 배치를 실행하세요."));
+            if (context.Downed) return AutoPlaceDecision.Deny(DownedRefused().ToString());
 
             var state = context.Runner;
             if (state is null) return AutoPlaceDecision.Deny(Tr("계획 데이터가 아직 준비되지 않았습니다."));

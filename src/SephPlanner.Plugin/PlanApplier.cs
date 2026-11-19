@@ -153,9 +153,7 @@ namespace SephPlanner.Plugin
                 var inventory = avatar != null ? avatar.Inventory : null;
                 if (inventory == null)
                     return Denied(new Phrase("적용할 인벤토리가 없습니다."));
-                // 죽은 플레이어의 가방 쓰기를 서버가 어떻게 다루는지 확인하지 못했다. 계획은 보여 주되 쓰지는 않는다.
-                if (avatar.IsDead)
-                    return Denied(new Phrase("쓰러져 있는 동안에는 자동 배치를 실행하지 않습니다. 부활한 뒤 다시 시도하세요."));
+                if (avatar.IsDead) return Denied(AutoPlacePolicy.DownedRefused());
 
                 var liveSnapshot = GameReader.Read(0, includeRecommendations: false);
                 var livePlacementFingerprint = PlanFingerprint.Placement(

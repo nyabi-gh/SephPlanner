@@ -76,6 +76,18 @@ public class AutoPlacePolicyTests
         Assert.Contains("미리보기", decision.Reason);
     }
 
+    /// <summary>멀티에서 쓰러진 동안에도 계획은 보인다. 적용기가 거절할 것을 안내 줄이 F8 로 광고하지 않게 정책도 거절한다.</summary>
+    [Fact]
+    public void ADownedPlayerIsNotOfferedAutoPlace()
+    {
+        var context = Context();
+        Assert.True(AutoPlacePolicy.Evaluate(context).Allowed);
+        context.Downed = true;
+        var decision = AutoPlacePolicy.Evaluate(context);
+        Assert.False(decision.Allowed);
+        Assert.Equal(AutoPlacePolicy.DownedRefused().ToString(), decision.Reason);
+    }
+
     [Fact]
     public void UnpublishedPlanIsRejectedEvenWithMatchingPlacement()
     {
