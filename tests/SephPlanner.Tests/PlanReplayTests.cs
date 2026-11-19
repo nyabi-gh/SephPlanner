@@ -348,6 +348,22 @@ public sealed class PlanReplayTests : IDisposable
         Assert.Empty(replay.Expected!.Differences(ReplayResult.From(replay.Rebuild(true))));
     }
 
+    /// <summary>
+    /// 형식을 올리면서 바로 아래 번호를 목록에 더하지 않으면 그 형식으로 나간 판의 제보가 통째로 거절된다 -
+    /// 27 이 빠져 0.5.0~0.6.2 의 제보가 그랬다. 형식을 일부러 잘라낼 때는 여기 시작 번호를 함께 올린다.
+    /// </summary>
+    [Fact]
+    public void EveryCatalogVersionSince20StillReplays()
+    {
+        for (var version = 20; version <= PlannerData.CatalogVersion; version++)
+        {
+            var replay = RoundTrip(Capture());
+            replay.CatalogVersion = version;
+
+            Assert.Empty(replay.Expected!.Differences(ReplayResult.From(replay.Rebuild(true))));
+        }
+    }
+
     [Fact]
     public void DifferentModelRequiresExplicitComparisonAndStillChecksResults()
     {
