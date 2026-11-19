@@ -270,6 +270,24 @@
 - `Update` 앞머리와 `OnDestroy` 가 `Guarded` 밖이다.
 - `inventory-snapshot.json`·`plan.replay` 는 진단 텍스트의 가림을 거치지 않는다(`DiagnosticCapture`).
   `DiagnosticText` 의 정규식은 `?token=` 꼴을 놓친다.
+- **긴 토큰 하나가 진단을 막는다**(검증 2026-11-19, .NET 에서 재현). `DiagnosticText.LobbyCodes` 의 둘째 갈래
+  `[^\s:]+(?=\s*:\s*DIFF VERSION LOBBY\b)` 가 공백·콜론 없는 긴 문자열에 제곱 시간이 든다. 8192자 한 줄이면 `Snapshot()` 이
+  1초 제한에 걸려 `RegexMatchTimeoutException` 을 던지고, 그 줄이 64KB 버퍼에서 밀려날 때까지 F10 과 자동 진단이 실패한다.
+  게임이 그런 줄을 찍는지와 Mono 에서의 속도는 못 봤다.
+- **합치기 재료를 비켜 두는 걸음이 없다**(검증 2026-11-19). `CombineRecipes.SafeOrder` 는 제자리로 넣는 교환의 순서만 바꾼다.
+  재료를 빈칸에 잠깐 옮겨야 풀리는 판은 적용을 막는다. 넣으려면 적용 목표에 거쳐 가는 칸을 실을 수 있어야 한다.
+  재료가 아티팩트가 아닌 레시피도 못 본다(게임은 모든 아이템에서 찾는다) - 1.1.4 에 그런 레시피가 있는지 에셋으로 확인한다.
+- `ApplyPlanRoutine` 이 `AbandonAt` 뒤에도 레벨 정착을 기다리며 최대 3초 더 돈다(검증 2026-11-19, 가짜 격자로 재현: 참가자,
+  30초쯤 걸리는 적용). 그 사이 `PlanApplier.InProgress` 가 먼저 풀린다.
+- `ReplayResult` 가 음수 인스턴스 번호를 현재 문화권으로 찍는다(검증 2026-11-19 재현). sv-SE·fi-FI·nb-NO·fa-IR·ar-SA 기계에서
+  그런 아이템이 든 `.replay` 를 재생하면 거짓 차이가 난다. 개발자 쪽 재생에만 걸린다.
+- 모드 창을 닫으면 `Time.timeScale = 1` 을 강제한다(`PlannerWindow`, 코드만 읽음). 모드 창을 먼저 열고 게임의 멈춤 창을 그 위에
+  연 뒤 모드 창을 닫으면 시간이 흐른다. 창작마당 판은 설정 하나를 바꿀 때마다 게임의 `DeviceOptions.xml` 을 통째로 다시 쓴다
+  (`ModOptionsSettingStore`, 코드만 읽음).
+- `PlacementSolver.ScoreOf` 는 지정 대상 지원 수에서 필러를 빼지 않고 `Describe` 는 뺀다. 실제 입력의 필러는 정의가 비어 있어
+  드러나지 않는다 - 필러에 정의를 싣게 되면 두 채점이 갈린다.
+- 진단 서버의 남은 항목(메모 길이, 전역 제한, 보존 정리의 예외)은 저장소 밖 `deploy/review-2026-11-09-security.md` 에 있고
+  2026-11-19 에 아직 그대로인 것을 다시 재현했다.
 
 ### 운영·공개
 
