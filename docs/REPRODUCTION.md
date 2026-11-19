@@ -66,7 +66,8 @@ dotnet run --project src/SephPlanner.DataTool -c Release -- --help
 
 새 요청이 계산 중이거나 실패했을 때 저장하면 마지막 게시 계획이라는 안내가 나온다.
 파일의 `Snapshot`과 별도 `inventory-snapshot.json`을 같은 순간의 자료로 취급하지 않는다.
-`--check`, `--replay`, `--churn`은 재현 자료가 아니라 현재 로컬 카탈로그와 기본 선호도를 쓴다.
+`--check`, `--replay`, `--churn`은 재현 자료가 아니라 현재 로컬 카탈로그와 기본 선호도를 쓴다. 점수 눈금은 플러그인처럼
+함께 덤프한 측정(`stat-measure.json`)으로 재고, 측정이 없으면 기본값으로 두고 그렇다고 출력한다.
 `--replay` 는 폴더가 비었거나 한 판이라도 풀지 못하면 1 로 끝난다.
 
 ## 형식 호환
@@ -90,7 +91,8 @@ dotnet run --project src/SephPlanner.DataTool -c Release -- --help
 
 1. 올린 번호 바로 아래 번호를 `PlanReplay.SupportedCatalogVersions` 에 **더한다.** 빠뜨리면 그 형식으로 모인 제보가 전부
    종료 코드 1 로 거절된다.
-2. **F9 로 로컬 덤프를 새로 만든 뒤에 견준다.** `--allow-model-change` 는 로컬 덤프가 지금 형식일 때만 값어치를 다시 재고
+2. **F9 로 로컬 덤프를 새로 만든 뒤에 견준다.** `--allow-model-change` 는 로컬 덤프가 지금 형식일 때만 값어치와 점수 눈금을
+   다시 재고(로컬 카탈로그에 없는 아티팩트는 재현 자료의 표를 둔다)
    (위 "재생") 아니면 재현 자료의 표를 그대로 쓴다. 형식을 올리면 옛 빌드는 재고 새 빌드는 못 재게 되어 **솔버를 건드리지 않았는데도
    배치가 통째로 달라진다.** 어느 쪽을 골라도 되지만 양쪽이 같아야 한다.
 
