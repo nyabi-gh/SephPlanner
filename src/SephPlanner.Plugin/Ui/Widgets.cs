@@ -66,6 +66,16 @@ namespace SephPlanner.Plugin.Ui
             return image;
         }
 
+        /// <summary>
+        /// 다른 모드가 준 글을 서식 없이 그대로 보이게 감싼다. 우리 색 태그 안에 끼워 넣어야 해서 칸의 서식을 끄는
+        /// 대신 이렇게 한다. 글 안의 닫는 태그만은 너비 없는 공백으로 끊어 감싼 것을 빠져나가지 못하게 한다.
+        /// </summary>
+        public static string Literal(string text) =>
+            "<noparse>" +
+            System.Text.RegularExpressions.Regex.Replace(
+                text ?? "", "</noparse>", "</​noparse>", System.Text.RegularExpressions.RegexOptions.IgnoreCase) +
+            "</noparse>";
+
         public static TextMeshProUGUI Label(
             string name, Transform parent, NativeSkin skin, float size, Color color,
             TextAlignmentOptions alignment = TextAlignmentOptions.MidlineLeft)

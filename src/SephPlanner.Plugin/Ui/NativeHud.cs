@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using SephPlanner.Core.Charms;
+using SephPlanner.Core.Extensions;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
@@ -106,6 +107,8 @@ namespace SephPlanner.Plugin.Ui
         private Section _discards;
         private TextMeshProUGUI _offerNotice;
         private TextMeshProUGUI _chips;
+        private RectTransform _extensionBlock;
+        private readonly List<TextMeshProUGUI> _extensionLines = new List<TextMeshProUGUI>();
 
         private readonly Tooltip _tooltip = new Tooltip();
         private readonly List<HoverTarget> _hover = new List<HoverTarget>();
@@ -227,6 +230,7 @@ namespace SephPlanner.Plugin.Ui
             var detail = Mathf.Min(S(12f), _inner * 0.55f);
             BuildGrid(_detail);
             _moves = new Section(_detail, _skin, _base, Tr("옮길 것"), NativeSkin.TextDim, MoveRows, detail);
+            BuildExtensionLines(_detail);
             BuildOffers(_detail, detail);
             _mixes = new Section(_detail, _skin, _base, Tr("석판 합성기"), NativeSkin.Mint, MixRows, detail);
             _enchants = new Section(_detail, _skin, _base, Tr("인챈트"), NativeSkin.Mint, EnchantRows, detail);
@@ -349,6 +353,23 @@ namespace SephPlanner.Plugin.Ui
             // 읽기 전에 눈에 들어온다.
             _offerNotice = Line(_offers.Body, S(0.75f), NativeSkin.TextDim);
             _offerNotice.transform.SetSiblingIndex(1);
+        }
+
+        /// <summary>
+        /// 확장 모드가 얹는 줄(<see cref="IPlanExtensionNotes"/>). 후보 목록 바로 위다. 후보가 없을 때도 보여야 하므로
+        /// 후보 묶음 밖에 둔다 - 묶음은 후보가 없으면 통째로 접힌다. 확장이 여럿이어도 자리는 이만큼이다.
+        /// </summary>
+        private void BuildExtensionLines(RectTransform parent)
+        {
+            _extensionBlock = Widgets.Rect("Extensions", parent);
+            Widgets.Column(_extensionBlock, S(0.1f));
+            _extensionLines.Clear();
+            for (var i = 0; i < ExtensionRegistry.MaxLines; i++)
+            {
+                var line = Line(_extensionBlock, S(0.8f), NativeSkin.Text);
+                line.richText = false;
+                _extensionLines.Add(line);
+            }
         }
 
         private TextMeshProUGUI Line(RectTransform parent, float size, Color color)
@@ -509,6 +530,7 @@ namespace SephPlanner.Plugin.Ui
                 _moves.Add(Tr("자동 배치"), Tr("미리보기를 종료한 뒤 실행하세요."), NativeSkin.TextDim);
                 _moves.End();
             }
+            RenderExtensionLines(frame.Notes);
             RenderOffers(plan, frame, previewed);
             RenderMixes(plan, snapshot.Mixer, frame.MixerOpen, frame.AdviceBusy, frame.AdviceFailed, previewed == null);
             RenderEnchants(plan, snapshot.EnchantChance, frame.EnchantOpen, frame.AdviceBusy, frame.AdviceFailed, previewed == null);
@@ -804,6 +826,17 @@ namespace SephPlanner.Plugin.Ui
             _moves.End();
         }
 
+        private void RenderExtensionLines(PlanNotes notes)
+        {
+            for (var i = 0; i < _extensionLines.Count; i++)
+            {
+                var shown = i < notes.Lines.Count;
+                _extensionLines[i].text = shown ? notes.Lines[i] : "";
+                Widgets.SetActive(_extensionLines[i], shown);
+            }
+            Widgets.SetActive(_extensionBlock, notes.Lines.Count > 0);
+        }
+
         private void RenderOffers(Plan plan, HudFrame frame, OfferAdvice previewed)
         {
             _offers.Begin();
@@ -823,13 +856,19 @@ namespace SephPlanner.Plugin.Ui
                         guessed++;
                 }
 
+                // 꼬리표의 열쇠는 아티팩트 정의 번호다. 석판 번호와 겹칠 수 있어 아티팩트에만 붙인다.
+                var note = charm != null ? frame.Notes.Candidate(advice.Candidate.DefinitionId) : null;
                 var picked = previewed != null && previewed.Key == advice.Key;
                 var row = _offers.Add(
-                    (picked ? "> " : "") + advice.Candidate.Name, Detail(advice),
+                    (picked ? "> " : "") + advice.Candidate.Name, Detail(advice, note),
                     picked ? NativeSkin.GoldEdge : NameTone(advice));
                 var gold = frame.Gold;
                 var values = frame.Values;
-                Hover(row, advice.Candidate.Name, () => Explain.Join(Explain.Offer(advice, gold, values)));
+                Hover(row, advice.Candidate.Name, () =>
+                    Explain.Join(Explain.Offer(advice, gold, values)) +
+                    (note != null && note.Description.Length > 0
+                        ? Environment.NewLine + Widgets.Literal(note.Description)
+                        : ""));
             }
             _offers.End();
 
@@ -859,11 +898,15 @@ namespace SephPlanner.Plugin.Ui
         /// 한 줄 오른쪽에 붙는 것들. 색이 서로 다르므로 TMP 서식으로 칠한다 - 텍스트를 여럿으로
         /// 쪼개 배치하는 것보다 짧고, 폭이 바뀌어도 알아서 붙는다.
         /// </summary>
-        private static string Detail(OfferAdvice advice)
+        private static string Detail(OfferAdvice advice, CandidateNote note)
         {
             var parts = new StringBuilder();
 
-            if (!advice.Available) return Tint(Tr("배치 못 찾음"), NativeSkin.Bad);
+            // 확장 모드의 꼬리표는 맨 앞이다. 줄 끝의 증가분은 우리 숫자라 그 자리를 내주지 않는다.
+            if (note != null && note.Tag.Length > 0)
+                parts.Append(Tint(Widgets.Literal(note.Tag), NativeSkin.TextBright)).Append("  ");
+
+            if (!advice.Available) return parts + Tint(Tr("배치 못 찾음"), NativeSkin.Bad);
 
             if (advice.MatchesPreset) parts.Append(Tint(Tr("빌드"), NativeSkin.Mint)).Append("  ");
 

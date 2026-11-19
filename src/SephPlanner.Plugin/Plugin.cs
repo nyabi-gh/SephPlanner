@@ -50,6 +50,11 @@ namespace SephPlanner.Plugin
 
         // 확장이 덮은 값어치 표. 계획·화면·진단이 같은 표를 보도록 폴링마다 한 번 짓고 함께 쓴다.
         private CharmValueBook _charmValues;
+
+        // 확장이 HUD 에 얹는 글자. 값어치 표와 같은 때 받아 두고 화면은 이것을 그린다.
+        private PlanNotes _extensionNotes = PlanNotes.Empty;
+        private ExtensionNoteContext _noteContext;
+        private int _noteContextRevision = -1;
         private PlanRunner _runner;
         private GameSnapshot _lastSnapshot;
         private DiagnosticCapture _pendingDiagnostic;
@@ -99,7 +104,7 @@ namespace SephPlanner.Plugin
             ApplyHighPerformance();
             _settings.HighPerformance.SettingChanged += (_, _) => ApplyHighPerformance();
             _prefs = PluginPreferences.Load(Log.Warning);
-            _window = new SettingsWindow(_settings.Rows, WindowActions);
+            _window = new SettingsWindow(_settings.Rows, ExtensionRows, WindowActions);
             _build = new BuildWindow(_prefs, CurrentBuild);
             _diagnosticLog = new DiagnosticText(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), PluginHost.GameFolder);
             Log.Written += CaptureOwnLog;
@@ -770,7 +775,10 @@ namespace SephPlanner.Plugin
             // 확장은 계획을 지을 때만 부른다(IPlanExtension 의 약속). 가방이 없는 스냅샷으로는 계획을 짓지 않는데, 그때도
             // 부르면 가방을 null 로 받을 줄 모르는 확장이 마을·타이틀에서 터져 그 판 내내 꺼진다.
             if (snapshot.Inventory != null)
+            {
                 _charmValues = PlanExtensions.Shared.Overlay(snapshot, CharmValueSource.Book, message => Log.Error(message));
+                _extensionNotes = PlanExtensions.Shared.Notes(snapshot, NoteContext(), message => Log.Error(message));
+            }
             var preferences = Preferences();
             _currentCatalogGeneration = CatalogDump.ActiveGeneration;
             _runner.Submit(snapshot, preferences, _currentCatalogGeneration);
@@ -779,6 +787,48 @@ namespace SephPlanner.Plugin
             // 두 번 해싱하는 셈이고, 그 값이 폴링 시간의 절반이었다.
             _currentPlacementFingerprint = _runner.PlacementFingerprint;
             _panelAwaitingRefresh = false;
+        }
+
+        /// <summary>확장에 읽기 전용으로 넘기는 플레이어 지정. 빌드 창에서 바꿀 때만 다시 짓는다.</summary>
+        private ExtensionNoteContext NoteContext()
+        {
+            if (_noteContext == null || _noteContextRevision != _prefs.Revision)
+            {
+                _noteContextRevision = _prefs.Revision;
+                _noteContext = new ExtensionNoteContext(_prefs.Preset() != null, _prefs.PriorityCategories);
+            }
+            return _noteContext;
+        }
+
+        /// <summary>
+        /// F3 "확장 모드" 묶음의 줄들. 창을 짓거나 확장의 줄 하나가 바뀔 때마다 새로 받는다 - 켜기를 끄면 아래 줄이
+        /// 접히는 것처럼, 무엇을 보여 줄지는 확장이 그때그때 정한다.
+        /// </summary>
+        private List<OptionRow> ExtensionRows()
+        {
+            var rows = new List<OptionRow>();
+            var groups = PlanExtensions.Shared.OptionGroups(message => Log.Error(message));
+            if (groups.Count == 0) return rows;
+
+            rows.Add(OptionRow.Heading(Tr("확장 모드")));
+            foreach (var group in groups)
+            {
+                rows.Add(OptionRow.Subheading(group.Disabled
+                    ? Widgets.Literal(group.Title) + "  " + Tr("오류로 새 판까지 꺼짐")
+                    : Widgets.Literal(group.Title)));
+                foreach (var option in group.Options)
+                {
+                    rows.Add(new OptionRow
+                    {
+                        Label = Widgets.Literal(option.Label),
+                        Choices = Array.ConvertAll(option.Choices, Widgets.Literal),
+                        Read = option.Read,
+                        Write = option.Write,
+                        Rebuilds = true,
+                    });
+                }
+            }
+            return rows;
         }
 
         /// <summary>빌드 창이 목록을 채울 재료. 창은 열려 있는 동안 시간이 멈추므로 그때 한 번 읽는다.</summary>
@@ -932,6 +982,7 @@ namespace SephPlanner.Plugin
                 Catalog = CatalogSource.Get(),
                 Prefs = _prefs,
                 Values = _charmValues ?? CharmValueSource.Book,
+                Notes = _extensionNotes,
                 Expanded = _expanded,
                 MixerOpen = mixerOpen,
                 EnchantOpen = enchantOpen,

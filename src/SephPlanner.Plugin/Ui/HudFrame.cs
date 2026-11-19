@@ -1,5 +1,6 @@
 #nullable disable
 using System;
+using SephPlanner.Core.Extensions;
 using SephPlanner.Core.Model;
 using SephPlanner.Core.Planning;
 using SephPlanner.Core.Runtime;
@@ -17,6 +18,9 @@ namespace SephPlanner.Plugin.Ui
         public ICatalog Catalog;
         public PluginPreferences Prefs;
         public CharmValueBook Values = CharmValueBook.Empty;
+
+        /// <summary>확장 모드가 얹은 줄과 후보 꼬리표. 계획을 지을 때 받아 둔 것이다.</summary>
+        public PlanNotes Notes = PlanNotes.Empty;
         public bool Expanded;
         public bool MixerOpen;
 
@@ -67,6 +71,7 @@ namespace SephPlanner.Plugin.Ui
         private readonly object _plan;
         private readonly object _catalog;
         private readonly object _values;
+        private readonly object _notes;
         private readonly string _hint;
         private readonly string _reason;
         private readonly string _previewKey;
@@ -90,6 +95,7 @@ namespace SephPlanner.Plugin.Ui
             _plan = frame.Plan;
             _catalog = frame.Catalog;
             _values = frame.Values;
+            _notes = frame.Notes;
             _hint = frame.Hint;
             _reason = frame.RuntimeVerificationReason;
             _previewKey = frame.PreviewKey;
@@ -120,6 +126,7 @@ namespace SephPlanner.Plugin.Ui
             ReferenceEquals(_plan, other._plan) &&
             ReferenceEquals(_catalog, other._catalog) &&
             ReferenceEquals(_values, other._values) &&
+            ReferenceEquals(_notes, other._notes) &&
             _verification == other._verification &&
             _unexplainedFixedCells == other._unexplainedFixedCells &&
             _prefs == other._prefs &&

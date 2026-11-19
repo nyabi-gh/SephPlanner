@@ -29,7 +29,15 @@ namespace SephPlanner.Plugin.Ui
         /// <summary>고를 값이 없는 줄은 아래 줄들을 묶는 소제목이다.</summary>
         public bool IsHeading => Choices == null && Shortcut == null;
 
+        /// <summary>소제목 아래 한 단 더 작은 이름. 확장 모드 묶음에서 확장마다 하나씩 붙는다.</summary>
+        public bool IsSubheading;
+
+        /// <summary>바꾸면 확장 모드 묶음을 새로 받아 다시 그린다. 켜기를 끄면 아래 줄이 접히는 식이다.</summary>
+        public bool Rebuilds;
+
         public static OptionRow Heading(string label) => new OptionRow { Label = label };
+
+        public static OptionRow Subheading(string label) => new OptionRow { Label = label, IsSubheading = true };
     }
 
     /// <summary>
@@ -49,8 +57,11 @@ namespace SephPlanner.Plugin.Ui
         private enum Tab { Display, Keys, Actions }
 
         private readonly Func<List<OptionRow>> _source;
+        private readonly Func<List<OptionRow>> _extensions;
         private readonly Func<List<ActionRow>> _actions;
         private readonly List<Row> _rows = new List<Row>();
+        private readonly List<Row> _extensionRows = new List<Row>();
+        private RectTransform _extensionArea;
         private readonly List<(OptionRow Option, TextMeshProUGUI Value)> _keys =
             new List<(OptionRow, TextMeshProUGUI)>();
         private readonly ShortcutCapture<KeyCode> _capture =
@@ -75,9 +86,11 @@ namespace SephPlanner.Plugin.Ui
         private Tab _tab;
         private string _result = "";
 
-        public SettingsWindow(Func<List<OptionRow>> source, Func<List<ActionRow>> actions)
+        public SettingsWindow(
+            Func<List<OptionRow>> source, Func<List<OptionRow>> extensions, Func<List<ActionRow>> actions)
         {
             _source = source;
+            _extensions = extensions;
             _actions = actions;
         }
 
@@ -121,16 +134,12 @@ namespace SephPlanner.Plugin.Ui
             {
                 if (option.IsHeading)
                 {
-                    var heading = Widgets.Label(
-                        "Heading_" + option.Label, general, Skin, S(0.75f), NativeSkin.Frame,
-                        TextAlignmentOptions.BottomLeft);
-                    heading.text = option.Label;
-                    Widgets.Fixed(heading.rectTransform, S(1.1f));
+                    Heading(general, option);
                     continue;
                 }
                 if (option.Shortcut == null)
                 {
-                    _rows.Add(new Row(general, Skin, Base, option, Refresh));
+                    _rows.Add(new Row(general, Skin, Base, option, _ => Refresh()));
                     continue;
                 }
                 var line = Widgets.Rect("Key_" + option.Label, shortcuts);
@@ -144,6 +153,9 @@ namespace SephPlanner.Plugin.Ui
                 Button(line, Tr("기본값"), 4f, () => Change(option, option.Reset));
                 _keys.Add((option, value));
             }
+            _extensionArea = Widgets.Rect("Extensions", general);
+            Widgets.Column(_extensionArea, S(0.25f));
+            BuildExtensions();
             FitValueColumn();
             var actions = Widgets.Rect("Actions", controls);
             Widgets.Column(actions, S(0.25f));
@@ -164,6 +176,63 @@ namespace SephPlanner.Plugin.Ui
             var cancelButton = _cancel.GetComponent<Button>();
             cancelButton.navigation = new Navigation { mode = Navigation.Mode.None };
             Show(_tab);
+        }
+
+        private void Heading(RectTransform parent, OptionRow option)
+        {
+            var heading = Widgets.Label(
+                "Heading_" + option.Label, parent, Skin, S(option.IsSubheading ? 0.85f : 0.75f),
+                option.IsSubheading ? NativeSkin.TextBright : NativeSkin.Frame, TextAlignmentOptions.BottomLeft);
+            heading.text = option.Label;
+            Widgets.Fixed(heading.rectTransform, S(option.IsSubheading ? 1.3f : 1.1f));
+        }
+
+        /// <summary>
+        /// "세부 조정" 다음의 확장 모드 묶음. 등록된 확장이 줄을 내놓을 때만 생긴다
+        /// (<see cref="Core.Extensions.IPlanExtensionOptions"/>).
+        /// </summary>
+        private void BuildExtensions()
+        {
+            _extensionRows.Clear();
+            foreach (var option in _extensions())
+            {
+                if (option.IsHeading)
+                {
+                    Heading(_extensionArea, option);
+                    continue;
+                }
+                var position = _extensionRows.Count;
+                _extensionRows.Add(new Row(
+                    _extensionArea, Skin, Base, option,
+                    delta =>
+                    {
+                        if (option.Rebuilds) RebuildExtensions(position, delta);
+                        else Refresh();
+                    }));
+            }
+        }
+
+        /// <summary>
+        /// 확장의 줄 하나가 바뀌었다. 줄을 새로 받아 묶음만 다시 짓는다 - 무엇이 보일지는 확장이 방금 바뀐 값을 보고
+        /// 정한다. 누른 화살표는 사라지므로 같은 자리의 새 화살표로 초점을 옮긴다. 그러지 않으면 패드로는 다음 칸으로
+        /// 갈 길이 끊긴다.
+        /// </summary>
+        private void RebuildExtensions(int position, int delta)
+        {
+            if (_extensionArea == null) return;
+
+            foreach (Transform child in _extensionArea)
+            {
+                child.gameObject.SetActive(false);
+                UnityEngine.Object.Destroy(child.gameObject);
+            }
+            BuildExtensions();
+            FitValueColumn();
+            Refresh();
+
+            if (_extensionRows.Count == 0 || EventSystem.current == null) return;
+            var row = _extensionRows[Mathf.Min(position, _extensionRows.Count - 1)];
+            EventSystem.current.SetSelectedGameObject(delta < 0 ? row.First : row.Last);
         }
 
         private TextMeshProUGUI Button(RectTransform parent, string text, float width, Action click)
@@ -189,9 +258,15 @@ namespace SephPlanner.Plugin.Ui
         private void FitValueColumn()
         {
             var width = S(7f);
-            foreach (var row in _rows) width = Mathf.Max(width, row.WidestChoice() + S(0.6f));
+            foreach (var row in AllRows()) width = Mathf.Max(width, row.WidestChoice() + S(0.6f));
             width = Mathf.Min(width, S(WidthRatio * 0.4f));
-            foreach (var row in _rows) row.SetValueWidth(width);
+            foreach (var row in AllRows()) row.SetValueWidth(width);
+        }
+
+        private IEnumerable<Row> AllRows()
+        {
+            foreach (var row in _rows) yield return row;
+            foreach (var row in _extensionRows) yield return row;
         }
 
         private void Show(Tab tab)
@@ -265,6 +340,8 @@ namespace SephPlanner.Plugin.Ui
         {
             _capture.Cancel();
             _rows.Clear();
+            _extensionRows.Clear();
+            _extensionArea = null;
             _keys.Clear();
             _tabs.Clear();
             _actionButtons.Clear();
@@ -307,7 +384,7 @@ namespace SephPlanner.Plugin.Ui
 
         public override void Refresh()
         {
-            foreach (var row in _rows) row.Refresh();
+            foreach (var row in AllRows()) row.Refresh();
             foreach (var row in _keys)
             {
                 var warning = row.Option.Warning();
@@ -358,8 +435,10 @@ namespace SephPlanner.Plugin.Ui
             /// <summary>이 줄의 첫 화살표. 창을 열 때 컨트롤러 초점을 여기에 준다.</summary>
             public GameObject First { get; private set; }
 
+            public GameObject Last { get; private set; }
+
             public Row(
-                RectTransform parent, NativeSkin skin, float b, OptionRow row, Action changed)
+                RectTransform parent, NativeSkin skin, float b, OptionRow row, Action<int> changed)
             {
                 _row = row;
 
@@ -377,18 +456,18 @@ namespace SephPlanner.Plugin.Ui
                     "Value", line, skin, b * 0.95f, NativeSkin.TextBright, TextAlignmentOptions.Center);
                 _valueSize = Widgets.Fixed(_value.rectTransform, b * 1.5f, b * 7f);
 
-                Arrow(line, skin, b, ">", 1, changed);
+                Last = Arrow(line, skin, b, ">", 1, changed);
             }
 
             private GameObject Arrow(
-                RectTransform line, NativeSkin skin, float b, string glyph, int delta, Action changed)
+                RectTransform line, NativeSkin skin, float b, string glyph, int delta, Action<int> changed)
             {
                 var arrow = Widgets.Clickable(
                     "Arrow", line, skin, b * 1.1f, NativeSkin.TextBright,
                     () =>
                     {
                         Step(delta);
-                        changed();
+                        changed(delta);
                     });
                 arrow.text = glyph;
                 arrow.alignment = TextAlignmentOptions.Center;

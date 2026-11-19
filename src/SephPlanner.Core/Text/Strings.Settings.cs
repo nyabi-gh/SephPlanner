@@ -74,6 +74,8 @@ namespace SephPlanner.Core.Text
             new Entry("진단·업데이트", "Diagnostics & updates", "診断・アップデート", "诊断·更新", "診斷·更新"),
             new Entry("진단", "Diagnostics", "診断", "诊断", "診斷"),
             new Entry("세부 조정", "Fine-tuning", "詳細調整", "细节调整", "細節調整"),
+            new Entry("확장 모드", "Extension mods", "拡張MOD", "扩展模组", "擴充模組"),
+            new Entry("오류로 새 판까지 꺼짐", "Off until the next run (error)", "エラーのため次の探検までオフ", "因错误关闭至下一局", "因錯誤關閉至下一局"),
             new Entry("해제", "Clear", "解除", "解除", "解除"),
             new Entry("기본값", "Default", "初期値", "默认", "預設"),
             new Entry("지정 취소", "Cancel binding", "割り当て中止", "取消设置", "取消設定"),

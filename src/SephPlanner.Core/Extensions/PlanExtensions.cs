@@ -25,6 +25,24 @@ namespace SephPlanner.Core.Extensions
 
         /// <summary>예외를 던지거나 쓸 수 없는 표를 돌려줘 새 판까지 꺼졌는가.</summary>
         public bool Disabled { get; set; }
+
+        /// <summary>
+        /// 마지막으로 HUD 에 얹은 글자(<see cref="IPlanExtensionNotes"/>). 플레이어가 무엇을 보고 제보했는지 가르는
+        /// 단서라 진단 파일에 남긴다. 얹은 것이 없으면 <c>null</c>.
+        /// </summary>
+        public ExtensionNotes? Notes { get; set; }
+    }
+
+    /// <summary>F3 "확장 모드" 묶음에 그릴 확장 하나의 줄들.</summary>
+    public sealed class ExtensionOptionGroup
+    {
+        public string Id { get; set; } = "";
+        public string Title { get; set; } = "";
+
+        /// <summary>실패해 새 판까지 꺼졌는가. 그때는 줄을 받지 않고 이름만 보여 준다.</summary>
+        public bool Disabled { get; set; }
+
+        public List<ExtensionOption> Options { get; set; } = new List<ExtensionOption>();
     }
 
     /// <summary>
@@ -33,16 +51,26 @@ namespace SephPlanner.Core.Extensions
     /// </summary>
     public sealed class ExtensionRegistry
     {
+        /// <summary>확장 하나가 후보 목록 위에 얹을 수 있는 줄 수.</summary>
+        public const int MaxLines = 3;
+
+        /// <summary>
+        /// 후보 꼬리표의 글자 수 상한. 꼬리표는 플래너의 콤보·가격·증가분과 한 칸을 나눠 쓰므로, 길면 그것들을 밀어낸다.
+        /// </summary>
+        public const int MaxTagLength = 12;
+
         private sealed class Slot
         {
             public IPlanExtension Extension = null!;
             public string Id = "";
             public string Version = "";
             public bool Disabled;
+            public ExtensionNotes? Notes;
         }
 
         private readonly object _gate = new object();
         private readonly List<Slot> _slots = new List<Slot>();
+        private PlanNotes _notes = PlanNotes.Empty;
 
         public void Register(IPlanExtension extension)
         {
@@ -84,13 +112,141 @@ namespace SephPlanner.Core.Extensions
                 }
                 catch (Exception ex)
                 {
-                    lock (_gate) slot.Disabled = true;
-                    warn($"확장 {slot.Id}({slot.Version})이 실패해 이번 판 동안 끕니다: {ex}");
+                    Fail(slot, ex, warn);
                     continue;
                 }
                 if (entries != null) book = book.Overlay(entries);
             }
             return book;
+        }
+
+        /// <summary>
+        /// 켜진 확장의 HUD 글자를 받아 합친다. <see cref="Overlay"/>와 같은 때 부른다. 줄은 등록한 순서대로 잇고,
+        /// 같은 후보에 둘이 꼬리표를 주면 값어치 표처럼 나중에 등록한 쪽이 이긴다. 내용이 직전과 같으면 직전 객체를
+        /// 그대로 돌려준다 - HUD 는 객체가 바뀌어야 다시 그린다.
+        /// </summary>
+        public PlanNotes Notes(GameSnapshot snapshot, ExtensionNoteContext context, Action<string> warn)
+        {
+            Slot[] slots;
+            lock (_gate) slots = _slots.ToArray();
+
+            var lines = new List<string>();
+            var candidates = new Dictionary<int, CandidateNote>();
+            foreach (var slot in slots)
+            {
+                ExtensionNotes? notes = null;
+                if (!slot.Disabled && slot.Extension is IPlanExtensionNotes source)
+                {
+                    try
+                    {
+                        notes = Validate(source.Notes(snapshot, context));
+                    }
+                    catch (Exception ex)
+                    {
+                        Fail(slot, ex, warn);
+                        continue;
+                    }
+                }
+                lock (_gate) slot.Notes = notes;
+                if (notes == null) continue;
+
+                lines.AddRange(notes.Lines);
+                foreach (var pair in notes.Candidates) candidates[pair.Key] = pair.Value;
+            }
+
+            var merged = lines.Count == 0 && candidates.Count == 0 ? PlanNotes.Empty : new PlanNotes(lines, candidates);
+            lock (_gate)
+            {
+                if (!merged.SameAs(_notes)) _notes = merged;
+                return _notes;
+            }
+        }
+
+        /// <summary>
+        /// F3 에 그릴 줄들. 줄의 읽기·쓰기는 감싸서 돌려주므로, 확장이 거기서 예외를 던져도 창은 그대로 있고 그
+        /// 확장만 새 판까지 꺼진다.
+        /// </summary>
+        public List<ExtensionOptionGroup> OptionGroups(Action<string> warn)
+        {
+            Slot[] slots;
+            lock (_gate) slots = _slots.ToArray();
+
+            var groups = new List<ExtensionOptionGroup>();
+            foreach (var slot in slots)
+            {
+                if (!(slot.Extension is IPlanExtensionOptions source)) continue;
+
+                var group = new ExtensionOptionGroup { Id = slot.Id, Disabled = slot.Disabled };
+                try
+                {
+                    group.Title = OneLine(source.Title);
+                    if (!group.Disabled)
+                        foreach (var option in source.Options() ?? Array.Empty<ExtensionOption>())
+                        {
+                            var wrapped = Wrap(slot, option, warn);
+                            if (wrapped != null) group.Options.Add(wrapped);
+                        }
+                }
+                catch (Exception ex)
+                {
+                    Fail(slot, ex, warn);
+                    group.Disabled = true;
+                    group.Options.Clear();
+                }
+                if (group.Title.Length == 0) group.Title = slot.Id;
+                groups.Add(group);
+            }
+            return groups;
+        }
+
+        private ExtensionOption? Wrap(Slot slot, ExtensionOption? option, Action<string> warn)
+        {
+            if (option?.Choices == null || option.Choices.Length == 0) return null;
+
+            var choices = Array.ConvertAll(option.Choices, choice => OneLine(choice));
+            var read = option.Read;
+            var write = option.Write;
+            return new ExtensionOption
+            {
+                Label = OneLine(option.Label),
+                Choices = choices,
+                Read = () =>
+                {
+                    if (slot.Disabled || read == null) return 0;
+                    try
+                    {
+                        return read();
+                    }
+                    catch (Exception ex)
+                    {
+                        Fail(slot, ex, warn);
+                        return 0;
+                    }
+                },
+                Write = index =>
+                {
+                    if (slot.Disabled || write == null) return;
+                    try
+                    {
+                        write(index);
+                    }
+                    catch (Exception ex)
+                    {
+                        Fail(slot, ex, warn);
+                    }
+                },
+            };
+        }
+
+        private void Fail(Slot slot, Exception ex, Action<string> warn)
+        {
+            lock (_gate)
+            {
+                if (slot.Disabled) return;
+                slot.Disabled = true;
+                slot.Notes = null;
+            }
+            warn($"확장 {slot.Id}({slot.Version})이 실패해 이번 판 동안 끕니다: {ex}");
         }
 
         /// <summary>새 판이 시작되면 꺼 둔 확장을 다시 켠다.</summary>
@@ -105,8 +261,52 @@ namespace SephPlanner.Core.Extensions
         public List<ExtensionStamp> Stamps()
         {
             lock (_gate)
-                return _slots.ConvertAll(slot => new ExtensionStamp { Id = slot.Id, Version = slot.Version, Disabled = slot.Disabled });
+                return _slots.ConvertAll(slot => new ExtensionStamp
+                {
+                    Id = slot.Id,
+                    Version = slot.Version,
+                    Disabled = slot.Disabled,
+                    Notes = Copy(slot.Notes),
+                });
         }
+
+        private static ExtensionNotes? Copy(ExtensionNotes? notes)
+        {
+            if (notes == null) return null;
+            var copy = new ExtensionNotes { Lines = new List<string>(notes.Lines) };
+            foreach (var pair in notes.Candidates) copy.Candidates[pair.Key] = pair.Value.Copy();
+            return copy;
+        }
+
+        /// <summary>
+        /// 받은 글자를 HUD 에 그릴 수 있는 모양으로 다듬는다. 확장이 나중에 고쳐도 번지지 않게 복사한다.
+        /// 아무것도 남지 않으면 <c>null</c>.
+        /// </summary>
+        private static ExtensionNotes? Validate(ExtensionNotes? notes)
+        {
+            if (notes == null) return null;
+
+            var result = new ExtensionNotes();
+            foreach (var line in notes.Lines ?? new List<string>())
+            {
+                if (result.Lines.Count >= MaxLines) break;
+                var text = OneLine(line);
+                if (text.Length > 0) result.Lines.Add(text);
+            }
+            foreach (var pair in notes.Candidates ?? new Dictionary<int, CandidateNote>())
+            {
+                if (pair.Key <= 0 || pair.Value == null) continue;
+                var tag = OneLine(pair.Value.Tag);
+                if (tag.Length > MaxTagLength) tag = tag.Substring(0, MaxTagLength - 1) + "…";
+                var description = (pair.Value.Description ?? "").Trim();
+                if (tag.Length == 0 && description.Length == 0) continue;
+                result.Candidates[pair.Key] = new CandidateNote { Tag = tag, Description = description };
+            }
+            return result.Lines.Count == 0 && result.Candidates.Count == 0 ? null : result;
+        }
+
+        private static string OneLine(string? text) =>
+            string.IsNullOrEmpty(text) ? "" : text!.Replace("\r\n", " ").Replace('\n', ' ').Replace('\r', ' ').Trim();
 
         private static List<CharmValueEntry>? Validate(CharmValueFile? file)
         {

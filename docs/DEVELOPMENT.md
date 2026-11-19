@@ -111,8 +111,8 @@ dotnet build src/SephPlanner.Workshop -c Release -p:PackWorkshop=true -p:DeployT
 ### 확장 모드
 
 다른 창작마당 모드가 판 상황에 맞춰 아티팩트 값어치를 덮어 넣는 통로다(`SephPlanner.Core.Extensions`). **실험적이다.**
-처음 몇 판 동안은 모양이 바뀔 수 있고, 약속하는 것은 `IPlanExtension` 과 `CharmValueEntry` 뿐이다. Core 의 다른 형식은
-예고 없이 바뀐다.
+처음 몇 판 동안은 모양이 바뀔 수 있고, 약속하는 것은 `IPlanExtension` 과 `CharmValueEntry`, 같은 객체에 골라 붙이는
+`IPlanExtensionOptions`·`IPlanExtensionNotes` 뿐이다. Core 의 다른 형식은 예고 없이 바뀐다.
 
 - 확장은 자기 `OnModLoaded` 에서 `PlanExtensions.Register` 를 한 번 부른다. `IPlanExtension.Values` 는 계획을 지을 때마다
   메인 스레드에서 불리고, 돌려준 표는 기본 표(`data/values/charms.json`) 위에 덮인다. 엔티티 번호나 식별자 어느 한쪽이라도 같은
@@ -125,6 +125,20 @@ dotnet build src/SephPlanner.Workshop -c Release -p:PackWorkshop=true -p:DeployT
   시작될 때까지 끄고 로그에 남긴다. 플래너는 기본 표로 계속 돈다.
 - 확장의 이름과 어셈블리 버전은 진단의 `report.json` 과 재현 자료(`Extensions`)에 남는다. 덮인 표는 재현 자료의 계산 설정에
   통째로 실리므로 확장 없이도 재현된다.
+- **F3 설정 줄(`IPlanExtensionOptions`).** 확장은 `Title` 과 `Options()` 만 준다. 줄 하나는 `Label`·`Choices`·`Read`(지금
+  선택지 번호)·`Write`(번호를 받아 저장)라 F3 의 `< 값 >` 줄과 같은 모양으로 그린다. 묶음은 "세부 조정" 다음이고, 이것을 구현한
+  확장이 있을 때만 생긴다. 켜기는 따로 두지 않고 확장의 첫 줄로 받는다. 줄을 바꿀 때마다 `Options()` 를 다시 받아 묶음을
+  다시 그리므로, 꺼져 있을 때 켜기 줄만 돌려주면 아래 줄이 접힌다(그때 `Values`·`Notes` 는 `null`). 저장은 확장이 하고, 확장의 글은
+  번역하지 않는다 - 확장이 `Localization.Current` 를 읽어 맞춘다.
+- **HUD 글자(`IPlanExtensionNotes`).** `Notes(GameSnapshot, ExtensionNoteContext)` 는 `Values` 와 같은 때 메인 스레드에서 불리고,
+  HUD 는 받아 둔 것을 그린다. `Lines` 는 확장마다 최대 3줄, 후보 목록 바로 위에 서고 한 줄씩 넘치면 잘린다(자리는 모든 확장을 합쳐
+  3줄). `Candidates` 는 아티팩트 정의 번호를 열쇠로 짧은 `Tag`(8글자 안팎, 12자에서 자름)와 긴 `Description` 을 받는다. 꼬리표는
+  후보 줄 오른쪽 맨 앞에, 설명은 마우스를 올렸을 때 뜨는 쪽지 끝에 붙는다. 줄 끝에 이미 우리 증가분 숫자가 있으므로 꼬리표에는
+  숫자를 넣지 말고 수치는 설명으로 보낸다. 색과 서식은 우리가 정하고 서식 태그는 글자 그대로 보인다.
+- `ExtensionNoteContext` 는 가져온 빌드가 있는지와 플레이어가 고른 콤보 우선 카테고리를 읽기 전용으로 준다. 플레이어가 명시한
+  것은 계산이 추정한 순서보다 앞서므로 확장이 그것을 덮지 못한다. 겹치면 확장 줄로 알린다.
+- `Options()`·`Read`·`Write`·`Notes` 가 예외를 던져도 `Values` 와 같이 그 확장만 새 판까지 끈다. 꺼진 확장은 F3 에 이름과 "오류로
+  새 판까지 꺼짐" 만 남는다. HUD 에 얹은 글은 `report.json`·재현 자료의 `Extensions[].Notes` 에 남는다.
 - 패키지 규칙은 [게임 내부 조사](RESEARCH.md)의 "모드 사이의 의존" 에 있다. 요약하면 `dependencies` 에 `nyabi.sephplanner` 를
   `version` 없이 적고, `SephPlanner.Plugin.dll`·`SephPlanner.Core.dll` 을 동봉하지 않는다. 게임에는 DLL 없는 `data` 모듈도
   있지만 플래너는 그것을 읽지 않는다. 고정된 표라도 DLL 로 `Register` 해야 한다.
