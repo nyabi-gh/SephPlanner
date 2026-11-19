@@ -40,12 +40,18 @@ public static class DiagnosticServer
         builder.Services.AddRateLimiter(limits =>
         {
             limits.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            // 보낸 곳마다 따로 센다. 하나로 세면 느리게 흘리는 연결 둘이 모두의 업로드를 막는다.
-            limits.AddPolicy("upload", context => RateLimitPartition.GetFixedWindowLimiter(SourceOf(context), _ => new FixedWindowRateLimiterOptions
-            { PermitLimit = options.UploadsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
-            limits.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
-                context.Request.Method == "POST" ? RateLimitPartition.GetConcurrencyLimiter(SourceOf(context), _ => new ConcurrencyLimiterOptions
-                { PermitLimit = options.ConcurrentUploads, QueueLimit = 0 }) : RateLimitPartition.GetNoLimiter("read"));
+            // 보낸 곳마다 세고 서버 전체로도 센다. 곳마다만 세면 주소를 여럿 쓰는 쪽이 업로드를 끝없이 겹쳐 메모리와 디스크를
+            // 다 쓰고, 전체로만 세면 느리게 흘리는 연결 둘이 모두의 업로드를 막는다. 동시 처리를 앞에 두어, 동시 처리에서
+            // 거절된 요청은 빈도 몫을 쓰지 않는다.
+            limits.GlobalLimiter = PartitionedRateLimiter.CreateChained(
+                Uploads(context => RateLimitPartition.GetConcurrencyLimiter(SourceOf(context), _ => new ConcurrencyLimiterOptions
+                { PermitLimit = options.ConcurrentUploads, QueueLimit = 0 })),
+                Uploads(_ => RateLimitPartition.GetConcurrencyLimiter("", _ => new ConcurrencyLimiterOptions
+                { PermitLimit = options.TotalConcurrentUploads, QueueLimit = 0 })),
+                Uploads(context => RateLimitPartition.GetFixedWindowLimiter(SourceOf(context), _ => new FixedWindowRateLimiterOptions
+                { PermitLimit = options.UploadsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })),
+                Uploads(_ => RateLimitPartition.GetFixedWindowLimiter("", _ => new FixedWindowRateLimiterOptions
+                { PermitLimit = options.TotalUploadsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
         });
         var app = builder.Build();
         app.UseForwardedHeaders();
@@ -74,7 +80,7 @@ public static class DiagnosticServer
         app.MapGet("/health", (DiagnosticHealth health) => health.Failure is { } failure
             ? Results.Text(failure, statusCode: StatusCodes.Status503ServiceUnavailable)
             : Results.Text("ok"));
-        app.MapPost("/api/v1/reports", Receive).RequireRateLimiting("upload");
+        app.MapPost("/api/v1/reports", Receive);
         app.MapGet("/admin/reports", async (int? offset, DiagnosticStore store, CancellationToken cancellation) =>
             offset is < 0 ? Results.BadRequest() : Results.Ok(await store.ListAsync(offset ?? 0, cancellation)));
         app.MapGet("/admin/reports/{id}", async (string id, DiagnosticStore store, CancellationToken cancellation) =>
@@ -121,6 +127,10 @@ public static class DiagnosticServer
         catch (DecoderFallbackException) { return Results.BadRequest(); }
         catch (OperationCanceledException) when (timeout.IsCancellationRequested) { return Results.StatusCode(StatusCodes.Status408RequestTimeout); }
     }
+
+    private static PartitionedRateLimiter<HttpContext> Uploads(Func<HttpContext, RateLimitPartition<string>> partition) =>
+        PartitionedRateLimiter.Create<HttpContext, string>(context =>
+            context.Request.Method == "POST" ? partition(context) : RateLimitPartition.GetNoLimiter("read"));
 
     /// <summary>
     /// 한도와 몫을 나누는 단위. 전달 헤더를 푼 뒤의 주소다. IPv6 는 한 회선이 /64 를 통째로 받는 것이 보통이라

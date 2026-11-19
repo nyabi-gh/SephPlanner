@@ -230,20 +230,7 @@ public sealed class DiagnosticServerTests
     public async Task ASlowUploadHoldsOnlyItsOwnSourceSlot()
     {
         await using var server = await DiagnosticTestServer.StartAsync(options => options.ConcurrentUploads = 1);
-        var stalled = new StalledContent();
-        var slowId = Guid.NewGuid();
-        using var slow = new HttpRequestMessage(HttpMethod.Post, "/api/v1/reports") { Content = stalled };
-        slow.Headers.Add("X-SephPlanner-Report-Id", slowId.ToString("N"));
-        slow.Headers.Add("X-SephPlanner-SHA256", new string('0', 64));
-        slow.Headers.Add("X-Forwarded-For", "203.0.113.9");
-        var pending = server.Client.SendAsync(slow);
-        await stalled.Started.Task.WaitAsync(TimeSpan.FromSeconds(10));
-        // 저장소가 임시 파일을 만들었으면 느린 요청이 한도를 지나 몫을 쥔 것이다. 그 전에 다른 요청을 보내면
-        // 그쪽이 먼저 몫을 쥐어 느린 요청이 거절될 수 있다.
-        var deadline = DateTime.UtcNow.AddSeconds(10);
-        while (!Directory.EnumerateFiles(server.Options.StorageDirectory, "*.upload").Any() && DateTime.UtcNow < deadline)
-            await Task.Delay(10);
-        Assert.NotEmpty(Directory.EnumerateFiles(server.Options.StorageDirectory, "*.upload"));
+        var (stalled, pending) = await StartStalledUpload(server, "203.0.113.9");
 
         var probe = Guid.NewGuid();
         using var same = await server.Upload(probe, Payload(probe), from: "203.0.113.9");
@@ -256,6 +243,59 @@ public sealed class DiagnosticServerTests
         stalled.Release.SetResult();
         using var finished = await pending;
         Assert.Equal(HttpStatusCode.BadRequest, finished.StatusCode);
+    }
+
+    /// <summary>곳마다만 세면 주소를 여럿 쓰는 쪽이 업로드를 끝없이 겹친다. 서버 전체의 동시 처리에도 상한이 있다.</summary>
+    [Fact]
+    public async Task ManySourcesCannotExceedTheServerWideConcurrency()
+    {
+        await using var server = await DiagnosticTestServer.StartAsync(options => options.TotalConcurrentUploads = 1);
+        var (stalled, pending) = await StartStalledUpload(server, "203.0.113.9");
+
+        var other = Guid.NewGuid();
+        using (var response = await server.Upload(other, Payload(other), from: "198.51.100.7"))
+            Assert.Equal(HttpStatusCode.TooManyRequests, response.StatusCode);
+
+        stalled.Release.SetResult();
+        using (await pending) { }
+        using var afterwards = await server.Upload(other, Payload(other), from: "198.51.100.7");
+        Assert.Equal(HttpStatusCode.Created, afterwards.StatusCode);
+    }
+
+    [Fact]
+    public async Task ManySourcesCannotExceedTheServerWideRate()
+    {
+        await using var server = await DiagnosticTestServer.StartAsync(options => options.TotalUploadsPerMinute = 2);
+        foreach (var (from, expected) in new[]
+                 {
+                     ("203.0.113.9", HttpStatusCode.Created), ("198.51.100.7", HttpStatusCode.Created),
+                     ("192.0.2.33", HttpStatusCode.TooManyRequests),
+                 })
+        {
+            var id = Guid.NewGuid();
+            using var response = await server.Upload(id, Payload(id), from: from);
+            Assert.True(expected == response.StatusCode, $"{from}: {response.StatusCode}");
+        }
+    }
+
+    /// <summary>본문을 조금 보낸 뒤 멈춘 업로드를 연다. 서버가 그 요청으로 동시 처리 몫을 쥔 뒤에 돌려준다.</summary>
+    private static async Task<(StalledContent Stalled, Task<HttpResponseMessage> Pending)> StartStalledUpload(
+        DiagnosticTestServer server, string from)
+    {
+        var stalled = new StalledContent();
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/reports") { Content = stalled };
+        request.Headers.Add("X-SephPlanner-Report-Id", Guid.NewGuid().ToString("N"));
+        request.Headers.Add("X-SephPlanner-SHA256", new string('0', 64));
+        request.Headers.Add("X-Forwarded-For", from);
+        var pending = server.Client.SendAsync(request);
+        await stalled.Started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        // 저장소가 임시 파일을 만들었으면 느린 요청이 한도를 지나 몫을 쥔 것이다. 그 전에 다른 요청을 보내면
+        // 그쪽이 먼저 몫을 쥐어 느린 요청이 거절될 수 있다.
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (!Directory.EnumerateFiles(server.Options.StorageDirectory, "*.upload").Any() && DateTime.UtcNow < deadline)
+            await Task.Delay(10);
+        Assert.NotEmpty(Directory.EnumerateFiles(server.Options.StorageDirectory, "*.upload"));
+        return (stalled, pending);
     }
 
     private sealed class StalledContent : HttpContent

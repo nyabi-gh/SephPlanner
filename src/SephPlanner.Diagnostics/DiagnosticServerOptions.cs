@@ -14,15 +14,21 @@ public sealed class DiagnosticServerOptions
     public int MaximumReportsPerSource { get; set; } = 50;
     public long MaximumStorageBytesPerSource { get; set; } = 64L * 1024 * 1024;
     public int RetentionDays { get; set; } = 14;
-    public int UploadsPerMinute { get; set; } = 30;
+    // 빈도와 동시 처리는 보낸 곳마다 하나, 서버 전체로 하나다. 게임은 한 번 켤 때 1분에 하나만 보내므로 곳마다의 빈도는
+    // 공유기 뒤 몇 사람을 감안한 값이다. 전체 동시 처리는 업로드 하나가 받는 동안 메모리에 압축 8MB 와 풀린 16MB 까지
+    // 쥐는 것을 보고 정했다. 모두 추정값이다.
+    public int UploadsPerMinute { get; set; } = 10;
+    public int TotalUploadsPerMinute { get; set; } = 60;
     public int ConcurrentUploads { get; set; } = 2;
+    public int TotalConcurrentUploads { get; set; } = 8;
     public int UploadTimeoutSeconds { get; set; } = 60;
 
     public void Validate()
     {
         if (!Path.IsPathFullyQualified(StorageDirectory) || !Path.IsPathFullyQualified(AdminTokenFile) ||
-            MaximumStorageBytes <= 0 || MaximumReports <= 0 || MaximumReportsPerSource <= 0 || MaximumStorageBytesPerSource <= 0 || RetentionDays is < 1 or > 14 || UploadsPerMinute <= 0 ||
-            ConcurrentUploads <= 0 || UploadTimeoutSeconds <= 0 || TrustedProxies.Length == 0 ||
+            MaximumStorageBytes <= 0 || MaximumReports <= 0 || MaximumReportsPerSource <= 0 || MaximumStorageBytesPerSource <= 0 ||
+            RetentionDays is < 1 or > 14 || UploadsPerMinute <= 0 || TotalUploadsPerMinute <= 0 ||
+            ConcurrentUploads <= 0 || TotalConcurrentUploads <= 0 || UploadTimeoutSeconds <= 0 || TrustedProxies.Length == 0 ||
             TrustedProxies.Any(value => !System.Net.IPAddress.TryParse(value, out _)))
             throw new InvalidOperationException("진단 서버의 경로 또는 운영 제한 설정이 올바르지 않습니다.");
     }
