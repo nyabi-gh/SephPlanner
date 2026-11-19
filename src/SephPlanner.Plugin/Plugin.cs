@@ -240,7 +240,8 @@ namespace SephPlanner.Plugin
                 Log.Error(label + " 실패 - " + ex);
                 if (diagnose) _owedDiagnostics.Add(label);
             }
-            if (_owedDiagnostics.Contains(label) && !QueueAutomaticDiagnostic(stage, ex.ToString()))
+            // 막힌 동안 묻지 않는다. 자동 진단을 거절한 실행에서는 늘 막혀 있어, 그러지 않으면 스택 문자열을 매 프레임 짓는다.
+            if (_owedDiagnostics.Contains(label) && !AutomaticQueueBlocked() && !QueueAutomaticDiagnostic(stage, ex.ToString()))
                 _owedDiagnostics.Remove(label);
         }
 

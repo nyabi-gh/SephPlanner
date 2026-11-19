@@ -171,11 +171,15 @@ namespace SephPlanner.Plugin
             }
         }
 
+        /// <summary>큐가 잠시 막혔다(동의 전, 다른 진단 처리 중, 답할 창이 떠 있음, 전송 간격). 이때는 내밀 것을 지을 필요도 없다.</summary>
+        private bool AutomaticQueueBlocked() =>
+            !_settings.AutomaticDiagnosticAllowed || _automaticIncident != null ||
+            _diagnosticTask != null || _pendingDiagnostic != null || AnsweringWindowOpen() ||
+            !_diagnosticThrottle.Ready;
+
         private bool TryQueueAutomaticDiagnostic(string stage, string detail, PlanFailure failure, string sameCause)
         {
-            if (!_settings.AutomaticDiagnosticAllowed || _automaticIncident != null ||
-                _diagnosticTask != null || _pendingDiagnostic != null || AnsweringWindowOpen() ||
-                !_diagnosticThrottle.Ready) return true;
+            if (AutomaticQueueBlocked()) return true;
             var redacted = _diagnosticLog.Redact(detail);
             var key = sameCause == null ? redacted : _diagnosticLog.Redact(sameCause);
             if (!_automaticPolicy.TryAccept(stage + "|" + key, _diagnosticThrottle, out var later)) return later;
