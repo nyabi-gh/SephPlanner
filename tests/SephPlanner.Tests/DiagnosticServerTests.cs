@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
@@ -5,6 +6,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using SephPlanner.Core.Runtime;
 using SephPlanner.Diagnostics;
 
@@ -116,7 +118,7 @@ public sealed class DiagnosticServerTests
         var archive = Payload(id);
         using (var store = new DiagnosticStore(options))
         using (var input = new MemoryStream(archive))
-            Assert.Equal(DiagnosticSaveResult.Created, await store.SaveAsync(id, DiagnosticArchive.Hash(archive), input, CancellationToken.None));
+            Assert.Equal(DiagnosticSaveResult.Created, await store.SaveAsync(id, DiagnosticArchive.Hash(archive), input, "127.0.0.1", CancellationToken.None));
         File.SetLastWriteTimeUtc(Path.Combine(directory.Path, id.ToString("N") + ".zip"), DateTime.UtcNow.AddDays(-15));
         File.WriteAllText(Path.Combine(directory.Path, Guid.NewGuid().ToString("N") + ".upload"), "미완료");
         using var restarted = new DiagnosticStore(options);
@@ -163,6 +165,169 @@ public sealed class DiagnosticServerTests
         Assert.Equal("", rows[without.ToString("N")].GetProperty("category").GetString());
         Assert.Equal("", rows[without.ToString("N")].GetProperty("note").GetString());
     }
+
+    private static byte[] WithNote(Guid id, object note) => DiagnosticArchive.Create(new Dictionary<string, string>
+    {
+        ["report.json"] = JsonSerializer.Serialize(new { Version = DiagnosticArchive.SchemaVersion, ReportId = id.ToString("N"), Note = note }),
+    });
+
+    [Theory]
+    [InlineData(DiagnosticNote.MaximumTextLength, HttpStatusCode.Created)]
+    [InlineData(DiagnosticNote.MaximumTextLength + 1, HttpStatusCode.BadRequest)]
+    public async Task TheServerHoldsTheNoteToTheClientLimit(int length, HttpStatusCode expected)
+    {
+        await using var server = await DiagnosticTestServer.StartAsync();
+        var id = Guid.NewGuid();
+        using var response = await server.Upload(id, WithNote(id, new { Category = "other", CategoryLabel = "기타", Text = new string('가', length) }));
+        Assert.Equal(expected, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ANoteThatIsNotTextIsRejected()
+    {
+        await using var server = await DiagnosticTestServer.StartAsync();
+        var id = Guid.NewGuid();
+        using var response = await server.Upload(id, WithNote(id, new { Text = new[] { "가" } }));
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    /// <summary>제한 전에 받은 자료가 목록을 부풀리거나 관리자 터미널을 조작하지 못하게 읽을 때도 자른다.</summary>
+    [Fact]
+    public async Task ListingTrimsLongNotesAndControlCharactersAlreadyOnDisk()
+    {
+        await using var server = await DiagnosticTestServer.StartAsync();
+        var id = Guid.NewGuid();
+        await File.WriteAllBytesAsync(Path.Combine(server.Options.StorageDirectory, id.ToString("N") + ".zip"),
+            WithNote(id, new { CategoryLabel = "기타", Text = "\u001b[2J첫 줄\n" + new string('가', 100_000) }));
+
+        server.Authorize();
+        using var json = JsonDocument.Parse(await server.Client.GetStringAsync("/admin/reports"));
+        var note = Assert.Single(json.RootElement.EnumerateArray()).GetProperty("note").GetString()!;
+        Assert.Equal(DiagnosticNote.MaximumTextLength, note.Length);
+        Assert.StartsWith(" [2J첫 줄\n가", note);
+    }
+
+    [Fact]
+    public async Task OneSourceCannotFillTheArchiveForEveryoneElse()
+    {
+        await using var server = await DiagnosticTestServer.StartAsync(options => options.MaximumReportsPerSource = 2);
+        foreach (var (from, expected) in new[]
+                 {
+                     ("203.0.113.9", HttpStatusCode.Created), ("203.0.113.9", HttpStatusCode.Created),
+                     ("203.0.113.9", HttpStatusCode.TooManyRequests), ("198.51.100.7", HttpStatusCode.Created),
+                     ("2001:db8:1:2::1", HttpStatusCode.Created), ("2001:db8:1:2::ffff", HttpStatusCode.Created),
+                     ("2001:db8:1:2:abcd::1", HttpStatusCode.TooManyRequests), ("2001:db8:1:3::1", HttpStatusCode.Created),
+                 })
+        {
+            var id = Guid.NewGuid();
+            using var response = await server.Upload(id, Payload(id), from: from);
+            Assert.True(expected == response.StatusCode, $"{from}: {response.StatusCode}");
+        }
+        Assert.Equal(6, Directory.GetFiles(server.Options.StorageDirectory).Length);
+    }
+
+    [Fact]
+    public async Task ASlowUploadHoldsOnlyItsOwnSourceSlot()
+    {
+        await using var server = await DiagnosticTestServer.StartAsync(options => options.ConcurrentUploads = 1);
+        var stalled = new StalledContent();
+        var slowId = Guid.NewGuid();
+        using var slow = new HttpRequestMessage(HttpMethod.Post, "/api/v1/reports") { Content = stalled };
+        slow.Headers.Add("X-SephPlanner-Report-Id", slowId.ToString("N"));
+        slow.Headers.Add("X-SephPlanner-SHA256", new string('0', 64));
+        slow.Headers.Add("X-Forwarded-For", "203.0.113.9");
+        var pending = server.Client.SendAsync(slow);
+        await stalled.Started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        // 저장소가 임시 파일을 만들었으면 느린 요청이 한도를 지나 몫을 쥔 것이다. 그 전에 다른 요청을 보내면
+        // 그쪽이 먼저 몫을 쥐어 느린 요청이 거절될 수 있다.
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (!Directory.EnumerateFiles(server.Options.StorageDirectory, "*.upload").Any() && DateTime.UtcNow < deadline)
+            await Task.Delay(10);
+        Assert.NotEmpty(Directory.EnumerateFiles(server.Options.StorageDirectory, "*.upload"));
+
+        var probe = Guid.NewGuid();
+        using var same = await server.Upload(probe, Payload(probe), from: "203.0.113.9");
+        Assert.Equal(HttpStatusCode.TooManyRequests, same.StatusCode);
+
+        var other = Guid.NewGuid();
+        using var response = await server.Upload(other, Payload(other), from: "198.51.100.7");
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        stalled.Release.SetResult();
+        using var finished = await pending;
+        Assert.Equal(HttpStatusCode.BadRequest, finished.StatusCode);
+    }
+
+    private sealed class StalledContent : HttpContent
+    {
+        internal TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public StalledContent() => Headers.ContentType = new MediaTypeHeaderValue("application/zip");
+
+        protected override async Task SerializeToStreamAsync(Stream stream, TransportContext? context)
+        {
+            await stream.WriteAsync(new byte[16]);
+            await stream.FlushAsync();
+            Started.SetResult();
+            await Release.Task;
+        }
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = 0;
+            return false;
+        }
+    }
+
+    [Fact]
+    public async Task APruneFailureKeepsTheServiceRunningAndShowsOnHealth()
+    {
+        using var directory = new DiagnosticTestDirectory();
+        var options = new DiagnosticServerOptions { StorageDirectory = Path.Combine(directory.Path, "reports") };
+        using var store = new DiagnosticStore(options);
+        var health = new DiagnosticHealth();
+        Directory.Delete(options.StorageDirectory);
+        using var retention = new DiagnosticRetention(store, health, NullLogger<DiagnosticRetention>.Instance);
+
+        await retention.StartAsync(CancellationToken.None);
+        for (var attempt = 0; attempt < 100 && health.Failure is null; attempt++) await Task.Delay(20);
+
+        Assert.NotNull(health.Failure);
+        Assert.False(retention.ExecuteTask!.IsCompleted);
+        await retention.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task HealthReportsAFailedPrune()
+    {
+        await using var server = await DiagnosticTestServer.StartAsync();
+        server.Health.Failure = "보관 기한이 지난 진단을 지우지 못했습니다.";
+        using var failing = await server.Client.GetAsync("/health");
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, failing.StatusCode);
+        server.Health.Failure = null;
+        using var healthy = await server.Client.GetAsync("/health");
+        Assert.Equal(HttpStatusCode.OK, healthy.StatusCode);
+    }
+
+    [Fact]
+    public async Task OneReportThatIsNotUtf8DoesNotBreakTheListing()
+    {
+        await using var server = await DiagnosticTestServer.StartAsync();
+        var good = Guid.NewGuid();
+        using (var response = await server.Upload(good, Payload(good))) Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var broken = Path.Combine(server.Options.StorageDirectory, Guid.NewGuid().ToString("N") + ".zip");
+        using (var file = File.Create(broken))
+        using (var archive = new ZipArchive(file, ZipArchiveMode.Create))
+        using (var entry = archive.CreateEntry("report.json").Open())
+            entry.Write([0x7b, 0xff, 0xfe, 0x7d]);
+
+        server.Authorize();
+        using var list = await server.Client.GetAsync("/admin/reports");
+        Assert.Equal(HttpStatusCode.OK, list.StatusCode);
+        using var json = JsonDocument.Parse(await list.Content.ReadAsStringAsync());
+        Assert.Equal(2, json.RootElement.GetArrayLength());
+    }
 }
 
 internal sealed class DiagnosticTestServer : IAsyncDisposable
@@ -172,6 +337,7 @@ internal sealed class DiagnosticTestServer : IAsyncDisposable
     private WebApplication? _app;
     internal HttpClient Client { get; private set; } = null!;
     internal DiagnosticServerOptions Options { get; private set; } = null!;
+    internal DiagnosticHealth Health => _app!.Services.GetRequiredService<DiagnosticHealth>();
 
     internal static async Task<DiagnosticTestServer> StartAsync(Action<DiagnosticServerOptions>? configure = null)
     {
@@ -207,9 +373,10 @@ internal sealed class DiagnosticTestServer : IAsyncDisposable
 
     internal void Authorize() => Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _token);
 
-    internal async Task<HttpResponseMessage> Upload(Guid id, byte[] archive, string? hash = null)
+    internal async Task<HttpResponseMessage> Upload(Guid id, byte[] archive, string? hash = null, string? from = null)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/reports");
+        if (from != null) request.Headers.Add("X-Forwarded-For", from);
         request.Headers.Add("X-SephPlanner-Report-Id", id.ToString("N"));
         request.Headers.Add("X-SephPlanner-SHA256", hash ?? DiagnosticArchive.Hash(archive));
         // 서버가 너무 큰 본문을 다 받기 전에 거절하면 보내던 연결이 끊겨 응답 대신 소켓 오류가
