@@ -834,15 +834,20 @@ namespace SephPlanner.Plugin.Ui
             _offers.End();
 
             // 후보가 있는데 아직 조언이 안 붙었으면 그렇다고 말한다. 배치가 먼저 게시되므로
-            // 창을 연 직후의 빈 칸은 "볼 것이 없다" 가 아니다.
-            var pending = plan.Offers.Count == 0 && (frame.AdviceBusy || frame.AdviceFailed) &&
+            // 창을 연 직후의 빈 칸은 "볼 것이 없다" 가 아니다. 조언이 실패하면 목록은 직전 계산이
+            // 남은 것이므로, 목록이 있어도 실패를 먼저 알린다.
+            var pending = plan.Offers.Count == 0 && frame.AdviceBusy &&
                           frame.Snapshot != null && frame.Snapshot.Offers.Count > 0;
-            _offerNotice.text = pending
-                ? frame.AdviceFailed ? Tr("후보 계산 실패 - 잠시 뒤 다시 계산합니다.") : Tr("후보를 계산하고 있습니다.")
+            var failed = frame.AdviceFailed && frame.Snapshot != null && frame.Snapshot.Offers.Count > 0;
+            _offerNotice.text = failed ? Tr("후보 계산 실패 - 잠시 뒤 다시 계산합니다.")
+                : pending ? Tr("후보를 계산하고 있습니다.")
                 : guessed > 0
                     ? Tr("효과를 충분히 비교하지 못한 아이템이 있습니다. 실제 체감도 함께 고려하세요.")
                     : Tr("순위는 참고용입니다.");
-            Widgets.SetActive(_offerNotice, plan.Offers.Count > 0 || pending);
+            var noticed = plan.Offers.Count > 0 || pending || failed;
+            Widgets.SetActive(_offerNotice, noticed);
+            // 안내는 칸 안에 있다. 줄이 하나도 없으면 End 가 칸째 끄므로 안내만 켜서는 보이지 않는다.
+            Widgets.SetActive(_offers.Root, noticed);
         }
 
         private static Color NameTone(OfferAdvice advice) =>
@@ -920,6 +925,9 @@ namespace SephPlanner.Plugin.Ui
             Plan plan, EnchantChanceState chance, bool enchantOpen, bool adviceBusy, bool adviceFailed, bool planDrawn)
         {
             _enchants.Begin();
+            // 실패하면 목록은 직전 계산이 남은 것이다. 남은 줄이 있어도 실패를 먼저 알린다.
+            if (enchantOpen && adviceFailed)
+                _enchants.Add(Tr("계산 실패"), Tr("잠시 뒤 다시 계산합니다."), NativeSkin.Bad);
             for (var i = 0; i < plan.Enchants.Count && i < EnchantRows; i++)
             {
                 var advice = plan.Enchants[i];
@@ -936,12 +944,10 @@ namespace SephPlanner.Plugin.Ui
                           + Explain.Join(Explain.Enchant(advice)),
                     planDrawn ? EnchantBadges(plan, advice) : null);
             }
-            if (enchantOpen && plan.Enchants.Count == 0)
+            if (enchantOpen && plan.Enchants.Count == 0 && !adviceFailed)
             {
                 // 조언은 배치보다 뒤에 붙는다. 그 사이에 "없음" 이라고 하면 거짓말이 된다.
-                if (adviceFailed)
-                    _enchants.Add(Tr("계산 실패"), Tr("잠시 뒤 다시 계산합니다."), NativeSkin.Bad);
-                else if (adviceBusy)
+                if (adviceBusy)
                     _enchants.Add(Tr("계산 중"), Tr("인챈트 추천을 계산하고 있습니다."), NativeSkin.TextDim);
                 else
                     _enchants.Add(Tr("추천 대상 없음"), chance == null ? Tr("제단 정보를 읽는 중입니다.") :
@@ -957,6 +963,9 @@ namespace SephPlanner.Plugin.Ui
         private void RenderMixes(Plan plan, MixerState mixer, bool mixerOpen, bool adviceBusy, bool adviceFailed, bool planDrawn)
         {
             _mixes.Begin();
+            // 실패하면 목록은 직전 계산이 남은 것이다. 남은 줄이 있어도 실패를 먼저 알린다.
+            if (mixerOpen && adviceFailed)
+                _mixes.Add(Tr("계산 실패"), Tr("잠시 뒤 다시 계산합니다."), NativeSkin.Bad);
             for (var i = 0; i < plan.Mixes.Count && i < MixRows; i++)
             {
                 var advice = plan.Mixes[i];
@@ -975,12 +984,10 @@ namespace SephPlanner.Plugin.Ui
                     () => Explain.Join(Explain.Mix(advice, _skin.FirstMark, _skin.SecondMark)),
                     planDrawn ? MixBadges(plan, advice) : null);
             }
-            if (mixerOpen && plan.Mixes.Count == 0)
+            if (mixerOpen && plan.Mixes.Count == 0 && !adviceFailed)
             {
                 // 조언은 배치보다 뒤에 붙는다. 그 사이에 "없음" 이라고 하면 거짓말이 된다.
-                if (adviceFailed)
-                    _mixes.Add(Tr("계산 실패"), Tr("잠시 뒤 다시 계산합니다."), NativeSkin.Bad);
-                else if (adviceBusy)
+                if (adviceBusy)
                     _mixes.Add(Tr("계산 중"), Tr("합성 추천을 계산하고 있습니다."), NativeSkin.TextDim);
                 else
                     _mixes.Add(Tr("추천 조합 없음"), mixer == null ? Tr("합성기 정보를 읽는 중입니다.") :
