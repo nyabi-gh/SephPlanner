@@ -434,6 +434,9 @@ public class BreakthroughAdversarialTests
         Assert.Equal(target.Offset(0, 1), solved.CharmPositions[4]);
         Assert.Equal(target.Offset(0, 2), solved.CharmPositions[3]);
         Assert.Equal(2, solved.SupportTargetMatches);
+        // 콤보를 못 보인 까닭도 지정 대상 때문이라고 말해야 한다. 일반 문구면 사용자가 없는 자리를 찾는다.
+        Assert.Contains(4, solved.UnmatchedComboCharms);
+        Assert.Contains("강화하느라", PriorityPlacement.FailureReason(problem, problem.Charms.Single(charm => charm.InstanceId == 4), solved));
     }
 
     /// <summary>희귀도 조건이 이미 맞는 대상에게는 돌파가 풀어 줄 것이 없다. 지원으로 세지 않으니 콤보가 데려간다.</summary>

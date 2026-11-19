@@ -550,6 +550,9 @@ namespace SephPlanner.Core.Solver
         /// </summary>
         public List<int> UnmatchedSupportCharms { get; } = new List<int>();
 
+        /// <summary>지정한 강화 대상의 희귀도 조건을 사슬 안에서 풀어 주는 돌파의 나침반.</summary>
+        public List<int> LiftingCharms { get; } = new List<int>();
+
         public List<TabletPlacement> Tablets { get; } = new List<TabletPlacement>();
 
         /// <summary>석판 인스턴스 번호별 시뮬레이션 적용 여부.</summary>

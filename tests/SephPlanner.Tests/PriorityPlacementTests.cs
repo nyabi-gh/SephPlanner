@@ -304,7 +304,7 @@ public class PriorityPlacementTests
         problem.Charms[2].Definition.Categories.Clear();
         var result = PlacementSolver.Solve(problem);
         Assert.Equal(new[] { 1 }, result.UnmatchedComboCharms);
-        Assert.Contains("양옆 아티팩트 둘", PriorityPlacement.FailureReason(problem, problem.Charms[0]));
+        Assert.Contains("양옆 아티팩트 둘", PriorityPlacement.FailureReason(problem, problem.Charms[0], new Arrangement()));
     }
 
     [Fact]
@@ -315,7 +315,7 @@ public class PriorityPlacementTests
         problem.PriorityCategories.Add("GLACIER");
         var result = PlacementSolver.Solve(problem);
         Assert.Equal(new[] { 1 }, result.UnmatchedComboCharms);
-        Assert.Contains("행이 아직 열리지", PriorityPlacement.FailureReason(problem, problem.Charms[0]));
+        Assert.Contains("행이 아직 열리지", PriorityPlacement.FailureReason(problem, problem.Charms[0], new Arrangement()));
     }
 
     [Fact]

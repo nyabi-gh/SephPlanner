@@ -540,7 +540,7 @@ namespace SephPlanner.Core.Planning
             {
                 var name = Naming.Of(charm.Definition.Names, charm.Definition.Id, Tr("아티팩트"));
                 if (best.UnmatchedComboCharms.Contains(charm.InstanceId))
-                    warnings.Add(name + ": " + PriorityPlacement.FailureReason(problem, charm));
+                    warnings.Add(name + ": " + PriorityPlacement.FailureReason(problem, charm, best));
                 if (best.UnmatchedSupportCharms.Contains(charm.InstanceId))
                     warnings.Add(name + ": " + PriorityPlacement.SupportFailureReason(problem, charm));
                 if (!charm.IsFiller && !charm.PreferredLeft.HasValue &&

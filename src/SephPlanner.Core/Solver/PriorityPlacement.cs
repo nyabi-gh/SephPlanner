@@ -22,14 +22,16 @@ namespace SephPlanner.Core.Solver
         public static bool Applies(CharmDefinition definition) =>
             ComboCounting.IsPositional(definition);
 
-        internal static string FailureReason(PlacementProblem problem, CharmSlot charm)
+        internal static string FailureReason(PlacementProblem problem, CharmSlot charm, Arrangement best)
         {
             var cells = Enumerable.Range(0, problem.Grid.Storage).Select(problem.Grid.ToPosition).ToList();
 
             // 강화 대상 지정이 콤보 우선보다 앞서므로, 침이 지정을 따르느라 콤보를 못 보인 것이
             // 가장 흔한 이유다. "자리를 못 찾았다" 로 뭉뚱그리면 사용자가 없는 자리를 찾으러 간다.
-            if (problem.DesignatedTargets.Count > 0 && DirectedCharmSupport.Strengthens(charm) &&
-                DirectedCharmSupport.WantsDesignatedTarget(problem, charm))
+            // 돌파의 나침반도 지정 대상과 침 사이에서 희귀도 조건을 푸는 동안은 같은 까닭으로 사슬에 남는다.
+            if (problem.DesignatedTargets.Count > 0 &&
+                (DirectedCharmSupport.Strengthens(charm) && DirectedCharmSupport.WantsDesignatedTarget(problem, charm) ||
+                 best.LiftingCharms.Contains(charm.InstanceId)))
                 return Tr("‘침·모래시계·별조각 우선’으로 지정한 아이템을 강화하느라 이 콤보를 복사하지 못했습니다. 콤보를 우선하려면 빌드 창(기본 F2)에서 강화받는 아이템의 ‘침·모래시계·별조각 우선’을 끄세요.");
 
             if (charm.Definition.LineCategories.Count > 0)

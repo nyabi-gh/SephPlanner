@@ -143,7 +143,7 @@ public class SupportTargetTests
 
         // 콤보를 못 보인 이유를 자리 탓으로 돌리지 않는다. 사용자가 풀 수 있는 말이어야 한다.
         Assert.Contains(1, solved.UnmatchedComboCharms);
-        var reason = PriorityPlacement.FailureReason(problem, problem.Charms[0]);
+        var reason = PriorityPlacement.FailureReason(problem, problem.Charms[0], new Arrangement());
         Assert.Contains("‘침·모래시계·별조각 우선’으로 지정한 아이템을 강화하느라", reason);
         Assert.Contains("강화받는 아이템의 ‘침·모래시계·별조각 우선’을 끄세요", reason);
     }

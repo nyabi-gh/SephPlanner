@@ -2676,7 +2676,10 @@ namespace SephPlanner.Core.Solver
                     }
                     else if (problem.DesignatedTargets.Count > 0 && DirectedCharmSupport.LiftsDesignatedTarget(
                                  charm, positions[charm.InstanceId], result, problem.Grid, occupancy, neighbors))
+                    {
                         arrangement.SupportTargetMatches++;
+                        arrangement.LiftingCharms.Add(charm.InstanceId);
+                    }
                 }
                 if (unlinked) arrangement.UnlinkedCharms.Add(charm.InstanceId);
                 if (charm.Retained && (inactive || unlinked)) arrangement.UnretainedCharms.Add(charm.InstanceId);
