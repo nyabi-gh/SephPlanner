@@ -90,7 +90,10 @@ dotnet build src/SephPlanner.Plugin -c Release -p:PackWorkshop=true -p:DeployToW
 - 처음에는 "목록에 없음" 으로 올라가므로 직접 구독해 돌려 본 뒤 공개로 바꾼다. 공개 여부는 갱신해도 그대로다.
 - **올릴 때마다 게임이 글의 제목·설명·태그를 `metadata.json` 으로 다시 쓴다.** Steam 글 페이지에서 고친 설명은 다음에
   올리면 사라진다. 설명은 `info.description` 에서 `default` → `en-US` → 첫 항목 순으로 하나만 들어간다([게임 내부
-  조사](RESEARCH.md)의 "공식 모드 API").
+  조사](RESEARCH.md)의 "공식 모드 API"). 그래서 글 설명은 `src/SephPlanner.Plugin/workshop-description.txt`(BBCode)에 두고,
+  패키지를 지을 때 `scripts/write-workshop-metadata.ps1` 이 그것을 `default` 에 넣는다. 게임 안 모드 창은 게임 언어의
+  항목을 먼저 쓰므로 그대로 짧은 설명이 보이고, 우리가 쓰지 않은 게임 언어 열 개에는 영어 설명을 채워 BBCode 가 드러나지
+  않게 한다. 7999자를 넘으면 게임이 올리기를 거절하므로 스크립트가 먼저 멈춘다. 검수 서버(ModGuard)에는 앞 2000자만 간다.
 - 게임은 미리보기 한 장만 올린다(`SetItemPreview`). 스크린샷 같은 추가 이미지는 Steam 글 페이지에서 넣는다.
 
 ### 확장 모드
@@ -178,8 +181,8 @@ dotnet run --project src/SephPlanner.DataTool -c Release -- --help
    # -> artifacts/workshop-notes-v{버전}.md
    ```
 
-4. 게임의 창작마당 창에서 올린다(위 "창작마당 판"). 올린 뒤 Steam 글 페이지에 설명(`artifacts/workshop-description.txt`)을
-   다시 붙여 넣는다 - 올릴 때마다 `metadata.json` 의 설명으로 덮인다.
+4. 게임의 창작마당 창에서 올린다(위 "창작마당 판"). 글 설명도 패키지의 것으로 함께 바뀐다. **`uploadticket.json` 이 있는
+   게임 폴더에서 올린다** - 없으면 기존 글이 아니라 새 글이 생긴다.
 
 지킬 것.
 

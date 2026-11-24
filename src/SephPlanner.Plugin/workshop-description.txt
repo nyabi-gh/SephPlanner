@@ -1,0 +1,51 @@
+[h1]SephPlanner[/h1]
+가방에 든 석판과 아티팩트를 어떻게 놓으면 좋은지 계산해서 게임 화면에 보여 주는 모드입니다.
+
+탐험에 들어가면 화면 구석에 지금 가방 점수와 제안 배치 점수가 뜹니다. [b]F7[/b]로 펼치면 자리가 바뀌는 칸에 금색 테두리가 생기고, 칸에 커서를 올리면 왜 그렇게 놓는지 나옵니다. [b]F8[/b]을 누르면 제안대로 옮깁니다. 직접 옮기고 싶으면 이동 안내를 위에서부터 따라 하면 됩니다.
+
+상자·상점·세피라이트에서 무엇을 고를지, 어떤 석판을 합성하고 어디에 인챈트할지도 알려 줍니다. [b]F1[/b]은 아직 얻지 않은 후보를 넣었을 때의 배치를 보여 줍니다. [b]F2[/b]에 게임에서 복사한 프리셋 코드를 붙여 넣거나 노리는 콤보를 고르면 추천이 그 빌드를 따라갑니다.
+
+[h2]단축키[/h2]
+F1 후보 미리보기, F2 빌드 설정, F3 설정, F4 숨기기, F5 불투명도, F6 패널 이동, F7 펼치기·접기, F8 배치 적용, F9 아이템 데이터 다시 읽기, F10 오류 제보
+키는 F3에서 바꿀 수 있습니다.
+
+[h2]참고[/h2]
+[list]
+[*]점수는 배치끼리 비교하려고 SephPlanner가 매긴 값이지 게임 공식 수치가 아닙니다.
+[*]내 화면에만 적용되므로 같이 하는 사람은 설치하지 않아도 됩니다. 멀티에서는 자동 배치가 꺼져 있으니, 같이 하는 사람들에게 동의를 받고 F3의 '멀티 자동 배치'를 켜세요.
+[*]BepInEx 판(ZIP)은 0.6.6을 끝으로 더 나오지 않습니다. 쓰던 분은 게임 폴더의 BepInEx/plugins에서 SephPlanner.Plugin.dll과 SephPlanner.Core.dll을 지워야 이 판이 켜집니다. 설정은 처음 켤 때 가져옵니다.
+[*]TEAM HORAY와 관계없는 개인이 만든 모드입니다.
+[*]게임이 이상하면 먼저 이 모드를 꺼 보세요. 끈 뒤에도 같은 문제가 나면 TEAM HORAY에, 끄면 사라지는 문제는 이 글 댓글이나 GitHub Issues로 알려 주세요.
+[/list]
+
+[h2]오류 제보[/h2]
+문제가 생긴 상태에서 F10을 누르면 보낼 내용을 먼저 보여 주고, 동의하면 개발자의 비공개 서버로 보낸 다음 제보 번호를 띄웁니다. 그 번호를 이 글 댓글이나 [url=https://github.com/nyabi-gh/SephPlanner/issues]GitHub Issues[/url]에 남겨 주세요.
+
+소스(MIT 라이선스)와 자세한 사용법은 [url=https://github.com/nyabi-gh/SephPlanner]GitHub[/url]에 있습니다.
+
+[hr][/hr]
+
+[h1]SephPlanner[/h1]
+Works out where the Tablets and Artifacts in your inventory should go and shows it on the game screen.
+
+Once you start a run, a corner of the screen shows your current score next to the score of the suggested layout. Press [b]F7[/b] to expand it. Slots that would change get a gold outline, and hovering over a slot tells you why. Press [b]F8[/b] to move everything into place, or follow the move list from the top if you'd rather do it by hand.
+
+It also tells you what to take from chests, shops and Sephirite, which Tablets to combine and where to enchant. [b]F1[/b] shows the layout with a candidate you haven't picked up yet. Paste a preset code copied in the game into [b]F2[/b], or pick the combos you're going for, and the suggestions will follow that build.
+
+[h2]Hotkeys[/h2]
+F1 candidate preview, F2 build settings, F3 settings, F4 hide, F5 opacity, F6 move panel, F7 expand/collapse, F8 apply layout, F9 reload item data, F10 bug report
+You can rebind them in F3.
+
+[h2]Notes[/h2]
+[list]
+[*]The score is SephPlanner's own number for comparing layouts, not an in-game stat.
+[*]It only changes your own screen, so other players don't need it. Auto-place is off in multiplayer. Get everyone's OK first, then turn on 'Auto-place in multiplayer' in F3.
+[*]The BepInEx (ZIP) version ended with 0.6.6. If you used it, delete SephPlanner.Plugin.dll and SephPlanner.Core.dll from BepInEx/plugins in the game folder, or this version won't load. Your settings carry over the first time it starts.
+[*]Made by an individual, not affiliated with TEAM HORAY.
+[*]If the game misbehaves, turn this mod off first. If the problem stays with it off, report it to TEAM HORAY; if it goes away, tell me in the comments here or on GitHub Issues.
+[/list]
+
+[h2]Reporting a problem[/h2]
+Press F10 while the problem is happening. It shows what it would send, uploads it to the developer's private server only if you agree, and then shows a report number. Post that number in the comments here or on [url=https://github.com/nyabi-gh/SephPlanner/issues]GitHub Issues[/url].
+
+Source code (MIT License) and more details are on [url=https://github.com/nyabi-gh/SephPlanner]GitHub[/url].

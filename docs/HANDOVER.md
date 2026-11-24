@@ -18,15 +18,18 @@
   옛 BepInEx 판 설정 가져오기(`BepInExConfigImport`)는 남겼다. `make-release.ps1` 은 이제 패키지를 `WorkshopLocal` 에 놓고
   CHANGELOG 절을 변경 사항 글로 뽑는다. **GitHub 릴리스는 만들지 않는다** - 0.6.6 의 게임 안 업데이트가 없는 ZIP 을 찾다 실패한다.
 - **개발사가 요청한 제보 안내가 창작마당 쪽에 없었다**(2026-09-03 요청, 그동안 ZIP 의 `INSTALL.txt` 에만 있었다). README
-  다섯 언어와 `artifacts/workshop-description.txt` 에 넣었다.
+  다섯 언어와 창작마당 설명글에 넣었다.
+- **창작마당 설명글이 저절로 올라간다.** 설명글을 `src/SephPlanner.Plugin/workshop-description.txt` 로 옮기고, 패키지를 지을 때
+  `metadata.json` 의 `default` 에 넣는다(게임은 올릴 때 이것을 쓴다). 이제 올린 뒤 손으로 붙여 넣지 않는다.
+- **이 Mac 에는 `uploadticket.json` 이 없다.** 여기서 올리면 새 글이 생긴다. 표가 있는 Windows 에서 올리거나 그 파일을 옮겨 온다.
 - `check.ps1`(1.1.4)이 마지막 트리에서 통과했다(1133개). 바뀐 코드는 게임에서 못 봤다.
 
 ## 다음 세션
 
-1. **창작마당 설명글 붙여 넣기**(사용자). `artifacts/workshop-description.txt` 를 고쳤다(ZIP 판 종료, 개발사 요청 제보 안내).
-   0.6.7 을 올린 뒤 Steam 글 페이지에 붙여 넣는다 - 올리면 `metadata.json` 의 설명으로 덮인다.
+1. **0.6.7 올리기**(사용자). 태그 `v0.6.7` 은 달았다. `uploadticket.json` 이 있는 게임 폴더에서 `make-release.ps1` 뒤 게임에서
+   올리고, Steam 글 설명이 새 설명글(ZIP 판 종료, 제보 안내)로 바뀌었는지 본다.
 2. **0.6.7 실기**(게임, 사용자). STATUS 표의 0.6.7 줄 둘(합친 창작마당 판, 1.1 클래스 직접 읽기)과 확장 모드 줄.
-3. **0.6.7 배포.** 태그 `v0.6.7`, `make-release.ps1`, 게임에서 올리기. GitHub 릴리스는 만들지 않는다.
+3. GitHub 릴리스는 만들지 않는다.
 4. **0.6.6 실기와 배포 기록**(사용자). STATUS 표의 0.6.6 줄 다섯, 창작마당 0.6.5·0.6.6 의 올린 날짜·접수 번호.
 5. **진단 서버 배포**(사용자). 템플릿이 있는 기계에서 `package-diagnostics.ps1`.
 6. **멀티 실기는 구독한 사본으로 한다.** BepInEx 판이 없어졌고 `WorkshopLocal` 사본은 멀티를 막는다.

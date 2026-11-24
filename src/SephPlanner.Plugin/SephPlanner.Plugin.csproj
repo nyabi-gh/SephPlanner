@@ -24,6 +24,7 @@
     <!-- 손으로 채운 아티팩트 가치를 런타임에서 읽도록 DLL에 포함한다. -->
     <EmbeddedResource Include="..\..\data\values\charms.json" LogicalName="SephPlanner.Values.Charms.json" />
     <None Remove="package\**" />
+    <None Remove="workshop-description.txt" />
   </ItemGroup>
 
   <Import Project="..\GameReferences.props" />
@@ -37,15 +38,18 @@
   </ItemGroup>
 
   <!--
-    창작마당 패키지 폴더를 짓는다: package 의 metadata.json·썸네일과 bin 의 DLL 둘. pdb 는 넣지 않는다 - 패키지 안의
-    파일은 모두 검수 대상이다. 게임이 그 폴더에 만든 uploadticket.json 은 지우지 않는다(창작마당 글 번호를 든다).
-    metadata.json 의 version 은 손으로 적고 scripts/check.ps1 이 Directory.Build.props 와 대조한다.
+    창작마당 패키지 폴더를 짓는다: package 의 썸네일, bin 의 DLL 둘, 그리고 package/metadata.json 에 설명글
+    (workshop-description.txt)을 넣은 것 - 게임이 올릴 때마다 Steam 글 설명을 metadata.json 으로 다시 쓰기 때문이다
+    (scripts/write-workshop-metadata.ps1). pdb 는 넣지 않는다 - 패키지 안의 파일은 모두 검수 대상이다. 게임이 그 폴더에 만든
+    uploadticket.json 은 지우지 않는다(창작마당 글 번호를 든다). metadata.json 의 version 은 손으로 적고 scripts/check.ps1 이
+    Directory.Build.props 와 대조한다.
   -->
   <Target Name="PackWorkshop" AfterTargets="Build" Condition="'$(PackWorkshop)' == 'true'">
     <ItemGroup>
-      <WorkshopStatic Include="$(MSBuildThisFileDirectory)package\**\*" />
+      <WorkshopStatic Include="$(MSBuildThisFileDirectory)package/**/*" Exclude="$(MSBuildThisFileDirectory)package/metadata.json" />
     </ItemGroup>
     <Copy SourceFiles="@(WorkshopStatic)" DestinationFiles="@(WorkshopStatic->'$(WorkshopPackageDir)%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Exec Command="pwsh -NoProfile -File &quot;$(MSBuildThisFileDirectory)../../scripts/write-workshop-metadata.ps1&quot; -Source &quot;$(MSBuildThisFileDirectory)package/metadata.json&quot; -Description &quot;$(MSBuildThisFileDirectory)workshop-description.txt&quot; -Destination &quot;$(WorkshopPackageDir)metadata.json&quot;" />
     <Copy SourceFiles="$(TargetPath);$(TargetDir)SephPlanner.Core.dll" DestinationFolder="$(WorkshopPackageDir)bin" />
   </Target>
 
