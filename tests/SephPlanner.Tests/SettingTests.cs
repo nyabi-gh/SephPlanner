@@ -3,8 +3,8 @@ using SephPlanner.Plugin.Host;
 namespace SephPlanner.Tests;
 
 /// <summary>
-/// BepInEx 의 <c>ConfigEntry</c> 를 갈음한 설정 값. 창작마당 판의 모드 옵션 저장소도 이 규칙에 기대므로, 0.5.x 의
-/// ConfigEntry 가 해 주던 것(같은 값이면 알리지 않음, 범위 자르기)이 그대로인지 본다.
+/// 0.5.x 의 BepInEx <c>ConfigEntry</c> 를 갈음한 설정 값. 모드 옵션 저장소가 이 규칙에 기대므로, ConfigEntry 가 해 주던
+/// 것(같은 값이면 알리지 않음, 범위 자르기)이 그대로인지 본다.
 /// </summary>
 public sealed class SettingTests
 {

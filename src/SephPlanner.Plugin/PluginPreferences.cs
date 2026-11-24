@@ -13,9 +13,9 @@ namespace SephPlanner.Plugin
     /// <summary>
     /// 플레이어가 고른 빌드 방향. 빌드 창(<see cref="Ui.BuildWindow"/>)에서 고르고 여기에 남는다.
     ///
-    /// <b>BepInEx 설정 파일이 아니라 제 파일을 쓴다.</b> 담는 것이 목록(콤보 카테고리, 아티팩트
+    /// <b>설정 저장소가 아니라 제 파일을 쓴다.</b> 담는 것이 목록(콤보 카테고리, 아티팩트
     /// 번호)과 긴 문자열(프리셋 코드)이라 한 줄짜리 설정 항목으로는 담기지 않는다. 표시 설정은
-    /// 그대로 BepInEx 쪽에 있다.
+    /// 그대로 설정 저장소(<see cref="PluginSettings"/>)에 있다.
     /// </summary>
     internal sealed class PluginPreferences
     {

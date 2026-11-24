@@ -21,8 +21,8 @@ namespace SephPlanner.Plugin
     /// 세피리아 상태를 읽어 게임 HUD에 배치와 추천을 표시하고, 싱글플레이에서는 제안된 배치를
     /// 게임 자체의 이동 경로로 적용한다. 멀티 세션에서는 읽기만 한다.
     ///
-    /// 띄우는 쪽은 둘이다 - BepInEx 판은 <c>BepInExHost/BepInExEntry</c>, 창작마당 판은 게임의 모드 로더가 부르는
-    /// <c>SephPlanner.Workshop</c> 의 진입점. 어느 쪽이든 <see cref="PluginHost"/> 를 채운 뒤 이 컴포넌트를 붙인다.
+    /// 게임의 창작마당 모드 로더가 부르는 진입점(<c>WorkshopHost/WorkshopEntry</c>)이 <see cref="PluginHost"/> 를 채운 뒤
+    /// 이 컴포넌트를 붙인다.
     /// </summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001", Justification = "Unity의 OnDestroy에서 계산 작업을 정리합니다.")]
     internal sealed partial class SephPlannerPlugin : MonoBehaviour
@@ -61,7 +61,6 @@ namespace SephPlanner.Plugin
         private DiagnosticText _diagnosticLog;
         private string _diagnosticNotice;
         private float _diagnosticNoticeUntil;
-        private string _startupNotice = "";
         private string _lastPanelOrigin;
         private string _lastPanelBlocker;
         private readonly Dictionary<string, string> _lastErrors = new Dictionary<string, string>();
@@ -122,19 +121,10 @@ namespace SephPlanner.Plugin
             Log.Info(PluginIdentity.Describe());
 
             StartDiagnostics();
-            StartUpdates();
-            // 처리기는 유니티 로그 안에서 불려 Guarded 로 감쌀 수 없다. 판이 섞였으면 옛 Core 에 AppendGame 이
-            // 없어 게임이 로그를 남길 때마다 예외가 유니티로 새므로 아예 걸지 않는다.
-            var filesSplit = false;
-            DetectFilesSplit(ref filesSplit);
-            if (!filesSplit) Application.logMessageReceivedThreaded += CaptureGameLog;
+            Application.logMessageReceivedThreaded += CaptureGameLog;
             Guarded(StartLanguage, "화면 언어");
         }
 
-        /// <summary>
-        /// 번역은 0.5.0 다음 판에 생긴 Core 멤버다. 판이 섞여 Core 가 옛것이면 여기서 실패하므로
-        /// 판 불일치를 알리는 <c>FinishPreviousUpdate</c>(BepInEx 판) 뒤에 부른다.
-        /// </summary>
         private void StartLanguage()
         {
             _settings.Language.SettingChanged += (_, _) => ApplyLanguage();
@@ -164,13 +154,12 @@ namespace SephPlanner.Plugin
 
             // 단축키·화면 쪽에서 난 예외가 폴링까지 굶기면 안 된다. Update 안의 예외는 유니티가
             // Player.log 에만 쌓고 우리 로그는 조용하므로, 여기서 잡아 같은 것 한 번씩 남긴다.
-            // 창을 여는 일(단축키, 진단·업데이트 안내)보다 먼저 낡은 창을 버린다. 뒤에 두면 크기·언어를 바꾼 직후 한 프레임
+            // 창을 여는 일(단축키, 진단 안내)보다 먼저 낡은 창을 버린다. 뒤에 두면 크기·언어를 바꾼 직후 한 프레임
             // 동안 옛 창이 열려 그대로 남는다. 바꾸는 쪽은 설정 창의 버튼이라 우리 Update 밖에서 온다.
             Guarded(_dropStaleWindows ??= DropStaleWindows, "낡은 창 정리");
             Guarded(_handleInput ??= HandleInput, "입력 처리");
             Guarded(_takePlanFailure ??= TakePlanFailure, "자동 진단 처리");
             PollDiagnostics();
-            PollUpdates();
 
             var panelStarted = FrameCost.Now;
             Guarded(_updateNativePanel ??= UpdateNativePanel, "화면 갱신");
@@ -536,7 +525,6 @@ namespace SephPlanner.Plugin
             yield return _build;
             var more = new List<PlannerWindow>();
             AddDiagnosticWindows(more);
-            AddUpdateWindows(more);
             foreach (var window in more) yield return window;
         }
 
@@ -580,33 +568,10 @@ namespace SephPlanner.Plugin
             Deliver(capture);
         }
 
-        // 게임 안 업데이트는 BepInEx 판에만 있다(BepInExHost/Plugin.Update.cs). 아래 partial void 는 몸체가 없으면
-        // 부르는 자리째 빠지고, ref 로 받는 값은 처음 값 그대로 남는다 - 창작마당 판이 그렇다.
-        partial void StartUpdates();
-
-        partial void PollUpdates();
-
-        partial void StopUpdates();
-
-        partial void AddUpdateWindows(List<PlannerWindow> windows);
-
-        partial void CheckUpdateWindow(ref bool open);
-
-        /// <summary>게임 안 업데이트가 적용됐으면 첫 화면에 띄울 문장을 <see cref="_startupNotice"/> 에 둔다.</summary>
-        partial void TakeUpdateNotice();
-
-        /// <summary>플러그인과 Core 의 판이 다른가(게임 안 업데이트가 반쯤 걸림).</summary>
-        partial void DetectFilesSplit(ref bool split);
-
         private bool QueueAutomaticDiagnostic(string stage, string detail) => QueueAutomaticDiagnostic(stage, detail, null);
 
-        /// <summary>물음에 답해야 닫히는 창(진단 동의, 업데이트)이 떠 있는가.</summary>
-        private bool AnsweringWindowOpen()
-        {
-            var open = DiagnosticWindowOpen();
-            CheckUpdateWindow(ref open);
-            return open;
-        }
+        /// <summary>물음에 답해야 닫히는 창(진단 동의)이 떠 있는가.</summary>
+        private bool AnsweringWindowOpen() => DiagnosticWindowOpen();
 
         private void TakePlanFailure()
         {
@@ -905,13 +870,6 @@ namespace SephPlanner.Plugin
                 // 무엇을 눌러야 하는지 알 길이 없다.
                 Report(Guide());
 
-                // 화면이 처음 서는 순간에 알린다. Awake 에서 걸어 두면 게임이 뜨는 사이에 시효가 지난다.
-                TakeUpdateNotice();
-                if (_startupNotice.Length > 0)
-                {
-                    ReportDiagnostic(_startupNotice);
-                    _startupNotice = "";
-                }
                 if (_hud.Origin != _lastPanelOrigin)
                 {
                     _lastPanelOrigin = _hud.Origin;
@@ -1514,7 +1472,6 @@ namespace SephPlanner.Plugin
             FrameCost.PlanStats = null;
             _runner?.Dispose();
             StopDiagnostics();
-            StopUpdates();
             Log.Written -= CaptureOwnLog;
             Application.logMessageReceivedThreaded -= CaptureGameLog;
             LocalizationManager.Instance.OnLanguageChanged -= GameLanguageChanged;

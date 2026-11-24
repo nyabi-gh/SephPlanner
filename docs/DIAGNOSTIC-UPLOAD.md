@@ -12,7 +12,7 @@
 
 - 보내는 항목을 바꾸면 동의 창 문구와 `DisclosureVersion` 을 함께 고친다(아래 "수집 범위").
 - 창작마당 판은 BepInEx 판에서 한 동의를 가져오지 않고 처음에 다시 묻는다.
-- 창작마당 설명글(`src/SephPlanner.Workshop/package/metadata.json`)도 동의한 경우에만 보낸다고 밝힌다.
+- 창작마당 설명글(`src/SephPlanner.Plugin/package/metadata.json`)도 동의한 경우에만 보낸다고 밝힌다.
 
 ## 목적
 

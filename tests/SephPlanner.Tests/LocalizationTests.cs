@@ -137,10 +137,10 @@ public sealed class LocalizationTests
     public void PhraseArgumentsFollowTheOuterLanguage()
     {
         using var _ = Localization.Use(Language.English);
-        var phrase = new Phrase("진단 전송 실패: {0} · 로컬 보관: {1}", new Phrase("배포 파일이 너무 큽니다."), "C:/x");
+        var phrase = new Phrase("진단 전송 실패: {0} · 로컬 보관: {1}", new Phrase("손으로 정리한 뒤 다시 시도하세요."), "C:/x");
 
-        Assert.Equal("진단 전송 실패: 배포 파일이 너무 큽니다. · 로컬 보관: C:/x", phrase.Korean);
-        Assert.DoesNotContain("배포", phrase.ToString());
+        Assert.Equal("진단 전송 실패: 손으로 정리한 뒤 다시 시도하세요. · 로컬 보관: C:/x", phrase.Korean);
+        Assert.DoesNotContain("정리", phrase.ToString());
     }
 
     [Fact]
@@ -154,11 +154,11 @@ public sealed class LocalizationTests
     public void ExceptionsKeepTheirTypeAndAKoreanMessage()
     {
         using var _ = Localization.Use(Language.English);
-        var exception = new Phrase("배포 파일이 너무 큽니다.").As(message => new InvalidDataException(message));
+        var exception = new Phrase("손으로 정리한 뒤 다시 시도하세요.").As(message => new InvalidDataException(message));
 
         Assert.IsType<InvalidDataException>(exception);
-        Assert.Equal("배포 파일이 너무 큽니다.", exception.Message);
-        Assert.Equal(Localization.Tr("배포 파일이 너무 큽니다."), Phrase.Of(exception).ToString());
+        Assert.Equal("손으로 정리한 뒤 다시 시도하세요.", exception.Message);
+        Assert.Equal(Localization.Tr("손으로 정리한 뒤 다시 시도하세요."), Phrase.Of(exception).ToString());
         Assert.Equal("boom", Phrase.Of(new InvalidOperationException("boom")).ToString());
     }
 

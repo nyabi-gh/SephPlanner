@@ -45,9 +45,7 @@ namespace SephPlanner.Plugin
 
         private void AddDiagnosticRows(List<OptionRow> rows)
         {
-            var updates = new List<OptionRow>();
-            AddUpdateRows(updates);
-            rows.Add(OptionRow.Heading(updates.Count > 0 ? Tr("진단·업데이트") : Tr("진단")));
+            rows.Add(OptionRow.Heading(Tr("진단")));
             rows.Add(new OptionRow
             {
                 Label = Tr("진단 서버 전송"),
@@ -62,7 +60,6 @@ namespace SephPlanner.Plugin
                 Read = () => AutomaticDiagnosticAllowed ? 1 : 0,
                 Write = i => { if (i == 0) WithdrawAutomaticDiagnostics(); else ReviewAutomaticDiagnostics(); },
             });
-            rows.AddRange(updates);
         }
 
         public void SetAutomaticDiagnosticConsent(bool allowed)

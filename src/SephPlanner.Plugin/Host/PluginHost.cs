@@ -5,7 +5,7 @@ using UnityEngine;
 namespace SephPlanner.Plugin.Host
 {
     /// <summary>
-    /// 플러그인을 띄운 쪽(BepInEx 또는 게임의 창작마당 모드 로더)이 알려 주는 것. 진입점이 <see cref="SephPlannerPlugin"/>
+    /// 플러그인을 띄운 쪽(게임의 창작마당 모드 로더)이 알려 주는 것. 진입점이 <see cref="SephPlannerPlugin"/>
     /// 를 붙이기 전에 한 번 채운다.
     /// </summary>
     internal static class PluginHost

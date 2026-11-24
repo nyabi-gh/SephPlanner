@@ -5,8 +5,7 @@ using System.Collections.Generic;
 namespace SephPlanner.Plugin.Host
 {
     /// <summary>
-    /// 설정을 어디에 두는지. BepInEx 판은 설정 파일, 창작마당 판은 게임의 모드 옵션이다. 둘 다 값을 고친 즉시
-    /// 저장한다.
+    /// 설정을 어디에 두는지. 게임의 모드 옵션이고, 값을 고친 즉시 저장한다.
     /// </summary>
     internal interface ISettingStore
     {

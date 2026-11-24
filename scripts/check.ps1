@@ -5,7 +5,6 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
 $solution = Join-Path $root "SephPlanner.slnx"
 $pluginProject = Join-Path $root "src/SephPlanner.Plugin/SephPlanner.Plugin.csproj"
-$workshopProject = Join-Path $root "src/SephPlanner.Workshop/SephPlanner.Workshop.csproj"
 $testProject = Join-Path $root "tests/SephPlanner.Tests/SephPlanner.Tests.csproj"
 
 function Invoke-DotNet([string[]]$Arguments, [string]$Failure) {
@@ -13,22 +12,17 @@ function Invoke-DotNet([string[]]$Arguments, [string]$Failure) {
     if ($LASTEXITCODE -ne 0) { throw $Failure }
 }
 
-# 버전은 다섯 곳에 손으로 적힌다. 어긋나도 빌드와 테스트는 통과하므로 여기서 붙잡는다.
-# BepInEx 로그와 F10 덤프 첫 줄에 찍히는 것이 플러그인 쪽 값이라, 어긋나면 제보를 받고도
-# 어느 빌드인지 되짚을 수 없다. STATUS 는 그 자체가 정본이라고 규정된 문서인데 갱신을
-# 강제하는 것이 없어 두 판이 밀린 적이 있다. 창작마당의 metadata.json 버전은 창작마당 판의 진단 첫 줄과
-# 게임의 모드 로그에 찍히는 값이라 같은 이유로 맞춘다. 멀티 로비는 이 판을 견주지 않는다 - local_only 모드는
+# 버전은 네 곳에 손으로 적힌다. 어긋나도 빌드와 테스트는 통과하므로 여기서 붙잡는다.
+# STATUS 는 그 자체가 정본이라고 규정된 문서인데 갱신을 강제하는 것이 없어 두 판이 밀린 적이 있다.
+# 창작마당의 metadata.json 버전은 진단 첫 줄과 게임의 모드 로그에 찍히는 값이라, 어긋나면 제보를 받고도
+# 어느 빌드인지 되짚을 수 없다. 멀티 로비는 이 판을 견주지 않는다 - local_only 모드는
 # 로비 비교에서 빠진다(docs/RESEARCH.md "공식 모드 API").
 $version = ([xml](Get-Content (Join-Path $root "Directory.Build.props"))).Project.PropertyGroup.Version |
     Where-Object { $_ } | Select-Object -First 1
 if (-not $version) { throw "배포 버전을 읽지 못했습니다." }
-$pluginSource = Get-Content (Join-Path $root "src/SephPlanner.Plugin/BepInExHost/BepInExEntry.cs") -Raw
-if ($pluginSource -notmatch [regex]::Escape("[BepInPlugin(PluginIdentity.Guid, ""SephPlanner"", ""$version"")]")) {
-    throw "[BepInPlugin] 의 버전이 $version 이 아닙니다. BepInExHost/BepInExEntry.cs 를 맞추세요."
-}
-$workshopMetadata = Get-Content (Join-Path $root "src/SephPlanner.Workshop/package/metadata.json") -Raw | ConvertFrom-Json
+$workshopMetadata = Get-Content (Join-Path $root "src/SephPlanner.Plugin/package/metadata.json") -Raw | ConvertFrom-Json
 if ($workshopMetadata.mod.version -ne $version) {
-    throw "창작마당 metadata.json 의 version 이 $version 이 아닙니다. src/SephPlanner.Workshop/package/metadata.json 을 맞추세요."
+    throw "창작마당 metadata.json 의 version 이 $version 이 아닙니다. src/SephPlanner.Plugin/package/metadata.json 을 맞추세요."
 }
 $status = Get-Content (Join-Path $root "docs/STATUS.md") -Raw
 if ($status -notmatch [regex]::Escape("**이번 판: $version.**")) {
@@ -48,12 +42,7 @@ Invoke-DotNet @("build", (Join-Path $root "src/SephPlanner.DataTool/SephPlanner.
 # 여기가 CI 의 사각지대다. 플러그인은 게임 어셈블리를 참조하는데 그것을 CI 에 둘 수 없어서
 # (docs/LEGAL.md - 게임 저작물 미배포), 플러그인만 깨지는 변경은 CI 를 초록으로 통과한다.
 # 밀기 전에 여기서 한 번 세운다.
-Invoke-DotNet @("build", $pluginProject, "-c", "Release", "--no-restore", "-p:DeployToGame=false", "-p:TreatWarningsAsErrors=true") "플러그인 빌드 실패"
-
-# 창작마당 판은 솔루션 밖에 있어 위의 복원·포맷 검사에 들지 않는다. 그래서 따로 한 번씩 돈다.
-Invoke-DotNet @("restore", $workshopProject, "--locked-mode") "창작마당 판 복원 실패"
-Invoke-DotNet @("format", $workshopProject, "--verify-no-changes", "--no-restore") "창작마당 판 포맷 검사 실패"
-Invoke-DotNet @("build", $workshopProject, "-c", "Release", "--no-restore", "-p:TreatWarningsAsErrors=true") "창작마당 판 빌드 실패"
+Invoke-DotNet @("build", $pluginProject, "-c", "Release", "--no-restore", "-p:TreatWarningsAsErrors=true") "플러그인 빌드 실패"
 
 Write-Host ""
-Write-Host "검사 통과 - 포맷, 테스트, 그리고 CI 가 못 보는 플러그인·창작마당 판 빌드까지."
+Write-Host "검사 통과 - 포맷, 테스트, 그리고 CI 가 못 보는 플러그인 빌드까지."

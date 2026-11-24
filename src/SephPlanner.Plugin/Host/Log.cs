@@ -5,7 +5,7 @@ namespace SephPlanner.Plugin.Host
     internal enum LogLevel { Info, Warning, Error }
 
     /// <summary>
-    /// 플러그인의 로그. 어디에 남는지(BepInEx 로그, 게임의 Player.log)는 진입점이 정하고, 진단은 <see cref="Written"/>
+    /// 플러그인의 로그. 어디에 남는지(게임의 Player.log)는 진입점이 정하고, 진단은 <see cref="Written"/>
     /// 으로 같은 줄을 받아 둔다.
     /// </summary>
     internal static class Log

@@ -47,15 +47,14 @@ namespace SephPlanner.Plugin
     }
 
     /// <summary>
-    /// 표시 설정과 단축키 전부. 저장소(BepInEx 설정 파일 또는 게임의 모드 옵션)가 원본이고, 설정 창
+    /// 표시 설정과 단축키 전부. 저장소(게임의 모드 옵션)가 원본이고, 설정 창
     /// (<see cref="SettingsWindow"/>)이 <see cref="Rows"/>로 같은 값을 읽고 쓴다. 두 길이 같은
     /// <see cref="Setting{T}"/> 를 보므로 어느 쪽으로 고쳐도 어긋나지 않는다.
     ///
     /// 빌드 지정(콤보·강화 우선·프리셋 코드)은 여기가 아니라 <see cref="PluginPreferences"/>에
     /// 있다. 목록과 긴 문자열이라 한 줄짜리 설정 항목으로 담기지 않는다.
     ///
-    /// 진단 전송 동의는 <c>PluginSettings.Diagnostics.cs</c>, BepInEx 판에만 있는 업데이트 확인은
-    /// <c>BepInExHost/PluginSettings.Update.cs</c> 에 있다.
+    /// 진단 전송 동의는 <c>PluginSettings.Diagnostics.cs</c> 에 있다.
     /// </summary>
     internal sealed partial class PluginSettings
     {
@@ -112,15 +111,13 @@ namespace SephPlanner.Plugin
         public static float MaxWidth => WidthSteps[WidthSteps.Length - 1];
 
         /// <summary>
-        /// 실수 설정은 범위를 붙여 묶는다. 붙여 두면 저장소의 값이 잘려 들어오고 BepInEx 는 설명에 범위도
-        /// 적어 준다. 없으면 NaN 이나 0 이 그대로 들어와, 폴링 주기의 경우 매 프레임 폴링이 된다.
+        /// 실수 설정은 범위를 붙여 묶는다. 붙여 두면 저장소의 값이 잘려 들어온다. 없으면 NaN 이나 0 이 그대로 들어와, 폴링 주기의 경우 매 프레임 폴링이 된다.
         /// </summary>
         public PluginSettings(ISettingStore config, Action<string> log)
         {
             _config = config;
             _log = log;
             BindDiagnostics(config);
-            BindUpdates(config);
 
             PollInterval = config.Bind(
                 "General", "PollIntervalSeconds", 0.25f,
@@ -276,7 +273,7 @@ namespace SephPlanner.Plugin
             foreach (var shortcut in _shortcuts)
                 shortcut.SettingChanged += (_, _) => _shortcutRevision++;
             foreach (var shortcut in _shortcuts) WarnIfGameKey(shortcut);
-            // 창작마당 판이 BepInEx 설정 파일에서 처음 가져온 값은 여기서 한 번에 적는다.
+            // 옛 BepInEx 판의 설정 파일에서 처음 가져온 값은 여기서 한 번에 적는다.
             config.Save();
         }
 
@@ -371,10 +368,6 @@ namespace SephPlanner.Plugin
             });
             return _rows;
         }
-
-        partial void BindUpdates(ISettingStore config);
-
-        partial void AddUpdateRows(List<OptionRow> rows);
 
         /// <summary>언어가 바뀌면 줄 이름을 새 언어로 다시 짓게 한다.</summary>
         public void ForgetRows() => _rows = null;

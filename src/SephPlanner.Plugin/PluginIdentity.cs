@@ -10,7 +10,7 @@ namespace SephPlanner.Plugin
     internal static class PluginIdentity
     {
         /// <summary>
-        /// BepInEx 플러그인 GUID 이자 Harmony 패치 주인 이름. BepInEx 설정 파일 이름이 여기서 나오므로 바꾸지 않는다.
+        /// Harmony 패치 주인 이름이자 0.6.6 까지의 BepInEx 판 GUID. 옛 설정을 가져오는 파일 이름이 여기서 나오므로 바꾸지 않는다.
         /// </summary>
         public const string Guid = "dev.nyabi.sephplanner.bridge";
 

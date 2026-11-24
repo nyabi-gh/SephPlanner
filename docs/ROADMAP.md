@@ -36,19 +36,7 @@
 - **진단은 지금 전송을 창작마당 판에도 그대로 넣는다.** TEAM HORAY 가 동의 기반 전송을 허용했다(2026-11-02 답변, [약관](LEGAL.md)의
   "진단 전송 문의"). 동의 창이 보낼 항목을 알리는 것이 개정 규칙 5 의 조건이다. 게임 안 업데이트는 넣지 않는다.
 
-**GitHub 릴리스 닫기**(2026-11-24 사용자 결정). 1.0.33 지원은 0.6.7 에서 내렸고(플러그인·빌드·문서), 게임사가 1.1 로 강제
-업데이트해 1.0.33 사용자를 위한 업데이트 차단은 필요 없다. 남은 것은 이 순서다.
-
-1. **0.6.7 을 GitHub 릴리스로 공개하지 않는다.** 이미 깔린 BepInEx 판은 `releases/latest` 의 태그를 새 판으로 보고 그 ZIP 을
-   받으므로, ZIP 없는 릴리스를 공개하면 `업데이트` 가 실패한다. 태그는 달아도 된다(`releases/latest` 는 릴리스만 본다).
-2. **릴리스 스크립트.** `make-release.ps1` 이 ZIP 대신 창작마당 패키지만 짓게 하고, `publish-release.ps1` 은 지운다. 실수로
-   GitHub 릴리스를 만드는 길이 남지 않게 한다. [개발 문서](DEVELOPMENT.md)의 릴리스 절을 함께 고친다.
-3. **BepInEx 판을 개발용으로 남길지 정한다(사용자).** 창작마당 로컬 사본은 멀티를 막으므로 멀티 시험에는 BepInEx 판이 쉽다.
-   지운다면 `BepInExHost`(게임 안 업데이트 포함), `tests/SephPlanner.Plugin.Net` 의 업데이트 시험, `build-macos-loader.sh`·
-   `scripts/patches`, `deploy-plugin.ps1`, `third-party` 의 BepInEx·Doorstop·plthook 라이선스, `INSTALL.txt`·`INSTALL-macos.txt`,
-   [약관](LEGAL.md)의 BepInEx 배포 대목이 함께 간다.
-
-창작마당 판(`src/SephPlanner.Workshop`)의 구조는 [개발 문서](DEVELOPMENT.md)의 "구조" 와 "창작마당 판" 에 있다. 남은 일은
+창작마당 판(`src/SephPlanner.Plugin`)의 구조는 [개발 문서](DEVELOPMENT.md)의 "구조" 와 "창작마당 판" 에 있다. 남은 일은
 이 순서다.
 
 1. 공개한 글(`3832790875`)에서 남은 것.
@@ -301,9 +289,9 @@
 - **사용자용 프라이버시 고지가 없다**(검토 7-5, 2시간). 동의 창에 수신처(`sephplanner.nyabi.me`)와 삭제 요청 연락처가
   없다.
 - **한 사람이 멈췄을 때의 계획이 없다**(검토 7-6, 3시간). 자산·접근 권한·`deploy/diagnostics` 보관처·중단 절차를
-  적은 문서가 없고, 포크가 바꿔야 할 상수 둘(`UpdateClient`, `DiagnosticUploadClient` 의 주소)도 README 에 없다.
-- 공개 저장소의 작은 것(검토 7-7). 릴리스 노트에 zip SHA-256 이 없고, README 에 이전 판으로 되돌리는 안내가 없다.
-  `check.ps1` 이 디컴파일 산출물 스테이징을 막지 않는다. `CONTRIBUTING.md`·이슈 템플릿·`SECURITY.md` 가 없다.
+  적은 문서가 없고, 포크가 바꿔야 할 상수(`DiagnosticUploadClient` 의 주소)도 README 에 없다.
+- 공개 저장소의 작은 것(검토 7-7). `check.ps1` 이 디컴파일 산출물 스테이징을 막지 않는다. `CONTRIBUTING.md`·이슈 템플릿·
+  `SECURITY.md` 가 없다.
 
 ### 판단이 필요한 것
 

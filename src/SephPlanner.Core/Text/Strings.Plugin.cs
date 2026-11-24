@@ -262,8 +262,6 @@ namespace SephPlanner.Core.Text
                 "診断を非公開サーバーに送信中です。ゲームを続けられます。",
                 "正在将诊断发送到非公开服务器。可以继续游戏。",
                 "正在將診斷傳送到非公開伺服器。可以繼續遊戲。"),
-            new Entry("SephPlanner {0} 으로 업데이트됐습니다.", "Updated to SephPlanner {0}.", "SephPlanner {0} にアップデートしました。", "已更新到 SephPlanner {0}。", "已更新至 SephPlanner {0}。"),
-            new Entry("시간이 너무 오래 걸려 그만두었습니다.", "Gave up because it took too long.", "時間がかかりすぎたため中止しました。", "耗时过长，已中止。", "耗時過長，已中止。"),
         };
     }
 }

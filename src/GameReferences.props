@@ -1,5 +1,5 @@
 <Project>
-  <!-- 게임 어셈블리 참조. BepInEx 판(SephPlanner.Plugin)과 창작마당 판(SephPlanner.Workshop)이 함께 쓴다. SEPHIRIA_DIR 환경변수로 경로를 바꿀 수 있다. -->
+  <!-- 게임 어셈블리 참조. 플러그인(SephPlanner.Plugin)이 쓴다. SEPHIRIA_DIR 환경변수로 경로를 바꿀 수 있다. -->
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
       <HintPath>$(SephiriaManagedDir)/Assembly-CSharp.dll</HintPath>
