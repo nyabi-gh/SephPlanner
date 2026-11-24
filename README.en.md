@@ -17,7 +17,7 @@ Subscribe on the [Steam Workshop](https://steamcommunity.com/sharedfiles/filedet
 The ZIP version with BepInEx included ended with 0.6.6 and gets no further releases. If you use the ZIP version, please move to the Workshop version as described under Installation below.
 
 > [!NOTE]
-> This is a mod made by an individual, not affiliated with TEAM HORAY. You use mods at your own risk, so back up any saves you care about first.
+> This is a mod made by an individual, not affiliated with TEAM HORAY. You use mods at your own risk, so back up any saves you care about first. If the game misbehaves, turn SephPlanner off first. If the problem stays with it off, report it to TEAM HORAY; if it goes away, report it here.
 
 ## Installation
 
