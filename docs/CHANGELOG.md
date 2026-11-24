@@ -10,6 +10,7 @@
 ### Changed
 
 - 게임 1.0.33 지원을 마쳤습니다. 이제 게임 1.1 이상에서만 돌아갑니다.
+- BepInEx를 함께 넣는 ZIP 판은 더 내지 않습니다. ZIP 판을 쓰고 있다면 게임 폴더의 `BepInEx/plugins`에서 `SephPlanner.Plugin.dll`과 `SephPlanner.Core.dll`을 지우고 창작마당 판을 구독해 주세요. 쓰던 설정은 창작마당 판을 처음 켤 때 가져옵니다.
 
 ## 0.6.6
 

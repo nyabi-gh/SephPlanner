@@ -5,8 +5,6 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/nyabi-gh/SephPlanner/releases/latest"><img src="https://img.shields.io/github/v/release/nyabi-gh/SephPlanner?style=flat-square&label=%EC%B5%9C%EC%8B%A0&color=b9a7f5" alt="최신 릴리스"></a>
-  <a href="https://github.com/nyabi-gh/SephPlanner/releases"><img src="https://img.shields.io/github/downloads/nyabi-gh/SephPlanner/total?style=flat-square&label=%EB%8B%A4%EC%9A%B4%EB%A1%9C%EB%93%9C&color=77d8b0" alt="다운로드"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/%EB%9D%BC%EC%9D%B4%EC%84%A0%EC%8A%A4-MIT-b9a7f5?style=flat-square" alt="라이선스"></a>
 </p>
 
@@ -14,22 +12,14 @@
 
 ## 다운로드
 
-게임 버전과 쓰는 방식에 따라 받는 곳이 다릅니다.
+[Steam 창작마당](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)에서 구독합니다. 게임 1.1 이상에서 돌아갑니다.
 
-| 게임 | 다운로드 |
-| --- | --- |
-| **게임 1.1 이상** | [Steam 창작마당](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)에서 구독 |
-| **BepInEx 판**, Windows | [최신 릴리스](https://github.com/nyabi-gh/SephPlanner/releases/latest)의 `SephPlanner-v버전.zip` |
-| **BepInEx 판**, macOS | [최신 릴리스](https://github.com/nyabi-gh/SephPlanner/releases/latest)의 `SephPlanner-macos-v버전.zip` |
-
-ZIP은 BepInEx가 들어 있는 판입니다. 게임 1.1 이상에서도 돌아가고, 1.0.33 이하에서는 이 판만 쓸 수 있습니다. `Source code`가 아니라 위 ZIP을 받습니다.
+BepInEx를 함께 넣는 ZIP 판은 0.6.6을 마지막으로 더 내지 않습니다. ZIP 판을 쓰고 있다면 아래 설치 안내대로 창작마당 판으로 옮겨 주세요.
 
 > [!NOTE]
 > TEAM HORAY와 관계없는 개인이 만든 모드입니다. 모드 사용은 본인 책임이며, 중요한 세이브는 미리 백업해 두세요.
 
 ## 설치
-
-### 창작마당 (게임 1.1 이상)
 
 1. [창작마당 글](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)에서 **구독**을 누릅니다.
 2. 게임을 켜고 타이틀의 창작마당 창에서 SephPlanner가 켜져 있는지 확인합니다.
@@ -38,30 +28,6 @@ ZIP은 BepInEx가 들어 있는 판입니다. 게임 1.1 이상에서도 돌아�
 업데이트는 Steam이 알아서 받습니다.
 
 **BepInEx 판(ZIP)을 쓰던 분은** 게임 폴더의 `BepInEx/plugins`에서 `SephPlanner.Plugin.dll`과 `SephPlanner.Core.dll`을 지워야 창작마당 판이 켜집니다. 그대로 두면 BepInEx 판만 실행됩니다. 쓰던 설정은 창작마당 판을 처음 켤 때 가져옵니다.
-
-### ZIP (BepInEx 판)
-
-**Windows**
-
-1. 게임을 끄고 ZIP의 압축을 풉니다.
-2. Steam에서 세피리아 우클릭 → **관리 → 로컬 파일 보기**로 게임 폴더를 엽니다.
-3. `게임 폴더에 복사` 폴더 **안의 내용물**을 게임 폴더에 복사합니다.
-4. 게임을 실행하고 탐험에 들어가면 화면에 SephPlanner가 나타납니다.
-
-**macOS**
-
-1. 게임을 끄고 `게임 폴더에 복사` 안의 내용물을 게임 폴더에 복사합니다. (`Sephiria.app` 안이 아니라 옆에 둡니다.)
-2. 터미널에서 다음을 실행합니다. `<게임 폴더>`는 실제 경로로 바꿉니다.
-   ```sh
-   xattr -c "<게임 폴더>/libdoorstop.dylib" "<게임 폴더>/run_bepinex.sh"
-   chmod +x "<게임 폴더>/run_bepinex.sh"
-   ```
-3. Steam에서 세피리아 **속성 → 일반 → 시작 옵션**에 `"<게임 폴더>/run_bepinex.sh" %command%`를 입력합니다.
-4. 게임을 실행합니다. 자세한 내용은 [macOS 설치 안내](docs/INSTALL-macos.txt)에 있습니다.
-
-ZIP 판은 스스로 업데이트합니다. 새 버전이 나오면 게임을 켤 때 알려 주고, `업데이트`를 누른 뒤 게임을 다시 시작하면 적용됩니다.
-
-이미 다른 모드로 BepInEx를 쓰고 있다면 ZIP의 `BepInEx/plugins` 안 DLL 두 개(`SephPlanner.Plugin.dll`, `SephPlanner.Core.dll`)만 게임 폴더의 같은 위치에 넣으면 됩니다. 직접 업데이트할 때도 이 두 파일을 덮어씁니다.
 
 ## 사용 방법
 
@@ -101,7 +67,7 @@ SephPlanner는 내 화면에만 적용되므로 함께하는 사람은 설치하
 
 ## 자주 묻는 질문
 
-**패널이 안 보여요.** 탐험에 들어갔는지, `F4`로 숨기지 않았는지, `F3`의 `플래너 화면 표시`가 켜져 있는지 확인합니다. 창작마당 판이라면 타이틀의 창작마당 창에서 켜져 있는지, `BepInEx/plugins`에 SephPlanner DLL이 남아 있지 않은지 봅니다. ZIP 판이라면 DLL 두 개가 `BepInEx/plugins`에 있는지 봅니다.
+**패널이 안 보여요.** 탐험에 들어갔는지, `F4`로 숨기지 않았는지, `F3`의 `플래너 화면 표시`가 켜져 있는지 확인합니다. 창작마당 판이라면 타이틀의 창작마당 창에서 켜져 있는지, `BepInEx/plugins`에 SephPlanner DLL이 남아 있지 않은지 봅니다.
 
 **게임 패치 후 인식이 이상해요.** `F9`로 아이템 데이터를 다시 읽습니다.
 
@@ -119,7 +85,7 @@ SephPlanner는 내 화면에만 적용되므로 함께하는 사람은 설치하
 
 SephPlanner는 [MIT 라이선스](LICENSE)로 자유롭게 쓰고 고치고 배포할 수 있습니다.
 
-개발사의 모드 정책에 따라 광고·후원·구독 없이 비영리로 운영합니다. 공유할 때는 파일 대신 [릴리스](https://github.com/nyabi-gh/SephPlanner/releases/latest)나 [창작마당 글](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875) 링크를 전해 주세요.
+개발사의 모드 정책에 따라 광고·후원·구독 없이 비영리로 운영합니다. 공유할 때는 파일 대신 [창작마당 글](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875) 링크를 전해 주세요.
 
 ## 개발 참여
 

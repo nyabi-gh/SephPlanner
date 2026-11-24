@@ -5,8 +5,6 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/nyabi-gh/SephPlanner/releases/latest"><img src="https://img.shields.io/github/v/release/nyabi-gh/SephPlanner?style=flat-square&label=%E6%9C%80%E6%96%B0&color=b9a7f5" alt="最新版本"></a>
-  <a href="https://github.com/nyabi-gh/SephPlanner/releases"><img src="https://img.shields.io/github/downloads/nyabi-gh/SephPlanner/total?style=flat-square&label=%E4%B8%8B%E8%BC%89&color=77d8b0" alt="下載次數"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/%E6%8E%88%E6%AC%8A-MIT-b9a7f5?style=flat-square" alt="授權"></a>
 </p>
 
@@ -14,22 +12,14 @@
 
 ## 下載
 
-下載來源依遊戲版本與使用方式而不同。
+在 [Steam 工作坊](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)訂閱即可。支援遊戲 1.1 以上。
 
-| 遊戲 | 下載 |
-| --- | --- |
-| **遊戲 1.1 以上** | 在 [Steam 工作坊](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)訂閱 |
-| **BepInEx 版**，Windows | [最新版本](https://github.com/nyabi-gh/SephPlanner/releases/latest)中的 `SephPlanner-v<版本>.zip` |
-| **BepInEx 版**，macOS | [最新版本](https://github.com/nyabi-gh/SephPlanner/releases/latest)中的 `SephPlanner-macos-v<版本>.zip` |
-
-ZIP 是內含 BepInEx 的版本。在遊戲 1.1 以上也能執行，而 1.0.33 以下只能使用這個版本。請下載上方的 ZIP，而不是 `Source code`。
+內含 BepInEx 的 ZIP 版已在 0.6.6 停止發布。如果你正在使用 ZIP 版，請依照下方的安裝說明改用工作坊版。
 
 > [!NOTE]
 > 這是由個人製作、與 TEAM HORAY 無關的模組。使用模組須自行承擔風險，重要的存檔請事先備份。
 
 ## 安裝
-
-### 工作坊（遊戲 1.1 以上）
 
 1. 在 [工作坊頁面](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)按下**訂閱**。
 2. 啟動遊戲，在標題畫面的工作坊視窗確認 SephPlanner 已啟用。
@@ -38,30 +28,6 @@ ZIP 是內含 BepInEx 的版本。在遊戲 1.1 以上也能執行，而 1.0.33 
 更新會由 Steam 自動下載。
 
 **如果你之前使用 BepInEx 版（ZIP）**，必須刪除遊戲資料夾 `BepInEx/plugins` 中的 `SephPlanner.Plugin.dll` 與 `SephPlanner.Core.dll`，工作坊版才會啟用。若不刪除，只會執行 BepInEx 版。原本的設定會在第一次啟動工作坊版時匯入。
-
-### ZIP（BepInEx 版）
-
-**Windows**
-
-1. 關閉遊戲，解壓縮 ZIP。
-2. 在 Steam 對《塞菲莉亞》按右鍵 → **管理 → 瀏覽本機檔案**，開啟遊戲資料夾。
-3. 將 `게임 폴더에 복사`（複製到遊戲資料夾）資料夾**裡面的內容**複製到遊戲資料夾。
-4. 啟動遊戲並開始探險，畫面上就會出現 SephPlanner。
-
-**macOS**
-
-1. 關閉遊戲，將 `게임 폴더에 복사`（複製到遊戲資料夾）裡面的內容複製到遊戲資料夾。（放在 `Sephiria.app` 旁邊，而不是裡面。）
-2. 在終端機執行下列指令，並把 `<遊戲資料夾>` 換成實際路徑。
-   ```sh
-   xattr -c "<遊戲資料夾>/libdoorstop.dylib" "<遊戲資料夾>/run_bepinex.sh"
-   chmod +x "<遊戲資料夾>/run_bepinex.sh"
-   ```
-3. 在 Steam 開啟《塞菲莉亞》的 **內容 → 一般 → 啟動選項**，輸入 `"<遊戲資料夾>/run_bepinex.sh" %command%`。
-4. 啟動遊戲。詳細說明請見 [macOS 安裝說明](docs/INSTALL-macos.txt)（韓文）。
-
-ZIP 版會自動更新。有新版本時，啟動遊戲就會通知你，按下 `更新` 後重新啟動遊戲即可套用。
-
-如果你已經因為其他模組而在使用 BepInEx，只要把 ZIP 中 `BepInEx/plugins` 裡的兩個 DLL（`SephPlanner.Plugin.dll`、`SephPlanner.Core.dll`）放到遊戲資料夾的相同位置即可。手動更新時也是覆蓋這兩個檔案。
 
 ## 使用方式
 
@@ -101,7 +67,7 @@ SephPlanner 只會作用在你自己的畫面上，所以一起遊玩的玩家�
 
 ## 常見問題
 
-**看不到面板。** 請確認是否已開始探險、是否用 `F4` 隱藏了面板，以及 `F3` 的 `顯示規劃面板` 是否已開啟。如果是工作坊版，請檢查標題畫面的工作坊視窗中是否已啟用，以及 `BepInEx/plugins` 是否還留有 SephPlanner 的 DLL。如果是 ZIP 版，請檢查兩個 DLL 是否位於 `BepInEx/plugins`。
+**看不到面板。** 請確認是否已開始探險、是否用 `F4` 隱藏了面板，以及 `F3` 的 `顯示規劃面板` 是否已開啟。如果是工作坊版，請檢查標題畫面的工作坊視窗中是否已啟用，以及 `BepInEx/plugins` 是否還留有 SephPlanner 的 DLL。
 
 **遊戲更新後辨識異常。** 按 `F9` 重新讀取物品資料。
 
@@ -119,7 +85,7 @@ SephPlanner 只會作用在你自己的畫面上，所以一起遊玩的玩家�
 
 SephPlanner 採用 [MIT 授權](LICENSE)，可自由使用、修改與散布。
 
-依照開發商的模組政策，本專案以非營利方式經營，沒有廣告、贊助或訂閱。分享時請提供 [發布頁面](https://github.com/nyabi-gh/SephPlanner/releases/latest)或[工作坊頁面](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)的連結，而不是檔案本身。
+依照開發商的模組政策，本專案以非營利方式經營，沒有廣告、贊助或訂閱。分享時請提供 [工作坊頁面](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)的連結，而不是檔案本身。
 
 ## 參與開發
 

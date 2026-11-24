@@ -5,8 +5,6 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/nyabi-gh/SephPlanner/releases/latest"><img src="https://img.shields.io/github/v/release/nyabi-gh/SephPlanner?style=flat-square&label=%E6%9C%80%E6%96%B0&color=b9a7f5" alt="最新リリース"></a>
-  <a href="https://github.com/nyabi-gh/SephPlanner/releases"><img src="https://img.shields.io/github/downloads/nyabi-gh/SephPlanner/total?style=flat-square&label=%E3%83%80%E3%82%A6%E3%83%B3%E3%83%AD%E3%83%BC%E3%83%89&color=77d8b0" alt="ダウンロード"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/%E3%83%A9%E3%82%A4%E3%82%BB%E3%83%B3%E3%82%B9-MIT-b9a7f5?style=flat-square" alt="ライセンス"></a>
 </p>
 
@@ -14,22 +12,14 @@
 
 ## ダウンロード
 
-ゲームのバージョンと使い方によってダウンロード先が異なります。
+[Steamワークショップ](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)でサブスクライブしてください。ゲーム 1.1 以降で動きます。
 
-| ゲーム | ダウンロード |
-| --- | --- |
-| **ゲーム 1.1 以降** | [Steamワークショップ](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)でサブスクライブ |
-| **BepInEx版**、Windows | [最新リリース](https://github.com/nyabi-gh/SephPlanner/releases/latest)の `SephPlanner-v<バージョン>.zip` |
-| **BepInEx版**、macOS | [最新リリース](https://github.com/nyabi-gh/SephPlanner/releases/latest)の `SephPlanner-macos-v<バージョン>.zip` |
-
-ZIPはBepInExが入った版です。ゲーム 1.1 以降でも動き、1.0.33 以前ではこの版だけが使えます。`Source code` ではなく、上のZIPをダウンロードしてください。
+BepInExを同梱したZIP版は0.6.6で配布を終了しました。ZIP版を使っている方は、下のインストール手順に従ってワークショップ版に移行してください。
 
 > [!NOTE]
 > TEAM HORAYとは関係のない個人が作ったMODです。MODの使用は自己責任でお願いします。大切なセーブデータは事前にバックアップしておいてください。
 
 ## インストール
-
-### ワークショップ（ゲーム 1.1 以降）
 
 1. [ワークショップのページ](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875)で**サブスクライブ**を押します。
 2. ゲームを起動し、タイトル画面のワークショップウィンドウでSephPlannerが有効になっているか確認します。
@@ -38,30 +28,6 @@ ZIPはBepInExが入った版です。ゲーム 1.1 以降でも動き、1.0.33 �
 アップデートはSteamが自動でダウンロードします。
 
 **BepInEx版（ZIP）を使っていた方は**、ゲームフォルダの `BepInEx/plugins` から `SephPlanner.Plugin.dll` と `SephPlanner.Core.dll` を削除しないと、ワークショップ版が有効になりません。そのままにするとBepInEx版だけが動きます。使っていた設定は、ワークショップ版を初めて起動したときに引き継がれます。
-
-### ZIP（BepInEx版）
-
-**Windows**
-
-1. ゲームを終了し、ZIPを展開します。
-2. Steamでセフィリアを右クリック → **管理 → ローカルファイルを閲覧** でゲームフォルダを開きます。
-3. `게임 폴더에 복사`（ゲームフォルダにコピー）フォルダの**中身**をゲームフォルダにコピーします。
-4. ゲームを起動して探検を始めると、画面にSephPlannerが表示されます。
-
-**macOS**
-
-1. ゲームを終了し、`게임 폴더에 복사`（ゲームフォルダにコピー）の中身をゲームフォルダにコピーします。（`Sephiria.app` の中ではなく、その隣に置きます。）
-2. ターミナルで次のコマンドを実行します。`<ゲームフォルダ>` は実際のパスに置き換えてください。
-   ```sh
-   xattr -c "<ゲームフォルダ>/libdoorstop.dylib" "<ゲームフォルダ>/run_bepinex.sh"
-   chmod +x "<ゲームフォルダ>/run_bepinex.sh"
-   ```
-3. Steamでセフィリアの **プロパティ → 一般 → 起動オプション** に `"<ゲームフォルダ>/run_bepinex.sh" %command%` と入力します。
-4. ゲームを起動します。詳しくは [macOSインストールガイド](docs/INSTALL-macos.txt)（韓国語）をご覧ください。
-
-ZIP版は自動でアップデートします。新しいバージョンが出るとゲーム起動時にお知らせが表示され、`アップデート` を押してゲームを再起動すると適用されます。
-
-すでに他のMODでBepInExを使っている場合は、ZIPの `BepInEx/plugins` にあるDLL 2つ（`SephPlanner.Plugin.dll`、`SephPlanner.Core.dll`）だけをゲームフォルダの同じ場所に入れれば大丈夫です。手動でアップデートするときも、この2つのファイルを上書きします。
 
 ## 使い方
 
@@ -101,7 +67,7 @@ SephPlannerは自分の画面にだけ反映されるので、一緒に遊ぶ人
 
 ## よくある質問
 
-**パネルが表示されません。** 探検中か、`F4` で隠していないか、`F3` の `プランナー画面を表示` がオンになっているかを確認してください。ワークショップ版なら、タイトル画面のワークショップウィンドウで有効になっているか、`BepInEx/plugins` にSephPlannerのDLLが残っていないかを見てください。ZIP版なら、DLL 2つが `BepInEx/plugins` にあるかを見てください。
+**パネルが表示されません。** 探検中か、`F4` で隠していないか、`F3` の `プランナー画面を表示` がオンになっているかを確認してください。ワークショップ版なら、タイトル画面のワークショップウィンドウで有効になっているか、`BepInEx/plugins` にSephPlannerのDLLが残っていないかを見てください。
 
 **ゲームのアップデート後、認識がおかしくなりました。** `F9` でアイテムデータを再読み込みしてください。
 
@@ -119,7 +85,7 @@ SephPlannerは自分の画面にだけ反映されるので、一緒に遊ぶ人
 
 SephPlannerは [MITライセンス](LICENSE) のもとで、自由に使用・改変・配布できます。
 
-開発元のMODポリシーに従い、広告・寄付・サブスクリプションなしの非営利で運営しています。共有するときは、ファイルではなく [リリース](https://github.com/nyabi-gh/SephPlanner/releases/latest) か [ワークショップのページ](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875) のリンクを伝えてください。
+開発元のMODポリシーに従い、広告・寄付・サブスクリプションなしの非営利で運営しています。共有するときは、ファイルではなく [ワークショップのページ](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875) のリンクを伝えてください。
 
 ## 開発への参加
 

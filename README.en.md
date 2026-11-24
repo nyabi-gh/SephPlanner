@@ -5,8 +5,6 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/nyabi-gh/SephPlanner/releases/latest"><img src="https://img.shields.io/github/v/release/nyabi-gh/SephPlanner?style=flat-square&label=Latest&color=b9a7f5" alt="Latest release"></a>
-  <a href="https://github.com/nyabi-gh/SephPlanner/releases"><img src="https://img.shields.io/github/downloads/nyabi-gh/SephPlanner/total?style=flat-square&label=Downloads&color=77d8b0" alt="Downloads"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-b9a7f5?style=flat-square" alt="License"></a>
 </p>
 
@@ -14,22 +12,14 @@
 
 ## Download
 
-Where to download it depends on your game version and how you want to run it.
+Subscribe on the [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875). It runs on game 1.1 or later.
 
-| Game | Download |
-| --- | --- |
-| **Game 1.1 or later** | Subscribe on the [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875) |
-| **BepInEx version**, Windows | `SephPlanner-v<version>.zip` from the [latest release](https://github.com/nyabi-gh/SephPlanner/releases/latest) |
-| **BepInEx version**, macOS | `SephPlanner-macos-v<version>.zip` from the [latest release](https://github.com/nyabi-gh/SephPlanner/releases/latest) |
-
-The ZIP is the version with BepInEx included. It also runs on game 1.1 or later, and it is the only version that works on 1.0.33 or earlier. Download the ZIP above, not `Source code`.
+The ZIP version with BepInEx included ended with 0.6.6 and gets no further releases. If you use the ZIP version, please move to the Workshop version as described under Installation below.
 
 > [!NOTE]
 > This is a mod made by an individual, not affiliated with TEAM HORAY. You use mods at your own risk, so back up any saves you care about first.
 
 ## Installation
-
-### Workshop (game 1.1 or later)
 
 1. Press **Subscribe** on the [Workshop page](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875).
 2. Launch the game and check that SephPlanner is enabled in the Workshop window on the title screen.
@@ -38,30 +28,6 @@ The ZIP is the version with BepInEx included. It also runs on game 1.1 or later,
 Steam downloads updates automatically.
 
 **If you used the BepInEx version (ZIP),** delete `SephPlanner.Plugin.dll` and `SephPlanner.Core.dll` from `BepInEx/plugins` in the game folder so that the Workshop version can turn on. If you leave them, only the BepInEx version runs. Your settings are carried over the first time you launch the Workshop version.
-
-### ZIP (BepInEx version)
-
-**Windows**
-
-1. Close the game and extract the ZIP.
-2. In Steam, right-click Sephiria → **Manage → Browse local files** to open the game folder.
-3. Copy **the contents of** the `게임 폴더에 복사` (Copy to game folder) folder into the game folder.
-4. Launch the game and start a run; SephPlanner appears on screen.
-
-**macOS**
-
-1. Close the game and copy the contents of `게임 폴더에 복사` (Copy to game folder) into the game folder. (Put them next to `Sephiria.app`, not inside it.)
-2. Run the following in Terminal, replacing `<game folder>` with the actual path.
-   ```sh
-   xattr -c "<game folder>/libdoorstop.dylib" "<game folder>/run_bepinex.sh"
-   chmod +x "<game folder>/run_bepinex.sh"
-   ```
-3. In Steam, open Sephiria's **Properties → General → Launch Options** and enter `"<game folder>/run_bepinex.sh" %command%`.
-4. Launch the game. See the [macOS installation guide](docs/INSTALL-macos.txt) (Korean) for details.
-
-The ZIP version updates itself. When a new version is out, it tells you when you start the game; press `Update` and restart the game to apply it.
-
-If you already use BepInEx for other mods, just put the two DLLs from the ZIP's `BepInEx/plugins` (`SephPlanner.Plugin.dll`, `SephPlanner.Core.dll`) in the same place in your game folder. To update manually, overwrite these two files.
 
 ## How to use
 
@@ -101,7 +67,7 @@ In multiplayer, auto-place is off by default. Get the other players' consent fir
 
 ## FAQ
 
-**I can't see the panel.** Check that you are in a run, that you didn't hide it with `F4`, and that `Show planner` is on in `F3`. For the Workshop version, check that it is enabled in the Workshop window on the title screen and that no SephPlanner DLLs are left in `BepInEx/plugins`. For the ZIP version, check that both DLLs are in `BepInEx/plugins`.
+**I can't see the panel.** Check that you are in a run, that you didn't hide it with `F4`, and that `Show planner` is on in `F3`. For the Workshop version, check that it is enabled in the Workshop window on the title screen and that no SephPlanner DLLs are left in `BepInEx/plugins`.
 
 **Items are recognized wrongly after a game patch.** Press `F9` to reload item data.
 
@@ -119,7 +85,7 @@ In multiplayer, auto-place is off by default. Get the other players' consent fir
 
 SephPlanner is released under the [MIT License](LICENSE), so you are free to use, modify and distribute it.
 
-In line with the developer's modding policy, it is run non-commercially, with no ads, donations or subscriptions. When sharing it, please pass along a link to the [release](https://github.com/nyabi-gh/SephPlanner/releases/latest) or the [Workshop page](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875) instead of the file.
+In line with the developer's modding policy, it is run non-commercially, with no ads, donations or subscriptions. When sharing it, please pass along a link to the [Workshop page](https://steamcommunity.com/sharedfiles/filedetails/?id=3832790875) instead of the file.
 
 ## Contributing
 

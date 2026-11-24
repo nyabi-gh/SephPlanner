@@ -176,6 +176,9 @@ dotnet run --project src/SephPlanner.DataTool -c Release -- --help
 
 ## 배포
 
+**0.6.7 부터 GitHub 릴리스는 내지 않는다.** 공개하면 깔린 BepInEx 판의 업데이트가 없는 ZIP 을 찾다 실패한다([백로그](ROADMAP.md)의
+"GitHub 릴리스 닫기"). 아래는 0.6.6 까지의 절차이고, 스크립트를 고칠 때 함께 고친다.
+
 GitHub 릴리스(BepInEx 판 zip 둘)와 창작마당(위 "창작마당 판")은 따로 올린다. GitHub 릴리스는 이 순서다.
 
 1. **판 번호를 다섯 곳에 적는다.** `Directory.Build.props` 의 `Version`, `BepInExHost/BepInExEntry.cs` 의 `[BepInPlugin]`,
