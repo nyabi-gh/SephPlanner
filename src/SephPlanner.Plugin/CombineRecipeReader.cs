@@ -1,26 +1,17 @@
 using System.Collections.Generic;
-using System.Reflection;
 
 namespace SephPlanner.Plugin
 {
     /// <summary>
     /// 붙여 두면 게임이 합쳐 버리는 배치 보너스 레시피(<c>ArrangementBonusEntity.IsCombine</c>)의 재료.
-    /// 합치기는 1.1.2 에 생겼고 1.0.33 의 <c>ArrangementBonusEntity</c> 에는 <c>combine</c> 필드가 없어 이름으로 읽는다.
     /// </summary>
     internal static class CombineRecipeReader
     {
-        private static readonly FieldInfo Combine =
-            typeof(ArrangementBonusEntity).GetField("combine", BindingFlags.Instance | BindingFlags.Public);
-
-        private static readonly FieldInfo Enabled =
-            typeof(ArrangementBonusEntity).GetField("isEnabled", BindingFlags.Instance | BindingFlags.Public);
-
         private static List<List<int>> _recipes;
 
         public static List<List<int>> Read()
         {
             if (_recipes != null) return Copy(_recipes);
-            if (Combine == null) return _recipes = new List<List<int>>();
 
             var recipes = new List<List<int>>();
             var seen = false;
@@ -28,10 +19,7 @@ namespace SephPlanner.Plugin
             {
                 seen = true;
                 if (bonus == null || bonus.arrangements == null || bonus.arrangements.Length == 0) continue;
-                if (Enabled != null && !(Enabled.GetValue(bonus) is bool enabled && enabled)) continue;
-                var combine = Combine.GetValue(bonus);
-                var result = combine?.GetType().GetField("resultItem", BindingFlags.Instance | BindingFlags.Public)?.GetValue(combine);
-                if (!(result is UnityEngine.Object resultItem) || resultItem == null) continue;
+                if (!bonus.isEnabled || bonus.combine == null || bonus.combine.resultItem == null) continue;
 
                 var materials = new List<int>();
                 foreach (var arrangement in bonus.arrangements)

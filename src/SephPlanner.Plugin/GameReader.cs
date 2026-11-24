@@ -262,10 +262,9 @@ namespace SephPlanner.Plugin
         /// <summary>
         /// 1.1.0 의 개인 합성기(<c>TabletMix_Personal</c>)는 멀티에서 참가자마다 하나씩 생기고, 남의 것은
         /// 상호작용·몸체·충돌이 꺼져 있어 쓸 수 없다(<c>OnStartClient</c>). 그런데도 네트워크 객체로는 우리 쪽에
-        /// 있으므로 거르지 않으면 쓸 수 없는 합성기로 추천을 준비한다. 1.0.33 에 없는 클래스라 이름으로 본다.
+        /// 있으므로 거르지 않으면 쓸 수 없는 합성기로 추천을 준비한다.
         /// </summary>
-        private static bool IsOthersPersonalMixer(TabletMix mixer) =>
-            !mixer.isOwned && ItemCatalog.DerivesFrom(mixer.GetType(), "TabletMix_Personal");
+        private static bool IsOthersPersonalMixer(TabletMix mixer) => !mixer.isOwned && mixer is TabletMix_Personal;
 
         private static RunState ReadRun(PlayerAvatar avatar)
         {
@@ -304,7 +303,7 @@ namespace SephPlanner.Plugin
         /// 달려 있어 Core 가 다시 만들 수 없다. Core 의 <c>ComboCounting.ReportsCategories</c> 와 맞춘다.
         /// </summary>
         private static bool ReportsCategories(Charm_Basic charm) =>
-            charm is Charm_WhitePaper || charm != null && ItemCatalog.DerivesFrom(charm.GetType(), "Charm_Compass");
+            charm is Charm_WhitePaper || charm is Charm_Compass;
 
         private static InventoryState ReadInventory(GridInventory inv)
         {

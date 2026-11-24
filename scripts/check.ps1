@@ -50,21 +50,10 @@ Invoke-DotNet @("build", (Join-Path $root "src/SephPlanner.DataTool/SephPlanner.
 # 밀기 전에 여기서 한 번 세운다.
 Invoke-DotNet @("build", $pluginProject, "-c", "Release", "--no-restore", "-p:DeployToGame=false", "-p:TreatWarningsAsErrors=true") "플러그인 빌드 실패"
 
-# 창작마당 판은 게임 1.1.x 의 Managed 로만 지어진다(WorkshopModBase 가 1.1.0 에 생겼다). 1.0.33 사본으로 돌리면 건너뛰고
-# 그렇다고 알린다. 솔루션에 넣지 않은 것도 같은 까닭이다 - 넣으면 1.0.33 에서 솔루션 포맷 검사가 깨진다.
-$managedDir = (& dotnet msbuild $pluginProject -nologo -getProperty:SephiriaManagedDir).Trim()
-$gameAssembly = Join-Path $managedDir "Assembly-CSharp.dll"
-$workshopGame = (Test-Path $gameAssembly) -and
-    [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($gameAssembly)).Contains("WorkshopModBase")
-if ($workshopGame) {
-    Invoke-DotNet @("restore", $workshopProject, "--locked-mode") "창작마당 판 복원 실패"
-    Invoke-DotNet @("format", $workshopProject, "--verify-no-changes", "--no-restore") "창작마당 판 포맷 검사 실패"
-    Invoke-DotNet @("build", $workshopProject, "-c", "Release", "--no-restore", "-p:TreatWarningsAsErrors=true") "창작마당 판 빌드 실패"
-    $workshopNote = "창작마당 판 빌드까지"
-} else {
-    Write-Host "게임 어셈블리에 창작마당 모드 API 가 없어(1.0.33) 창작마당 판 빌드는 건너뜁니다: $gameAssembly"
-    $workshopNote = "창작마당 판은 건너뜀"
-}
+# 창작마당 판은 솔루션 밖에 있어 위의 복원·포맷 검사에 들지 않는다. 그래서 따로 한 번씩 돈다.
+Invoke-DotNet @("restore", $workshopProject, "--locked-mode") "창작마당 판 복원 실패"
+Invoke-DotNet @("format", $workshopProject, "--verify-no-changes", "--no-restore") "창작마당 판 포맷 검사 실패"
+Invoke-DotNet @("build", $workshopProject, "-c", "Release", "--no-restore", "-p:TreatWarningsAsErrors=true") "창작마당 판 빌드 실패"
 
 Write-Host ""
-Write-Host "검사 통과 - 포맷, 테스트, 그리고 CI 가 못 보는 플러그인 빌드까지($workshopNote)."
+Write-Host "검사 통과 - 포맷, 테스트, 그리고 CI 가 못 보는 플러그인·창작마당 판 빌드까지."
